@@ -234,10 +234,6 @@
   gap: 8px;
 }
 
-.set-pane-actions .set-ai-status {
-  margin-right: 0;
-}
-
 .set-field {
   display: flex;
   align-items: center;
@@ -455,22 +451,6 @@
   font-size: 13px;
 }
 
-/* brand mark in the AI provider dropdown (trigger value + option rows are
-   flex containers from gs-dd); monochrome marks follow the text color */
-.set-provider-logo {
-  flex-shrink: 0;
-  display: inline-flex;
-  width: 16px;
-  height: 16px;
-  margin-right: 8px;
-  color: var(--text-primary);
-}
-
-.set-provider-logo svg {
-  width: 100%;
-  height: 100%;
-}
-
 .set-btn {
   flex-shrink: 0;
   display: inline-flex;
@@ -519,13 +499,6 @@
   color: var(--danger-text);
 }
 
-.set-ai-hub-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
 .set-pane-footer {
   margin-top: auto;
   padding-top: 20px;
@@ -534,8 +507,6 @@
   justify-content: flex-end;
   gap: 8px;
 }
-
-/* ── AI model pane ── */
 
 .set-input {
   flex-shrink: 0;
@@ -575,133 +546,11 @@
   color: var(--text-muted);
 }
 
-.set-ai-note {
-  padding: 8px 0 2px;
-  line-height: 1.5;
-}
-
-/* feedback pill: spinner while testing, green on success/saved, red on failure */
-.set-ai-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  margin-right: auto; /* status hugs the left edge, action buttons stay right */
-  padding: 4px 10px 4px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  background: var(--surface-subtle);
-}
-
-.set-ai-status.ok {
-  color: var(--success);
-  border-color: var(--success-border);
-  background: var(--success-bg);
-}
-
-.set-ai-status.err {
-  color: var(--danger);
-  border-color: var(--danger-border);
-  background: var(--danger-bg);
-}
-
-.set-ai-status-icon {
-  flex-shrink: 0;
-}
-
-.set-ai-status-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.set-ai-spin {
-  flex-shrink: 0;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--border-strong);
-  border-top-color: var(--text-secondary);
-  border-radius: 50%;
-  animation: set-ai-spin 0.8s linear infinite;
-}
-
-@keyframes set-ai-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .set-pane-subtitle {
   margin: 28px 0 4px;
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
-}
-
-.set-pane-subhead {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 28px 0 4px;
-}
-
-/* collapsible media block: the head is the toggle, the chevron says so */
-.set-ai-block-head {
-  cursor: pointer;
-  list-style: none;
-  border-radius: 8px;
-}
-
-.set-ai-block-head::-webkit-details-marker {
-  display: none;
-}
-
-.set-ai-block-head::before {
-  content: '';
-  flex-shrink: 0;
-  width: 6px;
-  height: 6px;
-  margin-inline: 2px 0;
-  border-right: 1.5px solid var(--text-muted);
-  border-bottom: 1.5px solid var(--text-muted);
-  transform: rotate(-45deg);
-  transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1);
-}
-
-[dir='rtl'] .set-ai-block-head::before {
-  transform: rotate(135deg);
-}
-
-.set-ai-block[open] > .set-ai-block-head::before {
-  transform: rotate(45deg);
-}
-
-.set-ai-block-provider {
-  margin-inline-start: auto;
-  font-size: 13px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.set-ai-block-head .set-ai-status {
-  margin-inline: 0;
-}
-
-.set-ai-block:not([open]) > .set-ai-block-head {
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.set-pane-subhead .set-pane-subtitle {
-  margin: 0;
-}
-
-.set-pane-subhead .set-ai-status {
-  margin-right: 0;
-  padding: 2px 8px 2px 6px;
-  font-size: 12px;
 }
 
 /* ── Integrations pane ── */
@@ -1689,20 +1538,7 @@
   }
 }
 
-/* UniWork cloud AI (Settings → Account rows, AI media notice) */
-.cloud-notice {
-  margin-bottom: 12px;
-}
-
-.cloud-notice .acct-notice-text {
-  flex: 1;
-}
-
-.cloud-notice-action {
-  flex-shrink: 0;
-  align-self: center;
-}
-
+/* UniWork cloud AI (Settings → Account rows) */
 .cloud-state.credits-exhausted,
 .cloud-state.subscription-inactive,
 .cloud-state.unavailable {
@@ -1717,18 +1553,6 @@
 .cloud-renews {
   margin-left: 8px;
   font-size: 12px;
-}
-
-/* unsaved-changes prompt pinned to the bottom of the dialog */
-.set-leave {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 22px;
-  border-top: 1px solid var(--border-subtle);
-  background: var(--bg-content);
 }
 
 /* a pane that could not load: the reason and a retry, inline */

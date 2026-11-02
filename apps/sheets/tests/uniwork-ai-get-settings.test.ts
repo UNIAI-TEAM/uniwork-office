@@ -1,16 +1,15 @@
 // @vitest-environment node
 /**
- * No silent fallback (sheets): the standalone sheets get-settings resolves the provider through
- * selectedProvider() only, which keeps a saved `uniwork` while UniWork AI is not offered, and a
- * send with `uniwork` stops at the ai_disabled error before any provider config or call.
- * The handlers sit behind a per-tab session (created by the window code, not reachable from a
- * test), so the wiring is pinned from the source; the resolution itself is pinned on the real
- * selectedProvider() here and in packages/ai-provider tests.
+ * UniWork AI is the only provider (sheets, standalone): get-settings always answers `uniwork` (the
+ * file only holds the cloud-tools opt-out), set-settings writes nothing else, and a send ends in
+ * the ai_disabled error with no provider call. The handlers sit behind a per-tab session (created
+ * by the window code, not reachable from a test), so the wiring is pinned from the source.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import { defaultAiSettings, selectedProvider, setUniworkAiAvailable } from '@genoffice/ai-provider'
+import { describe, expect, it } from 'vitest'
+import { aiSettingsFileOf, defaultAiSettings } from '@genoffice/ai-provider'
+import { aiSettingsInputSchema } from '../src/shared/desktop-api'
 
 const source = readFileSync(join(__dirname, '..', 'src', 'main', 'sheets-main.ts'), 'utf8')
 
@@ -22,39 +21,42 @@ function handlerBody(channel: string): string {
   return source.slice(start, next < 0 ? undefined : next)
 }
 
-describe('sheets AI settings keep uniwork', () => {
-  afterEach(() => setUniworkAiAvailable(false))
-
-  it('selectedProvider keeps a saved uniwork whether or not it is offered', () => {
-    const settings = { ...defaultAiSettings(), provider: 'uniwork' as const }
-    expect(selectedProvider(settings)).toBe('uniwork')
-    setUniworkAiAvailable(true)
-    expect(selectedProvider(settings)).toBe('uniwork')
+describe('sheets AI settings are UniWork AI only', () => {
+  it('the default provider is uniwork and the file shape drops every provider key', () => {
+    expect(defaultAiSettings().provider).toBe('uniwork')
+    expect(
+      aiSettingsFileOf({ provider: 'openai', providers: { openai: { apiKey: 'sk-1' } } }),
+    ).toEqual({ provider: 'uniwork', providers: {} })
   })
 
-  it('get-settings resolves through selectedProvider only (no UniAI substitution)', () => {
+  it('get-settings answers the defaults plus the stored opt-out, never a stored provider', () => {
     const body = handlerBody('IPC_CHANNELS.aiGetSettings')
-    expect(body).toContain('settings.provider = selectedProvider(settings)')
-    expect(body).not.toMatch(/provider = 'genspark'/)
+    expect(body).toContain('aiSettingsFileOf(')
+    expect(body).toContain('...defaultAiSettings()')
+    expect(body).not.toMatch(/resolveAiSettings|selectedProvider/)
   })
 
-  it('a uniwork send ends in ai_disabled before any provider config or request', () => {
+  it('set-settings writes through saveAiSettingsFile only', () => {
+    const body = handlerBody('IPC_CHANNELS.aiSetSettings')
+    expect(body).toMatch(/saveAiSettingsFile\(\s*SETTINGS_PATH\(\)/)
+    expect(body).not.toContain('writeJsonAtomic')
+  })
+
+  it('the renderer request schema takes the UniWork settings and refuses a key-shaped field', () => {
+    const settings = { provider: 'uniwork', providers: {}, gskToolsEnabled: false }
+    expect(aiSettingsInputSchema.safeParse(settings).success).toBe(true)
+    for (const bad of [
+      { ...settings, providers: { openrouter: { apiKey: 'sk-or-1', model: 'm' } } },
+      { ...settings, search: { provider: 'tavily', providers: { tavily: { apiKey: 'tv' } } } },
+      { ...settings, maxOutputTokens: 4096 },
+    ]) {
+      expect(aiSettingsInputSchema.safeParse(bad).success).toBe(false)
+    }
+  })
+
+  it('a send ends in ai_disabled with no provider request', () => {
     const body = handlerBody('IPC_CHANNELS.aiStream')
-    const guard = body.indexOf("provider === 'uniwork'")
-    expect(guard).toBeGreaterThan(-1)
-    expect(body.slice(guard)).toMatch(/^[^]*?uniworkCode: 'ai_disabled'[^]*?return/)
-    // nothing that talks to a provider runs before the guard
-    expect(body.slice(0, guard)).not.toMatch(/streamForProvider|chatForProvider/)
-    expect(body.slice(guard, body.indexOf('return', guard))).not.toMatch(/streamForProvider/)
-  })
-
-  it('the panel send entry (presets, retry, queue, selection ask all land in handleSend) stops on the model-need hint', () => {
-    // App.tsx cannot be mounted in a unit test; the one shared entry is pinned from the source
-    const app = readFileSync(join(__dirname, '..', 'src', 'renderer', 'App.tsx'), 'utf8')
-    expect(app).toMatch(/const needModelHint = useAiModelNeedHint\(\)/)
-    const start = app.indexOf('  function handleSend(')
-    expect(start).toBeGreaterThan(-1)
-    const body = app.slice(start, app.indexOf('runToolsRef.current = []', start))
-    expect(body).toMatch(/needModelHint !== null/)
+    expect(body).toContain("uniworkCode: 'ai_disabled'")
+    expect(body).not.toMatch(/streamForProvider|chatForProvider/)
   })
 })

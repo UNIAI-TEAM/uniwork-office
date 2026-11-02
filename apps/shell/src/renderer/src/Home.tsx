@@ -17,7 +17,6 @@ import type {
   RecentEntry,
   FileSearchHit,
   FileSearchPage,
-  FileSearchRerank,
   UniworkDocSummary,
   UniworkResult,
   UniworkWorkspaceRef,
@@ -38,7 +37,6 @@ import type { DocRowExtra, DocSubline } from './doclist/DocRow'
 import { readSort, writeSort } from './doclist/persist'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
-import { CreditWallet } from './CreditWallet'
 import type { SettingsSectionId, SettingsTarget } from './SettingsModal'
 import { AccountEntry } from './AccountEntry'
 import { showsProfile, viewOf, type AccountView } from './account-model'
@@ -1091,18 +1089,16 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
   )
 }
 
-// ── Sidebar footer: one dock — AI credits, then account + Settings ─────
+// ── Sidebar footer: one dock — account + Settings ─────
 // The UniWork account entry (AccountEntry.tsx) starts the browser sign-in or
 // opens Settings → Account; the gear beside it opens Settings → General.
 
 function SidebarFooter({
   onStatusChange,
-  onFileSearchSettingsChange,
   openRequest,
 }: {
   onStatusChange?: (status: AccountStatus | null) => void
-  onFileSearchSettingsChange?: () => void
-  /** a fresh object per request: the home list asks to open the modal on a given block */
+  /** a fresh object per request: the home list asks to open the modal on a given section */
   openRequest?: SettingsTarget | null
 }) {
   const { t } = useI18n()
@@ -1153,7 +1149,6 @@ function SidebarFooter({
   return (
     <div className="sidebar-footer">
       <div className="sidebar-dock">
-        <CreditWallet onOpenAiSettings={() => openSettings('aiModel')} />
         <div className="sidebar-dock-me">
           <AccountEntry
             onStatusChange={onStatusChange}
@@ -1163,7 +1158,6 @@ function SidebarFooter({
             onCloseSettings={() => setSettingsOpen(false)}
             skillUpdate={skillUpdate}
             onSkillUpdateDue={setSkillUpdate}
-            onFileSearchSettingsChange={onFileSearchSettingsChange}
             target={target}
           />
           <button
@@ -1360,9 +1354,6 @@ export function Home() {
   // ── File search (names + indexed content); active while the box has text ──
   const [searchQuery, setSearchQuery] = useState('')
   const [searchPage, setSearchPage] = useState<FileSearchPage | null>(null)
-  const [rerank, setRerank] = useState<{ key: string; result: FileSearchRerank } | null>(null)
-  // bumped when the Jev settings change so the current results are judged again (or the order dropped)
-  const [rerankSettingsTick, setRerankSettingsTick] = useState(0)
   const [settingsRequest, setSettingsRequest] = useState<SettingsTarget | null>(null)
   useEffect(
     () =>
@@ -1513,7 +1504,7 @@ export function Home() {
 
   // UNI-2079: a notice names a document's Share section or its Trash row. The Documents home does
   // the work (documents-intent-bus); this host brings it on screen: the Documents area, out of
-  // the Workbench / My AI, in the intent's workspace. It waits for the account and workspace
+  // the Workbench / Ask UNI, in the intent's workspace. It waits for the account and workspace
   // list on a cold start, and drops an intent for a workspace the person is not in.
   const [docsRoute, setDocsRoute] = useState<DocumentsIntent | null>(null)
   useEffect(() => onDocumentsIntentRoute(setDocsRoute), [])
@@ -1555,34 +1546,13 @@ export function Home() {
     setRowMenu(null)
   }
 
-  // Ctrl/Cmd+J asks for My AI in Ask UNI mode; NewChatPane applies and consumes the request
+  // Ctrl/Cmd+J asks for Ask UNI; NewChatPane focuses its composer and consumes the request
   const askOpenRequest = useAskUniOpenRequest()
   useEffect(() => {
     if (askOpenRequest && !chatMode) goNewChat()
     // goNewChat only sets state, so the request alone drives this
   }, [askOpenRequest, chatMode])
 
-  useEffect(() => {
-    const openMyAi = () => goNewChat()
-    const onSummarize = () => {
-      goNewChat()
-      window.setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent('uniwork:my-ai-submit', {
-            detail: {
-              text: 'Tóm tắt ngữ cảnh Workbench hôm nay: việc mở, lịch, ghi chú gần đây',
-            },
-          }),
-        )
-      }, 80)
-    }
-    window.addEventListener('uniwork:open-my-ai', openMyAi)
-    window.addEventListener('uniwork:agent-summarize', onSummarize)
-    return () => {
-      window.removeEventListener('uniwork:open-my-ai', openMyAi)
-      window.removeEventListener('uniwork:agent-summarize', onSummarize)
-    }
-  }, [])
   const [greetAskKey] = useState(
     () => GREET_ASK_KEYS[Math.floor(Math.random() * GREET_ASK_KEYS.length)]!,
   )
@@ -1820,25 +1790,6 @@ export function Home() {
     timer = window.setTimeout(run, 150)
     return () => window.clearTimeout(timer)
   }, [q, filter])
-
-  // Jev judges the top local hits once they settle; the main process answers null when reranking is off.
-  // The key changes only with the query, filter or candidate set, so index polls do not restart the timer.
-  const rerankKey =
-    q && searchPage && searchPage.hits.length >= 2
-      ? [q, filter, ...searchPage.hits.slice(0, 20).map((h) => h.path)].join('\n')
-      : ''
-  useEffect(() => {
-    if (!rerankKey) return
-    const key = rerankKey
-    const paths = key.split('\n').slice(2)
-    const timer = window.setTimeout(() => {
-      void window.aiOffice.rerankSearch({ q, paths }).then((result) => {
-        if (result) setRerank({ key, result })
-        else setRerank((cur) => (cur && cur.key === key ? null : cur))
-      })
-    }, 600)
-    return () => window.clearTimeout(timer)
-  }, [q, filter, rerankKey, rerankSettingsTick])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -3048,30 +2999,6 @@ export function Home() {
     searchInputRef.current?.focus()
   }
 
-  const renderSearchSettingsButton = () => (
-    <button
-      className="file-search-settings"
-      title={t('searchJevSettings')}
-      aria-label={t('searchJevSettings')}
-      onClick={() => setSettingsRequest({ section: 'aiMedia', block: 'rerank' })}
-    >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M12 20V4M12 4l-4 4M12 4l4 4" />
-        <path d="M3 12h6M3 16h5M3 20h4" />
-      </svg>
-    </button>
-  )
-
   const renderSearchBox = () => (
     <div className={`file-search${searchActive ? ' active' : ''}`}>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -3215,29 +3142,15 @@ export function Home() {
         )}
         {page && page.hits.length === 0 && !busy
           ? renderEmpty(t('searchNoResults', { q }))
-          : page && renderSearchHits(orderedSearchHits(page.hits))}
+          : page && renderSearchHits(page.hits)}
       </div>
     )
-  }
-
-  const rerankApplied = rerank && rerank.key === rerankKey ? rerank.result : null
-
-  /** judged hits in Jev's order, then the rest in local order */
-  const orderedSearchHits = (hits: readonly FileSearchHit[]): FileSearchHit[] => {
-    if (!rerankApplied) return [...hits]
-    const rank = new Map(rerankApplied.order.map((path, i) => [path, i]))
-    return [...hits].sort((a, b) => (rank.get(a.path) ?? Infinity) - (rank.get(b.path) ?? Infinity))
   }
 
   const renderSearchHeading = () => {
     const total = searchPage?.total ?? 0
     return (
       <div className="recents-heading">
-        {rerankApplied && (
-          <span className="search-rerank-badge" title={t('searchRerankedBy')}>
-            Jev
-          </span>
-        )}
         <span className="file-count">
           {t(total === 1 ? 'searchResultCountOne' : 'searchResultCount', { n: total })}
         </span>
@@ -3296,10 +3209,7 @@ export function Home() {
                 ))}
               </div>
             )}
-            <div className="file-search-group">
-              {renderSearchBox()}
-              {renderSearchSettingsButton()}
-            </div>
+            <div className="file-search-group">{renderSearchBox()}</div>
             {searchActive ? (
               renderSearchHeading()
             ) : (
@@ -3439,10 +3349,7 @@ export function Home() {
                 )}
               </div>
             )}
-            <div className="file-search-group">
-              {renderSearchBox()}
-              {renderSearchSettingsButton()}
-            </div>
+            <div className="file-search-group">{renderSearchBox()}</div>
             {searchActive ? (
               renderSearchHeading()
             ) : (
@@ -3660,7 +3567,7 @@ export function Home() {
   const activeUwSubView: DocumentsHomeSubViewId = activeUwWorkspaceId
     ? (uniworkSubViewByWs[activeUwWorkspaceId] ?? 'workspace')
     : 'workspace'
-  // the sidebar slot stays up under My AI / Workbench; only the main pane yields to them
+  // the sidebar slot stays up under Ask UNI / Workbench; only the main pane yields to them
   const showUniworkPane = area === 'uniwork' && !selectedProjectId && isSignedIn
   const uniworkPaneReady =
     showUniworkPane &&
@@ -3708,13 +3615,7 @@ export function Home() {
                 strokeLinecap="round"
               />
             </svg>
-            <span className="nav-label">
-              {lang === 'vi'
-                ? 'Trợ lý của bạn'
-                : lang === 'zh' || lang === 'zh-TW'
-                  ? '我的 AI'
-                  : 'My AI'}
-            </span>
+            <span className="nav-label">{t('askUniTitle')}</span>
           </button>
           {projectMode && (
             <button
@@ -3814,11 +3715,7 @@ export function Home() {
           )}
         </div>
 
-        <SidebarFooter
-          onStatusChange={handleAccountStatus}
-          onFileSearchSettingsChange={() => setRerankSettingsTick((n) => n + 1)}
-          openRequest={settingsRequest}
-        />
+        <SidebarFooter onStatusChange={handleAccountStatus} openRequest={settingsRequest} />
       </aside>
 
       {selectedProjectId ? (
@@ -3843,15 +3740,7 @@ export function Home() {
           accountName={accountName}
         />
       ) : chatMode ? (
-        <NewChatPane
-          practiceId={activePracticeId}
-          ensureWorkbench={() => {
-            setEduMode(true)
-            setChatMode(false)
-            setSelectedProjectId(null)
-            setSelectedFolder(null)
-          }}
-        />
+        <NewChatPane />
       ) : area === 'uniwork' ? (
         uniworkPaneReady ? null : acctView === 'loading' ? (
           <main className="content">
@@ -3889,7 +3778,7 @@ export function Home() {
         renderGlobalContent()
       )}
 
-      {/* stays mounted (main pane hidden) under My AI / Workbench so the portalled sidebar nav and its loaded lists survive */}
+      {/* stays mounted (main pane hidden) under Ask UNI / Workbench so the portalled sidebar nav and its loaded lists survive */}
       {uniworkPaneReady && uwWsState.workspaces && activeUwWorkspaceId && (
         <main className="content home-uw-pane" hidden={chatMode || eduMode}>
           <DocumentsHome

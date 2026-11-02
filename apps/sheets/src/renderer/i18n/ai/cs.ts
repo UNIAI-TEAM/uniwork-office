@@ -61,8 +61,6 @@ export const cs = {
   aiOverloadedError: 'Služba AI je právě zaneprázdněná — zkuste to prosím za chvíli znovu',
   aiNetworkError:
     'Problém se sítí: službu AI se nepodařilo kontaktovat. Zkontrolujte připojení a zkuste to znovu',
-  aiCreditsExhausted:
-    'Vaše kredity UniWork jsou vyčerpány. Dobijte je na uniworkos.com/pricing a zkuste to znovu',
   aiToolWorkbookContext: 'Načtení informací o sešitu',
   aiToolReadRange: 'Načtení oblasti',
   aiToolReadRangeOf: 'Načtení oblasti {range}',

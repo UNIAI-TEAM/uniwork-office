@@ -5,8 +5,8 @@ export const ko = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: '크레딧 {limit} 중 {remaining} 남음',
   aiUniworkFooterSignIn: 'UniWork AI를 사용하려면 UniWork에 로그인하세요',
-  aiUniworkSignedOut: 'UniWork에서 로그아웃되었습니다. 다른 제공자를 선택하거나 다시 로그인하세요.',
-  aiUniworkOff: '이 문서에서는 UniWork AI가 꺼져 있습니다. 다른 제공자를 선택하세요.',
+  aiUniworkSignedOut: 'UniWork에서 로그아웃되었습니다. 다시 로그인하세요.',
+  aiUniworkOff: '이 문서에서는 UniWork AI가 꺼져 있습니다.',
   aiUniworkViewOnly: '보기 전용: AI가 답변할 수는 있지만 문서를 편집하거나 저장할 수는 없습니다.',
 
   // S8 disclosure
@@ -36,7 +36,6 @@ export const ko = {
     '중지했습니다. 이미 적용된 변경 사항(있는 경우)은 문서에 남아 있으며 실행 취소할 수 있습니다.',
   aiRunRetry: '다시 시도',
   aiRunAskAgain: '다시 질문',
-  aiRunChooseOther: '다른 제공자 선택',
   aiRunOpenInApp: '앱에서 열기',
   aiConversationRestarted:
     '이전 대화가 만료되어 UniWork AI가 새 대화를 시작했으며 이전 내용은 기억하지 않습니다. 계속하려면 질문을 다시 보내세요.',
@@ -76,7 +75,7 @@ export const ko = {
   cloudCreditsLeft: '{remaining} / {limit} 남음',
   cloudCreditsUnlimited: '무제한',
   cloudInactiveBody:
-    '조직의 UniWork 구독이 활성 상태가 아니어서 클라우드 AI가 일시 중지되었습니다. 관리자에게 갱신을 요청하세요. 아래의 자체 공급자는 계속 작동합니다.',
+    '조직의 UniWork 구독이 활성 상태가 아니어서 클라우드 AI가 일시 중지되었습니다. 관리자에게 갱신을 요청하세요.',
   acctSignIn: '로그인',
   acctSignInAgain: '다시 로그인',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -89,7 +88,7 @@ export const ko = {
     '이 통합 문서는 너무 커서 웹에서 AI를 사용할 수 없습니다. UniWork Office 앱에서 여세요.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    '조직의 요금제에 UniWork AI가 포함되어 있지 않습니다. 조직 관리자에게 요금제를 문의하거나 설정 > AI 모델에서 직접 AI 키를 추가하세요.',
+    '조직의 요금제에 UniWork AI가 포함되어 있지 않습니다. 조직 관리자에게 요금제를 문의하세요.',
   credits_exhausted:
-    '조직에서 이번 기간의 AI 크레딧을 모두 사용했습니다. 조직 관리자에게 크레딧 추가를 요청하거나 설정 > AI 모델에서 직접 AI 키를 추가하세요.',
+    '조직에서 이번 기간의 AI 크레딧을 모두 사용했습니다. 조직 관리자에게 크레딧 추가를 요청하세요.',
 } satisfies Record<keyof typeof zh, string>

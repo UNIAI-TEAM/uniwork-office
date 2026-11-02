@@ -769,6 +769,9 @@ export interface ToolExecution {
   display?: ToolDisplay
 }
 
+/** write_document's refusal where no writer reaches the UniWork AI writer route */
+export const WRITER_UNAVAILABLE = 'document writing is not available here'
+
 const fail = (summary: string, output: string): ToolExecution => ({
   output,
   isError: true,
@@ -1376,7 +1379,7 @@ async function writeDocument(
   const summary = t('aiSumWriteDocument')
   const plan = String(call.input.plan ?? '').trim()
   if (!plan) return fail(summary, 'plan must not be empty')
-  if (!writer) return fail(summary, 'document writing is not available here')
+  if (!writer) return fail(summary, WRITER_UNAVAILABLE)
   const count = editor.state.doc.childCount
   const afterRaw = call.input.afterBlockIndex
   let position: WritePosition

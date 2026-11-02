@@ -117,8 +117,6 @@ export const hi = {
   aiErrOverloaded: 'AI सेवा अभी व्यस्त है — कृपया थोड़ी देर बाद फिर से प्रयास करें',
   aiErrNetwork:
     'नेटवर्क समस्या: AI सेवा से कनेक्ट नहीं हो सका। कनेक्शन जांचें और फिर से प्रयास करें',
-  aiCreditsExhausted:
-    'आपके UniWork क्रेडिट समाप्त हो गए हैं। uniworkos.com/pricing पर रिचार्ज करें और फिर से प्रयास करें',
   aiErrRequestFailed: 'अनुरोध भेजने में विफल: {msg}',
   aiErrGenerateFailed: 'जनरेशन विफल',
   aiErrRegenFailed: 'स्लाइड फिर से बनाने में विफल',

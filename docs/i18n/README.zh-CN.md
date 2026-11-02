@@ -44,10 +44,7 @@ PDF、Markdown 和 HTML，并在每份文档旁边配备一个 AI 智能体 —�
   仍然可以随意编辑。
 - **本地优先的设计。** 文件的打开、编辑、保存和转换都在你的电脑上完成。
   PDF → Word / Excel / PowerPoint、Markdown → Word、HTML → Word 全部在本机运行。
-  只有 AI 调用会发送到你选择的服务商。
-- **用自己的密钥，或者不用密钥。** 登录 Genspark 即可免配置使用；也可以自带
-  Claude、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、Doubao、MiniMax、Grok、
-  Mistral、OpenRouter、Requesty 的密钥，或任何 OpenAI 兼容端点，包括本地模型服务。
+  只有 AI 调用会发送到 UniWork AI。
 - **可脚本化，随时可供智能体调用。** 应用自带 `genoffice` 命令行和一份面向
   Claude Code、Codex、Cursor、Gemini CLI、GitHub Copilot、OpenCode 和 Windsurf
   的 agent skill，让编程智能体无需打开任何窗口，就能在你的电脑上创建、转换、
@@ -173,7 +170,7 @@ Claude Code、Codex、Cursor、Gemini CLI、GitHub Copilot、OpenCode 或 Windsu
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="GenOffice 设置的「集成」页面：genoffice skill 已安装到 Claude Code，Codex 和 Cursor 旁边显示着「安装」按钮"></td>
 </tr>
 <tr>
-<td><b>给智能体一句提示词</b> —— “制作一份关于太阳系的八页演示文稿。”智能体读取 skill，依次写出样式表、大纲和每页一份的页面规格，用 <code>genoffice image</code> 生成两张图片，再由 <code>genoffice slides check</code> 拦下所有溢出或重叠的内容，最后由 <code>genoffice create</code> 组装出 <code>.pptx</code>，并用 <code>slides render</code> 为每一页交回一张 PNG 供查看。</td>
+<td><b>给智能体一句提示词</b> —— “制作一份关于太阳系的八页演示文稿。”智能体读取 skill，依次写出样式表、大纲和每页一份的页面规格，再由 <code>genoffice slides check</code> 拦下所有溢出或重叠的内容，最后由 <code>genoffice create</code> 组装出 <code>.pptx</code>，并用 <code>slides render</code> 为每一页交回一张 PNG 供查看。</td>
 <td><b>在设置 → 集成中一次安装</b> —— GenOffice 会列出在这台电脑上找到的编程智能体，并把 skill 写入你选中的每一个。也可以把 skill 下载为 zip 压缩包，或运行 <code>npx skills add genspark-ai/genoffice</code>。命令和完整工作流见<a href="#command-line-and-agent-skill">命令行与 agent skill</a>。</td>
 </tr>
 </table>
@@ -186,15 +183,11 @@ Cursor 及任何其他 MCP 客户端都能自行启动 `genoffice mcp`，无需�
 应用内置的第二个 HTTP 服务器，还能让智能体在一个可见的编辑器标签页中构建
 Word 文档，供你实时查看。
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Claude Code 通过 genoffice MCP 服务器构建一份八页可再生能源投资简报的过程延时：它会搜索图表和照片，并用 media 检查每一张候选图片，deck_start 写入样式表和大纲，deck_page 逐页添加经过检查的页面，deck_build 组装出 .pptx，slides_render 返回每一页的图片；最终这份演示文稿会在 GenOffice Slides 中打开" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides 中显示 Claude Code 通过 genoffice MCP 服务器构建的八页可再生能源 2026 演示文稿：画布上是带有风电场照片的封面页，左侧是八张缩略图"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice 设置的「集成」页面，MCP 部分：Claude Code 对应的一行 claude mcp add 命令，Cursor、Claude Desktop 及其他 MCP 客户端对应的 JSON 代码块，以及下方的本地 HTTP 服务器选项"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice 设置的「集成」页面，MCP 部分：Claude Code 对应的一行 claude mcp add 命令，Cursor、Claude Desktop 及其他 MCP 客户端对应的 JSON 代码块，以及下方的本地 HTTP 服务器选项"></td>
 </tr>
 <tr>
-<td><b>一句提示词，三十八次工具调用，不用终端</b> —— “制作一份关于 2026 年可再生能源的八页投资简报，封面和其他合适的地方都配上真实照片。”智能体先用 <code>search</code> 搜集图表和照片，再用 <code>media</code> 确认每一张候选图片是不是真实照片，然后带着样式表和大纲调用 <code>deck_start</code>，接着逐页调用 <code>deck_page</code>；每一页都会先对照大纲和配色方案检查过关才会被保留，接着 <code>deck_build</code> 组装出 <code>.pptx</code>，<code>slides_audit</code> 检查是否溢出，<code>slides_render</code> 为每一页交回一张供模型查看的 PNG 图片内容，最后 <code>deck_replace</code> 修复了它不满意的三页。</td>
 <td><b>在设置 → 集成中连接一次即可</b> —— 复制 Claude Code 的 <code>claude mcp add</code> 命令行，或把 JSON 代码块粘贴进 Cursor、Claude Desktop 或任何其他 MCP 客户端。选项 B 会开启本地 HTTP 服务器，用于可见的 Word 编辑器。两者都在<a href="#mcp-server">MCP 服务器</a>中有详细说明。</td>
 </tr>
 </table>
@@ -208,8 +201,6 @@ Word 文档，供你实时查看。
   的部分原样复制。
 - **直接编辑文档的 AI。** Docs 中的修订痕迹、Sheets 中实时生效的公式和图表、直接
   在画布上生成的幻灯片，每一次 AI 操作都会留下可回滚的快照。
-- **自带模型，自带密钥。** 使用 Genspark 登录，或带上 Claude、OpenAI、Gemini、
-  DeepSeek 等的密钥，同样支持本地服务器和任意 OpenAI 兼容端点。
 - **认真做好 PDF。** 在页面内直接编辑文字，本机将 PDF 转换为 Word、Excel 或
   PowerPoint，扫描件支持系统 OCR。
 - **同样支持 Markdown 和 HTML**，共用同一个 AI 面板，并可本机导出为 Word。
@@ -217,19 +208,6 @@ Word 文档，供你实时查看。
   为 Claude Code、Claude Desktop、Codex、Cursor 及其他智能体所用，且仍然在本机
   运行。
 - **免费**，个人和团队皆可使用。
-
-## AI 后端
-
-**登录 Genspark**，无需任何配置：模型调用通过 Genspark 代理路由（Claude、GPT
-和 Gemini 系列），智能体同时获得网页与图片搜索、图片生成，以及图片/音频/视频
-解析能力。
-
-**或者自带密钥。** 设置 → AI 中列出了 Claude、OpenAI、Gemini、DeepSeek、Kimi、
-GLM、Qwen、Doubao、MiniMax、Grok、Mistral、OpenRouter、Requesty 和 OpenCode Zen/Go，另有
-一个自定义槽位可接入任何 OpenAI 兼容端点（Base URL + 密钥），包括本地模型服务。
-搜索和媒体能力在 **AI 媒体与搜索** 下按能力分别配置服务商：网页搜索可选 Serper
-或 Tavily；图片生成和图片/视频解析可选 OpenAI、Gemini、Doubao/Seedream、GLM、
-Grok、Qwen、MiniMax 或任何 OpenAI 兼容的图片端点。
 
 整个套件提供浅色、深色和跟随系统三种主题。主题只改变屏幕上的显示：导出、打印
 和保存的文件始终保留文档自身的颜色。
@@ -283,9 +261,8 @@ genoffice open sales.xlsx                          # hand the result to the edit
 检查：
 
 ```bash
-genoffice capabilities --json                        # which cloud tools GenOffice has configured
+genoffice capabilities --json                        # whether the app is installed
 genoffice guide slides design                        # the deck workflow and layout library
-genoffice image "the eight planets in a row …" --aspect 16:9 --out deck/assets/cover.jpg
 genoffice slides check deck/outline.json --json      # 8 pages, no findings
 genoffice slides check deck/pages/01.json --json     # builds one slide, audits overflow and overlap
 …                                                    # one page file per slide, fixed until each check is clean
@@ -307,10 +284,10 @@ genoffice open deck/solar-system.pptx
 的形式提供，供那些无法运行终端、或者你不想给它终端权限的助手使用。接入方式
 有两种，**设置 → 集成 → MCP** 中都提供了可直接复制的代码片段：
 
-| 方式                            | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A · `genoffice mcp`**（推荐） | 一个由助手自行启动的 stdio 服务器，GenOffice 无需处于打开状态。每条命令对应一个工具（`info`、`convert`、`create_docx`、`create_xlsx`、`create_pptx`、`create_pdf`、`docs_read` / `docs_apply` / `docs_check`、`sheet_*`、`slides_*`、`render`、`guide`、`search`、`image`、`media`、`open`），再加上分阶段的幻灯片构建流程 `deck_start` → `deck_page` → `deck_build` → `deck_replace`。Ops、spec 和 Markdown 都以内联方式传入，因此没有文件系统的客户端同样可以正常工作。 |
-| **B · 本地 HTTP 服务器**        | 运行在 GenOffice 应用内部，地址为 `http://127.0.0.1:3093/mcp`（Streamable HTTP，兼容旧版 SSE）。它的工具驱动一个可见的 Word 编辑器标签页：`create_session`、`insert_content`、`replace_blocks`、`apply_ops`、`read_document`、`save_session`，你可以实时看着文档成形。默认关闭；在同一个设置面板中开启。                                                                                                                                                                  |
+| 方式                            | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A · `genoffice mcp`**（推荐） | 一个由助手自行启动的 stdio 服务器，GenOffice 无需处于打开状态。每条命令对应一个工具（`info`、`convert`、`create_docx`、`create_xlsx`、`create_pptx`、`create_pdf`、`docs_read` / `docs_apply` / `docs_check`、`sheet_*`、`slides_*`、`render`、`guide`、`open`），再加上分阶段的幻灯片构建流程 `deck_start` → `deck_page` → `deck_build` → `deck_replace`。Ops、spec 和 Markdown 都以内联方式传入，因此没有文件系统的客户端同样可以正常工作。 |
+| **B · 本地 HTTP 服务器**        | 运行在 GenOffice 应用内部，地址为 `http://127.0.0.1:3093/mcp`（Streamable HTTP，兼容旧版 SSE）。它的工具驱动一个可见的 Word 编辑器标签页：`create_session`、`insert_content`、`replace_blocks`、`apply_ops`、`read_document`、`save_session`，你可以实时看着文档成形。默认关闭；在同一个设置面板中开启。                                                                                                                                      |
 
 ```bash
 # Claude Code
@@ -326,29 +303,7 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 `/Applications/GenOffice.app/Contents/Resources/cli/genoffice`；设置面板会
 打印出你本机安装的确切路径）。这个服务器自带工作流说明，并把操作参考文档以
 `genoffice://guide/*` 资源的形式暴露出来，因此不需要额外的 skill；skill 和
-MCP 服务器可以共存，由助手自行选择使用哪一个。云端能力（`search`、`image`、
-`media`）仍然经由 GenOffice 中配置的服务商完成；其余一切都在本机运行，
-`GENOFFICE_ALLOWED_ROOTS` 会把每个工具都限制在你列出的文件夹之内。
-
-上方演示中的可再生能源演示文稿，就是仅接入 `genoffice` MCP 服务器时，
-Claude Code 里一句提示词从协议层面呈现出的样子：
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-三十八次调用，大约十三分钟，助手全程没有碰过终端：图表、照片、指南、检查和渲染结果都是作为 MCP 工具结果传递的。只有 `search` 和 `media` 离开过本机，发往 GenOffice 中配置的服务商。
+MCP 服务器可以共存，由助手自行选择使用哪一个。`GENOFFICE_ALLOWED_ROOTS` 会把每个工具都限制在你列出的文件夹之内。
 
 <a id="download"></a>
 
@@ -463,8 +418,7 @@ GenOffice 正在积极开发中，你的反馈决定它的走向。
 <summary><b>GenOffice 可以离线使用吗？</b></summary>
 
 文档编辑完全在本地进行 —— 打开、编辑、保存和转换文件都不需要把文件发送到任何
-地方。AI 功能（智能体、搜索、图片工具）需要网络连接，并且需要登录 Genspark 或
-提供你自己的模型 API 密钥。
+地方。AI 功能（智能体、搜索、图片工具）需要网络连接和 UniWork 账户。
 
 </details>
 
@@ -482,16 +436,6 @@ GenOffice 正在积极开发中，你的反馈决定它的走向。
 可以 —— 完全在本机完成：PDFium 字符级提取加上基于几何的版面分析，不依赖云
 服务，不上传。扫描页同样支持：在 macOS 和 Windows 上由系统 OCR 识别，转换结果
 是可编辑的文字，而不是一张页面图片。
-
-</details>
-
-<details>
-<summary><b>我可以使用自己的 AI 模型或 API 密钥吗？</b></summary>
-
-可以。除了免密钥的 Genspark 登录，GenOffice 还支持自带 Claude、OpenAI、Gemini、
-DeepSeek、Kimi、GLM、Qwen、Doubao、MiniMax、Grok、Mistral、OpenRouter、Requesty 和
-OpenCode Zen/Go 的密钥，以及任何 OpenAI 兼容端点 —— 包括本地模型服务。搜索、
-图片生成和图片/视频解析在 设置 → AI 媒体与搜索 下使用各自的密钥。
 
 </details>
 

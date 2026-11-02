@@ -25,13 +25,12 @@ afterEach(() => {
 
 const handlers = () => ({
   onRetry: vi.fn(),
-  onChooseProvider: vi.fn(),
   onSignIn: vi.fn(),
   onAskAgain: vi.fn(),
   onOpenInApp: vi.fn(),
 })
 
-const chipFor = (error: string) => resultChip({ provider: 'uniwork', error })
+const chipFor = (error: string) => resultChip({ error })
 const render = (props: Parameters<typeof AiErrorAction>[0]) =>
   act(() => root.render(createElement(AiErrorAction, props)))
 const button = () => host.querySelector('button')
@@ -41,9 +40,6 @@ describe('AiErrorAction', () => {
     ['aiErrUnavailable', 'aiRunRetry', 'onRetry'],
     ['aiErrDisconnected', 'aiRunRetry', 'onRetry'],
     ['aiErrRateLimitedNoWait', 'aiRunRetry', 'onRetry'],
-    ['aiErrCredits', 'aiRunChooseOther', 'onChooseProvider'],
-    ['aiErrEntitlement', 'aiRunChooseOther', 'onChooseProvider'],
-    ['aiErrCapabilityOff', 'aiRunChooseOther', 'onChooseProvider'],
     ['aiErrSession', 'acctSignInAgain', 'onSignIn'],
     ['aiErrRunLimit', 'aiRunAskAgain', 'onAskAgain'],
     ['aiErrWorkbookTooLarge', 'aiRunOpenInApp', 'onOpenInApp'],
@@ -59,15 +55,21 @@ describe('AiErrorAction', () => {
       if (name !== handler) expect(fn).not.toHaveBeenCalled()
   })
 
-  it('vi labels read Thử lại / Chọn nhà cung cấp khác / Đăng nhập lại / Hỏi tiếp', () => {
+  it('vi labels read Thử lại / Đăng nhập lại / Hỏi tiếp', () => {
     const labelOf = (error: string) => {
       render({ chip: chipFor(error), lang: 'vi', ...handlers() })
       return button()?.textContent
     }
     expect(labelOf('aiErrUnavailable')).toBe('Thử lại')
-    expect(labelOf('aiErrCredits')).toBe('Chọn nhà cung cấp khác')
     expect(labelOf('aiErrSession')).toBe('Đăng nhập lại')
     expect(labelOf('aiErrRunLimit')).toBe('Hỏi tiếp')
+  })
+
+  it('renders nothing for a plan state: there is no other provider to choose (UNI-2309)', () => {
+    for (const error of ['aiErrCredits', 'aiErrEntitlement', 'aiErrCapabilityOff']) {
+      render({ chip: chipFor(error), lang: 'vi', ...handlers() })
+      expect(host.querySelector('button'), error).toBeNull()
+    }
   })
 
   it('renders nothing for a generic error, an offline error and a non-error chip', () => {
@@ -75,7 +77,7 @@ describe('AiErrorAction', () => {
       chipFor('aiErrGeneric'),
       chipFor('aiErrOffline'),
       chipFor('aiErrRevoked'),
-      resultChip({ provider: 'uniwork', text: 'hi' }),
+      resultChip({ text: 'hi' }),
       null,
     ]) {
       render({ chip, lang: 'vi', ...handlers() })
@@ -91,7 +93,7 @@ describe('AiErrorAction', () => {
   })
 
   it('an edited turn that then failed keeps its error action', () => {
-    const chip = resultChip({ provider: 'uniwork', mutated: true, error: 'aiErrUnavailable' })
+    const chip = resultChip({ mutated: true, error: 'aiErrUnavailable' })
     render({ chip, lang: 'en', ...handlers() })
     expect(button()!.textContent).toBe('Retry')
   })

@@ -1,15 +1,11 @@
 /**
  * Server conversation and run ids per panel session (design §3.3). Kept
  * where the adapter runs (the desktop shell main process, the web frame),
- * keyed by the panel transport's sessionId. Every AI turn of a session,
- * BYOK ones included, is observed here, so a UniWork AI turn after another
- * provider's turn starts a new server conversation and says so.
+ * keyed by the panel transport's sessionId.
  */
 import type { UniworkScope, UniworkTurnIds } from './types'
 
 interface SessionState {
-  /** provider of the last turn on this session */
-  lastProvider?: string
   scopeKey?: string
   conversationId?: string
   runId?: string
@@ -23,8 +19,6 @@ interface SessionState {
 
 export interface UniworkTurnStart {
   ids: UniworkTurnIds
-  /** a new conversation starts because another provider ran in between */
-  boundary: boolean
 }
 
 export function uniworkScopeKey(scope: UniworkScope): string {
@@ -48,16 +42,6 @@ export class UniworkConversations {
     return s
   }
 
-  /** a turn of another provider ran on this session (streamForProvider reports every turn) */
-  observe(sessionId: string | undefined, provider: string): void {
-    if (provider === 'uniwork') return
-    const s = this.state(sessionId)
-    s.lastProvider = provider
-    delete s.conversationId
-    delete s.runId
-    delete s.openToolCalls
-  }
-
   /**
    * The ids a UniWork AI turn sends. A question opens a new run (no run
    * header) unless it continues the run right after tool results; a turn in
@@ -70,16 +54,14 @@ export class UniworkConversations {
   ): UniworkTurnStart {
     const s = this.state(sessionId)
     const scopeKey = uniworkScopeKey(scope)
-    const boundary = s.lastProvider !== undefined && s.lastProvider !== 'uniwork'
-    if (boundary || s.scopeKey !== scopeKey) {
+    if (s.scopeKey !== scopeKey) {
       delete s.conversationId
       delete s.runId
       delete s.openToolCalls
     }
-    s.lastProvider = 'uniwork'
     s.scopeKey = scopeKey
     if (!continuesRun) delete s.runId
-    return { ids: this.ids(sessionId), boundary }
+    return { ids: this.ids(sessionId) }
   }
 
   /** ids an answer carried back; an absent header keeps the known id (API §3.7 Q6) */

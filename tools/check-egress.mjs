@@ -1,5 +1,6 @@
 // Egress gate: shipped code must not name a Genspark / GenOffice cloud host,
-// a Google Analytics / ads endpoint or the @genspark/cli package. Comments count
+// a Google Analytics / ads endpoint, the @genspark/cli package, or an AI vendor
+// host: AI runs only on UniWork AI (UniWork ADR 0051, UNI-2309). Comments count
 // too (cheap and simple); the few reasoned exemptions live in ALLOWLIST below.
 // Host patterns also match the escaped forms used in regex literals and RegExp
 // strings (`genspark\.ai`, `genspark\\.ai`). A host split across strings or
@@ -7,8 +8,8 @@
 // percent-encoding) is out of reach of a text scan; review catches those.
 // Scope is what ships: app sources, scripts, native sidecars and build
 // resources, package sources, package manifests, app build configs, the
-// uniai-pwa web app, scripts/ and skills/. Tests and packaging/ are out of
-// scope. Usage: node tools/check-egress.mjs [--root <dir>] [--json]
+// uniai-pwa web app, the web frames (web/docs, web/modules), scripts/ and
+// skills/. Tests and packaging/ are out of scope. Usage: node tools/check-egress.mjs [--root <dir>] [--json]
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,6 +17,44 @@ import { fileURLToPath } from 'node:url'
 /** a literal dot, optionally escaped once (regex literal) or twice (RegExp string) */
 const DOT = String.raw`\\{0,2}\.`
 const host = (...labels) => new RegExp(labels.join(DOT), 'i')
+/** an AI vendor host as a whole name: `exa.ai` matches `api.exa.ai`, never `hexa.ai` or `this.exa.aiRun` */
+const vendor = (name) =>
+  new RegExp(String.raw`(?<![\w-])${name.split('.').join(DOT)}(?![\w-])`, 'i')
+
+const AI_VENDOR_HOSTS = [
+  'openrouter.ai',
+  'api.openai.com',
+  'api.anthropic.com',
+  'generativelanguage.googleapis.com',
+  'api.deepseek.com',
+  'dashscope.aliyuncs.com',
+  'api.x.ai',
+  'api.mistral.ai',
+  'open.bigmodel.cn',
+  'volces.com',
+  'api.minimax.io',
+  'duckduckgo.com',
+  'parallel.ai',
+  'serper.dev',
+  'serply.io',
+  'tavily.com',
+  'exa.ai',
+  'firecrawl.dev',
+  'perplexity.ai',
+  // the hosts of the deleted provider catalog
+  'api.moonshot.ai',
+  'router.requesty.ai',
+  'router.eu.requesty.ai',
+  'tokenhub.tencentcloudmaas.com',
+  'maas-api.cn-huabei-1.xf-yun.com',
+  'api.longcat.chat',
+  'api.xiaomimimo.com',
+  'api.ant-ling.com',
+  'api.opper.ai',
+  'api.typesafe.ai',
+  'api.cheaperinference.com',
+  'opencode.ai',
+]
 
 export const PATTERNS = [
   { id: 'genspark.ai', re: host('genspark', 'ai') },
@@ -29,6 +68,7 @@ export const PATTERNS = [
   { id: 'doubleclick.net', re: host('doubleclick', 'net') },
   { id: 'gtag(', re: /\bgtag\s*\(/ },
   { id: '@genspark/cli', re: /@genspark\/cli/i },
+  ...AI_VENDOR_HOSTS.map((id) => ({ id, re: vendor(id) })),
 ]
 
 /**
@@ -60,6 +100,8 @@ const SCOPE = [
   /^packages\/[^/]+\/package\.json$/,
   /^scripts\//,
   /^skills\//,
+  // the web frames: the one place the AI writers remain (their tests stay out, as everywhere)
+  /^web\/(docs|modules)\//,
 ]
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'out', 'target', '.git'])
@@ -115,7 +157,7 @@ function* walk(root, dir) {
 /** scans the tree under `root`; returns the violations not covered by the allowlist */
 export function scanTree(root, { allowlist = ALLOWLIST } = {}) {
   const violations = []
-  for (const top of ['apps', 'packages', 'scripts', 'skills']) {
+  for (const top of ['apps', 'packages', 'scripts', 'skills', 'web']) {
     const dir = join(root, top)
     if (!existsSync(dir) || !statSync(dir).isDirectory()) continue
     for (const path of walk(root, dir)) {

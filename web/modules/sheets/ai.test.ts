@@ -144,9 +144,6 @@ describe('without the UniWork AI grant', () => {
       mergeWorkbooks: false,
     })
     expect(t.caps).not.toHaveProperty('aiCredentials')
-    const r = await t.desktop.aiChat({ settings: {}, system: 's', user: 'u' })
-    expect(r).toMatchObject({ ok: false })
-    expect(String(r.error)).toMatch(/^ai-unavailable:/)
     expect(await t.desktop.webSearch('q')).toMatchObject({ method: 'error', results: [] })
     expect(t.fetch).not.toHaveBeenCalled()
   })
@@ -184,10 +181,7 @@ describe('with the UniWork AI grant', () => {
     await t.boot()
     const settings = await t.desktop.getAiSettings()
     expect(settings.provider).toBe('uniwork')
-    expect(Object.keys(settings.providers)).toEqual(['uniwork'])
-    // a one-shot has no UniWork AI route: it answers the failure text and sends nothing
-    const r = await t.desktop.aiChat({ settings, system: 's', user: 'hello' })
-    expect(r.ok).toBe(false)
+    expect(settings.providers).toEqual({})
     for (const url of t.urls) {
       expect(url).toMatch(/\/office-frame\/documents\/doc-1\/ai\/cloud$/)
     }

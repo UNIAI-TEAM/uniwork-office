@@ -29,7 +29,7 @@ test.describe('first-run onboarding', () => {
       // last slide's primary button finishes the onboarding
       await page.locator('.onb-next').click()
       await expect(overlay).toBeHidden()
-      // Home starts on the My AI chat; Recent shows the hero and quick cards
+      // Home starts on the Ask UNI chat; Recent shows the hero and quick cards
       await expect(page.locator('.nav-item[data-nav="chat"]')).toHaveClass(/active/)
       await openHomeFiles(page)
       await expect(page.locator('.home-hero')).toBeVisible()

@@ -4,6 +4,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { aiUniworkText } from '@genoffice/ui'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { createRoot, type Root } from 'react-dom/client'
 
 // the loop is replaced by a harness that hands over its events and never finishes on its own
@@ -50,6 +51,7 @@ describe('UniWork AI chip wiring (pdf panel)', () => {
     container = null
     delete (window as any).projectApi
     delete (window as any).pdfApi
+    resetUniworkAi()
   })
 
   const api = new Proxy(
@@ -101,6 +103,7 @@ describe('UniWork AI chip wiring (pdf panel)', () => {
   /** mount, let the preset start its turn, return once the loop has handed over its events */
   async function started() {
     harness.events = null
+    readyUniworkAi('/docs/a.pdf')
     const m = mount()
     m.render('/docs/a.pdf')
     await flush()
@@ -144,7 +147,6 @@ describe('UniWork AI chip wiring (pdf panel)', () => {
   }
 
   it.each([
-    ['credits_exhausted', 'aiErrCredits', 'aiRunChooseOther'],
     ['session_expired', 'aiErrSession', 'acctSignInAgain'],
     ['cloud_unavailable', 'aiErrUnavailable', 'aiRunRetry'],
     ['run_limit_reached', 'aiErrRunLimit', 'aiRunAskAgain'],
@@ -162,6 +164,13 @@ describe('UniWork AI chip wiring (pdf panel)', () => {
       expect(visibleErrorText()).toBe(ui(errKey))
     },
   )
+
+  it('F1: a plan error (credits_exhausted) names itself and offers no action: UniWork AI is the one provider', async () => {
+    await uniworkTurn()
+    await failWith('credits_exhausted', 'aiErrCredits')
+    expect(visibleErrorText()).toBe(ui('aiErrCredits'))
+    expect(root_().querySelector('.ai-error-action')).toBeNull()
+  })
 
   it('F1: a generic error offers no action and a rate-limit wait offers no Retry', async () => {
     await uniworkTurn()
@@ -228,7 +237,7 @@ describe('UniWork AI chip wiring (pdf panel)', () => {
     },
   )
 
-  it('F12: a failure that is not a UniWork error (own key) keeps the bubble Retry', async () => {
+  it('F12: a failure with no UniWork error code keeps the bubble Retry', async () => {
     await started()
     await failRaw('upstream said no')
     expect(root_().querySelector('.ai-error-action')).toBeNull()

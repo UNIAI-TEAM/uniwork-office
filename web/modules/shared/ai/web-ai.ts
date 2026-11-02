@@ -8,7 +8,7 @@
  * stubs) and every AI capability key stays false, so nothing AI is visible.
  *
  * On: the members talk to the frame-token AI routes (./client.ts):
- *   - aiStream / aiChat: UniWork AI turns on the frame route (./stream.ts),
+ *   - aiStream: UniWork AI turns on the frame route (./stream.ts),
  *   - getAiSettings: UniWork AI, the one provider (no key; the server's policy names the model);
  *     setAiSettings keeps nothing, there is nothing to choose,
  *   - webSearch / imageSearch / aiGenerateImage (generateImage) / analyzeMedia: the UniWork cloud
@@ -204,7 +204,7 @@ export function createWebAi(opts: {
         return false
       }
       const granted = session.capabilities
-      // the availability flag adds the `uniwork` entry to AI_PROVIDERS (every list built from it)
+      // the availability flag: the model chip and the Send guard read it
       setUniworkAiAvailable(true)
       // the cloud status is always read (it names the UniWork AI model); its tool switches apply
       // only to a frame that was granted a cloud tool
@@ -383,15 +383,8 @@ export function createWebAi(opts: {
     return {
       ...base,
       provider: UNIWORK_PROVIDER_ID,
-      // UniWork AI is the one provider. No key: a non-empty slot reads as configured, an empty one
-      // (the server turned it off) as unavailable with Send blocked. The server's policy picks the
-      // model, so none is named here
-      providers: {
-        [UNIWORK_PROVIDER_ID]: { apiKey: uniworkOn ? '…' : '', model: '' },
-      } as AiSettings['providers'],
+      // UniWork AI is the one provider: no key, and the server's policy picks the model
       gskToolsEnabled: opts.capabilities.imageGeneration === true,
-      // UniAI is the desktop's pool of cloud models: never offered on the web
-      uniAiAvailable: false,
       ...(uniworkModel ? { uniworkModel } : {}),
     }
   }
@@ -519,7 +512,6 @@ export const WEB_AI_MEMBERS = [
   'aiStream',
   'aiStreamCancel',
   'onAiStream',
-  'aiChat',
   'aiGskStatus',
   'aiGskLogin',
   'gskStatus',
@@ -551,19 +543,11 @@ export function withWebAi(base: BridgeObject, ai: WebAi): BridgeObject {
 
   /**
    * The provider of a turn = UniWork AI: renderers read the settings once at boot, and may still
-   * hold another provider from then. Everything else of the renderer's settings (output cap, ...)
-   * is kept.
+   * hold another provider from then. Everything else of the renderer's settings is kept.
    */
   const current = async (given: AiSettings | undefined): Promise<AiSettings> => {
     const now = await ai.settings()
-    return {
-      ...(given ?? now),
-      provider: now.provider,
-      providers: {
-        ...(given?.providers ?? now.providers),
-        [now.provider]: now.providers[now.provider],
-      },
-    }
+    return { ...(given ?? now), provider: now.provider, providers: now.providers }
   }
 
   const members: BridgeObject = {
@@ -585,10 +569,6 @@ export function withWebAi(base: BridgeObject, ai: WebAi): BridgeObject {
         offWeb()
       }
     },
-    aiChat: when('aiChat', async (request) => {
-      const r = request as Parameters<WebAiStreams['aiChat']>[0]
-      return ai.streams.aiChat({ ...r, settings: await current(r.settings) })
-    }),
     aiGskStatus: when('aiGskStatus', async () => ({ loggedIn: true })),
     // sync subscriber like onAiStream: the model chip re-reads after UniWork AI went off
     onAiSettingsChanged: (handler: unknown) => {

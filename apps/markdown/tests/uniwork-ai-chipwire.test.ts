@@ -4,6 +4,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { aiUniworkText } from '@genoffice/ui'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
@@ -55,6 +56,7 @@ describe('UniWork AI chip wiring (markdown panel)', () => {
     editor = null
     delete (window as any).projectApi
     vi.unstubAllGlobals()
+    resetUniworkAi()
   })
 
   function mount(history: 'none' | 'deferred' = 'none') {
@@ -127,6 +129,7 @@ describe('UniWork AI chip wiring (markdown panel)', () => {
   /** mount, let the preset start its turn, return once the loop has handed over its events */
   async function started() {
     harness.events = null
+    readyUniworkAi('/docs/a.md')
     const m = mount()
     m.render('/docs/a.md')
     await flush()
@@ -173,7 +176,6 @@ describe('UniWork AI chip wiring (markdown panel)', () => {
   }
 
   it.each([
-    ['credits_exhausted', 'aiErrCredits', 'aiRunChooseOther'],
     ['session_expired', 'aiErrSession', 'acctSignInAgain'],
     ['cloud_unavailable', 'aiErrUnavailable', 'aiRunRetry'],
     ['run_limit_reached', 'aiErrRunLimit', 'aiRunAskAgain'],
@@ -191,6 +193,13 @@ describe('UniWork AI chip wiring (markdown panel)', () => {
       expect(visibleErrorText()).toBe(ui(errKey))
     },
   )
+
+  it('F1: a plan error (credits_exhausted) names itself and offers no action: UniWork AI is the one provider', async () => {
+    await uniworkTurn()
+    await failWith('credits_exhausted', 'aiErrCredits')
+    expect(visibleErrorText()).toBe(ui('aiErrCredits'))
+    expect(root_().querySelector('.ai-error-action')).toBeNull()
+  })
 
   it('F1: a generic error offers no action and a rate-limit wait offers no Retry', async () => {
     await uniworkTurn()
@@ -257,7 +266,7 @@ describe('UniWork AI chip wiring (markdown panel)', () => {
     },
   )
 
-  it('F12: a failure that is not a UniWork error (own key) keeps the bubble Retry', async () => {
+  it('F12: a failure with no UniWork error code keeps the bubble Retry', async () => {
     await started()
     await failRaw('upstream said no')
     expect(root_().querySelector('.ai-error-action')).toBeNull()

@@ -11,7 +11,6 @@ import {
   UniAiMark,
   useAiSidebarEnabled,
   useUniworkSendGate,
-  aiPanelOnUniwork,
   type AiTokenUsageView,
 } from '@genoffice/ui'
 
@@ -696,12 +695,8 @@ export function ExcelShell({
       const take = () => {
         if (onSend(aiPreset.text, undefined, undefined, aiPreset.displayText) !== true) toComposer()
       }
-      // a host job runs only on UniWork AI: the provider is the one of now, not of when it arrived
-      if (!aiPreset.uniworkOnly) take()
-      else
-        void aiPanelOnUniwork(() => window.desktopApi.getAiSettings()).then((on) =>
-          on ? take() : toComposer(),
-        )
+      // a host job runs on UniWork AI, the one provider
+      take()
     }, 120)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps

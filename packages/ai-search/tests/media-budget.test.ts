@@ -1,7 +1,31 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { storeGeneratedImage } from '@genoffice/electron-utils/generated-images'
+import {
+  UNIWORK_CLOUD_SIGNED_OUT,
+  setUniworkCloudStatus,
+  setUniworkCloudTransport,
+  type UniworkCloudStatus,
+} from '@genoffice/ai-provider'
+
+// spies on the real fs reads, so a test can prove how much of a file was read
+const reads = vi.hoisted(() => ({ readFile: 0, readSync: [] as number[] }))
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  return {
+    ...actual,
+    readFileSync: ((...args: Parameters<typeof actual.readFileSync>) => {
+      reads.readFile++
+      return actual.readFileSync(...args)
+    }) as typeof actual.readFileSync,
+    readSync: ((...args: Parameters<typeof actual.readSync>) => {
+      reads.readSync.push((args[1] as { byteLength: number }).byteLength)
+      return actual.readSync(...args)
+    }) as typeof actual.readSync,
+  }
+})
 
 import {
   MEDIA_BUDGET,
@@ -17,40 +41,55 @@ function dataUrl(bytes: number, mime = 'image/png'): string {
   return `data:${mime};base64,${'A'.repeat(Math.ceil((bytes * 4) / 3))}`
 }
 
-/** The production budget is 200 MB per item and in total, which no test should allocate. */
+/** The production budget is 25 MiB per item and in total; most tests use a tiny one. */
 const TINY = { maxItems: 3, maxItemBytes: 64, maxTotalBytes: 128, concurrency: 2 }
-
-function writeSettings(mediaProvider: string): string {
-  const dir = mkdtempSync(join(tmpdir(), 'genoffice-media-budget-'))
-  const path = join(dir, 'ai-settings.json')
-  writeFileSync(
-    path,
-    JSON.stringify({
-      provider: mediaProvider,
-      providers: { [mediaProvider]: { apiKey: 'k', model: 'test-model' } },
-      media: {
-        provider: mediaProvider,
-        providers: {
-          [mediaProvider]: {
-            apiKey: 'k',
-            analysisModel: 'test-model',
-            imageModel: 'test-image-model',
-          },
-        },
-      },
-    }),
-  )
-  return path
-}
 
 describe('loadMediaReferences budget', () => {
   it('pins the production ceilings', () => {
     expect(MEDIA_BUDGET).toEqual({
       maxItems: 12,
-      maxItemBytes: 200 * 1024 * 1024,
-      maxTotalBytes: 200 * 1024 * 1024,
+      maxItemBytes: 25 * 1024 * 1024,
+      maxTotalBytes: 25 * 1024 * 1024,
       concurrency: 3,
     })
+  })
+
+  it('refuses a 30 MiB local file without reading more than the cap plus one byte', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'genoffice-media-big-'))
+    const clip = join(dir, 'clip.mp4')
+    writeFileSync(clip, '')
+    truncateSync(clip, 30 * 1024 * 1024)
+    reads.readFile = 0
+    reads.readSync = []
+    await expect(loadMediaReferences([clip])).rejects.toBeInstanceOf(MediaTooLargeError)
+    await expect(loadMediaReferences([clip], undefined, [dir])).rejects.toBeInstanceOf(
+      MediaTooLargeError,
+    )
+    expect(reads.readFile).toBe(0)
+    expect(reads.readSync.reduce((n, len) => n + len, 0)).toBeLessThanOrEqual(25 * 1024 * 1024 + 1)
+  })
+
+  it('refuses a generated-image file over the item cap before reading it', async () => {
+    const url = storeGeneratedImage(new Uint8Array(2048).fill(1), 'image/png')
+    reads.readFile = 0
+    await expect(
+      loadMediaReferences([url], { ...TINY, maxItemBytes: 1024, maxTotalBytes: 4096 }),
+    ).rejects.toBeInstanceOf(MediaTooLargeError)
+    expect(reads.readFile).toBe(0)
+    const [blob] = await loadMediaReferences([url], {
+      ...TINY,
+      maxItemBytes: 4096,
+      maxTotalBytes: 4096,
+    })
+    expect(blob?.bytes.byteLength).toBe(2048)
+  })
+
+  it('reads a local file that fits', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'genoffice-media-fits-'))
+    const clip = join(dir, 'clip.mp4')
+    writeFileSync(clip, Buffer.alloc(1024, 7))
+    const [blob] = await loadMediaReferences([clip], undefined, [dir])
+    expect(blob?.bytes.byteLength).toBe(1024)
   })
 
   it('rejects too many items before loading anything', async () => {
@@ -99,18 +138,28 @@ describe('loadMediaReferences budget', () => {
   })
 })
 
+const READY: UniworkCloudStatus = {
+  state: 'ready',
+  enabled: true,
+  tools: {
+    web_search: true,
+    image_search: true,
+    image_generate: true,
+    media_analyze: true,
+    transcribe: true,
+  },
+  credits: null,
+}
+
 describe('media tool aggregate budget', () => {
-  it('analyze_media refuses too many items', async () => {
-    const result = await analyzeMediaTool(writeSettings('gemini'), {
-      mediaUrls: Array.from({ length: 13 }, () => dataUrl(8)),
-      requirements: 'describe these',
-    })
-    expect(result.error).toMatch(/Too many media items/)
+  afterEach(() => {
+    setUniworkCloudStatus(UNIWORK_CLOUD_SIGNED_OUT)
+    setUniworkCloudTransport(null)
   })
 
-  it('analyze_media reports a budget failure when only one provider is configured', async () => {
-    // openai reads images but not video; a budget failure stays a rejection
-    const result = await analyzeMediaTool(writeSettings('openai'), {
+  it('analyze_media refuses too many items before reading any', async () => {
+    setUniworkCloudStatus(READY)
+    const result = await analyzeMediaTool('/nonexistent/ai-settings.json', {
       mediaUrls: Array.from({ length: 13 }, () => dataUrl(8)),
       requirements: 'describe these',
     })
@@ -118,7 +167,8 @@ describe('media tool aggregate budget', () => {
   })
 
   it('generate_image refuses too many references', async () => {
-    const result = await generateImageTool(writeSettings('gemini'), {
+    setUniworkCloudStatus(READY)
+    const result = await generateImageTool('/nonexistent/ai-settings.json', {
       prompt: 'a logo',
       referenceImageUrls: Array.from({ length: 13 }, () => dataUrl(8)),
     })

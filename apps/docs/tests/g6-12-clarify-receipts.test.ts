@@ -6,9 +6,11 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
+import { clearUniworkAcks } from '@genoffice/ui'
+import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { t } from '../src/renderer/i18n/locale'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 
 // the loop is replaced by a fake whose run() asks one clarification and then finishes
 vi.mock('@genoffice/agent-core', async (orig) => {
@@ -38,10 +40,8 @@ vi.mock('@genoffice/agent-core', async (orig) => {
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 
 const settings: AiSettings = {
-  provider: 'anthropic',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  provider: 'uniwork',
+  providers: {},
 }
 
 const flush = async (): Promise<void> => {
@@ -68,6 +68,7 @@ describe('answered clarify receipts (docs)', () => {
     container = null
     editor = null
     delete (window as any).projectApi
+    clearUniworkAcks()
   })
 
   function mount(history: 'none' | 'deferred' = 'none') {
@@ -92,7 +93,9 @@ describe('answered clarify receipts (docs)', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    const render = (filePath: string | null) =>
+    const render = (filePath: string | null) => {
+      // every turn runs on UniWork AI: its disclosure is acknowledged for the document first
+      ackUniworkDisclosureInFile(filePath)
       act(() =>
         root!.render(
           createElement(AiPanel, {
@@ -105,6 +108,7 @@ describe('answered clarify receipts (docs)', () => {
           }),
         ),
       )
+    }
     return { render }
   }
 

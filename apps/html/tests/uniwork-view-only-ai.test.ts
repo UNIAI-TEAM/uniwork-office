@@ -9,6 +9,7 @@ import { createDocumentSkill } from '../src/renderer/ai/html-skill'
 import { AGENT_TOOLS, READ_ONLY_TOOLS, type HtmlDocAccess } from '../src/renderer/ai/tools'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { strings } from '../src/renderer/i18n/strings'
+import { resetForTest } from '../src/renderer/capabilities'
 
 beforeEach(() => vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true))
 const cleanups: Array<() => void> = []
@@ -112,8 +113,22 @@ describe('view-only skill (UniWork copy the user may only read)', () => {
   })
 })
 
-function renderRibbon(extra: { uniworkBound?: boolean; readOnly?: boolean; autoSave?: boolean }) {
+function renderRibbon({
+  web = false,
+  ...extra
+}: {
+  uniworkBound?: boolean
+  readOnly?: boolean
+  autoSave?: boolean
+  /** the web frame: Restyle and Theme show only there (UNI-2309) */
+  web?: boolean
+}) {
   stubHtmlApi()
+  if (web)
+    (window as unknown as { htmlApi: Record<string, unknown> }).htmlApi.capabilities = {
+      platform: 'web',
+    }
+  resetForTest()
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -168,7 +183,7 @@ describe('Ribbon AI buttons on a view-only copy', () => {
   const label = (b: HTMLButtonElement) => b.textContent?.trim()
 
   it('keeps summarize and turns the editing presets off with the reason as tooltip', () => {
-    const buttons = aiButtons(renderRibbon({ uniworkBound: true, readOnly: true }))
+    const buttons = aiButtons(renderRibbon({ uniworkBound: true, readOnly: true, web: true }))
     const summarize = buttons.find((b) => label(b) === strings.en.aiSummarizeBtn)!
     expect(summarize.disabled).toBe(false)
     const editing = buttons.filter((b) => b !== summarize)
@@ -180,7 +195,8 @@ describe('Ribbon AI buttons on a view-only copy', () => {
   })
 
   it('leaves every preset on for an editable copy', () => {
-    for (const b of aiButtons(renderRibbon({ uniworkBound: true }))) expect(b.disabled).toBe(false)
+    for (const b of aiButtons(renderRibbon({ uniworkBound: true, web: true })))
+      expect(b.disabled).toBe(false)
   })
 })
 
@@ -201,7 +217,7 @@ describe('view-only notice copy', () => {
 })
 
 describe('AiPanel on a view-only copy', () => {
-  async function mountPanel(readOnly: boolean, queued: boolean, provider?: string) {
+  async function mountPanel(readOnly: boolean, queued: boolean) {
     // jsdom has no scrollTo on elements; the test environment's localStorage has no methods
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', {
@@ -210,12 +226,6 @@ describe('AiPanel on a view-only copy', () => {
       removeItem: () => {},
     })
     stubHtmlApi()
-    if (provider) {
-      ;(window as any).htmlApi.getAiSettings = vi.fn(async () => ({
-        ...usableAiSettings(),
-        provider,
-      }))
-    }
     const deps = {
       access: fakeAccess().access,
       getSnapshot: () => ({}),
@@ -257,15 +267,11 @@ describe('AiPanel on a view-only copy', () => {
     return container
   }
 
-  it('shows the notice and no edit queue for BYOK, and viewOnly sub-line for UniWork AI', async () => {
+  it('shows the UniWork AI view-only line under the composer and no edit queue', async () => {
     const c = await mountPanel(true, true)
-    expect(c.querySelector('.ai-readonly-notice')?.textContent).toBe(strings.en.aiViewOnlyNotice)
-    expect(c.querySelector('.ai-uniwork-view-only')).toBeNull()
+    expect(c.querySelector('.ai-readonly-notice')).toBeNull()
+    expect(c.querySelector('.ai-uniwork-view-only')?.textContent).toBeTruthy()
     expect(c.querySelector('.ai-queue')).toBeNull()
-
-    const cu = await mountPanel(true, true, 'uniwork')
-    expect(cu.querySelector('.ai-readonly-notice')).toBeNull()
-    expect(cu.querySelector('.ai-uniwork-view-only')?.textContent).toBeTruthy()
   })
 
   it('shows no notice and keeps the edit queue on an editable copy', async () => {

@@ -26,16 +26,8 @@ afterEach(() => {
 })
 
 function makeBridge(): AiModelPickerBridge {
-  const settings = { ...defaultAiSettings(), provider: 'openai' as const }
-  settings.providers.openai = {
-    ...settings.providers.openai,
-    apiKey: 'sk-test',
-    model: 'gpt-5.4-mini',
-  }
-  return {
-    getSettings: async () => settings,
-    setSettings: async () => {},
-  }
+  const settings = defaultAiSettings()
+  return { getSettings: async () => settings }
 }
 
 describe('AiModelPicker popover positioning under CSS zoom (R3-2)', () => {

@@ -30,7 +30,7 @@ const WORKFLOW = [
 /** What the client shows the model about this server before any tool is called. */
 export const INSTRUCTIONS = [
   ABOUT,
-  'Paths are absolute, or relative to the working directory the server was started in. Only search, image and media send data off the machine, to the provider configured in UniWork Office.',
+  'Paths are absolute, or relative to the working directory the server was started in.',
   ...WORKFLOW,
   'A file open in a UniWork Office tab is not written unless force is set. Do not call open unless the user asks to see the file.',
 ].join('\n')
@@ -41,7 +41,7 @@ export function remoteInstructions(baseUrl: string): string {
   return [
     ABOUT,
     `This server runs on another machine: paths you know are not visible to it. To work on a file you have, upload it first (curl -T report.docx ${base}/files/ — the reply carries its url) and pass that url wherever a tool takes a file; any other http(s) URL the server can reach works too. Relative paths and deck folders live in a private scratch directory of this session.`,
-    'Omit out: the file a tool writes comes back in the result as output_url (download it with curl -o) and, when small, as an embedded resource with the bytes. Only search, image and media send data to the cloud provider configured in UniWork Office.',
+    'Omit out: the file a tool writes comes back in the result as output_url (download it with curl -o) and, when small, as an embedded resource with the bytes.',
     ...WORKFLOW,
   ].join('\n')
 }
@@ -107,10 +107,7 @@ export async function createMcpServer(
       {
         description: tool.description,
         inputSchema: toolShape(tool, ctx.mode, typed),
-        annotations: {
-          readOnlyHint: tool.readOnly === true,
-          openWorldHint: tool.openWorld === true,
-        },
+        annotations: { readOnlyHint: tool.readOnly === true, openWorldHint: false },
       },
       async (args) => {
         const outcome = await runTool(tool, { ...(args as Record<string, unknown>) }, ctx)

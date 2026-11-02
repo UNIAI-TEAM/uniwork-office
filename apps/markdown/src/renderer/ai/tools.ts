@@ -322,6 +322,9 @@ export const AGENT_TOOLS: AgentToolDef[] = [
 
 // ── executor ──
 
+/** write_document's refusal where no writer reaches the UniWork AI writer route */
+export const WRITER_UNAVAILABLE = 'document writing is not available here'
+
 function fail(output: string, summary: string): ToolExecution {
   return { output, isError: true, summary }
 }
@@ -345,7 +348,7 @@ function fenceVerify(editor: Editor): OpsContext['verify'] {
   return (before, after) => fenceViolation(before, after, spans)
 }
 
-// ── image URL rule for text that lands as markdown (UniWork AI only; BYOK registry never refuses) ──
+// ── image URL rule for text that lands as markdown (UniWork AI turns) ──
 
 /** a remote or inline image source; local md-asset / relative paths are not subject to the rule */
 const REMOTE_IMAGE_SRC = /^(?:https?:|data:|\/\/)/i
@@ -537,7 +540,7 @@ async function writeDocument(
   const label = t('aiToolWriteDoc')
   const plan = String(call.input.plan ?? '').trim()
   if (!plan) return fail('plan must not be empty', label)
-  if (!writer) return fail('document writing is not available here', label)
+  if (!writer) return fail(WRITER_UNAVAILABLE, label)
   if (editedExternally(editor)) return fail(STALE_DOC_ERROR, label)
   const doc = editor.state.doc
   const afterRaw = call.input.afterIndex

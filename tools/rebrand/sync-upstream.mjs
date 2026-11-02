@@ -15,7 +15,8 @@
 //   --branch <name>       sync branch (default upstream-sync/<target7>)
 //   --report <file.md>    write the markdown report there, plus a .json sibling
 //   --pr-body <file.md>   write the report cut below 60000 characters (a pull request body limit)
-//   --exclude <glob>      leave matching upstream paths out of the patch (repeatable; listed in the report)
+//   --exclude <glob>      leave matching upstream paths out of the patch (repeatable; listed in the report;
+//                         DROPPED_UPSTREAM_PATHS is always left out too, listed apart)
 //   --prettier <path>     prettier.cjs used to format the files the rebrand touched
 //                         (default: node_modules/prettier of the repo or its main checkout; skipped if absent)
 //   --commit-conflicts    commit conflicted files with their markers and finish the remaining steps
@@ -68,6 +69,91 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 export const REBRAND_TESTS = ['brand-scan.test.mjs', 'rebrand.test.mjs', 'sync-upstream.test.mjs']
 
 /**
+ * Upstream files the fork deleted with the own-key AI (UNI-2309: AI runs only on UniWork AI,
+ * UniWork ADR 0051) or with the Genspark cloud sign-in before it (UNI-2289), and their tests. Always left out of the patch, on top of --exclude, so an
+ * upstream edit to one is listed under "Removed in the fork (do not port)" instead of failing to apply.
+ * Only files that came from upstream belong here; see docs/upstream/UPSTREAM_SYNC.md.
+ */
+export const DROPPED_UPSTREAM_PATHS = [
+  // own-key providers, Codex CLI, OpenRouter, the one-shot chat and the media/search keys
+  'packages/ai-provider/src/ai-settings-guard.ts',
+  'packages/ai-provider/src/chat.ts',
+  'packages/ai-provider/src/codex-app-server.ts',
+  'packages/ai-provider/src/custom-models.ts',
+  'packages/ai-provider/src/fetch.ts',
+  'packages/ai-provider/src/media-protocols.ts',
+  'packages/ai-provider/src/openrouter.ts',
+  'packages/ai-provider/src/output-cap.ts',
+  // its SSE reader lives on in protocols/openai-sse.ts: port reader fixes by hand
+  'packages/ai-provider/src/protocols/openai-compatible.ts',
+  'packages/ai-provider/src/protocols/anthropic.ts',
+  'packages/ai-provider/src/protocols/gemini-schema.ts',
+  'packages/ai-provider/src/protocols/gemini.ts',
+  'packages/ai-provider/src/registry.ts',
+  'packages/ai-provider/src/search-settings.ts',
+  'packages/ai-provider/src/stream.ts',
+  'packages/ai-provider/tests/ai-settings-guard.test.ts',
+  'packages/ai-provider/tests/chat.test.ts',
+  'packages/ai-provider/tests/codex-app-server.test.ts',
+  'packages/ai-provider/tests/codex-stdout-lines.test.ts',
+  'packages/ai-provider/tests/custom-models.test.ts',
+  'packages/ai-provider/tests/endpoint-url.test.ts',
+  'packages/ai-provider/tests/fetch.test.ts',
+  'packages/ai-provider/tests/gemini-schema.test.ts',
+  'packages/ai-provider/tests/images.test.ts',
+  'packages/ai-provider/tests/media-conntest.test.ts',
+  'packages/ai-provider/tests/media-json-guard.test.ts',
+  'packages/ai-provider/tests/minimax-capabilities.test.ts',
+  'packages/ai-provider/tests/openrouter.test.ts',
+  'packages/ai-provider/tests/output-cap.test.ts',
+  'packages/ai-provider/tests/registry-baseurl-query.test.ts',
+  'packages/ai-provider/tests/registry.test.ts',
+  'packages/ai-provider/tests/search-settings.test.ts',
+  'packages/ai-provider/tests/stream-anthropic-index.test.ts',
+  'packages/ai-provider/tests/stream-openai-iserror.test.ts',
+  // keyless and key-based web search (Parallel MCP, DuckDuckGo, Serper, Serply, Tavily)
+  'packages/ai-search/src/parallel-mcp.ts',
+  'packages/ai-search/tests/copyright-host.test.ts',
+  'packages/ai-search/tests/parallel-mcp.test.ts',
+  'packages/ai-search/tests/parallel.test.ts',
+  'packages/ai-search/tests/search.test.ts',
+  'packages/ai-search/tests/serply.test.ts',
+  'packages/ai-search/tests/usable-images.test.ts',
+  // the Genspark cloud sign-in, replaced by the UniWork cloud tools (UNI-2289, 52a0be4eb)
+  'packages/ai-search/src/genoffice-auth.ts',
+  'packages/ai-search/tests/genoffice-auth.test.ts',
+  // the genoffice image, media and search commands
+  'packages/cli/src/cloud.ts',
+  'packages/cli/src/commands/image.ts',
+  'packages/cli/src/commands/media.ts',
+  'packages/cli/src/commands/search.ts',
+  'packages/cli/tests/cloud.test.ts',
+  // the editors' model picker
+  'packages/ui/src/ai-model-picker-options.ts',
+  'packages/ui/tests/ai-model-picker-options.test.ts',
+  // shell: My AI, the OpenRouter credit wallet, the AI usage ledger, provider logos
+  'apps/shell/src/renderer/src/CreditWallet.tsx',
+  'apps/shell/src/renderer/src/credit-wallet.ts',
+  'apps/shell/src/renderer/src/ai-usage-ledger.ts',
+  'apps/shell/src/renderer/src/my-ai-*.ts',
+  'apps/shell/src/renderer/src/provider-logos.tsx',
+  'apps/shell/tests/ai-usage-ledger.test.ts',
+  'apps/shell/tests/credit-wallet.test.ts',
+  'apps/shell/tests/my-ai-*.test.ts',
+  // shell: the decision-model file-search rerank and the AI Model / AI Media settings
+  'apps/shell/src/main/file-excerpts.ts',
+  'apps/shell/src/main/file-index/decider.ts',
+  'apps/shell/src/main/file-index/rerank.ts',
+  'apps/shell/src/shared/file-excerpt.ts',
+  'apps/shell/tests/file-excerpt.test.ts',
+  'apps/shell/tests/file-index-decision.test.ts',
+  'apps/shell/tests/settings-custom-models.test.ts',
+  'e2e/settings-media-search.spec.ts',
+  // slides: the screenshot QC prompt (a UniWork AI QC turn takes no screenshot)
+  'apps/slides/src/renderer/ai/prompts/qc-visual.md',
+]
+
+/**
  * Upstream paths that bring back things the fork removed or must adjust by hand
  * (see README "Known gaps"); hits are listed in the report's checklist.
  */
@@ -95,6 +181,24 @@ export const WATCH = [
   {
     test: (p) => p.startsWith('.github/'),
     note: 'upstream CI / repo config: compare with ours before taking it',
+  },
+  {
+    test: (p) => /^packages\/ai-(provider|search)\/src\//.test(p),
+    note: 'own-key AI provider or search code: UniWork AI only (UniWork ADR 0051); skip new providers, keys, Codex CLI, keyless search',
+  },
+  {
+    test: (p) => /^packages\/ui\/src\/(AiModelPicker\.tsx|strings-ai-model-picker\.ts)$/.test(p),
+    note: 'provider chooser removed; UniWork AI only (UniWork ADR 0051)',
+  },
+  {
+    test: (p) => /^apps\/shell\/src\/renderer\/src\/(SettingsModal|NewChatPane)\.tsx$/.test(p),
+    note: 'AI Model/AI Media panes and My AI were removed; keep them out',
+  },
+  {
+    test: (p) =>
+      /^packages\/cli\/src\/commands\/(image|media|search)\.ts$/.test(p) ||
+      /^apps\/shell\/src\/main\/file-index\/(decider|rerank)\.ts$/.test(p),
+    note: 'removed in the fork; remove it again',
   },
 ]
 
@@ -303,7 +407,7 @@ function splitZ(buf) {
 }
 
 /** Commits behind, upstream commit list, and the per-file shape of base..target. */
-export function rangeStats(git, base, target, { exclude = [] } = {}) {
+export function rangeStats(git, base, target, { exclude = [], dropped = [] } = {}) {
   const behind = Number(git(['rev-list', '--count', `${base}..${target}`]).text)
   const ancestor =
     git(['merge-base', '--is-ancestor', base, target], { allowFailure: true }).status === 0
@@ -334,13 +438,29 @@ export function rangeStats(git, base, target, { exclude = [] } = {}) {
       deletions += Number(del)
     }
   }
+  // left out: `dropped` (removed in the fork, never ported) apart from the caller's --exclude
   let excluded = []
+  let droppedHits = []
   if (exclude.length > 0) {
-    const all = splitZ(git([...DIFF_FLAGS, '--name-only', '-z', base, target]).stdout)
+    const nameOnly = (spec) =>
+      splitZ(git([...DIFF_FLAGS, '--name-only', '-z', base, target, ...spec]).stdout)
+    const all = nameOnly([])
     const kept = new Set(files.map((f) => f.path))
-    excluded = all.filter((p) => !kept.has(p))
+    const notDropped = new Set(dropped.length > 0 ? nameOnly(pathspec(dropped)) : all)
+    droppedHits = all.filter((p) => !notDropped.has(p))
+    excluded = all.filter((p) => !kept.has(p) && notDropped.has(p))
   }
-  return { behind, ancestor, commits, files, insertions, deletions, binary, excluded }
+  return {
+    behind,
+    ancestor,
+    commits,
+    files,
+    insertions,
+    deletions,
+    binary,
+    excluded,
+    dropped: droppedHits,
+  }
 }
 
 function unmergedPaths(git) {
@@ -709,7 +829,7 @@ export function syncUpstream(options) {
 }
 
 function runSync({ options, root, git, checks, log, started }) {
-  const exclude = options.exclude ?? []
+  const exclude = [...DROPPED_UPSTREAM_PATHS, ...(options.exclude ?? [])]
   if (options.continue) return continueSync({ git, root, checks, log, started })
 
   const base = options.base ?? readBase(root)
@@ -736,6 +856,7 @@ function runSync({ options, root, git, checks, log, started }) {
     deletions: 0,
     binary: [],
     excluded: [],
+    dropped: [],
     apply: { clean: [], conflicted: [], failed: [], mode: 'none' },
     commitsCreated: [],
     rebrand: null,
@@ -771,7 +892,10 @@ function runSync({ options, root, git, checks, log, started }) {
     )
   }
 
-  Object.assign(summary, rangeStats(git, range.base, range.target, { exclude }))
+  Object.assign(
+    summary,
+    rangeStats(git, range.base, range.target, { exclude, dropped: DROPPED_UPSTREAM_PATHS }),
+  )
   if (!summary.ancestor && !options.force) {
     throw new Error(
       `upstream base ${short(range.base)} is not an ancestor of ${short(range.target)} (rewritten or unrelated history); pass --force to sync anyway`,
@@ -863,6 +987,8 @@ function applyMessage(s) {
     for (const f of s.apply.failed) lines.push(`- ${f.path}`)
   }
   if (s.excluded.length > 0) lines.push('', `Left out by --exclude: ${s.excluded.length} file(s).`)
+  if (s.dropped?.length > 0)
+    lines.push('', `Removed in the fork (do not port): ${s.dropped.length} file(s).`)
   return `${lines.join('\n')}\n`
 }
 
@@ -879,6 +1005,7 @@ function stateOf(s) {
     deletions,
     binary,
     excluded,
+    dropped,
     apply,
     watch,
     remote,
@@ -895,6 +1022,7 @@ function stateOf(s) {
     deletions,
     binary,
     excluded,
+    dropped,
     apply,
     watch,
     remote,
@@ -1215,6 +1343,16 @@ function reportLines(s) {
       `## Left out by --exclude (${s.excluded.length}, port by hand)`,
       '',
       ...capped(s.excluded, (p) => `\`${p}\``),
+      '',
+    )
+  }
+  if (s.dropped?.length > 0) {
+    r.push(
+      `## Removed in the fork (${s.dropped.length}, do not port)`,
+      '',
+      'The fork deleted these with the own-key AI (UniWork ADR 0051) or the Genspark cloud sign-in; keep them out. A reader fix to upstream `packages/ai-provider/src/protocols/openai-compatible.ts` goes into `packages/ai-provider/src/protocols/openai-sse.ts` by hand.',
+      '',
+      ...capped(s.dropped, (p) => `\`${p}\``),
       '',
     )
   }

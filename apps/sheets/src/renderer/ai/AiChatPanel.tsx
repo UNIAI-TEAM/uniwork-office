@@ -22,13 +22,11 @@ import {
   type AiScopeQuoteData,
   type AiTokenUsageView,
   uniworkErrorForEntry,
-  useAiModelNeedHint,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
   type UniworkSendGate,
 } from '@genoffice/ui'
-import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
 import {
   getEntryResultChipView,
   panelLiveAnnouncement as computePanelLiveAnnouncement,
@@ -291,15 +289,13 @@ export interface AiChatMessage {
     | undefined
 }
 
-/** the model chip's "manage" row (one function: the picker keys an effect on its identity) */
+/** the model chip's "Details" (one function: the picker keys an effect on its identity) */
 const openDesktopModelSettings = () => window.desktopApi.openAiModelSettings().catch(() => {})
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.desktopApi.getAiSettings(),
-  setSettings: (settings, options) => window.desktopApi.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.desktopApi.onAiSettingsChanged(handler),
-  gskLoggedIn: () => window.desktopApi.aiGskStatus().then((s) => !!s?.loggedIn),
-  // the chip's "manage" row opens the desktop model settings; a web frame has none to open
+  // the chip's "Details" opens the desktop account settings; a web frame has none to open
   get openModelSettings() {
     return platform() === 'web' ? undefined : openDesktopModelSettings
   },
@@ -414,7 +410,6 @@ export function AiChatPanel({
   const { t, lang } = useI18n()
   const askUni = useAskUniMode(lang, askUniBindingKey)
   const leaveAskUni = askUni.leave
-  const needModelHint = useAiModelNeedHint()
   // the UniWork disclosure gate of every send entry: the composer feeds it, the queue pump asks it
   // silently, and retry (and, through ExcelShell, presets and ribbon runs) refuse through it
   const ownGate = useUniworkSendGate()
@@ -429,7 +424,6 @@ export function AiChatPanel({
   const msgQueue = useChatRunQueue<readonly AttachmentMeta[]>({
     busy: aiBusy,
     submit: (text, atts) => {
-      if (needModelHint !== null) return false
       // held until the user acknowledges the UniWork disclosure, as Send is
       if (uniworkGate.isBlocked()) return false
       return onSendQueued?.(text, atts) ?? false
@@ -596,30 +590,8 @@ export function AiChatPanel({
     stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
   }
 
-  const [provider, setProvider] = useState<string | undefined>(undefined)
-  useEffect(() => {
-    let cancelled = false
-    const sync = () => {
-      void MODEL_BRIDGE.getSettings()
-        .then((s) => {
-          if (!cancelled) setProvider(s?.provider)
-        })
-        .catch(() => {})
-    }
-    sync()
-    const off = MODEL_BRIDGE.onSettingsChanged?.(sync)
-    return () => {
-      cancelled = true
-      off?.()
-    }
-  }, [])
-  const isUniwork = provider === 'uniwork'
-
   const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
   const [composerAnnouncement, setComposerAnnouncement] = useState('')
-  // the model picker's list note, written into the panel's own polite node (never a node of the
-  // picker's); it stands while the announcement it was written over is the current one
-  const [pickerNote, setPickerNote] = useState<{ text: string; over: string } | null>(null)
   useEffect(() => {
     const bridge = readUniworkCloudStatus()
     if (!bridge) return
@@ -639,21 +611,17 @@ export function AiChatPanel({
     }
   }, [])
   const composerNoteState = composerNoteFor({
-    provider: provider ?? undefined,
+    uniworkSelected: true,
     cloudState: cloudSnapshot?.state ?? null,
     signedOut: cloudSnapshot ? !cloudSnapshot.signedIn : undefined,
   })
   // the gate must not depend on the composer being mounted (collapsed rail): read the ack key here
-  const { acked: uniworkDisclosureAcked } = useUniworkDisclosureAck(
-    isUniwork
-      ? {
-          account: cloudSnapshot?.accountId ?? '',
-          org: cloudSnapshot?.orgId ?? '',
-          document: 'local',
-        }
-      : null,
-  )
-  uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
+  const { acked: uniworkDisclosureAcked } = useUniworkDisclosureAck({
+    account: cloudSnapshot?.accountId ?? '',
+    org: cloudSnapshot?.orgId ?? '',
+    document: 'local',
+  })
+  uniworkGate.setPanelBlocked(!uniworkDisclosureAcked)
   // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
   uniworkGate.setPanelOpen(isOpen, () => {
     // the refusal's disclosure sits in the chat composer
@@ -744,7 +712,6 @@ export function AiChatPanel({
           lastEntryChipInput:
             lastEntry && lastEntry.role === 'assistant'
               ? {
-                  provider: provider ?? null,
                   mutated: Boolean(lastEntry.autoApplied),
                   hasStreamedText: Boolean(lastEntry.text?.trim()),
                   clarifyAsked: Boolean(lastEntry.clarifyReceipts?.length),
@@ -763,10 +730,7 @@ export function AiChatPanel({
         })
       : composerAnnouncement
 
-  const liveText =
-    pickerNote && pickerNote.over === panelLiveAnnouncement
-      ? pickerNote.text
-      : panelLiveAnnouncement
+  const liveText = panelLiveAnnouncement
   return (
     <aside
       ref={asideRef}
@@ -853,7 +817,7 @@ export function AiChatPanel({
                   {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
                   {entry.text && (
                     <div dir="auto">
-                      <Markdown text={aiNoticeBody(entry.text)} nav={citationNav} />
+                      <Markdown text={entry.text} nav={citationNav} />
                     </div>
                   )}
                 </div>
@@ -878,7 +842,6 @@ export function AiChatPanel({
               aiBusy,
               (key, vars) => aiUniworkText(lang, key, vars),
               {
-                provider: provider ?? null,
                 mutated: Boolean(entry.autoApplied),
                 hasStreamedText: Boolean(entry.text?.trim()),
                 clarifyAsked: Boolean(entry.clarifyReceipts?.length),
@@ -912,7 +875,7 @@ export function AiChatPanel({
             return (
               <div
                 key={index}
-                className={`ai-msg ai-msg-${entry.role}${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.role === 'assistant' && entry.streaming ? ' ai-msg-streaming' : ''}`}
+                className={`ai-msg ai-msg-${entry.role}${entry.isError ? ' ai-msg-error' : ''}${entry.role === 'assistant' && entry.streaming ? ' ai-msg-streaming' : ''}`}
               >
                 {entry.role === 'user' ? (
                   <>
@@ -968,11 +931,7 @@ export function AiChatPanel({
                     {entry.text || chip ? (
                       <div className="ai-msg-answer" dir="auto">
                         {(entry.text || chipLead) && (
-                          <Markdown
-                            text={entry.text ? aiNoticeBody(entry.text) : ''}
-                            nav={citationNav}
-                            lead={chipLead}
-                          />
+                          <Markdown text={entry.text ?? ''} nav={citationNav} lead={chipLead} />
                         )}
                       </div>
                     ) : (
@@ -1002,12 +961,6 @@ export function AiChatPanel({
                                 )
                             }
                           : undefined
-                      }
-                      // a web frame has no other provider to choose: no action there
-                      onChooseProvider={
-                        platform() === 'web'
-                          ? undefined
-                          : () => void window.desktopApi?.openAiSettings?.()
                       }
                       onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                       onAskAgain={isLast && !aiBusy ? () => inputRef.current?.focus() : undefined}
@@ -1137,9 +1090,6 @@ export function AiChatPanel({
         {/* the composer stays mounted (draft, attachments) while the card holds the run */}
         <div className="ai-composer" style={clarify ? { display: 'none' } : undefined}>
           {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
-          {viewOnly && !isUniwork && (
-            <div className="ai-readonly-notice">{t('aiViewOnlyNotice')}</div>
-          )}
           <AiComposer
             queueStrip={
               <AiQueueStrip
@@ -1272,40 +1222,30 @@ export function AiChatPanel({
             sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
             stopIcon={<img src={sendStop} alt="" aria-hidden />}
             lang={lang}
-            viewOnly={isUniwork && viewOnly ? true : undefined}
-            uniwork={
-              isUniwork
-                ? {
-                    provider: provider ?? 'uniwork',
-                    lang,
-                    note: composerNoteState,
-                    onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
-                    onChooseProvider:
-                      platform() === 'web'
-                        ? undefined
-                        : () => void window.desktopApi?.openAiSettings?.(),
-                    onAnnounce: setComposerAnnouncement,
-                    onSendBlockedChange: uniworkGate.onSendBlockedChange,
-                    registerBlockedHandler,
-                    disclosure: {
-                      orgName: cloudSnapshot?.orgName ?? undefined,
-                      ackKey: {
-                        account: cloudSnapshot?.accountId ?? '',
-                        org: cloudSnapshot?.orgId ?? '',
-                        document: 'local',
-                      },
-                      variant: 'local',
-                    },
-                  }
-                : undefined
-            }
+            viewOnly={viewOnly ? true : undefined}
+            uniwork={{
+              lang,
+              note: composerNoteState,
+              // the note only informs here: the fixed planner answers while UniWork AI cannot
+              noteGatesSend: false,
+              onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
+              onAnnounce: setComposerAnnouncement,
+              onSendBlockedChange: uniworkGate.onSendBlockedChange,
+              registerBlockedHandler,
+              disclosure: {
+                orgName: cloudSnapshot?.orgName ?? undefined,
+                ackKey: {
+                  account: cloudSnapshot?.accountId ?? '',
+                  org: cloudSnapshot?.orgId ?? '',
+                  document: 'local',
+                },
+                variant: 'local',
+              },
+            }}
             footerStart={
               <>
-                <AiModelPicker
-                  bridge={MODEL_BRIDGE}
-                  lang={lang}
-                  onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
-                />
+                {/* UniWork AI not offered never closes a send entry here: the fixed planner answers */}
+                <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} gatesSend={false} />
                 {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
                 {cap('attachments') && (
                   <button

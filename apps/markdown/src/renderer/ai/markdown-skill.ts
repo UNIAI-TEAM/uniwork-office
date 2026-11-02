@@ -8,6 +8,7 @@ import {
   buildDocContext,
   executeTool,
   markDocSeen,
+  WRITER_UNAVAILABLE,
   type AskClarification,
   type FrontmatterAccess,
 } from './tools'
@@ -99,12 +100,16 @@ const IMAGE_FETCH_OFF_NOTE =
   '\n\nNote: insert_image and generate_image are unavailable here (images cannot be downloaded into this document). Do not call or promise them; image_search results can be shared as links.'
 
 const IMAGE_GEN_OFF_NOTE =
-  '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
+  '\n\nNote: generate_image is currently unavailable (signed out of UniWork, or the UniWork cloud tools are off). Do not call or promise it; use image_search for imagery.'
+
+/** the one-shot writer behind write_document runs only where the host reaches the UniWork AI writer route */
+const WRITER_OFF_NOTE =
+  '\n\nNote: write_document is not available here. Edit the open document with the editing tools; do not offer to write a new document in one go.'
 
 export function createMarkdownSkill(
   getEditor: () => Editor | null,
   fm?: FrontmatterAccess,
-  /** live predicate (a BYOK media model is configured; the UniWork cloud route while its seam is on); false hides generate_image */
+  /** live predicate (the UniWork cloud route while its seam is on); false hides generate_image */
   imageGenAvailable?: () => boolean,
   /** streaming long-form writer behind write_document (panel-owned: progress chip, partial keep/discard) */
   getWriter?: () => AiDocWriter | undefined,
@@ -116,7 +121,13 @@ export function createMarkdownSkill(
   imageUrls?: ImageUrlRegistry,
   /** told the path of each picture file a run saves beside the document (the panel's Roll back drops them) */
   onImageAsset?: (rel: string, base64: string) => void,
+  /**
+   * live predicate: the host reaches the UniWork AI writer route (the web frame). The desktop has
+   * none: false hides and refuses write_document and says so in the prompt. Unset reads as true.
+   */
+  uniworkWriterRoute?: () => boolean,
 ): AgentSkill {
+  const writerRoute = (): boolean => uniworkWriterRoute?.() ?? true
   /** ask_clarification only exists while a panel hosts its card; it never edits, so view-only keeps it */
   const withAsk = (tools: AgentToolDef[], readOnly: boolean): AgentToolDef[] =>
     tools.filter((t) =>
@@ -134,9 +145,9 @@ export function createMarkdownSkill(
       const redact = labels.length > 0 ? `\n\n${placeholderInstruction(labels)}` : ''
       if (isReadOnly?.()) return AGENT_SYSTEM_PROMPT + VIEW_ONLY_NOTE + redact
       const prompt =
-        imageGenAvailable?.() === false
+        (imageGenAvailable?.() === false
           ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
-          : AGENT_SYSTEM_PROMPT
+          : AGENT_SYSTEM_PROMPT) + (writerRoute() ? '' : WRITER_OFF_NOTE)
       return (hostOffers('insert_image') ? prompt : prompt + IMAGE_FETCH_OFF_NOTE) + redact
     },
     get tools() {
@@ -146,7 +157,7 @@ export function createMarkdownSkill(
           ? AGENT_TOOLS.filter((t) => t.name !== 'generate_image')
           : AGENT_TOOLS
       return withAsk(
-        tools.filter((t) => hostOffers(t.name)),
+        tools.filter((t) => hostOffers(t.name) && (t.name !== 'write_document' || writerRoute())),
         false,
       )
     },
@@ -168,6 +179,13 @@ export function createMarkdownSkill(
       }
       if (!hostOffers(call.name)) {
         return { output: `${call.name} is not available here.`, isError: true, summary: call.name }
+      }
+      if (call.name === 'write_document' && !writerRoute()) {
+        return {
+          output: WRITER_UNAVAILABLE,
+          isError: true,
+          summary: call.name,
+        }
       }
       const editor = getEditor()
       if (!editor) {

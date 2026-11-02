@@ -44,6 +44,7 @@ vi.mock('@genoffice/agent-core', async (orig) => {
 })
 
 import { AiPanel, type MarkdownAiDeps } from '../src/renderer/ai/AiPanel'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const flush = async (): Promise<void> => {
   await act(async () => {
@@ -68,9 +69,11 @@ describe('markdown AI panel: ask before saving an untitled document', () => {
     editor = null
     harness.mutate = true
     vi.unstubAllGlobals()
+    resetUniworkAi()
   })
 
   async function mount(offer: string | null) {
+    readyUniworkAi()
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
     const save = vi.fn(async () => true)
@@ -83,7 +86,7 @@ describe('markdown AI panel: ask before saving an untitled document', () => {
               prop === 'save'
                 ? save
                 : prop === 'getAiSettings'
-                  ? vi.fn(async () => ({ ...usableAiSettings(), provider: 'openai' }))
+                  ? vi.fn(async () => usableAiSettings())
                   : /^on[A-Z]/.test(prop)
                     ? vi.fn(() => () => {})
                     : vi.fn(async () => undefined)

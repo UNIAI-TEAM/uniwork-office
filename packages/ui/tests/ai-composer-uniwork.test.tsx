@@ -62,18 +62,14 @@ function renderComposer(props: Partial<AiComposerProps> = {}) {
 }
 
 describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence (S11)', () => {
-  it('renders one composer note above the composer for each note kind with its action button', () => {
+  it('renders the signed-out composer note above the composer with its sign-in button', () => {
     const onSignIn = vi.fn()
-    const onChooseProvider = vi.fn()
     const signedOutNote = composerNoteFor({ uniworkSelected: true, cloudState: 'signed-out' })!
     renderComposer({
       lang: 'vi',
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         note: signedOutNote,
         onSignIn,
-        onChooseProvider,
       },
     })
 
@@ -93,30 +89,23 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
     expect(liveEl!.textContent).toContain(aiUniworkText('vi', 'aiUniworkSignedOut'))
   })
 
-  it('maps not-entitled, subscription-inactive, credits-exhausted, unavailable and off to Choose another provider', () => {
+  it('shows not-entitled, subscription-inactive, credits-exhausted, unavailable and off as notes without a button (UNI-2309)', () => {
     const cases: Array<[ComposerNote, string]> = [
+      [{ kind: 'off', key: 'aiUniworkOff', action: null }, aiUniworkText('en', 'aiUniworkOff')],
       [
-        { kind: 'off', key: 'aiUniworkOff', action: 'choose-provider' },
-        aiUniworkText('en', 'aiUniworkOff'),
-      ],
-      [
-        { kind: 'not-entitled', key: 'not_entitled', action: 'choose-provider' },
+        { kind: 'not-entitled', key: 'not_entitled', action: null },
         aiNoticeText('not_entitled', 'en'),
       ],
       [
-        {
-          kind: 'subscription-inactive',
-          key: 'cloudInactiveBody',
-          action: 'choose-provider',
-        },
+        { kind: 'subscription-inactive', key: 'cloudInactiveBody', action: null },
         aiUniworkText('en', 'cloudInactiveBody'),
       ],
       [
-        { kind: 'credits-exhausted', key: 'credits_exhausted', action: 'choose-provider' },
+        { kind: 'credits-exhausted', key: 'credits_exhausted', action: null },
         aiNoticeText('credits_exhausted', 'en'),
       ],
       [
-        { kind: 'unavailable', key: 'aiErrUnavailable', action: 'choose-provider' },
+        { kind: 'unavailable', key: 'aiErrUnavailable', action: null },
         aiUniworkText('en', 'aiErrUnavailable'),
       ],
     ]
@@ -125,16 +114,15 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
       renderComposer({
         lang: 'en',
         uniwork: {
-          active: true,
-          provider: 'uniwork',
           note,
         },
       })
       const noteEl = host.querySelector<HTMLElement>('.ai-uniwork-composer-note')
       expect(noteEl).not.toBeNull()
       expect(noteEl!.textContent).toContain(expectedBody)
-      const btn = noteEl!.querySelector<HTMLButtonElement>('button')
-      expect(btn!.textContent).toBe(aiUniworkText('en', 'aiRunChooseOther'))
+      expect(noteEl!.querySelector('button')).toBeNull()
+      // no way out but the organization: never another provider, a key or the AI Model settings
+      expect(noteEl!.textContent).not.toMatch(/provider|key|AI Model/i)
     }
   })
 
@@ -146,9 +134,7 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
       renderComposer({
         lang,
         uniwork: {
-          active: true,
-          provider: 'uniwork',
-          note: { kind: 'not-entitled', key: 'not_entitled', action: 'choose-provider' },
+          note: { kind: 'not-entitled', key: 'not_entitled', action: null },
         },
       })
       const notEntitledText =
@@ -159,9 +145,7 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
       renderComposer({
         lang,
         uniwork: {
-          active: true,
-          provider: 'uniwork',
-          note: { kind: 'credits-exhausted', key: 'credits_exhausted', action: 'choose-provider' },
+          note: { kind: 'credits-exhausted', key: 'credits_exhausted', action: null },
         },
       })
       const exhaustedText =
@@ -171,22 +155,20 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
     }
   })
 
-  it('never auto-hides over time, clears when its action button is clicked, and resets when provider changes', () => {
+  it('never auto-hides over time, clears when its action button is clicked, and shows again for another note', () => {
     vi.useFakeTimers()
     try {
-      const onChooseProvider = vi.fn()
+      const onSignIn = vi.fn()
       const note: ComposerNote = {
-        kind: 'credits-exhausted',
-        key: 'credits_exhausted',
-        action: 'choose-provider',
+        kind: 'signed-out',
+        key: 'aiUniworkSignedOut',
+        action: 'sign-in',
       }
       renderComposer({
         lang: 'vi',
         uniwork: {
-          active: true,
-          provider: 'uniwork',
           note,
-          onChooseProvider,
+          onSignIn,
         },
       })
 
@@ -202,26 +184,15 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
       act(() => {
         noteEl!.querySelector('button')!.click()
       })
-      expect(onChooseProvider).toHaveBeenCalledTimes(1)
+      expect(onSignIn).toHaveBeenCalledTimes(1)
       expect(host.querySelector('.ai-uniwork-composer-note')).toBeNull()
 
-      // Switching provider away and back re-shows the note if condition still holds
+      // a note of another kind is a new reason: it shows
       renderComposer({
         lang: 'vi',
         uniwork: {
-          active: false,
-          provider: 'openai',
-          note: null,
-          onChooseProvider,
-        },
-      })
-      renderComposer({
-        lang: 'vi',
-        uniwork: {
-          active: true,
-          provider: 'uniwork',
-          note,
-          onChooseProvider,
+          note: { kind: 'credits-exhausted', key: 'credits_exhausted', action: null },
+          onSignIn,
         },
       })
       expect(host.querySelector('.ai-uniwork-composer-note')).not.toBeNull()
@@ -231,17 +202,11 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
   })
 
   it('renders view-only sub-line under the composer and co-exists with a composer note above it (S11)', () => {
-    const note: ComposerNote = {
-      kind: 'credits-exhausted',
-      key: 'credits_exhausted',
-      action: 'choose-provider',
-    }
+    const note: ComposerNote = { kind: 'credits-exhausted', key: 'credits_exhausted', action: null }
     renderComposer({
       lang: 'vi',
       viewOnly: true,
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         note,
       },
     })
@@ -251,6 +216,26 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
     expect(noteEl).not.toBeNull()
     expect(viewOnlyEl).not.toBeNull()
     expect(viewOnlyEl!.textContent).toBe(aiUniworkText('vi', 'aiUniworkViewOnly'))
+  })
+
+  it('keeps Send and Enter off while a composer note shows, unless the note does not gate Send (Sheets) (UNI-2309)', () => {
+    const signedOut = composerNoteFor({ uniworkSelected: true, cloudState: 'signed-out' })!
+    const blocked = renderComposer({ uniwork: { note: signedOut } })
+    const send = host.querySelector<HTMLButtonElement>('.ai-send-btn')!
+    expect(send.disabled).toBe(true)
+    const textarea = host.querySelector<HTMLTextAreaElement>('textarea')!
+    act(() => {
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    expect(blocked.onSend).not.toHaveBeenCalled()
+
+    // Sheets: its fixed planner answers while UniWork AI cannot, so the note only informs
+    const open = renderComposer({ uniwork: { note: signedOut, noteGatesSend: false } })
+    const sheetsSend = host.querySelector<HTMLButtonElement>('.ai-send-btn')!
+    expect(host.querySelector('.ai-uniwork-composer-note')).not.toBeNull()
+    expect(sheetsSend.disabled).toBe(false)
+    act(() => sheetsSend.click())
+    expect(open.onSend).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -267,8 +252,6 @@ describe('AiComposer — First-use disclosure & local-file variant (S8 + G05BE-6
     renderComposer({
       lang: 'vi',
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         disclosure: {
           ackKey,
           orgName: 'Acme Corp',
@@ -310,8 +293,6 @@ describe('AiComposer — First-use disclosure & local-file variant (S8 + G05BE-6
     renderComposer({
       lang: 'vi',
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         disclosure: {
           ackKey: localKey,
           orgName: 'Acme Corp',
@@ -333,8 +314,6 @@ describe('AiComposer — First-use disclosure & local-file variant (S8 + G05BE-6
       lang: 'vi',
       value: 'Summarize this',
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         disclosure: {
           ackKey,
           orgName: 'Acme Corp',
@@ -387,8 +366,6 @@ describe('AiComposer — First-use disclosure & local-file variant (S8 + G05BE-6
       value: 'Hello',
       onSend,
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         disclosure: {
           ackKey,
           orgName: 'Acme Corp',
@@ -425,8 +402,6 @@ describe('AiComposer — First-use disclosure & local-file variant (S8 + G05BE-6
       value: 'Hello',
       onSend,
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         disclosure: {
           ackKey: { ...ackKey, document: 'doc-99' },
           orgName: 'Acme Corp',
@@ -450,8 +425,6 @@ describe('AiComposer — disclosure ack with an unscoped key (RF3-1)', () => {
       value: 'Hello',
       onSend,
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         disclosure: { ackKey: key, orgName: 'Acme Corp', variant: 'document' },
       },
     })
@@ -515,14 +488,12 @@ describe('AiComposer — send-blocked report and shared unscoped ack (RF4-1, RF4
   function renderWith(
     key: UniworkAckKey,
     onSendBlockedChange: (blocked: boolean) => void,
-    extra: { active?: boolean; renderInline?: boolean } = {},
+    extra: { renderInline?: boolean } = {},
   ) {
     renderComposer({
       lang: 'vi',
       value: 'Hello',
       uniwork: {
-        active: extra.active ?? true,
-        provider: extra.active === false ? 'openai' : 'uniwork',
         onSendBlockedChange,
         disclosure: {
           ackKey: key,
@@ -554,15 +525,11 @@ describe('AiComposer — send-blocked report and shared unscoped ack (RF4-1, RF4
     expect(seen.at(-1)).toBe(false)
   })
 
-  it('RF4-1: an already acked key, or another provider, never reports blocked', () => {
+  it('RF4-1: an already acked key never reports blocked', () => {
     ack(scoped)
     const seen: boolean[] = []
     renderWith(scoped, (b) => seen.push(b))
     expect(seen.at(-1)).toBe(false)
-    clearUniworkAcks()
-    const other: boolean[] = []
-    renderWith(scoped, (b) => other.push(b), { active: false })
-    expect(other.at(-1)).toBe(false)
   })
 
   it('RF4-1: a blocked composer reports unblocked when it unmounts, so a stale flag cannot hold a queue', () => {
@@ -584,8 +551,6 @@ describe('AiComposer — send-blocked report and shared unscoped ack (RF4-1, RF4
           createElement(AiComposer, {
             ...baseProps({ value: 'Hello' }),
             uniwork: {
-              active: true,
-              provider: 'uniwork',
               onSendBlockedChange: (b: boolean) => seen.push(b),
               disclosure: { ackKey: unscoped, variant: 'document', renderInline: false },
             },
@@ -615,8 +580,6 @@ describe('AiComposer — shared send gate for preset, retry and continue entries
     return createElement(AiComposer, {
       ...baseProps({ value: 'Hello' }),
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         lang: 'vi',
         onAnnounce: announce,
         onSendBlockedChange: gate.onSendBlockedChange,
@@ -742,8 +705,6 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
       busy: false,
       onStop,
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         disclosure: { ackKey, orgName: 'Org', variant: 'document' },
       },
     })
@@ -758,8 +719,6 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
       busy: true,
       onStop,
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         disclosure: { ackKey, orgName: 'Org', variant: 'document' },
       },
     })
@@ -777,8 +736,6 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
       busy: false,
       onStop,
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         disclosure: { ackKey, orgName: 'Org', variant: 'document' },
       },
     })
@@ -790,8 +747,6 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
       busy: true,
       onStop,
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         disclosure: { ackKey, orgName: 'Org', variant: 'document' },
       },
     })
@@ -811,8 +766,6 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
       busy: false,
       onStop,
       uniwork: {
-        active: true,
-        provider: 'uniwork',
         onAnnounce,
         disclosure: { ackKey, orgName: 'Org', variant: 'document' },
       },
@@ -827,10 +780,7 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
       busy: true,
       onStop,
       popupOpen: false,
-      uniwork: {
-        active: true,
-        provider: 'uniwork',
-      },
+      uniwork: {},
     })
 
     const textarea = host.querySelector<HTMLTextAreaElement>('.ai-input')!
@@ -843,7 +793,7 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
       busy: true,
       onStop,
       popupOpen: true,
-      uniwork: { active: true, provider: 'uniwork' },
+      uniwork: {},
     })
     act(() => {
       textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -856,7 +806,7 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
       busy: true,
       onStop,
       popupOpen: false,
-      uniwork: { active: true, provider: 'uniwork' },
+      uniwork: {},
     })
     const composerListbox = document.createElement('div')
     composerListbox.setAttribute('role', 'listbox')
@@ -900,7 +850,7 @@ describe('AiComposer — Send/Stop labels, polite live announcements, Escape gua
       lang: 'vi',
       busy: true,
       onStop,
-      uniwork: { active: true, provider: 'uniwork' },
+      uniwork: {},
     })
     const textarea = host.querySelector<HTMLTextAreaElement>('.ai-input')!
     const inputBox = host.querySelector<HTMLElement>('.ai-input-box')!

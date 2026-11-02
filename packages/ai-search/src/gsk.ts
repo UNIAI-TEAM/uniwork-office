@@ -1,6 +1,6 @@
 /**
- * UniWork cloud tools (web/image search, image generation, media analysis,
- * transcription), paid with the organization's UniWork AI credits. The calls
+ * UniWork cloud tools (web/image search, image generation, media analysis),
+ * paid with the organization's UniWork AI credits. The calls
  * go through the transport the shell main process installs in
  * `@genoffice/ai-provider` (uniwork-cloud.ts), which adds the bearer token
  * itself; this file never sees a token. Media is read here, client-side
@@ -38,7 +38,6 @@ export const UNIWORK_CLOUD_LIMITS = {
   maxReferenceImageBytes: 8 * MIB,
   maxMediaItems: 4,
   maxMediaTotalBytes: 25 * MIB,
-  maxAudioBytes: 25 * MIB,
 } as const
 
 const EXACT_SIZE = /^\d+x\d+$/
@@ -80,7 +79,7 @@ const LOCAL_READ_REFUSED =
  * gate and a prompt-injected path could ship any image, audio or video on the
  * disk to the server, so only https, data: and generated-store file: URLs pass.
  */
-export function assertCloudMediaRefs(refs: readonly string[], roots?: readonly string[]): void {
+function assertCloudMediaRefs(refs: readonly string[], roots?: readonly string[]): void {
   if (roots && roots.length > 0) return
   for (const ref of refs) {
     if (!/^(https?:|data:|file:)/i.test(ref)) throw new Error(LOCAL_READ_REFUSED)
@@ -294,43 +293,6 @@ export async function gskAnalyzeMedia(
   const refs = (options.mediaUrls ?? []).map(String).filter(Boolean)
   if (!refs.length) throw new Error('mediaUrls must not be empty')
   const blobs = await loadCloudMedia(refs, CLOUD_MEDIA_BUDGET, media.mediaRoots)
-  return analyzeLoadedMedia(requirements, blobs, signal)
-}
-
-/**
- * Analysis of references the caller already loaded (the mixed BYOK / cloud
- * batch, which loads once): applies the cloud caps, then sends the bytes. The
- * caller has already checked local reads with assertCloudMediaRefs.
- */
-export async function gskAnalyzeLoadedMedia(
-  options: { requirements: string; media: readonly MediaBlob[] },
-  signal?: AbortSignal,
-): Promise<string> {
-  requireTool('media_analyze')
-  const requirements = clip(
-    String(options.requirements ?? '').trim(),
-    UNIWORK_CLOUD_LIMITS.maxPromptChars,
-  )
-  if (!requirements) throw new Error('requirements must not be empty')
-  return analyzeLoadedMedia(requirements, options.media, signal)
-}
-
-async function analyzeLoadedMedia(
-  requirements: string,
-  blobs: readonly MediaBlob[],
-  signal?: AbortSignal,
-): Promise<string> {
-  if (blobs.length > CLOUD_MEDIA_BUDGET.maxItems) {
-    throw new Error(
-      `Too many media items for UniWork cloud AI (${blobs.length}, limit ${CLOUD_MEDIA_BUDGET.maxItems}); analyze them in smaller batches`,
-    )
-  }
-  const total = blobs.reduce((n, b) => n + b.bytes.byteLength, 0)
-  if (total > CLOUD_MEDIA_BUDGET.maxTotalBytes) {
-    throw new Error(
-      `Media is too large for UniWork cloud AI (limit ${CLOUD_MEDIA_BUDGET.maxTotalBytes / MIB} MB in total); analyze it in smaller batches`,
-    )
-  }
   const r = await uniworkCloudTransport().analyzeMedia(
     {
       requirements,
@@ -339,43 +301,4 @@ async function analyzeLoadedMedia(
     signal,
   )
   return r.text
-}
-
-export interface GskTranscribeOptions {
-  /** Audio URLs or local paths, read here and sent as bytes (one request each) */
-  audioUrls: string[]
-  /** Prompt (context / proper nouns; can improve recognition quality) */
-  prompt?: string
-  /** transcription model; ignored by the UniWork cloud (the server picks it) */
-  model?: string
-}
-
-export async function gskTranscribe(
-  options: GskTranscribeOptions,
-  signal?: AbortSignal,
-  media: GskMediaOptions = {},
-): Promise<string> {
-  requireTool('transcribe')
-  const refs = (options.audioUrls ?? []).map(String).filter(Boolean)
-  if (!refs.length) throw new Error('audioUrls must not be empty')
-  const blobs = await loadCloudMedia(
-    refs,
-    { ...CLOUD_MEDIA_BUDGET, maxItemBytes: UNIWORK_CLOUD_LIMITS.maxAudioBytes },
-    media.mediaRoots,
-  )
-  const prompt = options.prompt
-    ? clip(options.prompt.trim(), UNIWORK_CLOUD_LIMITS.maxPromptChars)
-    : undefined
-  const parts: string[] = []
-  for (const b of blobs) {
-    const r = await uniworkCloudTransport().transcribe(
-      {
-        ...(prompt ? { prompt } : {}),
-        audio: { mime: b.mime, dataBase64: toBase64(b.bytes) },
-      },
-      signal,
-    )
-    parts.push(r.text)
-  }
-  return parts.join('\n\n')
 }

@@ -6,7 +6,7 @@ import { LocaleProvider } from '../src/renderer/src/locale'
 import { en } from '../src/renderer/src/i18n/askuni/en'
 import type { AskUniContext, AskUniFlags } from '../src/shared/askuni-api'
 
-// the v2 panel is tested on its own; here only the My AI wiring around it
+// the v2 panel is tested on its own; here only the Home chat pane around it
 vi.mock('../src/renderer/src/askuni-v2/AskUniPanel', async () => {
   const { createElement } = await import('react')
   return {
@@ -27,10 +27,9 @@ import { requestAskUniOpen, resetAskUniEntryForTests } from '../src/renderer/src
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-describe('My AI pane with the Ask UNI v2 flag', () => {
+describe('Home chat pane (Ask UNI v2)', () => {
   let host: HTMLDivElement
   let root: Root
-  let flags: ReturnType<typeof vi.fn<() => Promise<AskUniFlags>>>
 
   async function flush(): Promise<void> {
     await act(async () => {
@@ -39,29 +38,17 @@ describe('My AI pane with the Ask UNI v2 flag', () => {
   }
   async function mount(): Promise<void> {
     await act(async () => {
-      root.render(
-        h(LocaleProvider, {
-          initial: 'en',
-          children: h(NewChatPane, {
-            practiceId: 'general' as never,
-            ensureWorkbench: () => undefined,
-          }),
-        }),
-      )
+      root.render(h(LocaleProvider, { initial: 'en', children: h(NewChatPane) }))
     })
     await flush()
   }
-  const modeBtn = (label: string) =>
-    [...host.querySelectorAll('.new-chat-bar button')].find(
-      (b) => b.textContent?.trim() === label,
-    ) as HTMLButtonElement | undefined
+  const composer = () => host.querySelector('textarea[aria-label="composer"]')
 
   beforeEach(() => {
     host = document.createElement('div')
     document.body.appendChild(host)
     root = createRoot(host)
     resetAskUniEntryForTests()
-    flags = vi.fn(async () => ({ streamEnabled: true }))
     const ctx: AskUniContext = {
       workspaces: [{ id: 'ws-a', name: 'Marketing team' }],
       currentWorkspaceId: 'ws-a',
@@ -71,8 +58,7 @@ describe('My AI pane with the Ask UNI v2 flag', () => {
       {
         uniworkAskUni: vi.fn(),
         uniworkAskUniContext: vi.fn(async () => ctx),
-        askUniFlags: flags,
-        recents: async () => ({ items: [], total: 0 }),
+        askUniFlags: vi.fn(async (): Promise<AskUniFlags> => ({ streamEnabled: true })),
         setLanguage: async () => null,
       } as Record<string, unknown>,
       { get: (t, p: string) => (p in t ? t[p] : undefined) },
@@ -85,54 +71,125 @@ describe('My AI pane with the Ask UNI v2 flag', () => {
     delete (window as unknown as { aiOffice?: unknown }).aiOffice
   })
 
-  it('the Ask UNI toggle mounts the v2 panel when the flag is on', async () => {
+  it('renders the v2 panel at once, with no mode switch', async () => {
     await mount()
-    expect(host.querySelector('[data-testid="v2-panel"]')).toBeNull()
-    await act(async () => modeBtn(en.askUniModeAsk)!.click())
-    await flush()
-    expect(host.querySelector('[data-testid="v2-panel"]')).not.toBeNull()
+    const panel = host.querySelector('[data-testid="v2-panel"]') as HTMLElement | null
+    expect(panel).not.toBeNull()
+    expect(panel!.hidden).toBe(false)
+    expect(host.querySelector('.askuni-modes')).toBeNull()
+    expect(host.querySelector('.new-chat-bar button')).toBeNull()
     expect(host.querySelector('.askuni-pane')).toBeNull()
   })
 
-  it('keeps the v2 panel mounted (hidden) when the chat mode comes back', async () => {
+  it('is titled Ask UNI', async () => {
     await mount()
-    await act(async () => modeBtn(en.askUniModeAsk)!.click())
-    await flush()
-    await act(async () => modeBtn(en.askUniModeChat)!.click())
-    const panel = host.querySelector('[data-testid="v2-panel"]') as HTMLElement
-    expect(panel).not.toBeNull()
-    expect(panel.hidden).toBe(true)
+    expect(host.querySelector('.new-chat-title')?.textContent).toBe(en.askUniTitle)
+    expect(host.querySelector('main')?.getAttribute('aria-label')).toBe(en.askUniTitle)
   })
 
-  it('an open request switches to Ask UNI and focuses the composer', async () => {
+  it('an open request (Ctrl/Cmd+J) puts the caret in the composer', async () => {
     await mount()
-    expect(modeBtn(en.askUniModeAsk)!.getAttribute('aria-pressed')).toBe('false')
     await act(async () => requestAskUniOpen())
     await flush()
-    expect(modeBtn(en.askUniModeAsk)!.getAttribute('aria-pressed')).toBe('true')
-    expect(host.querySelector('[data-testid="v2-panel"]')).not.toBeNull()
-    expect(document.activeElement).toBe(host.querySelector('textarea[aria-label="composer"]'))
+    expect(document.activeElement).toBe(composer())
   })
 
   it('a request made before the pane existed is applied when it mounts', async () => {
     requestAskUniOpen()
     await mount()
-    expect(modeBtn(en.askUniModeAsk)!.getAttribute('aria-pressed')).toBe('true')
-    expect(document.activeElement).toBe(host.querySelector('textarea[aria-label="composer"]'))
+    expect(document.activeElement).toBe(composer())
   })
 
-  it('without an Ask UNI bridge a request changes nothing', async () => {
+  it('still shows the Ask UNI states when the shell bridge has no Ask UNI', async () => {
     ;(window as unknown as { aiOffice: unknown }).aiOffice = new Proxy(
-      { recents: async () => ({ items: [], total: 0 }), setLanguage: async () => null } as Record<
-        string,
-        unknown
-      >,
-      { get: (t, p: string) => (p in t ? t[p] : undefined) },
+      {} as Record<string, unknown>,
+      {
+        get: (t, p: string) => t[p],
+      },
     )
     await mount()
-    await act(async () => requestAskUniOpen())
-    await flush()
-    expect(modeBtn(en.askUniModeAsk)).toBeUndefined()
-    expect(host.querySelector('[data-testid="v2-panel"]')).toBeNull()
+    expect(host.querySelector('.askuni-pane')).not.toBeNull()
+    expect(host.querySelector('.askuni-modes')).toBeNull()
+  })
+})
+
+describe('Home chat pane: pick up where you left off', () => {
+  let host: HTMLDivElement
+  let root: Root
+  const entry = (name: string, extra: Record<string, unknown> = {}) => ({
+    path: `/docs/${name}`,
+    name,
+    ext: 'docx',
+    mtimeMs: Date.now() - 3_600_000,
+    ...extra,
+  })
+  let openPath: ReturnType<typeof vi.fn>
+
+  async function mount(entries: unknown[]): Promise<void> {
+    openPath = vi.fn(async () => undefined)
+    ;(window as unknown as { aiOffice: unknown }).aiOffice = new Proxy(
+      {
+        recents: vi.fn(async () => ({ entries })),
+        openPath,
+        uniworkAskUni: vi.fn(),
+        uniworkAskUniContext: vi.fn(async () => ({
+          workspaces: [],
+          currentWorkspaceId: null,
+          signedIn: false,
+        })),
+        askUniFlags: vi.fn(async (): Promise<AskUniFlags> => ({ streamEnabled: true })),
+        setLanguage: async () => null,
+      } as Record<string, unknown>,
+      { get: (t, p: string) => (p in t ? t[p] : undefined) },
+    )
+    await act(async () => {
+      root.render(h(LocaleProvider, { initial: 'en', children: h(NewChatPane) }))
+    })
+    await act(async () => {
+      for (let i = 0; i < 8; i++) await Promise.resolve()
+    })
+  }
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    resetAskUniEntryForTests()
+  })
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    host.remove()
+    delete (window as unknown as { aiOffice?: unknown }).aiOffice
+  })
+
+  it('lists the three newest reachable recents and opens one', async () => {
+    await mount([
+      entry('missing.docx', { missing: true }),
+      entry('a.docx'),
+      entry('b.docx'),
+      entry('c.docx'),
+      entry('d.docx'),
+    ])
+    const rows = [...host.querySelectorAll('.new-chat-continue-row')]
+    expect(rows.map((r) => r.querySelector('.new-chat-continue-name')?.textContent)).toEqual([
+      'a.docx',
+      'b.docx',
+      'c.docx',
+    ])
+    await act(async () =>
+      (rows[1]!.querySelector('.new-chat-continue-open') as HTMLButtonElement).click(),
+    )
+    expect(openPath).toHaveBeenCalledWith('/docs/b.docx')
+  })
+
+  it('has no summarize button', async () => {
+    await mount([entry('a.docx')])
+    expect(host.querySelector('.new-chat-continue-ask')).toBeNull()
+    expect(host.querySelectorAll('.new-chat-continue button')).toHaveLength(1)
+  })
+
+  it('renders nothing when there are no recents', async () => {
+    await mount([])
+    expect(host.querySelector('.new-chat-continue')).toBeNull()
   })
 })

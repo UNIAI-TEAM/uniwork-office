@@ -1,4 +1,3 @@
-import { aiNoticeKind } from '@genoffice/ai-provider/browser'
 import { isUniworkRefusalErrorKey } from '@genoffice/ui'
 import type { AiChatMessage } from './AiChatPanel'
 
@@ -18,12 +17,9 @@ export function markRunFailed(
   for (let i = next.length - 1; i >= 0; i--) {
     const entry = next[i]!
     if (entry.role === 'user') {
-      // a setup state (no key / no model) is not a send failure: no "not sent" pill, no retry; nor
-      // is a refused question (too long, rejected): sending the same text again cannot help
-      next[i] =
-        aiNoticeKind(error) || isUniworkRefusalErrorKey(errorKey)
-          ? entry
-          : { ...entry, undelivered: true }
+      // a refused question (too long, rejected) is not a send failure: no "not sent" pill, no
+      // retry; sending the same text again cannot help
+      next[i] = isUniworkRefusalErrorKey(errorKey) ? entry : { ...entry, undelivered: true }
       break
     }
   }
@@ -41,4 +37,16 @@ export function markRunFailed(
     }
   }
   return next
+}
+
+/** the S9 keys of a UniWork AI turn the network failed: no network, or the connection dropped */
+const NETWORK_ERROR_KEYS: ReadonlySet<string> = new Set(['aiErrOffline', 'aiErrDisconnected'])
+
+/**
+ * True when the fixed planner answers a failed run instead of its error: the UniWork AI call failed
+ * for the network before the run touched the workbook. Offline while signed in, the availability
+ * flag stays on until the next cloud read, so the run still went to UniWork AI (UNI-2309).
+ */
+export function plannerAnswersFailedRun(errorKey: string | undefined, ranTools: boolean): boolean {
+  return !ranTools && errorKey !== undefined && NETWORK_ERROR_KEYS.has(errorKey)
 }

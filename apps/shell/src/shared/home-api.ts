@@ -1,20 +1,4 @@
-import type {
-  AiChatResponse,
-  AiMediaProviderConfig,
-  AiMediaProviderId,
-  AiMediaProviderMeta,
-  AiProviderMeta,
-  AiSearchProviderId,
-  AiSearchProviderMeta,
-  AiSettings,
-  AiSettingsSaveOptions,
-  AiStreamChunk,
-  AiStreamRequest,
-  AiTestFailureKind,
-  CodexModelCatalog,
-  OpenRouterKeyStatus,
-  UniworkCloudStatus,
-} from '@genoffice/ai-provider'
+import type { AiSettings, UniworkCloudStatus } from '@genoffice/ai-provider'
 import type {
   AskUniContext,
   AskUniOpenRequest,
@@ -57,15 +41,7 @@ export type {
 } from './uniwork-conflict'
 
 /** Legal files shipped beside the app and opened from Settings > About. */
-/** The Settings window shows and saves the account's UniWork AI pick; My AI, email and one-click never pass this. */
-export interface AiSettingsPickOptions {
-  includeUniworkPick?: boolean
-}
-
 export type LegalDoc = 'license' | 'notice' | 'modifications' | 'thirdParty'
-
-/** Image attachment extensions — multimodal base64 on send (mirrors docs). */
-export const ATTACHMENT_IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp'])
 
 export interface AttachmentMeta {
   path: string
@@ -80,23 +56,7 @@ export interface AttachmentAddResult {
   rejected: string[]
 }
 
-export interface AttachmentReadResult {
-  ok: boolean
-  error?: string
-  name?: string
-  totalChars?: number
-  text?: string
-  offset?: number
-}
-
-export interface AttachmentImageResult {
-  ok: boolean
-  base64?: string
-  mime?: string
-  error?: string
-}
 import type { AiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
-import type { FileExcerpt } from './file-excerpt'
 import type { DocumentTabKind } from './tabs-api'
 import type {
   BatchUploadPickInput,
@@ -1216,39 +1176,6 @@ export interface FileSearchHit extends RecentEntry {
   needles: string[]
 }
 
-/**
- * Endpoints the search reranker can judge against. The hosted Jev routes are
- * OpenRouter and TypeSafe's own API; Perplexity and Cloudflare host their own
- * decision models; Kev and Rizzo Flow are local /v1/systemone servers;
- * `custom` points at any other /v1/systemone-compatible server.
- */
-export type DecisionEndpoint =
-  'openrouter' | 'direct' | 'perplexity' | 'cloudflare' | 'kev' | 'rizzo' | 'custom'
-
-/** home search options persisted in app-settings.json under `fileSearch` */
-export interface FileSearchSettings {
-  /** send the top local hits to a decision model for reranking; default off */
-  rerank: boolean
-  endpoint: DecisionEndpoint
-  /** one API key per endpoint; local endpoints (kev/rizzo/custom) may stay empty */
-  keys: Record<DecisionEndpoint, string>
-  /** `custom` endpoint only: base URL of a /v1/systemone-compatible server */
-  customBaseUrl: string
-  /** `custom` endpoint only: model id the server expects */
-  customModel: string
-  /** `cloudflare` endpoint only: Workers AI account id */
-  cloudflareAccountId: string
-  /** `cloudflare` endpoint only: Workers AI model path, e.g. @cf/cloudflare/clef */
-  cloudflareModel: string
-}
-
-export interface FileSearchRerank {
-  /** paths in the decision model's order, most relevant first; paths not judged keep their local order after these */
-  order: string[]
-  /** calibrated 0–2 relevance per judged path */
-  scores: Record<string, number>
-}
-
 export interface FileSearchPage {
   hits: FileSearchHit[]
   total: number
@@ -1285,12 +1212,6 @@ export interface CliLinkState {
   /** shell line that adds the link's folder to the PATH when the shell does not search it */
   pathHint?: string
   manual?: string
-}
-
-/** Settings "Test connection" answer: a failure carries its kind, never the provider's raw text */
-export interface AiConnectionTestResult {
-  ok: boolean
-  errorKind?: AiTestFailureKind
 }
 
 /** Desk "In progress": an open tab with unsaved changes, or a crash copy newer than its recent file */
@@ -1341,12 +1262,6 @@ export interface HomeApi {
   recents(query?: RecentQuery): Promise<RecentPage>
   /** search indexed files by name, folder and content */
   searchFiles(query: FileSearchQuery): Promise<FileSearchPage>
-  /** decision-model order for the hits currently shown (≤ 20 paths); null when reranking is off or unavailable */
-  rerankSearch(query: { q: string; paths: string[] }): Promise<FileSearchRerank | null>
-  getFileSearchSettings(): Promise<FileSearchSettings>
-  setFileSearchSettings(patch: Partial<FileSearchSettings>): Promise<FileSearchSettings>
-  /** one two-document judgement against the (possibly unsaved) settings */
-  testFileSearchRerank(settings: FileSearchSettings): Promise<AiConnectionTestResult>
   /** starred files (independent of the recent list), newest first (paged) */
   starred(query?: RecentQuery): Promise<RecentPage>
   /** starred group names that currently have at least one file, in creation order */
@@ -1359,11 +1274,6 @@ export interface HomeApi {
   toggleStar(path: string): Promise<void>
   /** open an existing file, routing to the right module by extension */
   openPath(path: string): Promise<void>
-  /**
-   * Budget-capped text excerpts for Recent/Starred files (My AI summarize).
-   * Paths outside recents/starred are skipped.
-   */
-  fileExcerpts(paths: string[]): Promise<FileExcerpt[]>
   /** file picker accepting every supported extension, then routes */
   browse(): Promise<void>
   /** open a docs window at its start screen (optional HTML seed for teacher templates) */
@@ -1374,15 +1284,6 @@ export interface HomeApi {
   newSlide(opts?: NewSlideOptions): Promise<void>
   /** create a blank PDF (optional AI preset) */
   newPdf(opts?: NewPdfOptions): Promise<void>
-  /** Best Office tab for My AI continue/summarize (last editor if Home is active) */
-  activeOfficeTab(): Promise<ActiveOfficeTab | null>
-  /** Activate Office tab and push an AI panel preset */
-  pushAiPreset(input: {
-    text: string
-    autoRun?: boolean
-    displayText?: string
-    tabId?: string
-  }): Promise<{ ok: boolean; tabId?: string; kind?: string; title?: string; path?: string }>
   /** PWA / Hub → desktop Agent Intent (navigate Workbench tabs, optional mutate) */
   onAgentIntent(handler: (intent: AgentIntentDto) => void): () => void
   /** Ack intent lifecycle for future Hub result channel */
@@ -1485,7 +1386,7 @@ export interface HomeApi {
   uniworkCloudRefresh?(): Promise<UniworkCloudStatus>
   /** cloud status pushes; returns an unsubscribe */
   onUniworkCloudStatus?(handler: (status: UniworkCloudStatus) => void): () => void
-  /** Editor AI “Open AI settings” → open a Settings section (e.g. aiModel); unsubscribe returned */
+  /** Editor AI “Open AI settings” → open a Settings section (e.g. account); unsubscribe returned */
   onOpenSettingsEvent?(handler: (section: string) => void): () => void
   /** app version (from package.json / electron app.getVersion) */
   getAppVersion(): Promise<string>
@@ -1550,54 +1451,15 @@ export interface HomeApi {
   onThemeChanged(handler: (theme: UiTheme) => void): () => void
   /** document page theme switched anywhere (broadcast from the main process) */
   onDocumentThemeChanged(handler: (theme: DocTheme) => void): () => void
-  /** open the Token Hub (OpenRouter) credits page in the default browser */
-  openCreditUsage(): Promise<void>
   /** AI settings (userData/ai-settings.json, shared by every editor) */
-  getAiSettings(options?: AiSettingsPickOptions): Promise<AiSettings>
+  getAiSettings(): Promise<AiSettings>
   /** persist AI settings; every renderer gets ai:settings-changed and re-reads */
-  setAiSettings(
-    settings: AiSettings,
-    options?: AiSettingsPickOptions & AiSettingsSaveOptions,
-  ): Promise<void>
+  setAiSettings(settings: AiSettings): Promise<void>
   /** ai-settings.json was rewritten by any renderer (composer model chip, another window) */
   onAiSettingsChanged(handler: () => void): () => void
-  /** provider catalog with each fixed endpoint's default base URL (empty for UniAI/custom) */
-  getAiProviders(): AiCatalogEntry[]
-  /** live Codex model catalog discovered through the current or overridden app-server */
-  getCodexModels(cliPath?: string): Promise<CodexModelCatalog>
-  /** live model list advertised by a user-hosted OpenAI-compatible endpoint; empty when it cannot answer */
-  getCustomModels(baseUrl: string, apiKey?: string): Promise<CodexModelCatalog>
-  /** one-shot round trip against the given (possibly unsaved) settings — the settings-UI connection test */
-  testAiSettings(settings: AiSettings): Promise<AiConnectionTestResult>
-  /** OpenRouter Token Hub: GET /api/v1/key for the given (possibly unsaved) API key */
-  probeOpenRouterKey(apiKey: string): Promise<OpenRouterKeyStatus>
-  /** one-shot non-streaming chat using saved (or provided) AI settings — Workbench helpers */
-  aiChat(input: { system: string; user: string; settings?: AiSettings }): Promise<AiChatResponse>
-  /** streaming chat (same IPC as editor AI panels) */
-  aiStream(request: AiStreamRequest): Promise<void>
-  aiStreamCancel(requestId: string): Promise<void>
-  onAiStream(handler: (chunk: AiStreamChunk) => void): () => void
-  /** local file attachments for My AI (files stay on device) */
+  /** file picker for the workbench module panes (files stay on device) */
   pickAttachments(): Promise<AttachmentAddResult | null>
-  addAttachmentPaths(paths: string[]): Promise<AttachmentAddResult>
-  addPastedImage(data: ArrayBuffer, ext: string): Promise<AttachmentAddResult>
-  readAttachment(path: string, offset: number, maxChars: number): Promise<AttachmentReadResult>
-  readAttachmentImage(path: string): Promise<AttachmentImageResult>
   getPathForFile(file: File): string
-  /** image generation / media analysis providers a picker may offer */
-  getAiMediaProviders(): AiMediaProviderMeta[]
-  /** credential check for a (possibly unsaved) media provider */
-  testAiMediaSettings(input: {
-    provider: AiMediaProviderId
-    config: AiMediaProviderConfig
-  }): Promise<AiConnectionTestResult>
-  /** web search provider catalog */
-  getAiSearchProviders(): AiSearchProviderMeta[]
-  /** one minimal query against the given key (the keyless auto entry needs none) */
-  testAiSearchSettings(input: {
-    provider: AiSearchProviderId
-    apiKey: string
-  }): Promise<AiConnectionTestResult>
   /** Local Workbench SQLite store (main-process source of truth) */
   wb: WorkbenchStoreApi
   /** UNI-2069: Ask UNI over the workspace's documents (shell main, device bearer); see askuni-api.ts */
@@ -1921,11 +1783,6 @@ export interface WorkbenchStoreApi {
   }>
 }
 
-export interface AiCatalogEntry extends AiProviderMeta {
-  /** default endpoint for fixed-endpoint providers ('' = model-dependent or user-supplied) */
-  defaultBaseUrl: string
-}
-
 export type AccountState =
   | 'not-configured'
   | 'signed-out'
@@ -2197,13 +2054,6 @@ export interface NewPdfOptions extends NewFileOpts {
   aiPreset?: HomeAiPreset
 }
 
-export interface ActiveOfficeTab {
-  id: string
-  kind: string
-  title: string
-  path?: string
-}
-
 export interface TimelineEntryItem {
   filePath: string
   fileName: string
@@ -2274,10 +2124,6 @@ export interface MoveResult {
 export const HOME_CHANNELS = {
   recents: 'home:recents',
   searchFiles: 'home:search-files',
-  rerankSearch: 'home:rerank-search',
-  getFileSearchSettings: 'home:get-file-search-settings',
-  setFileSearchSettings: 'home:set-file-search-settings',
-  testFileSearchRerank: 'home:test-file-search-rerank',
   starred: 'home:starred',
   statPaths: 'home:stat-paths',
   toggleStar: 'home:toggle-star',
@@ -2361,14 +2207,10 @@ export const HOME_CHANNELS = {
   getCliLinkStatus: 'home:get-cli-link-status',
   installCliLink: 'home:install-cli-link',
   pickDefaultSaveDir: 'home:pick-default-save-dir',
-  openCreditUsage: 'home:open-credit-usage',
   agentIntentEvent: 'home:agent-intent-event',
   agentIntentAck: 'home:agent-intent-ack',
   resolveAgentIntent: 'home:resolve-agent-intent',
   submitAgentIntent: 'home:submit-agent-intent',
-  fileExcerpts: 'home:file-excerpts',
-  activeOfficeTab: 'home:active-office-tab',
-  pushAiPreset: 'home:push-ai-preset',
   wbLoadAll: 'home:wb-load-all',
   wbGetKey: 'home:wb-get-key',
   wbSetKey: 'home:wb-set-key',

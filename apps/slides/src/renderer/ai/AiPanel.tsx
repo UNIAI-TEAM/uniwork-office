@@ -14,7 +14,6 @@ import {
   isComposerPopupOpen,
   useUniworkDisclosureAck,
   useOverlayDock,
-  aiPanelOnUniwork,
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
@@ -46,14 +45,11 @@ function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
 }
 import type { RenderSlide } from '@genoffice/pptx-render'
 import {
-  aiNoticeBody,
-  aiNoticeKind,
   cloudToolsEnabled,
   imageGenerationAvailable,
   mediaAnalysisAvailable,
 } from '@genoffice/ai-provider/browser'
 import { platform } from '../capabilities'
-import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import {
@@ -87,17 +83,7 @@ import {
   slidePageWriter,
   writerRefusalIsFinal,
 } from './llm-request'
-import { renderSlidesToPngBase64 } from '../export-render'
-import {
-  isQcEnabled,
-  isUnsupportedImageInputError,
-  mergeQcPages,
-  NO_SCREENSHOT_NOTE,
-  qcSlidePage,
-  QC_MAX_PAGES,
-  screenshotAllowed,
-  settingsSupportVision,
-} from './slide-qc'
+import { isQcEnabled, mergeQcPages, qcSlidePage, QC_MAX_PAGES } from './slide-qc'
 import {
   AskUniModeBody,
   AskUniModeToggle,
@@ -335,22 +321,18 @@ interface AiPanelProps {
   selectedIds: string[]
   /** no slide carries real content yet — the empty-state copy offers generation instead of polish */
   deckEmpty?: boolean
-  /** Decoded image cache from App (SlideThumb needs it) — powers AI-vision slide screenshots */
-  images: Map<string, HTMLImageElement>
   applySlide: (slideIndex: number, updated: RenderSlide) => void
   applyDeck: (slides: RenderSlide[], goTo?: number) => void
   fitWidthPx: number
   settings: AiSettings
   /** Preset instruction pushed from the ribbon/start screen; sent immediately when autoRun. When displayText exists the chat bubble shows only it while the full text still goes to the model.
-      attachments are local files added in the start-screen input, taking effect with the first message.
-      slideShot attaches a rendering of the current slide so the model sees what it's editing (AI Beautify) */
+      attachments are local files added in the start-screen input, taking effect with the first message. */
   preset?: {
     text: string
     nonce: number
     autoRun?: boolean
     displayText?: string
     attachments?: AttachmentMeta[]
-    slideShot?: boolean
     scope?: AiScopeQuoteData
     /** a web host's job: it runs only while the panel is on UniWork AI (read when it would run) */
     uniworkOnly?: boolean
@@ -385,8 +367,6 @@ interface AiPanelProps {
   onQueueConsume?: (keys: string[]) => void
   /** view-only UniWork deck: the agent only gets read-only tools, edit-only composer affordances are gone */
   readOnly?: boolean
-  /** UniWork-bound deck: AI generation writes nothing outside the document (no draft, no sidecar) */
-  uniworkBound?: boolean
 }
 
 /** Some locales already end the label with an ellipsis — normalize to exactly one. */
@@ -448,15 +428,13 @@ function clampPanelWidth(w: number): number {
   return Math.min(Math.max(w, PANEL_WIDTH_MIN), max)
 }
 
-/** the model chip's "manage" row (one function: the picker keys an effect on its identity) */
+/** the model chip's "Details" (one function: the picker keys an effect on its identity) */
 const openDesktopModelSettings = () => window.slidesApi.openAiModelSettings().catch(() => {})
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.slidesApi.getAiSettings(),
-  setSettings: (settings, options) => window.slidesApi.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.slidesApi.onAiSettingsChanged(handler),
-  gskLoggedIn: () => window.slidesApi.aiGskStatus().then((s) => !!s?.loggedIn),
-  // the chip's "manage" row opens the desktop model settings; a web frame has none to open
+  // the chip's "Details" opens the desktop account settings; a web frame has none to open
   get openModelSettings() {
     return platform() === 'web' ? undefined : openDesktopModelSettings
   },
@@ -467,7 +445,6 @@ export function AiPanel({
   current,
   selectedIds,
   deckEmpty,
-  images,
   applySlide,
   applyDeck,
   fitWidthPx,
@@ -489,7 +466,6 @@ export function AiPanel({
   onQueueFocus,
   onQueueConsume,
   readOnly = false,
-  uniworkBound = false,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   const askUni = useAskUniMode(lang, currentFilePath)
@@ -502,7 +478,7 @@ export function AiPanel({
   // Shared AI panel pref (Settings → General): the bespoke slides composer
   // must honor it like the shared AiComposer does.
   const { spellcheck } = useAiPanelPrefs()
-  // no key or no known model (web): send stays off and the hint says why, as in AiComposer
+  // UniWork AI not offered here: send stays off and the hint says why, as in AiComposer
   const needModelHint = useAiModelNeedHint()
   const needModelAction = useAiModelNeedAction()
   // the panel's own composer gates Send on the UniWork disclosure and on a UniWork composer note
@@ -638,8 +614,6 @@ export function AiPanel({
   slidesRef.current = slides
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
-  const uniworkBoundRef = useRef(uniworkBound)
-  uniworkBoundRef.current = uniworkBound
   const currentRef = useRef(current)
   currentRef.current = current
   const selectedRef = useRef(selectedIds)
@@ -662,8 +636,6 @@ export function AiPanel({
     () => window.slidesApi?.aiGskStatus(),
     open,
   )
-  const imagesRef = useRef(images)
-  imagesRef.current = images
   const attachmentsRef = useRef(attachments)
   attachmentsRef.current = attachments
   /** attachments consumed by the most recent send — retry resends the same set */
@@ -912,24 +884,9 @@ export function AiPanel({
 
   const loopRef = useRef<AgentLoop | null>(null)
   if (!loopRef.current) {
-    // The three slides generation steps (style/planning/per-page HTML) force the high-quality model (only with the anthropic provider;
-    // other providers keep the user setting, avoiding passing nonexistent model names). Chat/fine-tuning still uses the user's configured model.
-    const SLIDES_GEN_MODEL = 'claude-opus-4-7'
-    // Return on demand a settings copy with the generation model overridden (deep copy, doesn't pollute settingsRef).
-    const settingsForGen = (): AiSettings => {
-      const cur = settingsRef.current
-      if (cur.provider !== 'anthropic') return cur
-      const ap = cur.providers.anthropic
-      return {
-        ...cur,
-        providers: { ...cur.providers, anthropic: { ...ap, model: SLIDES_GEN_MODEL } },
-      }
-    }
     // Send one LLM request, aggregating streaming deltas into complete text. Shared by in-tool per-page/planning.
     // - On timeout/user stop (signal abort) call aiStreamCancel to cancel the main-process stream, leaving no orphan requests.
-    // - useGenModel=true uses SLIDES_GEN_MODEL first; on request errors (non-timeout) automatically falls back to the
-    //   user-configured model and retries once, so generation isn't wiped out when the key lacks access to that model.
-    // errKind marks failure categories that shouldn't retry with another model (timeout/empty output/user stop)
+    // errKind marks failure categories a retry cannot help (timeout/empty output/user stop)
     type LlmResult = {
       ok: boolean
       text?: string
@@ -1011,10 +968,15 @@ export function AiPanel({
             })
         })
         signal?.addEventListener('abort', onAbort, { once: true })
-        // only a UniWork AI writer joins the chat session (its run); a BYOK generator stays
-        // sessionless as before, so a provider's native session (Codex) is never shared
-        const sessionId = settings.provider === 'uniwork' ? chatTransport.sessionId : undefined
-        const args = { requestId, settings, system, user, maxTokens, sessionId }
+        // a UniWork AI writer joins the chat session (its run)
+        const args = {
+          requestId,
+          settings,
+          system,
+          user,
+          maxTokens,
+          sessionId: chatTransport.sessionId,
+        }
         // If invoke itself rejects (IPC-layer failure), fail immediately instead of waiting out the timeout
         window.slidesApi.aiStream(oneShotStreamRequest(args, writer)).catch((e) =>
           finish({
@@ -1025,42 +987,24 @@ export function AiPanel({
           }),
         )
       })
-    const runLlmOnce = async (
+    const runLlmOnce = (
       system: string,
       user: string,
       timeoutMs = IPC_STREAM_SILENCE_TIMEOUT_MS,
-      useGenModel = true,
       signal?: AbortSignal,
       maxTokens?: number,
       writer?: WriterCall,
-    ): Promise<LlmResult> => {
-      const first = await runLlmAttempt(
-        useGenModel ? settingsForGen() : settingsRef.current,
-        system,
-        user,
-        timeoutMs,
-        signal,
-        maxTokens,
-        writer,
-      )
-      if (first.ok || !useGenModel || signal?.aborted) return first
-      // Only "request errors" fall back to the user's model for a retry; timeouts/empty output don't switch models (mostly network/output problems, switching won't help)
-      if (first.errKind) return first
-      const cur = settingsRef.current
-      if (cur.provider !== 'anthropic') return first // The gen-model override only applies with anthropic
-      if (cur.providers.anthropic?.model === SLIDES_GEN_MODEL) return first
-      return runLlmAttempt(cur, system, user, timeoutMs, signal, maxTokens, writer)
-    }
+    ): Promise<LlmResult> =>
+      runLlmAttempt(settingsRef.current, system, user, timeoutMs, signal, maxTokens, writer)
 
     const access: DeckAccess = {
       readOnly: () => readOnlyRef.current,
-      // the adapter bound feeds the AI through the shared rule: a web frame reads as bound
-      uniworkBound: () => uniworkBoundForAi(uniworkBoundRef.current ?? false, platform()),
-      uniworkAi: () => settingsRef.current.provider === 'uniwork',
+      // every turn runs on UniWork AI
+      uniworkAi: () => true,
       // only the web frame reaches the UniWork AI writer route; the desktop refuses writer calls
       uniworkWriterRoute: () => platform() === 'web',
       imageUrls: createImageUrlRegistry({
-        enforce: () => settingsRef.current.provider === 'uniwork',
+        enforce: () => true,
         attachments: () =>
           lastAttachmentsRef.current
             .filter((a) => ATTACHMENT_IMAGE_EXTS.has(a.ext))
@@ -1183,7 +1127,7 @@ export function AiPanel({
           return false
         }
       },
-      // Local single-page generation (no cloud needed, e.g. BYOK): one LLM request through the
+      // Local single-page generation (no cloud page service needed): one LLM request through the
       // app's own AI transport writes a structured JSON slide spec, and the main process builds
       // it directly into a one-slide pptx with pptx-engine primitives — no HTML intermediate.
       generatePageLocal: async (args) => {
@@ -1247,7 +1191,7 @@ export function AiPanel({
               : `${userMsg}\n\nYour previous output was rejected: ${lastErr}. Output the corrected JSON object only.`
           // Text-heavy spec JSON can exceed the default 8192 tokens; single-page requests get a higher cap
           const writer = slidePageWriter(args, attempt === 0 ? undefined : lastErr)
-          const r = await runLlmOnce(sys, msg, 120000, true, args.signal, 16384, writer)
+          const r = await runLlmOnce(sys, msg, 120000, args.signal, 16384, writer)
           if (!r.ok || !r.text) {
             lastErr = r.error ?? tGlobal('aiErrEmptyOutput')
             // a refusal the same request cannot get past is not a repair note: stop here
@@ -1339,7 +1283,7 @@ export function AiPanel({
         const hint = a.styleHint ? `\nStyle preference: ${a.styleHint}` : ''
         const userMsg = `Topic and style preferences: ${a.topic}${hint}${q}\nOutput the Style Skill.`
         const writer = deckStyleWriter(a)
-        const r = await runLlmOnce(sys, userMsg, undefined, true, a.signal, undefined, writer)
+        const r = await runLlmOnce(sys, userMsg, undefined, a.signal, undefined, writer)
         return r.ok && r.text
           ? { ok: true, styleSkill: r.text.trim() }
           : { ok: false, error: r.error ?? tGlobal('aiErrEmptyOutput') }
@@ -1390,7 +1334,7 @@ export function AiPanel({
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           if (a.signal?.aborted) return { ok: false, error: tGlobal('aiErrStopped') }
           const writer = deckOutlineWriter(a)
-          const r = await runLlmOnce(sys, userMsg, undefined, true, a.signal, undefined, writer)
+          const r = await runLlmOnce(sys, userMsg, undefined, a.signal, undefined, writer)
           if (!r.ok || !r.text) {
             lastErr = r.error ?? tGlobal('aiErrEmptyOutput')
             // Empty output/timeout doesn't burn another attempt; request-level errors may retry,
@@ -1472,13 +1416,6 @@ export function AiPanel({
           return r.images.map((im) => im.imageUrl).filter(Boolean)
         } catch {
           return []
-        }
-      },
-      saveSidecar: async (data) => {
-        try {
-          await window.slidesApi.saveStyleSidecar(data)
-        } catch {
-          /* fail-open */
         }
       },
       saveStyleTemplate: async (name, data) => {
@@ -1739,19 +1676,16 @@ export function AiPanel({
     const take = () => {
       if (preset.autoRun !== true) toComposer(false)
       else if (
-        !runWith(preset.text, preset.displayText, {
-          slideShot: preset.slideShot ?? false,
-          ...(preset.scope ? { scope: preset.scope } : {}),
-        })
+        !runWith(
+          preset.text,
+          preset.displayText,
+          preset.scope ? { scope: preset.scope } : undefined,
+        )
       )
         toComposer(true)
     }
-    // a host job runs only on UniWork AI: the provider is the one of now, not of when it arrived
-    if (!preset.uniworkOnly) take()
-    else
-      void aiPanelOnUniwork(() => window.slidesApi.getAiSettings()).then((on) =>
-        on ? take() : toComposer(false),
-      )
+    // a host job runs on UniWork AI, the one provider
+    take()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset?.nonce])
 
@@ -1851,33 +1785,10 @@ export function AiPanel({
     return images
   }
 
-  /** Current slide rendered at pixelRatio 1 (vision-friendly size); null when rendering fails */
-  /**
-   * A rendered picture of the slide, when sending one is safe.
-   *
-   * A screenshot is the one outbound path that no text projection can reach:
-   * the renderer tints a withheld run, it does not replace it, so the words are
-   * in the bitmap. There is no mask to put over them — a picture has no spans.
-   * So a slide that withholds anything gets no picture, and the caller says so,
-   * rather than the model receiving an image it was never shown the text of.
-   */
-  const captureSlideShot = async (pageIndex: number): Promise<AgentImage | null> => {
-    const slide = slidesRef.current[pageIndex]
-    if (!slide) return null
-    if (!screenshotAllowed(slide)) return null
-    try {
-      const [png] = await renderSlidesToPngBase64([slide], imagesRef.current, 1)
-      return png ? { base64: png, mime: 'image/png' } : null
-    } catch {
-      return null
-    }
-  }
-
   const runWith = (
     instruction: string,
     displayText?: string,
     opts?: {
-      slideShot?: boolean
       attachments?: AttachmentMeta[]
       scope?: AiScopeQuoteData
       /** resend of the last message: quote what it quoted */
@@ -1949,25 +1860,11 @@ export function AiPanel({
     persistMessage('user', shown, undefined, sentAtts, scope)
     void collectImageAttachments(sentAtts)
       .then(async (images) => {
-        // AI Beautify sends the current slide's rendering along, so the model sees what it edits;
-        // the note rides on the model instruction only — the chat bubble stays the localized preset text
-        let modelInstruction = instruction
-        if (opts?.slideShot && settingsSupportVision(settingsRef.current)) {
-          const shot = await captureSlideShot(currentRef.current)
-          if (shot) {
-            images.push(shot)
-            modelInstruction += `\n\n(Attached image: the current rendering of this slide, slideIndex ${currentRef.current}. Use it to spot visual issues the element inventory can't show.)`
-          } else {
-            // said rather than omitted: a model told nothing assumes it has the
-            // rendering and reasons about text it cannot see
-            modelInstruction += `\n\n(${NO_SCREENSHOT_NOTE})`
-          }
-        }
         // Clear the flag before run: loop.run sets running synchronously, leaving no re-entry window
         runStartingRef.current = false
         await onBeforeRunRef.current?.()
         if (await window.slidesApi.beginHistoryBatch()) historyBatchActiveRef.current = true
-        loop.run(modelInstruction, images)
+        loop.run(instruction, images)
       })
       .catch(() => {
         runStartingRef.current = false
@@ -2078,8 +1975,8 @@ export function AiPanel({
 
   /**
    * Post-generation layout QC: each page landed by this run gets one focused pass in a fresh
-   * AgentLoop. Vision models receive screenshot + inventory; text-only models receive only
-   * deterministic geometry evidence. Each page's edits sit in their own history batch; if the
+   * AgentLoop with the inventory and the deterministic geometry evidence (UniWork AI takes no
+   * screenshot in these turns). Each page's edits sit in their own history batch; if the
    * deterministic audit says the page got worse, that batch is rolled back. Progress streams
    * into one assistant chat entry.
    */
@@ -2110,38 +2007,17 @@ export function AiPanel({
     // First kept QC batch — the run's own batch takes precedence (it is earlier,
     // so restoring it rewinds past the QC edits too)
     let qcSnapshotId: number | null = null
-    // A custom endpoint may claim generic OpenAI-compatible vision support but reject the
-    // first image. Fall back for that page and keep the rest of this pass geometry-only.
-    let forceGeometryOnly = false
     try {
       for (const page of capped) {
         if (controller.signal.aborted) break
-        const useScreenshot = !forceGeometryOnly && settingsSupportVision(settingsRef.current)
-        const shot = useScreenshot ? await captureSlideShot(page) : null
-        if (useScreenshot && !shot) {
-          if (slidesRef.current[page]) lines.push(tGlobal('aiQcPageSkipped', { n: page + 1 }))
-          continue
-        }
         const batchOpened = await window.slidesApi.beginHistoryBatch()
-        let result = await qcSlidePage({
+        const result = await qcSlidePage({
           access,
           transport,
           pageIndex: page,
-          screenshot: shot,
           systemSuffix: aiLangDirective,
           signal: controller.signal,
         })
-        if (shot && result.error && isUnsupportedImageInputError(result.error)) {
-          forceGeometryOnly = true
-          result = await qcSlidePage({
-            access,
-            transport,
-            pageIndex: page,
-            screenshot: null,
-            systemSuffix: aiLangDirective,
-            signal: controller.signal,
-          })
-        }
         const batchId = batchOpened ? await window.slidesApi.endHistoryBatch() : null
         if (controller.signal.aborted) break
         if (result.error) {
@@ -2321,12 +2197,8 @@ export function AiPanel({
     resizer.setPointerCapture(e.pointerId)
   }
 
-  const isUniwork = settings.provider === 'uniwork'
   const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
   const [composerAnnouncement, setComposerAnnouncement] = useState('')
-  // the model picker's list note, written into the panel's own polite node (never a node of the
-  // picker's); it stands while the announcement it was written over is the current one
-  const [pickerNote, setPickerNote] = useState<{ text: string; over: string } | null>(null)
   const [refusalAnnouncement, setRefusalAnnouncement] = useState('')
   const pendingRefusalRef = useRef(false)
   const disclosureRegionRef = useRef<HTMLElement | null>(null)
@@ -2349,20 +2221,18 @@ export function AiPanel({
     }
   }, [])
   const composerNoteState = composerNoteFor({
-    provider: settings.provider,
+    uniworkSelected: true,
     cloudState: cloudSnapshot?.state ?? null,
     signedOut: cloudSnapshot ? !cloudSnapshot.signedIn : undefined,
   })
-  const ackKey = isUniwork
-    ? {
-        account: cloudSnapshot?.accountId ?? '',
-        org: cloudSnapshot?.orgId ?? '',
-        document: currentFilePath ?? 'local',
-      }
-    : null
+  const ackKey = {
+    account: cloudSnapshot?.accountId ?? '',
+    org: cloudSnapshot?.orgId ?? '',
+    document: currentFilePath ?? 'local',
+  }
   const { acked: disclosureAcked } = useUniworkDisclosureAck(ackKey)
-  const disclosureUnacked = isUniwork && !disclosureAcked
-  uniworkSendBlockedRef.current = disclosureUnacked || (isUniwork && composerNoteState !== null)
+  const disclosureUnacked = !disclosureAcked
+  uniworkSendBlockedRef.current = disclosureUnacked || composerNoteState !== null
   refuseUniworkSendRef.current = () => {
     if (!uniworkSendBlockedRef.current) return false
     // a composer note alone only keeps Send off (as in the composer); the disclosure also speaks
@@ -2417,7 +2287,6 @@ export function AiPanel({
           lastEntryChipInput:
             lastEntry && lastEntry.role === 'assistant'
               ? {
-                  provider: settings.provider,
                   mutated: lastEntry.snapshotId != null,
                   stopped: Boolean(lastEntry.stopped),
                   hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
@@ -2430,10 +2299,7 @@ export function AiPanel({
         })
       : composerAnnouncement
 
-  const liveText =
-    pickerNote && pickerNote.over === (refusalAnnouncement || panelLiveAnnouncement)
-      ? pickerNote.text
-      : refusalAnnouncement || panelLiveAnnouncement
+  const liveText = refusalAnnouncement || panelLiveAnnouncement
   return (
     <aside
       ref={asideRef}
@@ -2619,7 +2485,6 @@ export function AiPanel({
               busy,
               (key, vars) => aiUniworkText(lang, key, vars),
               {
-                provider: settings.provider,
                 mutated: entry.snapshotId != null,
                 stopped: Boolean(entry.stopped),
                 hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
@@ -2702,31 +2567,21 @@ export function AiPanel({
                     <AiUsageChip usage={entry.usage} lang={lang} />
                   </div>
                 )}
-                {entry.error &&
-                  (aiNoticeKind(entry.error) ? (
-                    // "nothing to chat with" is a setup / plan state: a plain notice, not a red error
-                    <div className="ai-msg-notice">{aiNoticeBody(entry.error)}</div>
-                  ) : (
-                    <div className="ai-msg-error">
-                      {cap('errorLabel')
-                        ? uniworkErrorLineText(chip, entry.error, (error) =>
-                            t('aiMsgError', { error }),
-                          )
-                        : entry.error}
-                    </div>
-                  ))}
+                {entry.error && (
+                  <div className="ai-msg-error">
+                    {cap('errorLabel')
+                      ? uniworkErrorLineText(chip, entry.error, (error) =>
+                          t('aiMsgError', { error }),
+                        )
+                      : entry.error}
+                  </div>
+                )}
                 {entry.error && (
                   <AiErrorAction
                     chip={chip}
                     lang={lang}
                     waiting={Boolean(entry.waitLine)}
                     onRetry={isLast && !busy && lastInstructionRef.current ? retry : undefined}
-                    // a web frame has no other provider to choose: no action there
-                    onChooseProvider={
-                      platform() === 'web'
-                        ? undefined
-                        : () => void window.slidesApi.openAiModelSettings().catch(() => {})
-                    }
                     onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                     onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
                   />
@@ -2767,7 +2622,6 @@ export function AiPanel({
                     {isLast &&
                       !busy &&
                       lastInstructionRef.current &&
-                      !aiNoticeKind(entry.error) &&
                       !isUniworkRefusalErrorKey(entry.errorKey) &&
                       // the labelled "Thử lại" under the error line is the retry of an error turn
                       chip?.errorLine?.action !== 'retry' && (
@@ -2854,11 +2708,6 @@ export function AiPanel({
           </div>
         ) : (
           <div className="ai-composer">
-            {readOnly && !isUniwork && (
-              <div className="ai-readonly-notice" role="note">
-                {t('aiViewOnlyNotice')}
-              </div>
-            )}
             {!readOnly && editQueue && editQueue.length > 0 && (
               <EditQueueCard
                 items={editQueue}
@@ -2873,20 +2722,12 @@ export function AiPanel({
             )}
             {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
             <div className="ai-input-box">
-              {isUniwork && (
-                <UniworkComposerNote
-                  note={composerNoteState}
-                  lang={lang}
-                  provider={settings.provider}
-                  onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
-                  onChooseProvider={
-                    platform() === 'web'
-                      ? undefined
-                      : () => void window.slidesApi.openAiModelSettings().catch(() => {})
-                  }
-                  onAnnounce={setComposerAnnouncement}
-                />
-              )}
+              <UniworkComposerNote
+                note={composerNoteState}
+                lang={lang}
+                onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
+                onAnnounce={setComposerAnnouncement}
+              />
               {disclosureUnacked && (
                 <UniworkDisclosure
                   ackKey={ackKey}
@@ -3028,13 +2869,7 @@ export function AiPanel({
                 </div>
               )}
               <div className="ai-input-footer">
-                <AiModelPicker
-                  bridge={MODEL_BRIDGE}
-                  lang={lang}
-                  onAnnounce={(text) =>
-                    setPickerNote({ text, over: refusalAnnouncement || panelLiveAnnouncement })
-                  }
-                />
+                <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
                 {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
                 <button
                   className="ai-attach-btn"
@@ -3062,18 +2897,16 @@ export function AiPanel({
                         disclosureRegionRef.current?.focus()
                         return
                       }
-                      if (isUniwork && composerNoteState !== null) return
+                      if (composerNoteState !== null) return
                       run()
                     }}
                     disabled={
                       !disclosureUnacked &&
-                      !(isUniwork && composerNoteState !== null) &&
+                      composerNoteState === null &&
                       (!input.trim() || needModelHint !== null)
                     }
                     aria-disabled={
-                      disclosureUnacked || (isUniwork && composerNoteState !== null)
-                        ? 'true'
-                        : undefined
+                      disclosureUnacked || composerNoteState !== null ? 'true' : undefined
                     }
                     data-tip={needModelHint ?? t('aiSend')}
                     aria-label={t('aiSend')}
@@ -3083,7 +2916,7 @@ export function AiPanel({
                         input.trim() &&
                         needModelHint === null &&
                         !disclosureUnacked &&
-                        (!isUniwork || composerNoteState === null)
+                        composerNoteState === null
                           ? sendEnterOn
                           : sendEnterOff
                       }
@@ -3093,14 +2926,14 @@ export function AiPanel({
                   </button>
                 )}
               </div>
-              {isUniwork && !disclosureUnacked && (
+              {!disclosureUnacked && (
                 <UniworkDisclosureShort
                   orgName={cloudSnapshot?.orgName ?? undefined}
                   variant={currentFilePath ? 'document' : 'local'}
                   lang={lang}
                 />
               )}
-              {isUniwork && readOnly && (
+              {readOnly && (
                 <div className="ai-uniwork-view-only">
                   {aiUniworkText(lang, 'aiUniworkViewOnly')}
                 </div>

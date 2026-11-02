@@ -103,33 +103,15 @@ describe('assistant panel notice', () => {
     }
   }
 
-  async function renderWithProvider(readOnly: boolean, provider: string) {
-    ;(window as any).pdfApi = {
-      getAiSettings: async () => ({ provider, providers: {} }),
-      setAiPanelPrefs: () => {},
-      gskStatus: async () => ({ loggedIn: false }),
-      onLanguageChanged: () => () => {},
-    }
-    const res = render(readOnly)
-    await act(async () => {
-      await Promise.resolve()
-    })
-    return res
-  }
-
-  it('shows the reason above the composer only when view-only for BYOK, and sub-line under composer for UniWork AI', async () => {
+  it('shows the UniWork AI view-only line under the composer only when view-only, never the old notice above it', () => {
     const view = render(true)
-    expect(view.container.querySelector('.ai-readonly-notice')).not.toBeNull()
-    expect(view.container.querySelector('.ai-uniwork-view-only')).toBeNull()
+    expect(view.container.querySelector('.ai-readonly-notice')).toBeNull()
+    expect(view.container.querySelector('.ai-uniwork-view-only')?.textContent).toBeTruthy()
     view.cleanup()
     const edit = render(false)
     expect(edit.container.querySelector('.ai-readonly-notice')).toBeNull()
+    expect(edit.container.querySelector('.ai-uniwork-view-only')).toBeNull()
     edit.cleanup()
-    const uniworkView = await renderWithProvider(true, 'uniwork')
-    expect(uniworkView.container.querySelector('.ai-readonly-notice')).toBeNull()
-    expect(uniworkView.container.querySelector('.ai-uniwork-view-only')?.textContent).toBeTruthy()
-    uniworkView.cleanup()
-    delete (window as any).pdfApi
   })
 })
 

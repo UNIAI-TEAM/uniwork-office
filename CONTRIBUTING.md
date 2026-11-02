@@ -59,9 +59,10 @@ All pure TypeScript, no Electron dependency, unit-tested (except the UI kit):
   text formats).
 - `packages/agent-core` — the AI agent loop and skill composition shared by
   every app.
-- `packages/ai-provider` — provider abstraction and streaming for the model
-  backends.
-- `packages/ai-search` — web/image search tools.
+- `packages/ai-provider` — the UniWork AI client and streaming (UniWork AI is
+  the only model backend).
+- `packages/ai-search` — UniWork cloud tools (web/image search, image
+  generation, media analysis).
 - `packages/i18n`, `packages/ui`, `packages/project-store`,
   `packages/electron-utils` — shared i18n core, React UI kit, recent-files
   store, and Electron main-process helpers.
@@ -159,20 +160,19 @@ or copy an existing `target/release/xlsx-sidecar.exe` to
 None are required — the apps run with all of these unset. They exist for
 testing and local overrides:
 
-| Variable                                                                 | Effect                                                                        |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| `BUILD_DIR`                                                              | Override the electron-builder output directory (default `apps/shell/release`) |
-| `GENOFFICE_USER_DATA`                                                    | Override the Electron userData directory (test isolation)                     |
-| `GENOFFICE_LANG`                                                         | Force the UI language instead of following the OS locale                      |
-| `GENOFFICE_FAKE_UPDATE`                                                  | Exercise the updater UI without a real release feed                           |
-| `GENOFFICE_CLOUD_SLIDE`, `GENOFFICE_CLOUD_SLIDE_TIER`                    | Route slide generation through the cloud endpoint                             |
-| `SERPER_API_KEY`, `SERPLY_API_KEY`, `TAVILY_API_KEY`, `PARALLEL_API_KEY` | Supply a Serper, Serply, Tavily or Parallel search key                        |
-| `XLSX_SIDECAR_PATH`, `XLSX_OPEN_PATH`, `XLSX_DEBUG_PORT`                 | Point at a locally built xlsx sidecar and its debug port                      |
-| `*_DEV_PORT`, `*_RENDERER_URL`                                           | Per-app Vite dev server ports and renderer URLs (set by `npm run dev`)        |
+| Variable                                                 | Effect                                                                        |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `BUILD_DIR`                                              | Override the electron-builder output directory (default `apps/shell/release`) |
+| `GENOFFICE_USER_DATA`                                    | Override the Electron userData directory (test isolation)                     |
+| `GENOFFICE_LANG`                                         | Force the UI language instead of following the OS locale                      |
+| `GENOFFICE_FAKE_UPDATE`                                  | Exercise the updater UI without a real release feed                           |
+| `GENOFFICE_CLOUD_SLIDE`, `GENOFFICE_CLOUD_SLIDE_TIER`    | Route slide generation through the cloud endpoint                             |
+| `XLSX_SIDECAR_PATH`, `XLSX_OPEN_PATH`, `XLSX_DEBUG_PORT` | Point at a locally built xlsx sidecar and its debug port                      |
+| `*_DEV_PORT`, `*_RENDERER_URL`                           | Per-app Vite dev server ports and renderer URLs (set by `npm run dev`)        |
 
 AI features degrade rather than break without credentials: requests surface an
-inline sign-in prompt, and web search falls back to keyless backends (Parallel's
-free Search MCP, then DuckDuckGo).
+inline sign-in prompt, and web search, image search and image generation answer
+with the UniWork sign-in sentence until the user signs in.
 
 ## Coding conventions
 

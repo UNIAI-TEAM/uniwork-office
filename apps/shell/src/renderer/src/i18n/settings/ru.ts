@@ -3,14 +3,6 @@ import type { zh } from './zh'
 export const ru = {
   setClose: 'Закрыть',
   setRetry: 'Повторить',
-  setUnsavedTitle: 'Несохранённые изменения',
-  setUnsavedBody: 'Уйти со страницы без сохранения? Внесённые изменения будут потеряны.',
-  setUnsavedKeep: 'Продолжить редактирование',
-  setUnsavedDiscard: 'Отменить изменения',
-  setAiSaveFailed: 'Не удалось сохранить: {error}',
-  setAiCreditLeft: 'Кредиты: осталось {remain} · использовано {used}',
-  setAiCreditUsedNoLimit: 'Использовано кредитов: {used} (у ключа нет лимита)',
-  setAiCreditRate: '1 USD на балансе ключа = 1000 кредитов ИИ',
   setGrpAppearance: 'Оформление',
   setGrpAiPanel: 'Панель ИИ',
   setGrpFiles: 'Файлы и сохранение',
@@ -20,19 +12,6 @@ export const ru = {
   intgActionFailed:
     'Не удалось завершить. Проверьте, что в папку разрешена запись, и повторите попытку.',
   intgLoadFailed: 'Не удалось получить состояние интеграции.',
-
-  cwTitle: 'Кредиты ИИ',
-  cwAddKey: 'Добавить ключ',
-  cwNoKey: 'Ключа ИИ пока нет',
-  cwUpdating: 'Обновление…',
-  cwLoadFailed: 'Не загрузилось',
-  cwLeft: 'Осталось {n}',
-  cwUsed: 'Использовано {n}',
-  cwToday: 'Сегодня ≈ {n}',
-  cwHistory: 'История использования ИИ',
-  cwLogNote: 'Оценка на этом устройстве, а не ваш счёт.',
-  cwLogEmpty: 'Обращений к ИИ пока нет.',
-  cwOpenHint: 'Щелчок — настройки ИИ · правый щелчок — страница расхода',
 
   bkLead:
     'Платные дополнения сохраняют резервную копию Рабочего места в UniWork Cloud и добавляют место в хранилище. Экспорт и восстановление на этом устройстве всегда бесплатны.',

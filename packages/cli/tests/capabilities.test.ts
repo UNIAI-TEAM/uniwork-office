@@ -1,121 +1,27 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import * as aiSearch from '@genoffice/ai-search'
+import { describe, expect, it } from 'vitest'
 import { run, tempDir } from './helpers'
 
-afterEach(() => {
-  vi.restoreAllMocks()
-})
-
-// a real settings file always carries the chat provider block; without it every section resets to defaults
-function settingsFile(dir: string, settings: Record<string, unknown>): string {
-  const path = join(dir, 'ai-settings.json')
-  writeFileSync(path, JSON.stringify({ provider: 'anthropic', providers: {}, ...settings }))
-  return path
-}
-
 describe('genoffice capabilities', () => {
-  it('reports nothing configured with default settings', async () => {
-    const dir = tempDir()
+  it('reports only the app: no cloud feature key', async () => {
     const r = await run(['capabilities', '--json'], {
-      env: {
-        ...process.env,
-        GENOFFICE_AI_SETTINGS: join(dir, 'missing.json'),
-        GENOFFICE_APP_BIN: '',
-      },
+      env: { ...process.env, GENOFFICE_APP_BIN: '' },
     })
     expect(r.code).toBe(0)
-    const d = r.json().detail
-    expect(d.search.available).toBe(false)
-    expect(d.image_search.available).toBe(false)
-    expect(d.image_generation.available).toBe(false)
-    expect(d.media_analysis.available).toBe(false)
+    // a checkout may find its own dev app, so only the shape is fixed here
+    expect(Object.keys(r.json().detail)).toEqual(['app'])
+    expect(typeof r.json().detail.app.available).toBe('boolean')
   })
 
-  it('counts a Serper key as search + image search and a BYOK image model as generation', async () => {
+  it('reports the app as available when its binary exists', async () => {
     const dir = tempDir()
     mkdirSync(join(dir, 'bin'))
-    const settings = settingsFile(dir, {
-      search: {
-        provider: 'serper',
-        providers: { serper: { apiKey: 'k' }, tavily: { apiKey: '' } },
-      },
-      media: {
-        imageProvider: 'openai',
-        providers: { openai: { apiKey: 'sk', imageModel: 'gpt-image-1' } },
-      },
-    })
     const r = await run(['capabilities', '--json'], {
-      env: {
-        ...process.env,
-        GENOFFICE_AI_SETTINGS: settings,
-        GENOFFICE_APP_BIN: join(dir, 'bin', 'app'),
-      },
+      env: { ...process.env, GENOFFICE_APP_BIN: join(dir, 'bin', 'app') },
     })
     expect(r.code).toBe(0)
-    const d = r.json().detail
-    expect(d.search).toEqual({ available: true, via: 'serper' })
-    expect(d.image_search).toEqual({ available: true, via: 'serper' })
-    expect(d.image_generation).toEqual({ available: true, via: 'openai' })
-    // the shared OpenAI key also serves analysis (the stored default yields to the first usable vendor)
-    expect(d.media_analysis.available).toBe(true)
-    expect(d.app.available).toBe(true)
-    expect(r.json().summary).toContain('image_generation')
-  })
-
-  it('counts a Serply key as search + image search', async () => {
-    const settings = settingsFile(tempDir(), {
-      search: { provider: 'serply', providers: { serply: { apiKey: 'k' } } },
-    })
-    const r = await run(['capabilities', '--json'], {
-      env: { ...process.env, GENOFFICE_AI_SETTINGS: settings },
-    })
-    const d = r.json().detail
-    expect(d.search).toEqual({ available: true, via: 'serply' })
-    expect(d.image_search).toEqual({ available: true, via: 'serply' })
-  })
-
-  it.each(['tavily', 'parallel'])('%s gives web search but no image search', async (provider) => {
-    const dir = tempDir()
-    const settings = settingsFile(dir, {
-      search: {
-        provider,
-        providers: { [provider]: { apiKey: 'test-key' } },
-      },
-    })
-    const r = await run(['capabilities', '--json'], {
-      env: { ...process.env, GENOFFICE_AI_SETTINGS: settings },
-    })
-    const d = r.json().detail
-    expect(d.search).toEqual({ available: true, via: provider })
-    expect(d.image_search.available).toBe(false)
-  })
-
-  it('never counts the UniWork cloud (no app session in the CLI process), even when one is claimed', async () => {
-    vi.spyOn(aiSearch, 'hasGskAuth').mockReturnValue(true)
-    const settings = settingsFile(tempDir(), {
-      search: { provider: 'genspark', providers: {} },
-    })
-    const r = await run(['capabilities', '--json'], {
-      env: { ...process.env, GENOFFICE_AI_SETTINGS: settings },
-    })
-    const d = r.json().detail
-    expect(d.search).toEqual({ available: false, via: null })
-    expect(d.image_search).toEqual({ available: false, via: null })
-    expect(d.image_generation).toEqual({ available: false, via: null })
-    expect(d.media_analysis).toEqual({ available: false, via: null })
-    expect(JSON.stringify(d)).not.toContain('genspark')
-  })
-
-  it('reports selected keyless Parallel as web search without requiring a login', async () => {
-    const settings = settingsFile(tempDir(), {
-      search: { provider: 'parallel', providers: { parallel: { apiKey: '' } } },
-    })
-    const r = await run(['capabilities', '--json'], {
-      env: { ...process.env, GENOFFICE_AI_SETTINGS: settings },
-    })
-    expect(r.json().detail.search).toEqual({ available: true, via: 'parallel' })
-    expect(r.json().detail.image_search).toEqual({ available: false, via: null })
+    expect(Object.keys(r.json().detail)).toEqual(['app'])
+    expect(r.json().detail.app.available).toBe(true)
   })
 })

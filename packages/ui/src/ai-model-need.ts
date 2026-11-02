@@ -1,11 +1,12 @@
 import { useSyncExternalStore } from 'react'
 
 /**
- * The AI panel's "nothing to chat with yet" state: no key stored, or a key but no model. The model
- * chip (AiModelPicker) knows both; the composer (AiComposer) sits in the same panel and has to
- * keep send off with that hint, so the chip publishes it here instead of every app wiring it.
- * The hint is the localized sentence; null = a model is known (or nothing asked for the rule).
- * `action` opens the AI settings (the way out of the state), when the host has one.
+ * The AI panel's "nothing to chat with" state: UniWork AI is not on here (signed out, the
+ * organization or the format without it, or a cloud state other than ready). The model chip
+ * (AiModelPicker) knows it; the composer (AiComposer) sits in the same panel and has to keep send
+ * off with that hint, so the chip publishes it here instead of every app wiring it. The hint is
+ * the localized sentence (`needModel`); null = UniWork AI can answer (or nothing asked for the
+ * rule). `action` opens the account settings (the way out of the state), when the host has one.
  */
 interface NeedState {
   hint: string | null
@@ -38,7 +39,7 @@ export function useAiModelNeedHint(): string | null {
   )
 }
 
-/** opens the AI settings from the hint; null when the host has no such entry */
+/** opens the account settings from the hint; null when the host has no such entry */
 export function useAiModelNeedAction(): (() => void) | null {
   return useSyncExternalStore(
     subscribe,

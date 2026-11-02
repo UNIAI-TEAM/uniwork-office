@@ -297,7 +297,7 @@ export default function App() {
 
   // web frame (capabilities.ts): AI and autosave off, view only without the host's save grant
   const aiEnabled = cap('ai')
-  // the selection popover's "Regenerate with AI" chip: host grant + a live way to generate
+  // the selection popover's "Regenerate with AI" chip: host grant + the UniWork cloud
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null)
   useEffect(() => {
     if (!aiEnabled) return

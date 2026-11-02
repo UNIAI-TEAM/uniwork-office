@@ -3,14 +3,6 @@ import type { zh } from './zh'
 export const de = {
   setClose: 'Schließen',
   setRetry: 'Erneut versuchen',
-  setUnsavedTitle: 'Nicht gespeicherte Änderungen',
-  setUnsavedBody: 'Seite ohne Speichern verlassen? Ihre Änderungen gehen verloren.',
-  setUnsavedKeep: 'Weiter bearbeiten',
-  setUnsavedDiscard: 'Änderungen verwerfen',
-  setAiSaveFailed: 'Speichern fehlgeschlagen: {error}',
-  setAiCreditLeft: 'Credits: {remain} übrig · {used} verbraucht',
-  setAiCreditUsedNoLimit: 'Verbrauchte Credits: {used} (kein Schlüssellimit)',
-  setAiCreditRate: '1 USD Schlüsselguthaben = 1.000 KI-Credits',
   setGrpAppearance: 'Darstellung',
   setGrpAiPanel: 'KI-Bereich',
   setGrpFiles: 'Dateien und Speichern',
@@ -21,19 +13,6 @@ export const de = {
   intgActionFailed:
     'Vorgang konnte nicht abgeschlossen werden. Prüfe, ob in den Ordner geschrieben werden kann, und versuche es erneut.',
   intgLoadFailed: 'Der Integrationsstatus konnte nicht gelesen werden.',
-
-  cwTitle: 'KI-Credits',
-  cwAddKey: 'Schlüssel hinzufügen',
-  cwNoKey: 'Noch kein KI-Schlüssel',
-  cwUpdating: 'Wird aktualisiert…',
-  cwLoadFailed: 'Laden fehlgeschlagen',
-  cwLeft: '{n} übrig',
-  cwUsed: '{n} verbraucht',
-  cwToday: 'Heute ≈ {n}',
-  cwHistory: 'KI-Nutzungsverlauf',
-  cwLogNote: 'Auf diesem Gerät geschätzt, keine Rechnung.',
-  cwLogEmpty: 'Noch keine KI-Aufrufe protokolliert.',
-  cwOpenHint: 'Klicken für KI-Einstellungen · Rechtsklick für die Nutzungsseite',
 
   bkLead:
     'Kostenpflichtige Add-ons sichern Ihren Arbeitsplatz in der UniWork Cloud und erweitern den Speicherplatz. Exportieren und Wiederherstellen auf diesem Gerät ist immer kostenlos.',

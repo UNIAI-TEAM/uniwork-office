@@ -232,7 +232,6 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
         total: 0,
         index: { pending: 0, scanning: false },
       })),
-      rerankSearch: vi.fn(async () => null),
       addFolderRoot: vi.fn(async () => null),
       removeFolderRoot: vi.fn(async () => {}),
       pickDefaultSaveDir: vi.fn(async () => null),

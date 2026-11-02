@@ -1331,7 +1331,7 @@ export function registerSlidesIpc(): void {
     },
   )
 
-  // ── Local single-page generation (no cloud needed, e.g. BYOK): a JSON slide spec written by
+  // ── Local single-page generation (no cloud page generation needed): a JSON slide spec written by
   // the renderer's LLM call is built directly into a one-slide pptx with pptx-engine
   // primitives — no HTML intermediate. Returns the same marker kind as the cloud path, so
   // landing (slides:land-generated-pages) is shared.
@@ -1993,9 +1993,8 @@ export function installSlidesMenu(): void {
 }
 
 /**
- * Attach a proxy to the main process's global fetch. Environment variables take priority;
- * otherwise, after app ready, read the system proxy via session.resolveProxy() (the critical
- * path for packaged builds launched by double-click).
+ * Attach a proxy to the main process's global fetch from the environment variables. The
+ * standalone module has no UniWork API host to probe the system proxy against.
  */
 async function applyMainProcessProxy(): Promise<void> {
   const setDispatcher = async (proxyUrl: string) => {
@@ -2019,21 +2018,6 @@ async function applyMainProcessProxy(): Promise<void> {
     await setDispatcher(envProxy)
     return
   }
-  // No environment variables: read the system proxy (requires app ready)
-  try {
-    await app.whenReady()
-    // PAC/rule proxies answer per-host: probe the host the default UniAI chat route targets
-    const resolved = await electronSession.defaultSession.resolveProxy('https://openrouter.ai/')
-    // resolveProxy returns strings like "PROXY 127.0.0.1:1087" or "DIRECT"
-    const m = /PROXY\s+([^;]+)/i.exec(resolved || '')
-    if (m) {
-      await setDispatcher(`http://${m[1].trim()}`)
-    } else {
-      console.log('[proxy] system proxy = DIRECT, no dispatcher set')
-    }
-  } catch (e) {
-    console.warn('[proxy] resolveProxy failed:', e)
-  }
 }
 
 export function startSlidesStandalone(): void {
@@ -2056,7 +2040,7 @@ export function startSlidesStandalone(): void {
     app.setPath('userData', process.env.GENOFFICE_USER_DATA)
   }
   // The main process's Node fetch (undici) does not use the system proxy by default, so access
-  // from mainland China to overseas LLM APIs like api.anthropic.com hits ETIMEDOUT on direct
+  // from mainland China to overseas services (UniWork AI cloud tools) hits ETIMEDOUT on direct
   // connections. Route the global dispatcher through the proxy; the renderer (Chromium) uses
   // the system proxy on its own and is unaffected. Prefer environment variables (terminal
   // launches); packaged builds launched by double-click don't inherit terminal environment

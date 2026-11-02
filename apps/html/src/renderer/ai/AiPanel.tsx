@@ -10,7 +10,6 @@ import {
   UniAiMark,
   composerNoteFor,
   useOverlayDock,
-  aiPanelOnUniwork,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
@@ -31,7 +30,6 @@ import {
 } from '@genoffice/agent-core'
 import type { AgentImage } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
-import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
 import type {
   UniworkCloudStatusBridge,
   UniworkCloudStatusSnapshot,
@@ -350,15 +348,13 @@ export interface HtmlAiDeps {
 /** how often the streaming draft is pushed into the preview mirror */
 const DRAFT_PREVIEW_MS = 400
 
-/** the model chip's "manage" row (one function: the picker keys an effect on its identity) */
+/** the model chip's "Details" (one function: the picker keys an effect on its identity) */
 const openDesktopModelSettings = () => window.htmlApi.openAiModelSettings().catch(() => {})
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.htmlApi.getAiSettings(),
-  setSettings: (settings, options) => window.htmlApi.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.htmlApi.onAiSettingsChanged(handler),
-  gskLoggedIn: () => window.htmlApi.aiGskStatus().then((s) => !!s?.loggedIn),
-  // the chip's "manage" row opens the desktop model settings; a web frame has none to open
+  // the chip's "Details" opens the desktop account settings; a web frame has none to open
   get openModelSettings() {
     return platform() === 'web' ? undefined : openDesktopModelSettings
   },
@@ -824,6 +820,8 @@ export function AiPanel({
             listAttachmentNames: () => availableAttachments().map((a) => a.name),
             getEditFence: () => fenceRef.current,
             uniworkBound: () => depsRef.current.access.uniworkBound?.() ?? false,
+            // the page and document writers need the UniWork AI writer route: the web frame only
+            uniworkWriterRoute: () => platform() === 'web',
           },
           () => readOnlyRef.current,
         ),
@@ -832,7 +830,8 @@ export function AiPanel({
         createIntentSkill(
           () => intentRef.current,
           () => isDocEmpty(depsRef.current.access.getText()),
-          () => depsRef.current.access.uniworkBound?.() === true,
+          // the WRITE directive points at write_document: not where the page has no writer
+          () => depsRef.current.access.uniworkBound?.() === true || platform() !== 'web',
         ),
       ]),
       captureSnapshot: () => depsRef.current.getSnapshot(),
@@ -939,12 +938,11 @@ export function AiPanel({
         },
         onError: (error, errorKey) => {
           // once a tool ran the message was delivered; a later turn failing is not a send failure
-          // a setup state (no key / no model) is not a send failure either: no "not sent" pill
           // a refused question (too long, rejected) is no send failure to retry as is: it goes back
           // into the composer to be shortened or fixed, as the message says
           const refused = isUniworkRefusalErrorKey(errorKey)
           if (refused) setPrompt((current) => current || runDisplayRef.current)
-          const undelivered = runToolsRef.current.length === 0 && !aiNoticeKind(error) && !refused
+          const undelivered = runToolsRef.current.length === 0 && !refused
           setChat((prev) => {
             const next = [...prev]
             for (let i = undelivered ? next.length - 1 : -1; i >= 0; i--) {
@@ -1142,7 +1140,6 @@ export function AiPanel({
       try {
         const s = await window.htmlApi.getAiSettings()
         settingsRef.current = s
-        if (mountedRef.current) setProvider(s?.provider)
         const images = sentAtts.length > 0 ? await collectImages(sentAtts) : []
         if (!mountedRef.current || seq !== sendSeqRef.current) return
         await loop.run(instruction, images.length > 0 ? images : undefined)
@@ -1286,12 +1283,8 @@ export function AiPanel({
       )
         toComposer(kept, true)
     }
-    // a host job runs only on UniWork AI: the provider is the one of now, not of when it arrived
-    if (!preset.uniworkOnly) take()
-    else
-      void aiPanelOnUniwork(() => window.htmlApi.getAiSettings()).then((on) =>
-        on ? take() : toComposer(kept, false),
-      )
+    // a host job runs on UniWork AI, the one provider
+    take()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset])
 
@@ -1352,7 +1345,6 @@ export function AiPanel({
     resizer.setPointerCapture(e.pointerId)
   }
 
-  const [provider, setProvider] = useState<string | undefined>(() => settingsRef.current?.provider)
   useEffect(() => {
     let cancelled = false
     const sync = () => {
@@ -1361,7 +1353,6 @@ export function AiPanel({
         .then((s) => {
           if (cancelled) return
           settingsRef.current = s
-          setProvider(s?.provider)
         })
         .catch(() => {})
     }
@@ -1372,13 +1363,9 @@ export function AiPanel({
       off?.()
     }
   }, [])
-  const isUniwork = provider === 'uniwork'
 
   const [cloudSnapshot, setCloudSnapshot] = useState<UniworkCloudStatusSnapshot | null>(null)
   const [composerAnnouncement, setComposerAnnouncement] = useState('')
-  // the model picker's list note, written into the panel's own polite node (never a node of the
-  // picker's); it stands while the announcement it was written over is the current one
-  const [pickerNote, setPickerNote] = useState<{ text: string; over: string } | null>(null)
   useEffect(() => {
     const bridge = readUniworkCloudStatus()
     if (!bridge) return
@@ -1398,22 +1385,18 @@ export function AiPanel({
     }
   }, [])
   const composerNoteState = composerNoteFor({
-    provider: provider ?? settingsRef.current?.provider ?? undefined,
+    uniworkSelected: true,
     cloudState: cloudSnapshot?.state ?? null,
     signedOut: cloudSnapshot ? !cloudSnapshot.signedIn : undefined,
   })
   // the disclosure gate must not depend on the composer being mounted (collapsed rail): the panel
   // reads the same ack key itself, so a ribbon action that fires while collapsed is refused too
-  const { acked: uniworkDisclosureAcked } = useUniworkDisclosureAck(
-    isUniwork
-      ? {
-          account: cloudSnapshot?.accountId ?? '',
-          org: cloudSnapshot?.orgId ?? '',
-          document: filePath ?? 'local',
-        }
-      : null,
-  )
-  uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
+  const { acked: uniworkDisclosureAcked } = useUniworkDisclosureAck({
+    account: cloudSnapshot?.accountId ?? '',
+    org: cloudSnapshot?.orgId ?? '',
+    document: filePath ?? 'local',
+  })
+  uniworkGate.setPanelBlocked(!uniworkDisclosureAcked)
   // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
   uniworkGate.setPanelOpen(open, onExpand)
   useEffect(() => {
@@ -1421,8 +1404,9 @@ export function AiPanel({
   }, [open, uniworkGate])
 
   const docEmpty = chat.length === 0 && isDocEmpty(deps.access.getText())
-  // a bound page has no whole-page writer, so the blank-page intent choice is gone: design is the only path
-  const intentBound = deps.access.uniworkBound?.() === true
+  // a bound page, or a host without the UniWork AI writer route (the desktop), has no whole-page
+  // writer, so the blank-page intent choice is gone: design is the only path
+  const intentBound = deps.access.uniworkBound?.() === true || platform() !== 'web'
 
   const lastEntry = chat.at(-1)
   const panelLiveAnnouncement =
@@ -1434,7 +1418,6 @@ export function AiPanel({
           lastEntryChipInput:
             lastEntry && lastEntry.role === 'assistant'
               ? {
-                  provider: provider ?? settingsRef.current?.provider ?? null,
                   mutated: Boolean(lastEntry.mutated),
                   stopped: Boolean(lastEntry.stopped),
                   hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
@@ -1450,10 +1433,7 @@ export function AiPanel({
         })
       : composerAnnouncement
 
-  const liveText =
-    pickerNote && pickerNote.over === panelLiveAnnouncement
-      ? pickerNote.text
-      : panelLiveAnnouncement
+  const liveText = panelLiveAnnouncement
   return (
     <aside
       ref={asideRef}
@@ -1657,7 +1637,6 @@ export function AiPanel({
               busy,
               (key, vars) => aiUniworkText(lang, key, vars),
               {
-                provider: provider ?? settingsRef.current?.provider ?? null,
                 mutated: Boolean(entry.mutated),
                 stopped: Boolean(entry.stopped),
                 hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
@@ -1687,7 +1666,7 @@ export function AiPanel({
             return (
               <div
                 key={i}
-                className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
+                className={`ai-msg ai-msg-assistant${entry.isError ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
               >
                 {Boolean(entry.notes?.length || entry.waitLine) && (
                   <div className="ai-msg-live">
@@ -1707,11 +1686,7 @@ export function AiPanel({
                   (bodyText || chip) && (
                     <div className="ai-msg-answer" dir="auto">
                       {(bodyText || chipLead) && (
-                        <Markdown
-                          text={bodyText ? aiNoticeBody(bodyText) : ''}
-                          nav={docNav}
-                          lead={chipLead}
-                        />
+                        <Markdown text={bodyText ?? ''} nav={docNav} lead={chipLead} />
                       )}
                     </div>
                   )
@@ -1738,12 +1713,6 @@ export function AiPanel({
                   lang={lang}
                   waiting={Boolean(entry.waitLine)}
                   onRetry={isLast && !busy && runInstructionRef.current ? retry : undefined}
-                  // a web frame has no other provider to choose: no action there
-                  onChooseProvider={
-                    platform() === 'web'
-                      ? undefined
-                      : () => void window.htmlApi?.openAiModelSettings?.()
-                  }
                   onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                   onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
                 />
@@ -1917,11 +1886,6 @@ export function AiPanel({
           className="ai-composer"
           style={activeClarify || activeBrief || activePartial ? { display: 'none' } : undefined}
         >
-          {readOnly && !isUniwork && (
-            <div className="ai-readonly-notice" role="note">
-              {t('aiViewOnlyNotice')}
-            </div>
-          )}
           {chat.length === 0 && docEmpty && !readOnly && !intentBound && (
             <div className="ai-intent-bar">
               <div className="ai-intent-label">{t('aiIntentLabel')}</div>
@@ -2026,40 +1990,27 @@ export function AiPanel({
             onPasteFiles={(files) => void onPasteFiles(files)}
             onPasteText={onPasteText}
             lang={lang}
-            viewOnly={isUniwork && readOnly ? true : undefined}
-            uniwork={
-              isUniwork
-                ? {
-                    provider: provider ?? 'uniwork',
-                    lang,
-                    note: composerNoteState,
-                    onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
-                    onChooseProvider:
-                      platform() === 'web'
-                        ? undefined
-                        : () => void window.htmlApi?.openAiModelSettings?.(),
-                    onAnnounce: setComposerAnnouncement,
-                    onSendBlockedChange: uniworkGate.onSendBlockedChange,
-                    registerBlockedHandler: uniworkGate.registerBlockedHandler,
-                    disclosure: {
-                      orgName: cloudSnapshot?.orgName ?? undefined,
-                      ackKey: {
-                        account: cloudSnapshot?.accountId ?? '',
-                        org: cloudSnapshot?.orgId ?? '',
-                        document: filePath ?? 'local',
-                      },
-                      variant: filePath ? 'document' : 'local',
-                    },
-                  }
-                : undefined
-            }
+            viewOnly={readOnly ? true : undefined}
+            uniwork={{
+              lang,
+              note: composerNoteState,
+              onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
+              onAnnounce: setComposerAnnouncement,
+              onSendBlockedChange: uniworkGate.onSendBlockedChange,
+              registerBlockedHandler: uniworkGate.registerBlockedHandler,
+              disclosure: {
+                orgName: cloudSnapshot?.orgName ?? undefined,
+                ackKey: {
+                  account: cloudSnapshot?.accountId ?? '',
+                  org: cloudSnapshot?.orgId ?? '',
+                  document: filePath ?? 'local',
+                },
+                variant: filePath ? 'document' : 'local',
+              },
+            }}
             footerStart={
               <>
-                <AiModelPicker
-                  bridge={MODEL_BRIDGE}
-                  lang={lang}
-                  onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
-                />
+                <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
                 {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
                 <button
                   type="button"

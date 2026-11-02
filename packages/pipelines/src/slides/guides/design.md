@@ -14,9 +14,9 @@ Files of one deck, in a folder of their own (`deck/`):
 
 Never put more than one page in a file, and never write a page before its outline entry exists: the build refuses to run until every outline page has its file, and a page written in one focused step with the style sheet and its brief in front of you is what keeps a 20-page deck consistent. Keep the three files together: `slides check`, `create --spec` and `slides replace` look for `outline.json` and `style.md` beside the page files and one folder up, check every page against its outline entry (file `NN.json` is entry `pages[N-1]`) and against the style sheet's colors, and say so in `detail.notes` when either file is missing.
 
-## 0. Check what the machine can do
+## 0. What the machine can do
 
-Run `genoffice capabilities --json` once. It reads UniWork Office's own settings and reports, without a network call, whether web search, image search, image generation and media analysis are configured (a UniWork login with cloud tools on, or a key the user entered in Settings). Only when a feature is configured may the deck use it; when nothing is configured, work from the material you have and use typography, color blocks and shapes instead of photos. Never ask the user to configure a key just for a deck.
+The CLI has no search or image generation and sends nothing off the machine. Work from the material you have and from local photos the user gave you; when there is none, use typography, color blocks and shapes instead of photos. Never ask the user to configure anything just for a deck.
 
 ## 1. Style sheet first (one per deck)
 
@@ -57,8 +57,8 @@ Then `genoffice slides check deck/outline.json --json`: errors (unknown layout, 
 - A core hook for the whole deck: one sentence with tension, a number or a counter-intuitive contrast.
 - Content pages in one deck must not repeat the same layout variant back to back, and the deck should use at least three different variants.
 - Pick the variant from the content: three parallel points → `three_column_cards`; one key number → `hero_big_number`; comparison → `two_column_comparison` or `two_by_two_grid`; a sequence → `timeline_horizontal`; metrics → `kpi_cards_row`.
-- No placeholders ("XX%", "lorem"): every figure and name comes from the material you have. With web search configured, look up the facts and figures the brief needs before writing pages (`genoffice search "<query>" --json`). Without material and without search, tell the user which figures are illustrative; never present invented numbers as facts.
-- Photos: with image search configured, give each photo slot an English query for a concrete scene ("harbor cranes at dawn", not "logistics") and fetch candidates with `genoffice search --images "<query>" --max 6 --json`; put a result's `imageUrl` straight into the page's image element (the builder downloads it), and keep its `sourceUrl` (the page the picture came from) for the closing page's credits: the `imageUrl` is often a search-provider proxy that says nothing about origin or license. Give the image box roughly the picture's aspect ratio; a portrait shot squeezed into a flat strip is center-cropped to a sliver and reported by `slides check`. With image generation configured, `genoffice image "<prompt>" --aspect 16:9 --out assets/p3.jpg` makes a photo or illustration in the deck's palette. With neither, plan pages that need no photo.
+- No placeholders ("XX%", "lorem"): every figure and name comes from the material you have. Without material, tell the user which figures are illustrative; never present invented numbers as facts.
+- Photos: only local files the user gave you, as picture elements with the box at roughly the picture's aspect ratio (a portrait shot squeezed into a flat strip is center-cropped to a sliver and reported by `slides check`). With none, plan pages that need no photo.
 
 ## 3. Write each page spec, one file at a time
 

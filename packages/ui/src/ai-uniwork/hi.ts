@@ -5,8 +5,8 @@ export const hi = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'बचे क्रेडिट: {limit} में से {remaining}',
   aiUniworkFooterSignIn: 'UniWork AI इस्तेमाल करने के लिए UniWork में साइन इन करें',
-  aiUniworkSignedOut: 'आप UniWork से साइन आउट हैं। कोई दूसरा प्रदाता चुनें या फिर से साइन इन करें।',
-  aiUniworkOff: 'इस दस्तावेज़ के लिए UniWork AI बंद है। कोई दूसरा प्रदाता चुनें।',
+  aiUniworkSignedOut: 'आप UniWork से साइन आउट हैं। फिर से साइन इन करें।',
+  aiUniworkOff: 'इस दस्तावेज़ के लिए UniWork AI बंद है।',
   aiUniworkViewOnly: 'केवल देखें: AI जवाब दे सकता है, पर दस्तावेज़ संपादित या सहेज नहीं सकता।',
 
   // S8 disclosure
@@ -35,7 +35,6 @@ export const hi = {
   aiRunStopped: 'रोक दिया गया। पहले से लागू बदलाव दस्तावेज़ में रहेंगे और पूर्ववत किए जा सकते हैं।',
   aiRunRetry: 'फिर से कोशिश करें',
   aiRunAskAgain: 'फिर से पूछें',
-  aiRunChooseOther: 'दूसरा प्रदाता चुनें',
   aiRunOpenInApp: 'ऐप में खोलें',
   aiConversationRestarted:
     'पिछली बातचीत की अवधि समाप्त हो गई, इसलिए UniWork AI ने नई बातचीत शुरू की और पहले के संदेश याद नहीं रखता। जारी रखने के लिए अपना प्रश्न फिर से भेजें।',
@@ -77,7 +76,7 @@ export const hi = {
   cloudCreditsLeft: '{remaining} / {limit} शेष',
   cloudCreditsUnlimited: 'असीमित',
   cloudInactiveBody:
-    'आपके संगठन की UniWork सदस्यता सक्रिय नहीं है, इसलिए क्लाउड AI रुका हुआ है। किसी एडमिन से इसे नवीनीकृत करवाएँ; नीचे आपके अपने प्रदाता काम करते रहेंगे।',
+    'आपके संगठन की UniWork सदस्यता सक्रिय नहीं है, इसलिए क्लाउड AI रुका हुआ है। किसी एडमिन से इसे नवीनीकृत करवाएँ।',
   acctSignIn: 'साइन इन करें',
   acctSignInAgain: 'फिर से साइन इन करें',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -90,7 +89,7 @@ export const hi = {
     'यह वर्कबुक वेब पर AI के लिए बहुत बड़ी है। इसे UniWork Office ऐप में खोलें।',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    'आपके संगठन के प्लान में UniWork AI शामिल नहीं है। प्लान के बारे में संगठन व्यवस्थापक से पूछें, या सेटिंग्स > AI मॉडल में अपनी खुद की AI कुंजी जोड़ें।',
+    'आपके संगठन के प्लान में UniWork AI शामिल नहीं है। प्लान के बारे में संगठन व्यवस्थापक से पूछें।',
   credits_exhausted:
-    'आपके संगठन ने इस अवधि के सभी AI क्रेडिट उपयोग कर लिए हैं। संगठन व्यवस्थापक से क्रेडिट जोड़ने के लिए कहें, या सेटिंग्स > AI मॉडल में अपनी खुद की AI कुंजी जोड़ें।',
+    'आपके संगठन ने इस अवधि के सभी AI क्रेडिट उपयोग कर लिए हैं। संगठन व्यवस्थापक से क्रेडिट जोड़ने के लिए कहें।',
 } satisfies Record<keyof typeof zh, string>

@@ -2,9 +2,6 @@ import type { zh } from './zh'
 import { sharedAskUni } from './shared'
 
 export const nl = {
-  askUniModeGroup: 'Modus',
-  askUniModeChat: 'Assistent',
-  askUniModeAsk: 'Vraag het UNI',
   askUniTitle: 'Vraag het UNI',
   askUniDescription:
     'UNI antwoordt alleen op basis van gegevens die jij in deze werkruimte kunt zien, met bronnen.',

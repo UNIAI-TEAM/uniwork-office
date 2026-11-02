@@ -10,6 +10,7 @@ import { AiChatPanel, type AiChatMessage } from '../src/renderer/ai/AiChatPanel'
 import { resetForTest } from '../src/renderer/capabilities'
 import { ExcelShell } from '../src/renderer/ExcelShell'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const JOB = 'Build this workbook from the job:  Plan\n- Goals'
 const noop = () => {}
@@ -146,13 +147,13 @@ describe('ExcelShell: a preset from outside', () => {
     resetForTest()
   })
 
-  /** `provider`: what the bridge answers when the shell reads the panel's provider */
-  function mount(provider: () => string = () => 'uniwork') {
+  /** `provider`: what the bridge answers when the shell reads the saved settings */
+  function mount(provider = 'uniwork') {
     Object.assign(window, {
       desktopApi: {
         onLanguageChanged: () => () => undefined,
         capabilities: { ai: false },
-        getAiSettings: async () => ({ provider: provider(), providers: {} }),
+        getAiSettings: async () => ({ provider, providers: {} }),
       },
     })
     resetForTest()
@@ -213,17 +214,12 @@ describe('ExcelShell: a preset from outside', () => {
     expect(shell.prompts).toEqual([])
   })
 
-  it('a host job runs only while the panel is on UniWork AI when it would run, else it waits in the composer', async () => {
-    let provider = 'openai'
-    const shell = mount(() => provider)
+  it('a host job runs on UniWork AI, the one provider, whatever a legacy settings file names', async () => {
+    const shell = mount('openai')
     await shell.render({ aiPreset: { text: JOB, nonce: 5, autoRun: true, uniworkOnly: true } })
     await shell.wait(200)
-    expect(shell.sends).toEqual([])
-    expect(shell.prompts).toEqual([JOB])
-    provider = 'uniwork'
-    await shell.render({ aiPreset: { text: JOB, nonce: 6, autoRun: true, uniworkOnly: true } })
-    await shell.wait(200)
     expect(shell.sends).toEqual([[JOB, undefined, undefined, undefined]])
+    expect(shell.prompts).toEqual([])
   })
 
   it('a preset the send refuses waits in the composer, word for word', async () => {
@@ -246,18 +242,21 @@ describe('AiChatPanel: Retry of a bubble that shows other words than it sent', (
     container?.remove()
     container = null
     Object.assign(window, { desktopApi: undefined })
+    resetUniworkAi()
   })
 
   it('sends the sent text again and keeps the bubble words', async () => {
     ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
     Element.prototype.scrollTo ??= () => {}
+    // every turn runs on UniWork AI: its disclosure is acknowledged for the workbook first
+    readyUniworkAi()
     Object.assign(window, {
       desktopApi: new Proxy(
         {},
         {
           get: (_t, prop: string) =>
             prop === 'getAiSettings'
-              ? () => Promise.resolve({ provider: 'openai', providers: {} })
+              ? () => Promise.resolve({ provider: 'uniwork', providers: {} })
               : /^on[A-Z]/.test(prop)
                 ? () => () => {}
                 : () => Promise.resolve(undefined),

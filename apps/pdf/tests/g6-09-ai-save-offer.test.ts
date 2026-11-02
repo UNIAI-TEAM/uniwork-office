@@ -5,6 +5,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { defaultAiSettings } from '@genoffice/ai-provider'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import {
   aiRunSaveOffer,
@@ -66,12 +67,13 @@ describe('pdf AI panel: ask before saving an untitled blank', () => {
     container = null
     harness.mutate = true
     delete (window as any).pdfApi
+    resetUniworkAi()
   })
 
   async function mount(offer: string | null) {
+    readyUniworkAi('/docs/Untitled.pdf')
     Element.prototype.scrollTo = () => {}
-    const settings = { ...defaultAiSettings(), uniAiAvailable: false, provider: 'openai' as const }
-    settings.providers.openai = { ...settings.providers.openai, apiKey: 'k', model: 'm' }
+    const settings = defaultAiSettings()
     const save = vi.fn(async () => ({ ok: true }))
     ;(window as any).pdfApi = {
       getAiSettings: async () => settings,

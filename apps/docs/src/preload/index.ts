@@ -3,7 +3,6 @@ import type { IpcRendererEvent } from 'electron'
 import { VIEW_IMAGE_CHANNEL } from '../shared/ipc'
 import type { AiPanelPrefs } from '@genoffice/ui'
 import type {
-  AiChatRequest,
   AiStreamChunk,
   AiStreamRequest,
   DesktopApi,
@@ -100,14 +99,8 @@ const api: DesktopApi = {
   consumeNewBlankDoc: () => ipcRenderer.invoke('docs:consume-new-blank'),
   consumeAiDocContent: () => ipcRenderer.invoke('docs:consume-ai-doc-content'),
   consumeAiPreset: () => ipcRenderer.invoke('docs:consume-ai-preset'),
-  onAiPreset: (handler) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      preset: { text: string; autoRun?: boolean; displayText?: string },
-    ) => handler(preset)
-    ipcRenderer.on('my-ai:ai-preset', listener)
-    return () => ipcRenderer.removeListener('my-ai:ai-preset', listener)
-  },
+  // the shell no longer pushes presets into a running editor (My AI is gone); only a web host does
+  onAiPreset: () => () => {},
   consumeHeadlessExport: () => ipcRenderer.invoke('docs:consume-headless-export'),
   headlessExportDone: (result: { ok: boolean; error?: string }) =>
     ipcRenderer.send('docs:headless-export-done', result),
@@ -218,18 +211,16 @@ const api: DesktopApi = {
     return () => ipcRenderer.removeListener(VIEW_IMAGE_CHANNEL, listener)
   },
   getAiSettings: () => ipcRenderer.invoke('ai:get-settings'),
-  setAiSettings: (settings, options) => ipcRenderer.invoke('ai:set-settings', settings, options),
+  setAiSettings: (settings) => ipcRenderer.invoke('ai:set-settings', settings),
   onAiSettingsChanged: (handler) => {
     const listener = () => handler()
     ipcRenderer.on('ai:settings-changed', listener)
     return () => ipcRenderer.removeListener('ai:settings-changed', listener)
   },
   openAiModelSettings: () => ipcRenderer.invoke('ai:open-model-settings'),
-  aiChat: (request: AiChatRequest) => ipcRenderer.invoke('ai:chat', request),
   aiStream: (request: AiStreamRequest) => ipcRenderer.invoke('ai:stream', request),
   aiStreamCancel: (requestId: string) => ipcRenderer.invoke('ai:stream-cancel', requestId),
   aiGskStatus: (withEmail?: boolean) => ipcRenderer.invoke('ai:gsk-status', withEmail),
-  aiOpenBilling: () => ipcRenderer.invoke('ai:open-billing'),
   webSearch: (query: string, maxResults?: number) =>
     ipcRenderer.invoke('ai:web-search', query, maxResults),
   imageSearch: (query: string, maxResults?: number) =>
@@ -303,7 +294,7 @@ installDropOpenBridge()
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
 installUniworkCommentsBridge()
 installAiRunBridge()
-// window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's provider list mirrors it)
+// window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's availability flag mirrors it)
 installUniworkAiFlagBridge()
 installUniworkCloudStatusBridge()
 // window.uniworkAskUniDoc: Ask UNI about the open document (main derives the document from this tab)

@@ -2,9 +2,6 @@ import type { zh } from './zh'
 import { sharedAskUni } from './shared'
 
 export const ar = {
-  askUniModeGroup: 'الوضع',
-  askUniModeChat: 'المساعد',
-  askUniModeAsk: 'اسأل UNI',
   askUniTitle: 'اسأل UNI',
   askUniDescription:
     'يجيب UNI فقط من البيانات التي يمكنك رؤيتها في مساحة العمل هذه، مع ذكر المصادر.',

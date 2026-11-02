@@ -88,10 +88,7 @@ export interface MergeOutputResponse {
 // ---- AI provider settings/config/streaming: canonical types live in @genoffice/ai-provider ----
 
 import type {
-  AiChatRequest,
-  AiChatResponse,
   AiSettings,
-  AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
   GenSparkAccountStatus,
@@ -103,17 +100,12 @@ import type { AiPanelPrefs } from '@genoffice/ui'
 export type { FaceVerticalMetrics }
 
 export type {
-  AiChatRequest,
-  AiChatResponse,
-  AiProviderConfig,
   AiProviderId,
-  AiProviderMeta,
   AiSettings,
   AiStreamChunk,
   AiStreamRequest,
   GenSparkAccountStatus,
 } from '@genoffice/ai-provider'
-export { AI_PROVIDERS } from '@genoffice/ai-provider/browser'
 
 // ---- agent protocol: canonical types live in @genoffice/agent-core ----
 
@@ -621,10 +613,10 @@ export interface DesktopApi {
   /** vertical metrics of an installed family (exact name match), null when missing */
   fontMetrics(family: string): Promise<FaceVerticalMetrics | null>
   getAiSettings(): Promise<AiSettings>
-  setAiSettings(settings: AiSettings, options?: AiSettingsSaveOptions): Promise<void>
+  setAiSettings(settings: AiSettings): Promise<void>
   /** ai-settings.json was rewritten by any renderer; re-read it */
   onAiSettingsChanged(handler: () => void): () => void
-  /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */
+  /** shell only: switch to Home and open Settings › Account, UniWork AI sign-in (rejects in standalone) */
   openAiModelSettings(): Promise<void>
   /** system print dialog for the current window; ok=false without error = canceled.
    *  scale: print scale inverting the preview's print zoom (print-zoom.ts) */
@@ -672,14 +664,11 @@ export interface DesktopApi {
   saveImageAs(src: string): Promise<{ ok: boolean; path?: string; error?: string }>
   /** Native context menu "View Image" on a chrome surface such as the AI panel */
   onViewImage(handler: (src: string) => void): () => void
-  aiChat(request: AiChatRequest): Promise<AiChatResponse>
   /** start a streaming AI call; deltas arrive via onAiStream with the same requestId */
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>
   /** UniWork cloud account status (internal gsk name); loggedIn = signed in to UniWork + plan includes cloud AI */
   aiGskStatus(withEmail?: boolean): Promise<GenSparkAccountStatus>
-  /** Focus Home → Settings → Account (AI plan purchase UI) */
-  aiOpenBilling(): Promise<void>
   webSearch(
     query: string,
     maxResults?: number,

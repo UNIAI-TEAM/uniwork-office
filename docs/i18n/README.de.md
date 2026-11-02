@@ -50,12 +50,7 @@ er verändert hat.
 - **Lokal von Grund auf.** Dateien werden auf deinem Rechner geöffnet,
   bearbeitet, gespeichert und konvertiert. PDF → Word / Excel / PowerPoint,
   Markdown → Word und HTML → Word laufen vollständig auf dem Gerät. Nur die
-  KI-Aufrufe verlassen den Rechner – zu dem Anbieter, den du wählst.
-- **Deine Schlüssel oder keine.** Melde dich mit Genspark an und du brauchst
-  keine Schlüssel, oder bring deinen eigenen Schlüssel für Claude, OpenAI,
-  Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral,
-  OpenRouter, Requesty oder jeden OpenAI-kompatiblen Endpunkt mit – auch lokale Server
-  werden unterstützt.
+  KI-Aufrufe verlassen den Rechner – zu UniWork AI.
 - **Skriptbar und bereit für Agenten.** Die App bringt eine
   `genoffice`-Befehlszeile und einen Skill für Claude Code, Codex, Cursor,
   Gemini CLI, GitHub Copilot, OpenCode und Windsurf mit, sodass ein
@@ -186,7 +181,7 @@ Fenster zu öffnen.
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="GenOffice-Einstellungen, Seite Integrationen: der genoffice-Skill ist in Claude Code installiert, mit Installieren-Schaltflächen neben Codex und Cursor"></td>
 </tr>
 <tr>
-<td><b>Ein Prompt an deinen Agenten</b> — „Erstelle eine Präsentation mit acht Folien über das Sonnensystem.“ Der Agent liest den Skill, schreibt ein Stylesheet, eine Gliederung und eine Seitenspezifikation pro Folie, generiert die beiden Fotos mit <code>genoffice image</code> und lässt <code>genoffice slides check</code> alles zurückweisen, was überläuft oder sich überlappt, bevor <code>genoffice create</code> die <code>.pptx</code> zusammensetzt und <code>slides render</code> pro Folie ein PNG zum Anschauen zurückgibt.</td>
+<td><b>Ein Prompt an deinen Agenten</b> — „Erstelle eine Präsentation mit acht Folien über das Sonnensystem.“ Der Agent liest den Skill, schreibt ein Stylesheet, eine Gliederung und eine Seitenspezifikation pro Folie und lässt <code>genoffice slides check</code> alles zurückweisen, was überläuft oder sich überlappt, bevor <code>genoffice create</code> die <code>.pptx</code> zusammensetzt und <code>slides render</code> pro Folie ein PNG zum Anschauen zurückgibt.</td>
 <td><b>Einmal installieren, unter Einstellungen → Integrationen</b> — GenOffice listet die Coding-Agenten auf, die es auf diesem Rechner findet, und schreibt den Skill in jeden, den du auswählst. Oder lade den Skill als Zip herunter oder führe <code>npx skills add genspark-ai/genoffice</code> aus. Befehle und der vollständige Workflow stehen unter <a href="#command-line-and-agent-skill">Befehlszeile und Agent-Skill</a>.</td>
 </tr>
 </table>
@@ -200,15 +195,11 @@ Tools plus die Op-Referenzen als Ressourcen. Ein zweiter HTTP-Server in der
 App lässt einen Agenten ein Word-Dokument in einem sichtbaren Editor-Tab
 aufbauen, während du zusiehst.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Zeitraffer von Claude Code beim Bau einer achtseitigen Investoren-Präsentation über erneuerbare Energien über den genoffice-MCP-Server: sucht nach Abbildungen und Fotos, prüft jedes Kandidatenbild mit media, deck_start schreibt das Stylesheet und die Gliederung, deck_page fügt Seite für Seite eine geprüfte Seite hinzu, deck_build stellt die .pptx zusammen und slides_render liefert ein Bild jeder Folie zurück; die fertige Präsentation öffnet sich danach in GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides zeigt die achtseitige Präsentation Renewable Energy 2026, die Claude Code über den genoffice-MCP-Server erstellt hat: die Titelfolie mit einem Foto eines Windparks auf der Arbeitsfläche und acht Miniaturansichten links"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice-Einstellungen, Seite Integrationen, MCP-Teil: der einzeilige claude mcp add-Befehl für Claude Code, der JSON-Block für Cursor, Claude Desktop und andere MCP-Clients, und die Option für den lokalen HTTP-Server darunter"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice-Einstellungen, Seite Integrationen, MCP-Teil: der einzeilige claude mcp add-Befehl für Claude Code, der JSON-Block für Cursor, Claude Desktop und andere MCP-Clients, und die Option für den lokalen HTTP-Server darunter"></td>
 </tr>
 <tr>
-<td><b>Ein Prompt, 38 Tool-Aufrufe, kein Terminal</b> — „Erstelle eine achtseitige Investoren-Präsentation über erneuerbare Energien im Jahr 2026, mit einem echten Foto auf dem Titelblatt und überall sonst, wo ein Foto hilft.“ Der Agent holt die Abbildungen und die Fotos mit <code>search</code>, fragt <code>media</code>, ob jedes Kandidatenbild eine echte Fotografie ist, ruft <code>deck_start</code> mit einem Stylesheet und einer Gliederung auf, dann <code>deck_page</code> einmal pro Folie; jede Seite wird gegen die Gliederung und die Palette geprüft, bevor sie behalten wird, <code>deck_build</code> stellt die <code>.pptx</code> zusammen, <code>slides_audit</code> sucht nach Überlauf, <code>slides_render</code> liefert pro Folie ein PNG als Bildinhalt zurück, den das Modell ansehen kann, und <code>deck_replace</code> überarbeitet die drei Seiten, die ihm nicht gefallen haben.</td>
 <td><b>Einmal verbinden, unter Einstellungen → Integrationen</b> — kopiere die <code>claude mcp add</code>-Zeile für Claude Code oder den JSON-Block in Cursor, Claude Desktop oder einen anderen MCP-Client. Option B schaltet den lokalen HTTP-Server für den sichtbaren Word-Editor ein. Beides wird unter <a href="#mcp-server">MCP-Server</a> beschrieben.</td>
 </tr>
 </table>
@@ -225,9 +216,6 @@ aufbauen, während du zusiehst.
   Docs, echte Formeln und Diagramme in Sheets, Folien werden direkt auf die
   Arbeitsfläche gezeichnet, und jeder KI-Schritt hinterlässt einen Snapshot,
   den du zurückrollen kannst.
-- **Dein Modell, dein Schlüssel.** Melde dich mit Genspark an oder bring einen
-  eigenen Schlüssel für Claude, OpenAI, Gemini, DeepSeek und mehr mit – lokale
-  Server und jeder OpenAI-kompatible Endpunkt sind ebenfalls möglich.
 - **PDF richtig gemacht.** Text direkt auf der Seite bearbeiten und PDF lokal
   in Word, Excel oder PowerPoint konvertieren, mit System-OCR für Scans.
 - **Auch Markdown und HTML**, mit demselben KI-Panel und lokalem Export nach
@@ -236,22 +224,6 @@ aufbauen, während du zusiehst.
   MCP-Server stellen jede Engine in den Dienst von Claude Code, Claude
   Desktop, Codex, Cursor und anderen Agenten – weiterhin auf dem Gerät.
 - **Kostenlos**, für Einzelpersonen wie für Teams.
-
-## KI-Backends
-
-**Mit Genspark anmelden**, und es gibt nichts zu konfigurieren:
-Modellaufrufe laufen über den Genspark-Proxy (die Modellfamilien Claude, GPT
-und Gemini), und die Agenten erhalten Web- und Bildsuche, Bildgenerierung
-sowie Bild-/Audio-/Videoanalyse.
-
-**Oder bring deinen eigenen Schlüssel mit.** Unter Einstellungen → KI stehen
-Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok,
-Mistral, OpenRouter, Requesty und OpenCode Zen/Go zur Wahl, plus ein freier Slot für
-jeden OpenAI-kompatiblen Endpunkt (Basis-URL + Schlüssel), einschließlich
-lokaler Modell-Server. Suche und Medien haben eigene Anbieter je Fähigkeit
-unter KI-Medien & Suche: Serper oder Tavily für die Websuche und OpenAI,
-Gemini, Doubao/Seedream, GLM, Grok, Qwen, MiniMax oder jeder
-OpenAI-kompatible Bild-Endpunkt für Bildgenerierung und Bild-/Videoanalyse.
 
 Die gesamte Suite bringt ein helles, ein dunkles und einen
 Systemdesign-Modus mit. Designs ändern nur, was auf dem Bildschirm zu sehen
@@ -315,9 +287,8 @@ in Claude Code. Dahinter folgte der Agent dem gestuften Workflow des Skills,
 und die CLI prüfte jede Stufe, bevor die nächste begann:
 
 ```bash
-genoffice capabilities --json                        # which cloud tools GenOffice has configured
+genoffice capabilities --json                        # whether the app is installed
 genoffice guide slides design                        # the deck workflow and layout library
-genoffice image "the eight planets in a row …" --aspect 16:9 --out deck/assets/cover.jpg
 genoffice slides check deck/outline.json --json      # 8 pages, no findings
 genoffice slides check deck/pages/01.json --json     # builds one slide, audits overflow and overlap
 …                                                    # one page file per slide, fixed until each check is clean
@@ -342,10 +313,10 @@ Verfügung, für Assistenten, die kein Terminal ausführen können oder denen du
 lieber keins gibst. Es gibt zwei Wege hinein, beide mit kopierfertigen
 Snippets unter **Einstellungen → Integrationen → MCP**:
 
-| Weg                                 | Was es ist                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A · `genoffice mcp`** (empfohlen) | Ein Stdio-Server, den der Assistent selbst startet; GenOffice muss dafür nicht geöffnet sein. Ein Tool pro Befehl (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `search`, `image`, `media`, `open`) plus der gestufte Deck-Ablauf `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Ops, Specs und Markdown werden inline übergeben, sodass auch ein Client ohne Dateisystem funktioniert. |
-| **B · Lokaler HTTP-Server**         | Läuft innerhalb der GenOffice-App unter `http://127.0.0.1:3093/mcp` (Streamable HTTP, mit Legacy-SSE). Seine Tools steuern einen sichtbaren Word-Editor-Tab: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, und du siehst zu, wie das Dokument entsteht. Standardmäßig aus; im selben Einstellungsbereich einschalten.                                                                                                                                                |
+| Weg                                 | Was es ist                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A · `genoffice mcp`** (empfohlen) | Ein Stdio-Server, den der Assistent selbst startet; GenOffice muss dafür nicht geöffnet sein. Ein Tool pro Befehl (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `open`) plus der gestufte Deck-Ablauf `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Ops, Specs und Markdown werden inline übergeben, sodass auch ein Client ohne Dateisystem funktioniert. |
+| **B · Lokaler HTTP-Server**         | Läuft innerhalb der GenOffice-App unter `http://127.0.0.1:3093/mcp` (Streamable HTTP, mit Legacy-SSE). Seine Tools steuern einen sichtbaren Word-Editor-Tab: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, und du siehst zu, wie das Dokument entsteht. Standardmäßig aus; im selben Einstellungsbereich einschalten.                                                                                                                    |
 
 ```bash
 # Claude Code
@@ -363,35 +334,8 @@ Einstellungsbereich zeigt den genauen Pfad für deine Installation an). Der
 Server bringt seine eigenen Workflow-Anweisungen mit und stellt die
 Op-Referenzen als `genoffice://guide/*`-Ressourcen bereit, sodass kein
 Skill nötig ist; der Skill und der MCP-Server können nebeneinander
-bestehen, und der Assistent wählt einen davon. Cloud-Funktionen (`search`,
-`image`, `media`) laufen weiterhin über den in GenOffice konfigurierten
-Anbieter; alles andere läuft lokal, und `GENOFFICE_ALLOWED_ROOTS`
+bestehen, und der Assistent wählt einen davon. `GENOFFICE_ALLOWED_ROOTS`
 beschränkt jedes Tool auf die Ordner, die du angibst.
-
-Die Präsentation über erneuerbare Energien aus der Demo oben zeigt, wie ein
-einzelner Prompt in Claude Code mit nur dem `genoffice`-MCP-Server auf
-Protokollebene aussieht:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-Achtunddreißig Aufrufe, etwa dreizehn Minuten, und der Assistent hat nie
-ein Terminal angefasst: Die Abbildungen, die Fotos, die Guides, die
-Prüfungen und die Renderings liefen alle als MCP-Tool-Ergebnisse. Nur
-`search` und `media` haben die Maschine verlassen, zum in GenOffice
-konfigurierten Provider.
 
 <a id="download"></a>
 
@@ -518,8 +462,7 @@ Dokumente in Microsoft Office weiter funktionieren.
 Die Dokumentbearbeitung ist vollständig lokal – Dateien verlassen deinen
 Rechner nie, um geöffnet, bearbeitet, gespeichert oder konvertiert zu
 werden. Die KI-Funktionen (Agenten, Suche, Bildwerkzeuge) benötigen eine
-Netzwerkverbindung, entweder über eine Genspark-Anmeldung oder deinen
-eigenen Modell-API-Schlüssel.
+Netzwerkverbindung und ein UniWork-Konto.
 
 </details>
 
@@ -539,18 +482,6 @@ geometriebasierte Layoutanalyse, kein Cloud-Dienst, kein Upload. Auch
 gescannte Seiten werden abgedeckt: Unter macOS und Windows liest die
 System-OCR sie aus, sodass sie zu bearbeitbarem Text statt zu einem
 Seitenbild konvertiert werden.
-
-</details>
-
-<details>
-<summary><b>Kann ich mein eigenes KI-Modell oder meinen eigenen API-Schlüssel verwenden?</b></summary>
-
-Ja. Neben der schlüssellosen Genspark-Anmeldung unterstützt GenOffice das
-Mitbringen eigener Schlüssel für Claude, OpenAI, Gemini, DeepSeek, Kimi,
-GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty und OpenCode Zen/Go,
-plus jeden OpenAI-kompatiblen Endpunkt – einschließlich lokaler
-Modell-Server. Suche, Bildgenerierung und Bild-/Videoanalyse benötigen
-eigene Schlüssel unter Einstellungen → KI-Medien & Suche.
 
 </details>
 

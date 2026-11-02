@@ -10,7 +10,7 @@ import { hasAskUniBridge } from './AskUniPane'
 
 /**
  * The renderer-side switches around Ask UNI: the public `ask_uni_stream` flag (which version of the
- * pane shows), the request to open My AI in Ask UNI mode (Ctrl/Cmd+J), and the shortcut itself.
+ * pane shows), the request to open Home's Ask UNI (Ctrl/Cmd+J), and the shortcut itself.
  * Everything lives in the shell renderer: no new main channel.
  */
 
@@ -109,7 +109,7 @@ let requestSeq = 0
 let pendingSeq: number | null = null
 const requestListeners = new Set<() => void>()
 
-/** ask My AI to open in Ask UNI mode; waits for the first subscriber if none is mounted yet */
+/** ask Home to open Ask UNI; waits for the first subscriber if none is mounted yet */
 export function requestAskUniOpen(): void {
   pendingSeq = ++requestSeq
   for (const l of requestListeners) l()
@@ -153,7 +153,7 @@ export function isAskUniShortcut(
 }
 
 /**
- * Ctrl/Cmd+J opens Home My AI in Ask UNI mode. A window keydown of the shell page, so it only fires
+ * Ctrl/Cmd+J opens Home's Ask UNI. A window keydown of the shell page, so it only fires
  * while the shell webContents has focus (Home, the tab strip): the editors are other webContents and
  * keep Justify. Nothing happens when the shell has no Ask UNI.
  */

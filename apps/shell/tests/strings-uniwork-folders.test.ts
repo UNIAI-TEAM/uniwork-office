@@ -125,7 +125,6 @@ describe('uniwork folders string shards', () => {
     expect(strings.vi.openLocal).toBe('Mở tệp trên máy')
     expect(strings.en.openLocal).toBe('Open file on this device')
     expect(strings.vi.setMcp).toBe('Máy chủ MCP trên máy này')
-    expect(strings.vi.setAiCapFileSearch).toBe('Tìm kiếm tệp trên máy')
     expect(strings.zh.openLocal).toBe('打开本机文件')
     expect(strings['zh-TW'].openLocal).toBe('開啟本機檔案')
     expect(strings.ja.openLocal).toBe('この端末のファイルを開く')

@@ -10,6 +10,7 @@ import type { AgentStreamNotice } from '@genoffice/agent-core'
 import { createRoot, type Root } from 'react-dom/client'
 import { buildParseMap } from '../src/renderer/document/parse-map'
 import { usableAiSettings } from './helpers/ai-settings'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 // the stylesheet is only loaded as text so jsdom can compute the rendered style (vitest stubs css imports)
 const appStyles = readFileSync(resolve(__dirname, '../src/renderer/styles.css'), 'utf8')
 
@@ -73,6 +74,7 @@ describe('UniWork AI notices (html panel)', () => {
     root = null
     container = null
     vi.unstubAllGlobals()
+    resetUniworkAi()
   })
 
   const text = '<!doctype html>\n<html><body><h1>Quarterly</h1></body></html>'
@@ -133,6 +135,7 @@ describe('UniWork AI notices (html panel)', () => {
   /** mount, let the preset start its turn, return once the loop has handed over its events */
   async function started() {
     harness.events = null
+    readyUniworkAi('/docs/a.html')
     const m = mount()
     m.render('/docs/a.html')
     await flush()

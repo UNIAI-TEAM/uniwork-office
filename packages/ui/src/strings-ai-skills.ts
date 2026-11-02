@@ -37,7 +37,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: '本条消息附带的技能',
     maxSkillsHint: '每条消息最多附加 3 个技能',
     uniworkTooLongNotice:
-      '附带的技能对于 UniWork AI 来说过长（超过 8,000 个字符）。请移除一个技能，或使用您自己的 API 密钥。',
+      '附带的技能对于 UniWork AI 来说过长（超过 8,000 个字符）。请移除一个技能。',
   },
   en: {
     addTitle: 'Add',
@@ -52,7 +52,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Skills attached to this message',
     maxSkillsHint: 'Up to 3 skills per message',
     uniworkTooLongNotice:
-      'The attached skills are too long for UniWork AI (over 8,000 characters). Remove a skill or use your own API key.',
+      'The attached skills are too long for UniWork AI (over 8,000 characters). Remove a skill.',
   },
   ja: {
     addTitle: '追加',
@@ -67,7 +67,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'このメッセージに添付したスキル',
     maxSkillsHint: '1件のメッセージに最大3つのスキルを添付できます',
     uniworkTooLongNotice:
-      '添付されたスキルが UniWork AI の上限（8,000文字）を超えています。スキルを外すか、ご自身の API キーをご使用ください。',
+      '添付されたスキルが UniWork AI の上限（8,000文字）を超えています。スキルを外してください。',
   },
   ko: {
     addTitle: '추가',
@@ -81,8 +81,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     removeTitle: '스킬 제거',
     attachedTitle: '이 메시지에 첨부된 스킬',
     maxSkillsHint: '메시지당 최대 3개의 스킬을 첨부할 수 있습니다',
-    uniworkTooLongNotice:
-      '첨부된 스킬이 UniWork AI 한도(8,000자)를 초과합니다. 스킬을 제거하거나 자체 API 키를 사용하세요.',
+    uniworkTooLongNotice: '첨부된 스킬이 UniWork AI 한도(8,000자)를 초과합니다. 스킬을 제거하세요.',
   },
   fr: {
     addTitle: 'Ajouter',
@@ -97,7 +96,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Compétences jointes à ce message',
     maxSkillsHint: 'Jusqu’à 3 compétences par message',
     uniworkTooLongNotice:
-      'Les compétences jointes sont trop longues pour UniWork AI (plus de 8 000 caractères). Retirez une compétence ou utilisez votre propre clé API.',
+      'Les compétences jointes sont trop longues pour UniWork AI (plus de 8 000 caractères). Retirez une compétence.',
   },
   de: {
     addTitle: 'Hinzufügen',
@@ -112,7 +111,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'An diese Nachricht angehängte Skills',
     maxSkillsHint: 'Bis zu 3 Skills pro Nachricht',
     uniworkTooLongNotice:
-      'Die angehängten Skills sind für UniWork AI zu lang (über 8.000 Zeichen). Entfernen Sie einen Skill oder verwenden Sie Ihren eigenen API-Schlüssel.',
+      'Die angehängten Skills sind für UniWork AI zu lang (über 8.000 Zeichen). Entfernen Sie einen Skill.',
   },
   es: {
     addTitle: 'Añadir',
@@ -127,7 +126,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Habilidades adjuntas a este mensaje',
     maxSkillsHint: 'Hasta 3 habilidades por mensaje',
     uniworkTooLongNotice:
-      'Las habilidades adjuntas son demasiado largas para UniWork AI (más de 8.000 caracteres). Quite una habilidad o use su propia clave API.',
+      'Las habilidades adjuntas son demasiado largas para UniWork AI (más de 8.000 caracteres). Quite una habilidad.',
   },
   th: {
     addTitle: 'เพิ่ม',
@@ -142,7 +141,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'ทักษะที่แนบกับข้อความนี้',
     maxSkillsHint: 'แนบได้สูงสุด 3 ทักษะต่อข้อความ',
     uniworkTooLongNotice:
-      'ทักษะที่แนบมามีความยาวเกินขีดจำกัดของ UniWork AI (เกิน 8,000 อักขระ) โปรดนำทักษะออกหรือใช้คีย์ API ของคุณเอง',
+      'ทักษะที่แนบมามีความยาวเกินขีดจำกัดของ UniWork AI (เกิน 8,000 อักขระ) โปรดนำทักษะออก',
   },
   id: {
     addTitle: 'Tambah',
@@ -157,7 +156,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Keterampilan yang dilampirkan pada pesan ini',
     maxSkillsHint: 'Maksimal 3 keterampilan per pesan',
     uniworkTooLongNotice:
-      'Keterampilan yang dilampirkan terlalu panjang untuk UniWork AI (lebih dari 8.000 karakter). Hapus satu keterampilan atau gunakan kunci API Anda sendiri.',
+      'Keterampilan yang dilampirkan terlalu panjang untuk UniWork AI (lebih dari 8.000 karakter). Hapus satu keterampilan.',
   },
   ru: {
     addTitle: 'Добавить',
@@ -172,7 +171,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Навыки, приложенные к этому сообщению',
     maxSkillsHint: 'Не более 3 навыков на сообщение',
     uniworkTooLongNotice:
-      'Приложенные навыки слишком велики для UniWork AI (более 8 000 символов). Уберите навык или используйте собственный API-ключ.',
+      'Приложенные навыки слишком велики для UniWork AI (более 8 000 символов). Уберите навык.',
   },
   ar: {
     addTitle: 'إضافة',
@@ -187,7 +186,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'المهارات المرفقة بهذه الرسالة',
     maxSkillsHint: 'ما يصل إلى 3 مهارات لكل رسالة',
     uniworkTooLongNotice:
-      'المهارات المرفقة طويلة جدًا بالنسبة إلى UniWork AI (أكثر من 8000 حرف). أزل مهارة أو استخدم مفتاح API الخاص بك.',
+      'المهارات المرفقة طويلة جدًا بالنسبة إلى UniWork AI (أكثر من 8000 حرف). أزل مهارة.',
   },
   pt: {
     addTitle: 'Adicionar',
@@ -202,7 +201,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Habilidades anexadas a esta mensagem',
     maxSkillsHint: 'Até 3 habilidades por mensagem',
     uniworkTooLongNotice:
-      'As habilidades anexadas são longas demais para o UniWork AI (mais de 8.000 caracteres). Remova uma habilidade ou use sua própria chave de API.',
+      'As habilidades anexadas são longas demais para o UniWork AI (mais de 8.000 caracteres). Remova uma habilidade.',
   },
   it: {
     addTitle: 'Aggiungi',
@@ -217,7 +216,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Competenze allegate a questo messaggio',
     maxSkillsHint: 'Fino a 3 competenze per messaggio',
     uniworkTooLongNotice:
-      'Le competenze allegate sono troppo lunghe per UniWork AI (oltre 8.000 caratteri). Rimuovi una competenza o usa la tua chiave API.',
+      'Le competenze allegate sono troppo lunghe per UniWork AI (oltre 8.000 caratteri). Rimuovi una competenza.',
   },
   pl: {
     addTitle: 'Dodaj',
@@ -232,7 +231,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Umiejętności dołączone do tej wiadomości',
     maxSkillsHint: 'Maksymalnie 3 umiejętności na wiadomość',
     uniworkTooLongNotice:
-      'Dołączone umiejętności są za długie dla UniWork AI (ponad 8000 znaków). Usuń umiejętność lub użyj własnego klucza API.',
+      'Dołączone umiejętności są za długie dla UniWork AI (ponad 8000 znaków). Usuń umiejętność.',
   },
   cs: {
     addTitle: 'Přidat',
@@ -247,7 +246,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Dovednosti připojené k této zprávě',
     maxSkillsHint: 'Nejvýše 3 dovednosti na zprávu',
     uniworkTooLongNotice:
-      'Připojené dovednosti jsou pro UniWork AI příliš dlouhé (přes 8 000 znaků). Odeberte dovednost nebo použijte vlastní klíč API.',
+      'Připojené dovednosti jsou pro UniWork AI příliš dlouhé (přes 8 000 znaků). Odeberte dovednost.',
   },
   nl: {
     addTitle: 'Toevoegen',
@@ -262,7 +261,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Vaardigheden bij dit bericht',
     maxSkillsHint: 'Maximaal 3 vaardigheden per bericht',
     uniworkTooLongNotice:
-      'De bijgevoegde vaardigheden zijn te lang voor UniWork AI (meer dan 8.000 tekens). Verwijder een vaardigheid of gebruik uw eigen API-sleutel.',
+      'De bijgevoegde vaardigheden zijn te lang voor UniWork AI (meer dan 8.000 tekens). Verwijder een vaardigheid.',
   },
   ms: {
     addTitle: 'Tambah',
@@ -277,7 +276,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Kemahiran yang dilampirkan pada mesej ini',
     maxSkillsHint: 'Sehingga 3 kemahiran setiap mesej',
     uniworkTooLongNotice:
-      'Kemahiran yang dilampirkan terlalu panjang untuk UniWork AI (melebihi 8,000 aksara). Buang satu kemahiran atau gunakan kunci API anda sendiri.',
+      'Kemahiran yang dilampirkan terlalu panjang untuk UniWork AI (melebihi 8,000 aksara). Buang satu kemahiran.',
   },
   he: {
     addTitle: 'הוספה',
@@ -292,7 +291,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'מיומנויות שצורפו להודעה זו',
     maxSkillsHint: 'עד 3 מיומנויות להודעה',
     uniworkTooLongNotice:
-      'המיומנויות המצורפות ארוכות מדי עבור UniWork AI (מעל 8,000 תווים). הסר מיומנות או השתמש במפתח API משלך.',
+      'המיומנויות המצורפות ארוכות מדי עבור UniWork AI (מעל 8,000 תווים). הסר מיומנות.',
   },
   hi: {
     addTitle: 'जोड़ें',
@@ -307,7 +306,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'इस संदेश के साथ जुड़े कौशल',
     maxSkillsHint: 'प्रति संदेश अधिकतम 3 कौशल',
     uniworkTooLongNotice:
-      'जुड़े हुए कौशल UniWork AI के लिए बहुत लंबे हैं (8,000 वर्णों से अधिक)। कोई कौशल हटाएँ या अपनी स्वयं की API कुंजी का उपयोग करें।',
+      'जुड़े हुए कौशल UniWork AI के लिए बहुत लंबे हैं (8,000 वर्णों से अधिक)। कोई कौशल हटाएँ।',
   },
   'zh-TW': {
     addTitle: '新增',
@@ -321,8 +320,7 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     removeTitle: '移除技能',
     attachedTitle: '此訊息附帶的技能',
     maxSkillsHint: '每則訊息最多附加 3 個技能',
-    uniworkTooLongNotice:
-      '附帶的技能對 UniWork AI 而言過長（超過 8,000 個字元）。請移除一個技能，或使用您自己的 API 金鑰。',
+    uniworkTooLongNotice: '附帶的技能對 UniWork AI 而言過長（超過 8,000 個字元）。請移除一個技能。',
   },
   vi: {
     addTitle: 'Thêm',
@@ -337,6 +335,6 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     attachedTitle: 'Kỹ năng đính kèm tin nhắn này',
     maxSkillsHint: 'Tối đa 3 kỹ năng mỗi tin nhắn',
     uniworkTooLongNotice:
-      'Kỹ năng đính kèm quá dài đối với UniWork AI (hơn 8.000 ký tự). Hãy gỡ bớt một kỹ năng hoặc dùng khóa API của riêng bạn.',
+      'Kỹ năng đính kèm quá dài đối với UniWork AI (hơn 8.000 ký tự). Hãy gỡ bớt một kỹ năng.',
   },
 }

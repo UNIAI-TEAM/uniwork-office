@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import {
   UNIWORK_CLOUD_SIGNED_OUT,
@@ -11,31 +14,44 @@ import {
 
 import { generateImageTool, analyzeMediaTool, MEDIA_NOT_CONFIGURED_ERROR } from '../src/media-tools'
 
-// nonexistent settings file → defaults: no BYOK media provider, and no cloud route while signed out
+// nonexistent settings file → defaults: the cloud-tools switch is on
 const SETTINGS = '/nonexistent/ai-settings.json'
 
-describe('media tools without a BYOK provider', () => {
-  it('generate_image reports that no media provider is configured', async () => {
-    const r = await generateImageTool(SETTINGS, {
-      prompt: 'red podcast icon',
-      transparentBackground: true,
-    })
+function switchedOffSettings(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'genoffice-media-tools-'))
+  const path = join(dir, 'ai-settings.json')
+  writeFileSync(
+    path,
+    JSON.stringify({ provider: 'uniwork', providers: {}, gskToolsEnabled: false }),
+  )
+  return path
+}
+
+describe('media tools with the cloud-tools switch off', () => {
+  it('generate_image says the cloud tools are turned off', async () => {
+    const r = await generateImageTool(switchedOffSettings(), { prompt: 'red podcast icon' })
     expect(r).toEqual({ error: MEDIA_NOT_CONFIGURED_ERROR })
   })
 
-  it('analyze_media reports that no media provider is configured', async () => {
-    const r = await analyzeMediaTool(SETTINGS, {
+  it('analyze_media says the cloud tools are turned off', async () => {
+    const r = await analyzeMediaTool(switchedOffSettings(), {
       mediaUrls: ['https://cdn/x/a.png'],
       requirements: 'describe it',
     })
     expect(r).toEqual({ error: MEDIA_NOT_CONFIGURED_ERROR })
   })
 
+  it('names where to turn them back on', () => {
+    expect(MEDIA_NOT_CONFIGURED_ERROR).toBe(
+      'Cloud tools are turned off. Turn them on under Settings (Account).',
+    )
+  })
+
   it('uses the caller-supplied localized message', async () => {
     const r = await generateImageTool(
-      SETTINGS,
+      switchedOffSettings(),
       { prompt: 'red podcast icon' },
-      { notLoggedInError: 'localized' },
+      { cloudToolsOffError: 'localized' },
     )
     expect(r).toEqual({ error: 'localized' })
   })
@@ -47,6 +63,11 @@ describe('media tools without a BYOK provider', () => {
     expect(await analyzeMediaTool(SETTINGS, { mediaUrls: [], requirements: 'x' })).toEqual({
       error: 'mediaUrls must not be empty',
     })
+  })
+
+  it('signed out is the sign-in sentence, not the switch sentence', async () => {
+    const r = await generateImageTool(SETTINGS, { prompt: 'red podcast icon' })
+    expect(r).toEqual({ error: new UniworkCloudError('signed_out').message })
   })
 })
 
@@ -77,17 +98,17 @@ describe('media tools after the plan changed on the server', () => {
     setUniworkCloudRefresher(refresher)
     const r = await generateImageTool(SETTINGS, { prompt: 'red podcast icon' })
     expect(refresher).toHaveBeenCalledTimes(1)
-    // the cloud route was tried: the answer is no longer "no media provider is configured"
+    // the cloud route was tried: the answer is the transport's, not the entitlement refusal
     expect(generateImage).toHaveBeenCalledTimes(1)
-    expect(r.error).not.toBe(MEDIA_NOT_CONFIGURED_ERROR)
+    expect(r.error).toBe(new UniworkCloudError('network').message)
   })
 
-  it('stays "not configured" when the re-read says the plan is still off', async () => {
+  it('stays refused with the plan sentence when the re-read says the plan is still off', async () => {
     setUniworkCloudStatus({ ...UNIWORK_CLOUD_SIGNED_OUT, state: 'not-entitled' })
     const refresher = vi.fn(async () => undefined)
     setUniworkCloudRefresher(refresher)
     const r = await generateImageTool(SETTINGS, { prompt: 'red podcast icon' })
     expect(refresher).toHaveBeenCalledTimes(1)
-    expect(r).toEqual({ error: MEDIA_NOT_CONFIGURED_ERROR })
+    expect(r).toEqual({ error: new UniworkCloudError('entitlement_required').message })
   })
 })

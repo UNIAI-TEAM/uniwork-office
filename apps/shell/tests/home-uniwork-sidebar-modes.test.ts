@@ -34,8 +34,8 @@ actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const ok = <T>(value: T): UniworkResult<T> => ({ ok: true, value })
 
-// UNI-1932: the UniWork sidebar nav must survive My AI / Workbench on the UniWork tab.
-describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
+// UNI-1932: the UniWork sidebar nav must survive Ask UNI / Workbench on the UniWork tab.
+describe('Home UniWork sidebar in Ask UNI / Workbench mode (UNI-1932)', () => {
   let host: HTMLDivElement
   let root: Root
   let api: Record<string, ReturnType<typeof vi.fn>>
@@ -108,7 +108,6 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
         total: 0,
         index: { pending: 0, scanning: false },
       })),
-      rerankSearch: vi.fn(async () => null),
       addFolderRoot: vi.fn(async () => null),
       removeFolderRoot: vi.fn(async () => {}),
       pickDefaultSaveDir: vi.fn(async () => null),
@@ -183,7 +182,7 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
     await flush()
   }
 
-  const myAiNav = () => host.querySelector<HTMLButtonElement>('.sidebar-nav [data-nav="chat"]')
+  const askUniNav = () => host.querySelector<HTMLButtonElement>('.sidebar-nav [data-nav="chat"]')
   const workbenchNav = () =>
     Array.from(host.querySelectorAll<HTMLButtonElement>('.sidebar-nav .nav-item')).find((b) =>
       b.textContent?.includes('Workbench'),
@@ -194,9 +193,9 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
   const uwPane = () => host.querySelector<HTMLElement>('main.home-uw-pane')
   const uwPaneShown = () => !!uwPane() && uwPane()!.hidden === false
 
-  async function enterMyAi() {
-    await click(myAiNav())
-    expect(myAiNav()!.getAttribute('aria-current')).toBe('page')
+  async function enterAskUni() {
+    await click(askUniNav())
+    expect(askUniNav()!.getAttribute('aria-current')).toBe('page')
   }
   async function enterWorkbench() {
     await click(workbenchNav())
@@ -211,7 +210,7 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
   })
 
   it.each([
-    ['My AI', enterMyAi],
+    ['Ask UNI', enterAskUni],
     ['Workbench', enterWorkbench],
   ])('keeps the UniWork nav in %s with no item current', async (_label, enter) => {
     await mountHome()
@@ -227,7 +226,7 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
   })
 
   it.each([
-    ['My AI', enterMyAi],
+    ['Ask UNI', enterAskUni],
     ['Workbench', enterWorkbench],
   ])('clicking a nav item in %s leaves the mode and shows that sub-view', async (_l, enter) => {
     await mountHome()
@@ -235,16 +234,16 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
 
     await click(uwNavItem('recent'))
 
-    expect(myAiNav()!.getAttribute('aria-current')).toBeNull()
+    expect(askUniNav()!.getAttribute('aria-current')).toBeNull()
     expect(workbenchNav()!.getAttribute('aria-current')).toBeNull()
     expect(uwPaneShown()).toBe(true)
     expect(uwNavItem('recent')!.getAttribute('aria-current')).toBe('page')
     expect(uwPane()!.querySelector('.dh-main h1')!.textContent).toBe('Recent')
   })
 
-  it('clicking a folder in the tree from My AI leaves the mode and opens that folder', async () => {
+  it('clicking a folder in the tree from Ask UNI leaves the mode and opens that folder', async () => {
     await mountHome()
-    await enterMyAi()
+    await enterAskUni()
 
     const row = Array.from(
       host.querySelectorAll<HTMLElement>('.home-uw-side-slot [role="treeitem"]'),
@@ -252,7 +251,7 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
     expect(row).toBeTruthy()
     await click(row)
 
-    expect(myAiNav()!.getAttribute('aria-current')).toBeNull()
+    expect(askUniNav()!.getAttribute('aria-current')).toBeNull()
     expect(uwPaneShown()).toBe(true)
     expect(uwPane()!.querySelector('.dh-main h1')!.textContent).toBe('Alpha Folder')
   })
@@ -268,7 +267,7 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
     )
 
   it.each([
-    ['My AI', enterMyAi],
+    ['Ask UNI', enterAskUni],
     ['Workbench', enterWorkbench],
   ])('the + New folder button in %s leaves the mode and shows its dialog', async (_l, enter) => {
     await mountHome()
@@ -276,16 +275,16 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
 
     await click(host.querySelector('.home-uw-side-slot .dh-sidebar-add'))
 
-    expect(myAiNav()!.getAttribute('aria-current')).toBeNull()
+    expect(askUniNav()!.getAttribute('aria-current')).toBeNull()
     expect(workbenchNav()!.getAttribute('aria-current')).toBeNull()
     expect(uwPaneShown()).toBe(true)
     expect(visibleDialog()).toBeTruthy()
   })
 
   it.each([
-    ['new', 'My AI', enterMyAi],
+    ['new', 'Ask UNI', enterAskUni],
     ['new', 'Workbench', enterWorkbench],
-    ['move', 'My AI', enterMyAi],
+    ['move', 'Ask UNI', enterAskUni],
   ])('tree row menu "%s" in %s leaves the mode and shows its dialog', async (action, _l, enter) => {
     await mountHome()
     await enter()
@@ -293,28 +292,28 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
     await click(alphaRow()!.querySelector('[data-folder-menu-for]'))
     await click(document.querySelector(`[role="menuitem"][data-folder-action="${action}"]`))
 
-    expect(myAiNav()!.getAttribute('aria-current')).toBeNull()
+    expect(askUniNav()!.getAttribute('aria-current')).toBeNull()
     expect(workbenchNav()!.getAttribute('aria-current')).toBeNull()
     expect(uwPaneShown()).toBe(true)
     expect(visibleDialog()).toBeTruthy()
   })
 
-  it('inline tree rename in My AI stays in the mode', async () => {
+  it('inline tree rename in Ask UNI stays in the mode', async () => {
     await mountHome()
-    await enterMyAi()
+    await enterAskUni()
 
     await click(alphaRow()!.querySelector('[data-folder-menu-for]'))
     await click(document.querySelector('[role="menuitem"][data-folder-action="rename"]'))
 
-    expect(myAiNav()!.getAttribute('aria-current')).toBe('page')
+    expect(askUniNav()!.getAttribute('aria-current')).toBe('page')
   })
 
-  it('does not refetch the folder tree or the list when entering and leaving My AI', async () => {
+  it('does not refetch the folder tree or the list when entering and leaving Ask UNI', async () => {
     await mountHome()
     const treeCalls = api.uniworkFolderTree!.mock.calls.length
     const listCalls = api.uniworkListChildren!.mock.calls.length
 
-    await enterMyAi()
+    await enterAskUni()
     await click(uwNavItem('workspace'))
 
     expect(api.uniworkFolderTree!.mock.calls.length).toBe(treeCalls)
@@ -364,7 +363,7 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
     })
 
     it.each([
-      ['My AI', enterMyAi],
+      ['Ask UNI', enterAskUni],
       ['Workbench', enterWorkbench],
     ])(
       'a Trash intent in %s leaves the mode, opens the Trash and selects the row',
@@ -374,7 +373,7 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
         await act(async () => revealInTrash({ documentId: 'doc-trashed', workspaceId: 'ws-1' }))
         await flush(8)
 
-        expect(myAiNav()!.getAttribute('aria-current')).toBeNull()
+        expect(askUniNav()!.getAttribute('aria-current')).toBeNull()
         expect(workbenchNav()!.getAttribute('aria-current')).toBeNull()
         expect(uwPaneShown()).toBe(true)
         expect(trashNavCurrent()).toBe(true)

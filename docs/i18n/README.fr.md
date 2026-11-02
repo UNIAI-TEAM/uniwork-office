@@ -50,12 +50,7 @@ modification, et vous montre exactement ce qu'il a touché.
 - **Local par conception.** L'ouverture, l'édition, l'enregistrement et la
   conversion des fichiers se font sur votre machine. Les conversions
   PDF → Word / Excel / PowerPoint, Markdown → Word et HTML → Word s'exécutent
-  toutes en local. Seuls les appels à l'IA quittent la machine, vers le
-  fournisseur de votre choix.
-- **Vos clés ou aucune.** Connectez-vous avec Genspark pour vous dispenser de
-  clé, ou utilisez votre propre clé pour Claude, OpenAI, Gemini, DeepSeek,
-  Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty, ou tout point
-  de terminaison compatible OpenAI, y compris les serveurs locaux.
+  toutes en local. Seuls les appels à l'IA quittent la machine, vers UniWork AI.
 - **Scriptable et prêt pour les agents.** L'application embarque une ligne de
   commande `genoffice` et un skill pour Claude Code, Codex, Cursor, Gemini
   CLI, GitHub Copilot, OpenCode et Windsurf, si bien qu'un agent de codage
@@ -186,7 +181,7 @@ fenêtre.
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="GenOffice, page Réglages → Intégrations : le skill genoffice installé dans Claude Code, avec des boutons Installer à côté de Codex et Cursor"></td>
 </tr>
 <tr>
-<td><b>Un seul prompt à votre agent</b> — « Construis un deck de huit diapositives sur le Système solaire. » L'agent lit le skill, écrit une feuille de style, un plan et une spécification de page par diapositive, génère les deux photos avec <code>genoffice image</code>, et laisse <code>genoffice slides check</code> rejeter tout ce qui déborde ou se chevauche avant que <code>genoffice create</code> n'assemble le <code>.pptx</code> et que <code>slides render</code> ne renvoie un PNG par diapositive à examiner.</td>
+<td><b>Un seul prompt à votre agent</b> — « Construis un deck de huit diapositives sur le Système solaire. » L'agent lit le skill, écrit une feuille de style, un plan et une spécification de page par diapositive, et laisse <code>genoffice slides check</code> rejeter tout ce qui déborde ou se chevauche avant que <code>genoffice create</code> n'assemble le <code>.pptx</code> et que <code>slides render</code> ne renvoie un PNG par diapositive à examiner.</td>
 <td><b>Installez une fois, depuis Réglages → Intégrations</b> — GenOffice liste les agents de codage qu'il trouve sur cet ordinateur et écrit le skill dans chacun de ceux que vous choisissez. Ou téléchargez le skill en zip, ou lancez <code>npx skills add genspark-ai/genoffice</code>. Les commandes et le flux de travail complet sont dans <a href="#command-line-and-agent-skill">Ligne de commande et skill d'agent</a>.</td>
 </tr>
 </table>
@@ -200,15 +195,11 @@ outils ainsi que les références d'opérations sous forme de ressources. Un
 second serveur HTTP dans l'application permet à un agent de construire un
 document Word dans un onglet d'éditeur visible pendant que vous regardez.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Time-lapse de Claude Code construisant un dossier d'investissement de huit diapositives sur les énergies renouvelables via le serveur MCP de genoffice : recherche des figures et des photos, vérifie chaque image candidate avec media, deck_start écrit la feuille de style et le plan, deck_page ajoute une page vérifiée à la fois, deck_build assemble le .pptx et slides_render renvoie une image de chaque diapositive ; le deck terminé s'ouvre ensuite dans GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides affichant le deck Renewable Energy 2026 de huit diapositives que Claude Code a construit via le serveur MCP de genoffice : la diapositive de couverture avec une photographie d'un parc éolien sur le canevas et huit miniatures à gauche"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice, page Réglages → Intégrations, partie MCP : la commande claude mcp add en une ligne pour Claude Code, le bloc JSON pour Cursor, Claude Desktop et d'autres clients MCP, et l'option de serveur HTTP local en dessous"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice, page Réglages → Intégrations, partie MCP : la commande claude mcp add en une ligne pour Claude Code, le bloc JSON pour Cursor, Claude Desktop et d'autres clients MCP, et l'option de serveur HTTP local en dessous"></td>
 </tr>
 <tr>
-<td><b>Un prompt, 38 appels d'outils, aucun terminal</b> — « Construis un dossier d'investissement de huit diapositives sur les énergies renouvelables en 2026, avec une vraie photo en couverture et partout où une photo est utile. » L'agent récupère les figures et les photos avec <code>search</code>, demande à <code>media</code> si chaque image candidate est une véritable photographie, appelle <code>deck_start</code> avec une feuille de style et un plan, puis <code>deck_page</code> une fois par diapositive ; chaque page est vérifiée par rapport au plan et à la palette avant d'être conservée, <code>deck_build</code> assemble le <code>.pptx</code>, <code>slides_audit</code> recherche les débordements, <code>slides_render</code> renvoie un PNG par diapositive sous forme de contenu image que le modèle peut regarder, et <code>deck_replace</code> retravaille les trois pages qui ne lui plaisaient pas.</td>
 <td><b>Connectez-vous une fois, depuis Réglages → Intégrations</b> — copiez la ligne <code>claude mcp add</code> pour Claude Code, ou le bloc JSON dans Cursor, Claude Desktop ou tout autre client MCP. L'option B active le serveur HTTP local pour l'éditeur Word visible. Les deux sont décrites dans <a href="#mcp-server">Serveur MCP</a>.</td>
 </tr>
 </table>
@@ -226,9 +217,6 @@ document Word dans un onglet d'éditeur visible pendant que vous regardez.
   Docs, formules et graphiques vivants dans Sheets, diapositives dessinées
   directement sur le canevas, chaque étape de l'IA laissant un instantané que
   vous pouvez restaurer.
-- **Votre modèle, votre clé.** Connectez-vous avec Genspark, ou apportez une
-  clé pour Claude, OpenAI, Gemini, DeepSeek et d'autres, serveurs locaux et
-  tout point de terminaison compatible OpenAI inclus.
 - **Le PDF fait sérieusement.** Modifiez le texte directement dans la page,
   et convertissez le PDF en Word, Excel ou PowerPoint en local, avec OCR
   système pour les scans.
@@ -238,23 +226,6 @@ document Word dans un onglet d'éditeur visible pendant que vous regardez.
   serveur MCP mettent chaque moteur au service de Claude Code, Claude
   Desktop, Codex, Cursor et d'autres agents, toujours en local.
 - **Gratuit**, pour les particuliers comme pour les équipes.
-
-## Moteurs IA
-
-**Connectez-vous avec Genspark** et il n'y a rien à configurer : les appels
-aux modèles passent par le proxy Genspark (familles Claude, GPT et Gemini) et
-les agents ont accès à la recherche web et d'images, à la génération
-d'images, et à l'analyse d'images, d'audio et de vidéo.
-
-**Ou utilisez votre propre clé.** Paramètres → IA propose Claude, OpenAI,
-Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty
-et OpenCode Zen/Go, ainsi qu'un emplacement personnalisé pour tout point de
-terminaison compatible OpenAI (URL de base + clé), y compris les serveurs de
-modèles locaux. La recherche et les médias disposent de leurs propres
-fournisseurs par fonctionnalité sous **IA Médias et Recherche** : Serper ou
-Tavily pour la recherche web, et OpenAI, Gemini, Doubao/Seedream, GLM, Grok,
-Qwen, MiniMax ou tout point de terminaison d'images compatible OpenAI pour la
-génération d'images et l'analyse d'images/vidéos.
 
 Toute la suite propose les thèmes clair, sombre et système. Les thèmes ne
 changent que ce qui est affiché à l'écran : les exports, les impressions et
@@ -318,9 +289,8 @@ prompt dans Claude Code. En coulisses, l'agent a suivi le flux de travail par
 suivante :
 
 ```bash
-genoffice capabilities --json                        # which cloud tools GenOffice has configured
+genoffice capabilities --json                        # whether the app is installed
 genoffice guide slides design                        # the deck workflow and layout library
-genoffice image "the eight planets in a row …" --aspect 16:9 --out deck/assets/cover.jpg
 genoffice slides check deck/outline.json --json      # 8 pages, no findings
 genoffice slides check deck/pages/01.json --json     # builds one slide, audits overflow and overlap
 …                                                    # one page file per slide, fixed until each check is clean
@@ -346,10 +316,10 @@ préférez ne pas en donner un. Il existe deux façons de vous connecter,
 toutes deux présentées avec des extraits prêts à copier dans
 **Réglages → Intégrations → MCP** :
 
-| Voie                                 | Ce que c'est                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **A · `genoffice mcp`** (recommandé) | Un serveur stdio que l'assistant démarre lui-même ; GenOffice n'a pas besoin d'être ouvert. Un outil par commande (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `search`, `image`, `media`, `open`) plus le flux de deck par étapes `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Les opérations, les spécifications et le Markdown sont passés en ligne, donc un client sans système de fichiers fonctionne quand même. |
-| **B · Serveur HTTP local**           | Tourne dans l'application GenOffice sur `http://127.0.0.1:3093/mcp` (Streamable HTTP, avec SSE hérité). Ses outils pilotent un onglet d'éditeur Word visible : `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, et vous regardez le document prendre forme. Désactivé par défaut ; activez-le dans le même panneau de réglages.                                                                                                                                                                           |
+| Voie                                 | Ce que c'est                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A · `genoffice mcp`** (recommandé) | Un serveur stdio que l'assistant démarre lui-même ; GenOffice n'a pas besoin d'être ouvert. Un outil par commande (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `open`) plus le flux de deck par étapes `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Les opérations, les spécifications et le Markdown sont passés en ligne, donc un client sans système de fichiers fonctionne quand même. |
+| **B · Serveur HTTP local**           | Tourne dans l'application GenOffice sur `http://127.0.0.1:3093/mcp` (Streamable HTTP, avec SSE hérité). Ses outils pilotent un onglet d'éditeur Word visible : `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, et vous regardez le document prendre forme. Désactivé par défaut ; activez-le dans le même panneau de réglages.                                                                                                                                               |
 
 ```bash
 # Claude Code
@@ -367,35 +337,8 @@ de réglages affiche le chemin exact de votre installation). Le serveur
 embarque ses propres instructions de workflow et expose les références
 d'opérations comme ressources `genoffice://guide/*`, donc aucun skill n'est
 nécessaire ; le skill et le serveur MCP peuvent coexister, et l'assistant
-en choisit un. Les fonctionnalités cloud (`search`, `image`, `media`)
-passent toujours par le fournisseur configuré dans GenOffice ; tout le
-reste tourne en local, et `GENOFFICE_ALLOWED_ROOTS` limite chaque outil aux
+en choisit un. `GENOFFICE_ALLOWED_ROOTS` limite chaque outil aux
 dossiers que vous indiquez.
-
-Le deck sur les énergies renouvelables de la démonstration ci-dessus, c'est
-à quoi ressemble, côté protocole, un seul prompt dans Claude Code avec
-uniquement le serveur MCP `genoffice` connecté :
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-Trente-huit appels, environ treize minutes, et l'assistant n'a jamais
-touché de terminal : les figures, les photos, les guides, les vérifications
-et les rendus ont tous voyagé sous forme de résultats d'outils MCP. Seuls
-`search` et `media` ont quitté la machine, vers le fournisseur configuré
-dans GenOffice.
 
 <a id="download"></a>
 
@@ -524,8 +467,7 @@ documents continuent de fonctionner dans Microsoft Office.
 L'édition de documents est entièrement locale — les fichiers ne quittent
 jamais votre machine pour être ouverts, modifiés, enregistrés ou convertis.
 Les fonctionnalités IA (agents, recherche, outils d'image) nécessitent une
-connexion réseau, avec soit une connexion Genspark, soit votre propre clé
-d'API de modèle.
+connexion réseau et un compte UniWork.
 
 </details>
 
@@ -546,19 +488,6 @@ combinée à une analyse de mise en page fondée sur la géométrie, sans servic
 cloud, sans envoi. Les pages scannées sont également prises en charge : sur
 macOS et Windows, l'OCR du système les lit, si bien qu'elles sont converties
 en texte modifiable plutôt qu'en image de page.
-
-</details>
-
-<details>
-<summary><b>Puis-je utiliser mon propre modèle IA ou ma propre clé d'API ?</b></summary>
-
-Oui. Outre la connexion Genspark sans clé, GenOffice prend en charge
-l'utilisation de votre propre clé pour Claude, OpenAI, Gemini, DeepSeek,
-Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty et OpenCode
-Zen/Go, ainsi que tout point de terminaison compatible OpenAI — y compris les
-serveurs de modèles locaux. La recherche, la génération d'images et
-l'analyse d'images/vidéos utilisent leurs propres clés sous Paramètres → IA
-Médias et Recherche.
 
 </details>
 

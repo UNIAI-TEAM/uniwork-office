@@ -100,10 +100,8 @@ export function noticePatch(
     case 'conversation-boundary':
       return addNote({
         kind: 'boundary',
-        // the adapter names the new conversation's provider by id; 'uniwork' reads as the product name
-        text: tr('aiConversationBoundary', {
-          provider: notice.provider === 'uniwork' ? tr('aiUniworkProvider') : notice.provider,
-        }),
+        // UniWork AI is the one provider: the boundary always names it by its product name
+        text: tr('aiConversationBoundary', { provider: tr('aiUniworkProvider') }),
       })
     case 'uniwork-off':
       return addNote({ kind: 'off', text: tr('aiUniworkOff') })

@@ -33,7 +33,7 @@ describe('scanText', () => {
         "const u = 'https://www.google-analytics.com/mp/collect'",
         '<script src="https://www.googletagmanager.com/gtag/js"></script>',
         '"@genspark/cli": "^1.4.2"',
-        'const ok = "https://openrouter.ai/api/v1"',
+        'const ok = "https://openrouter.example/api/v1"',
       ].join('\n'),
     )
     assert.deepEqual(
@@ -73,6 +73,56 @@ describe('scanText', () => {
     )
   })
 
+  it('flags every AI vendor host: AI runs only on UniWork AI', () => {
+    const hosts = [
+      'openrouter.ai',
+      'api.openai.com',
+      'api.anthropic.com',
+      'generativelanguage.googleapis.com',
+      'api.deepseek.com',
+      'dashscope.aliyuncs.com',
+      'api.x.ai',
+      'api.mistral.ai',
+      'open.bigmodel.cn',
+      'volces.com',
+      'api.minimax.io',
+      'duckduckgo.com',
+      'parallel.ai',
+      'serper.dev',
+      'serply.io',
+      'tavily.com',
+      'exa.ai',
+      'firecrawl.dev',
+      'perplexity.ai',
+      // the hosts of the deleted provider catalog
+      'api.moonshot.ai',
+      'router.requesty.ai',
+      'router.eu.requesty.ai',
+      'tokenhub.tencentcloudmaas.com',
+      'maas-api.cn-huabei-1.xf-yun.com',
+      'api.longcat.chat',
+      'api.xiaomimimo.com',
+      'api.ant-ling.com',
+      'api.opper.ai',
+      'api.typesafe.ai',
+      'api.cheaperinference.com',
+      'opencode.ai',
+    ]
+    const hits = scanText(hosts.map((h) => `const u = 'https://${h}/v1'`).join('\n'))
+    assert.deepEqual(
+      hits.map((h) => h.pattern),
+      hosts,
+    )
+    assert.deepEqual(
+      scanText("fetch('https://html.duckduckgo.com/html/?q=x')").map((h) => h.pattern),
+      ['duckduckgo.com'],
+    )
+  })
+
+  it('does not take a look-alike word for an AI vendor host', () => {
+    assert.deepEqual(scanText('const hexa = flexa.aiValue; this.parallel.aiRun()'), [])
+  })
+
   it('flags the escaped host forms of a regex literal and a RegExp string', () => {
     assert.deepEqual(
       scanText(String.raw`const re = /(^|\.)genspark\.ai$/i`).map((h) => h.pattern),
@@ -107,6 +157,8 @@ describe('inScope', () => {
       'apps/docs/electron-builder.cjs',
       'apps/docs/electron.vite.config.ts',
       'apps/docs/vite.renderer.config.ts',
+      'web/docs/bridge/web-bridge.ts',
+      'web/modules/shared/ai/web-ai.ts',
     ]) {
       assert.equal(inScope(p), true, p)
     }
@@ -124,6 +176,9 @@ describe('inScope', () => {
       'packages/cli/node_modules/x/index.js',
       'apps/sheets/native/excel-sidecar/target/debug/build.rs',
       'apps/docs/README.md',
+      'web/modules/shared/ai/ai.test.ts',
+      'web/docs/bridge/tests/bridge.test.ts',
+      'web/e2e/ai-web.spec.ts',
     ]) {
       assert.equal(inScope(p), false, p)
     }
@@ -146,6 +201,35 @@ describe('scanTree', () => {
         ['apps/b/package.json', 1, '@genspark/cli'],
         ['packages/a/src/x.ts', 1, 'genspark.ai'],
       ].sort(),
+    )
+  })
+
+  it('reports an AI vendor host in shipped code', () => {
+    const root = tree({
+      'packages/ai-provider/src/vendor.ts': "const BASE = 'https://openrouter.ai/api/v1'\n",
+      'apps/docs/src/main/search.ts': "fetch('https://html.duckduckgo.com/html/')\n",
+    })
+    assert.deepEqual(
+      scanTree(root, { allowlist: [] }).map((h) => [h.path, h.line, h.pattern]),
+      [
+        ['apps/docs/src/main/search.ts', 1, 'duckduckgo.com'],
+        ['packages/ai-provider/src/vendor.ts', 1, 'openrouter.ai'],
+      ],
+    )
+  })
+
+  it('scans the web frames, leaving their tests out', () => {
+    const root = tree({
+      'web/modules/shared/ai/vendor.ts': "const BASE = 'https://api.moonshot.ai/v1'\n",
+      'web/docs/bridge/x.ts': "fetch('https://opencode.ai/zen')\n",
+      'web/modules/shared/ai/ai.test.ts': "const BASE = 'https://openrouter.ai/api/v1'\n",
+    })
+    assert.deepEqual(
+      scanTree(root, { allowlist: [] }).map((h) => [h.path, h.line, h.pattern]),
+      [
+        ['web/docs/bridge/x.ts', 1, 'opencode.ai'],
+        ['web/modules/shared/ai/vendor.ts', 1, 'api.moonshot.ai'],
+      ],
     )
   })
 

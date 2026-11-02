@@ -87,7 +87,7 @@ export async function fetchRemoteImage(
   } = {},
 ): Promise<Response | null> {
   const { retryDelaysMs = RETRY_DELAYS_MS, ...guardOptions } = options
-  // BYOK-generated images live in the local store; only its own files resolve
+  // generated images that arrive as bytes live in the local store; only its own files resolve
   if (rawUrl.startsWith('file:')) {
     const local = readGeneratedImage(rawUrl)
     if (!local) return null

@@ -844,7 +844,7 @@ export function refusedLocalImagePaths(
 }
 
 /** The first add_image URL source this run's image_search / generate_image did not return, as the
- * refusal for the model; null when every URL source is registered, or the rule is off (BYOK).
+ * refusal for the model; null when every URL source is registered, or the rule is off.
  * Local paths are not URL sources: the bound local-path rule above keeps governing them. */
 export function refusedImageUrl(
   operations: readonly WorkbookOperation[],

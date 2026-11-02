@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
+import { ONBOARDING_COPY } from './onboarding-copy.mjs'
 import { globToRegExp, rebrand } from './rebrand.mjs'
 
 const FIXTURE = {
@@ -189,28 +190,13 @@ test('CLI binary paths are fixed in the prettier-wrapped multi-line shape too', 
   }
 })
 
-test('en and vi errNoApiKey keep the UniWork wording after an upstream merge', () => {
-  const upstreamEn = "    errNoApiKey: 'No API key configured for {provider}',\n"
-  for (const file of [
-    'apps/docs/src/main/docs-main.ts',
-    'apps/sheets/src/main/sheets-main.ts',
-    'apps/slides/src/main/i18n-main.ts',
-  ]) {
-    withFiles({ [file]: upstreamEn }, (get) => {
-      assert.equal(
-        get(file),
-        "    errNoApiKey: 'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.',\n",
-      )
-    })
-  }
-})
-
-test('vi errNoApiKey keeps the UniWork wording after an upstream merge', () => {
-  const upstreamVi = "    errNoApiKey: 'Chưa cấu hình khóa API cho {provider}',\n"
-  withFiles({ 'apps/docs/src/main/docs-main.ts': upstreamVi }, (get) => {
+test('the ai-search description names only the UniWork cloud tools after an upstream merge', () => {
+  const upstream =
+    '  "description": "Shared web/image search (Genspark, Serper, Serply, Tavily, Parallel, DuckDuckGo fallback) for docs/sheets/slides AI. No Electron deps; runs in main process (Node fetch).",\n'
+  withFiles({ 'packages/ai-search/package.json': upstream }, (get) => {
     assert.equal(
-      get('apps/docs/src/main/docs-main.ts'),
-      "    errNoApiKey: 'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.',\n",
+      get('packages/ai-search/package.json'),
+      `  "description": "UniWork cloud tools (web/image search, image generation, media analysis) for the editors' AI. No Electron deps; runs in the main process.",\n`,
     )
   })
 })
@@ -271,6 +257,38 @@ test('first-run welcome copy is re-applied per locale and survives a merge', () 
     )
     assert.match(text, /^ {4}onbSkip: 'Skip',$/m)
     assert.ok(!/GO-1|Work Graph|this phase|runtime/.test(text))
+  })
+})
+
+test('the first-run AI line offers the UniWork account only, after a merge too (UNI-2309)', () => {
+  // the en / vi wording before UNI-2309, which an upstream merge or an old copy can bring back
+  const ownKey = /own AI provider key|provider key|own key|khóa AI của riêng|khóa riêng|hay khóa/i
+  for (const locale of ['en', 'vi']) {
+    for (const [key, value] of Object.entries(ONBOARDING_COPY[locale])) {
+      assert.ok(!ownKey.test(value), `${locale}.${key}: ${value}`)
+    }
+  }
+  const merged = [
+    'export const strings = {',
+    '  en: {',
+    '    onbBody2:',
+    "      'Draft, rewrite and explain right inside your documents. Use your UniWork account or your own AI provider key.',",
+    '    onbNote3:',
+    "      'AI is optional. Your documents are edited on your computer; no account or key is needed to open or save files.',",
+    '  },',
+    '  vi: {',
+    '    onbBody2:',
+    "      'Soạn thảo, viết lại và giải thích ngay trong tài liệu của bạn. Dùng tài khoản UniWork hoặc khóa AI của riêng bạn.',",
+    '  },',
+    '}',
+    '',
+  ].join('\n')
+  withFiles({ 'apps/shell/src/renderer/src/strings.ts': merged }, (get) => {
+    const text = get('apps/shell/src/renderer/src/strings.ts')
+    assert.ok(!ownKey.test(text), text)
+    assert.match(text, /AI runs with your UniWork account\./)
+    assert.match(text, /AI chạy bằng tài khoản UniWork của bạn\./)
+    assert.match(text, /no account is needed to open or save files\./)
   })
 })
 

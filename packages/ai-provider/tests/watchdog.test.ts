@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentToolCall } from '@genoffice/agent-core'
-import { streamForProvider } from '../src/stream'
+import { UniworkConversations } from '../src/uniwork/conversation'
+import { UniworkError } from '../src/uniwork/errors'
+import { streamUniwork, type UniworkTurnRequest } from '../src/uniwork/protocol'
+import type { UniworkChatTransport } from '../src/uniwork/types'
+import type { StreamCallbacks } from '../src/protocols/shared'
 import {
   AI_CONNECT_TIMEOUT_MS,
   AI_IDLE_TIMEOUT_MS,
@@ -14,7 +17,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
-  vi.unstubAllGlobals()
 })
 
 /** promise that rejects when the given signal aborts (models a fetch/body read) */
@@ -78,7 +80,13 @@ describe('createStreamWatchdog', () => {
   })
 })
 
-describe('stream timeouts end to end', () => {
+describe('UniWork AI turn timeouts end to end', () => {
+  const turn: UniworkTurnRequest = {
+    scope: { kind: 'org', orgId: 'org-1', format: 'docx' },
+    messages: [{ role: 'user', text: 'hi' }],
+    tools: [],
+    toolPolicy: { cloudTools: false },
+  }
   const collector = () => {
     const deltas: string[] = []
     return {
@@ -86,93 +94,67 @@ describe('stream timeouts end to end', () => {
       cb: {
         signal: new AbortController().signal,
         onDelta: (text: string) => deltas.push(text),
-        onToolCall: (_call: AgentToolCall) => {},
+        onToolCall: () => {},
       },
     }
   }
+  const run = (transport: UniworkChatTransport, cb: StreamCallbacks) =>
+    streamUniwork(transport, turn, cb, { conversations: new UniworkConversations() })
+  const timedOut = (e: unknown) => e instanceof UniworkError && e.code === 'ai_provider_timeout'
 
-  it('rejects with AiTimeoutError when the connection never yields a response', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation((_url: string, init: RequestInit) => abortable(init.signal!)),
+  it('times out when the connection never yields a response', async () => {
+    const transport: UniworkChatTransport = { post: ({ signal }) => abortable(signal) }
+    const result = run(transport, collector().cb).then(
+      () => null,
+      (e: unknown) => e,
     )
-    const { cb } = collector()
-    const run = streamForProvider(
-      'anthropic',
-      { apiKey: 'k', model: 'claude-sonnet-5' },
-      'system',
-      [{ role: 'user', text: 'hi' }],
-      [],
-      100,
-      cb,
-    )
-    const result = expect(run).rejects.toBeInstanceOf(AiTimeoutError)
     await vi.advanceTimersByTimeAsync(AI_CONNECT_TIMEOUT_MS)
-    await result
+    expect(timedOut(await result)).toBe(true)
   })
 
-  it('rejects with AiTimeoutError when an open stream goes silent', async () => {
+  it('times out when an open stream goes silent, keeping what arrived', async () => {
     const encoder = new TextEncoder()
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation((_url: string, init: RequestInit) => {
-        const signal = init.signal!
+    const transport: UniworkChatTransport = {
+      post: ({ signal }) => {
         const body = new ReadableStream<Uint8Array>({
           start(controller) {
-            controller.enqueue(
-              encoder.encode(
-                'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hi"}}\n',
-              ),
-            )
+            controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"hi"}}]}\n'))
             // stays open forever; reads reject once the watchdog aborts
             signal.addEventListener('abort', () => controller.error(new Error('aborted')))
           },
         })
         return Promise.resolve(new Response(body, { status: 200 }))
-      }),
-    )
+      },
+    }
     const { deltas, cb } = collector()
-    const run = streamForProvider(
-      'anthropic',
-      { apiKey: 'k', model: 'claude-sonnet-5' },
-      'system',
-      [{ role: 'user', text: 'hi' }],
-      [],
-      100,
-      cb,
+    const result = run(transport, cb).then(
+      () => null,
+      (e: unknown) => e,
     )
-    const result = expect(run).rejects.toBeInstanceOf(AiTimeoutError)
     await vi.advanceTimersByTimeAsync(AI_IDLE_TIMEOUT_MS + 1_000)
-    await result
+    expect(timedOut(await result)).toBe(true)
     expect(deltas).toEqual(['hi'])
   })
 
   it('reports wire activity through onActivity', async () => {
     const encoder = new TextEncoder()
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation(() => {
+    const transport: UniworkChatTransport = {
+      post: () => {
         const body = new ReadableStream<Uint8Array>({
           start(controller) {
-            controller.enqueue(encoder.encode('data: {"type":"ping"}\n'))
+            controller.enqueue(
+              encoder.encode(
+                'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n',
+              ),
+            )
             controller.close()
           },
         })
         return Promise.resolve(new Response(body, { status: 200 }))
-      }),
-    )
+      },
+    }
     const onActivity = vi.fn()
-    const run = streamForProvider(
-      'anthropic',
-      { apiKey: 'k', model: 'claude-sonnet-5' },
-      'system',
-      [{ role: 'user', text: 'hi' }],
-      [],
-      100,
-      { ...collector().cb, onActivity },
-    )
-    // a ping-only stream carries no content, so the turn itself rejects
-    await expect(run).rejects.toThrow(/returned no content/)
+    await run(transport, { ...collector().cb, onActivity })
     expect(onActivity).toHaveBeenCalled()
   })
 })

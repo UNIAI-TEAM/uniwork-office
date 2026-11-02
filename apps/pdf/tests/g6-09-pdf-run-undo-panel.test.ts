@@ -6,6 +6,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { defaultAiSettings } from '@genoffice/ai-provider'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { createFakeRunHistoryGroup } from '@genoffice/agent-core'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 
@@ -72,12 +73,13 @@ describe('pdf AI panel: Undo this run', () => {
     harness.mutate = true
     harness.runs = 0
     delete (window as any).pdfApi
+    resetUniworkAi()
   })
 
   async function mount(initial: RunState) {
+    readyUniworkAi('/docs/a.pdf')
     Element.prototype.scrollTo = () => {}
-    const settings = { ...defaultAiSettings(), uniAiAvailable: false, provider: 'openai' as const }
-    settings.providers.openai = { ...settings.providers.openai, apiKey: 'k', model: 'm' }
+    const settings = defaultAiSettings()
     ;(window as any).pdfApi = {
       getAiSettings: async () => settings,
       onAiSettingsChanged: () => () => {},

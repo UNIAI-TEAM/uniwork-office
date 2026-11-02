@@ -8,7 +8,6 @@ export const es = {
   aiStarterPolishAll: 'Pulir todo el documento para un tono más profesional',
   aiStarterContinue: 'Continúa escribiendo desde donde termina el documento',
   aiStarterFillTemplate: 'Encuentra y completa los marcadores de posición del documento',
-  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'UniAI',
   aiOpenAssistant: 'Abrir el asistente de IA',
   aiSummarizeBtn: 'Resumen IA',
@@ -133,8 +132,6 @@ export const es = {
     'El servicio de IA está saturado en este momento; inténtalo de nuevo en unos instantes',
   aiNetworkError:
     'Problema de red: no se pudo conectar con el servicio de IA. Comprueba tu conexión e inténtalo de nuevo',
-  aiCreditsExhausted:
-    'Tus créditos de UniWork se han agotado. Recarga en uniworkos.com/pricing e inténtalo de nuevo',
   aiSumReadAttachment: 'Leer dato adjunto',
   aiSumImageAttachment: 'Imagen adjunta {name}',
   aiSumRead: 'Leer {name}',

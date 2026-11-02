@@ -1405,7 +1405,6 @@ export function createWebSlidesApi(
     },
     consumeAiPreset: async () => null,
     onAiPreset: disposer,
-    saveStyleSidecar: async () => ({ ok: false }),
     saveStyleTemplate: async () => ({ ok: false, error: aiUnavailableMessage('style templates') }),
     listStyleTemplates: async () => [],
     loadStyleTemplate: async () => ({ ok: false, error: aiUnavailableMessage('style templates') }),

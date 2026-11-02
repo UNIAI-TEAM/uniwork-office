@@ -88,7 +88,6 @@ import {
   isUniworkRefusalErrorKey,
   useAutoSavePref,
   useCloudSignedIn,
-  useAiModelNeedHint,
   addTokenUsage,
   ImageViewer,
   type AiTokenUsageView,
@@ -214,7 +213,7 @@ import {
   type SheetsSkillDeps,
 } from './ai/tools'
 import { scopeLabel, type AiChatMessage } from './ai/AiChatPanel'
-import { markRunFailed } from './ai/run-error'
+import { markRunFailed, plannerAnswersFailedRun } from './ai/run-error'
 import { pruneFailedExchange } from './ai/retry-prune'
 import { withReceipt, withoutReceipts } from './ai/clarify-receipts'
 import { parseSheetNavHref } from './ai/sheet-nav'
@@ -1241,7 +1240,7 @@ export function App({
   }
 
   // ---- AI: real LLM agent (falls back to the deterministic planner above
-  // when no provider is configured — see isAgentConfigured/handleSend) ----
+  // while UniWork AI is not offered — see isAgentConfigured/handleSend) ----
   const [aiSettings, setAiSettingsState] = useState<AiSettings | null>(null)
   const aiSettingsRef = useRef<AiSettings | null>(null)
   aiSettingsRef.current = aiSettings
@@ -1250,9 +1249,6 @@ export function App({
   const { loggedInRef: gskLoggedInRef, refresh: refreshGskStatus } = useCloudSignedIn(() =>
     window.desktopApi?.aiGskStatus(),
   )
-  // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
-  // send entry closed - presets, retry, queue and selection ask included - the hint says why
-  const needModelHint = useAiModelNeedHint()
   const [aiBusy, setAiBusy] = useState(false)
   /** ask_clarification card waiting for the user; its resolver unblocks the tool */
   const [aiClarify, setAiClarify] = useState<readonly ClarifyQuestion[] | null>(null)
@@ -1297,10 +1293,10 @@ export function App({
   /** attachments of the message the running (or last) run was started with */
   const runAttachmentsRef = useRef<readonly AttachmentMeta[]>([])
   /** image URLs the AI may insert this run: image_search / generate_image results and the run's image
-   * attachments; UniWork AI turns refuse any other URL (BYOK keeps today's rules) */
+   * attachments; any other URL is refused */
   const imageUrlsRef = useRef(
     createImageUrlRegistry({
-      enforce: () => aiSettingsRef.current?.provider === 'uniwork',
+      enforce: () => true,
       attachments: () =>
         runAttachmentsRef.current
           .filter((a) => ATTACHMENT_IMAGE_EXTS.has(a.ext))
@@ -1836,6 +1832,24 @@ export function App({
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },
         onError: (error, errorKey) => {
+          // offline (or the connection dropped) before any tool ran: the fixed planner answers, as
+          // it does while UniWork AI is not offered
+          if (plannerAnswersFailedRun(errorKey, runToolsRef.current.length > 0)) {
+            const outcome = runDeterministicPlan(runQuestionRef.current)
+            setMessage(outcome.text)
+            patchLastAssistant((entry) => ({
+              ...entry,
+              text: outcome.text,
+              status: '',
+              streaming: false,
+              isError: outcome.isError,
+              tools: [],
+            }))
+            persistChatMessage('assistant', outcome.text)
+            setAiRunScope(undefined)
+            void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
+            return
+          }
           // a refused question (too long, rejected) goes back into the composer to be shortened or
           // fixed, as the message says
           if (isUniworkRefusalErrorKey(errorKey))
@@ -3976,7 +3990,7 @@ export function App({
     displayText?: string,
   ): boolean {
     const instruction = (overrideInstruction ?? prompt).trim()
-    if (needModelHint !== null || !instruction || aiBusy) return false
+    if (!instruction || aiBusy) return false
     // nothing can run before the AI settings are read (the regex planner would answer a question
     // meant for the model), nor while the loop is busy or a run is still starting: the caller keeps
     // the text (a preset waits in the composer)
@@ -4028,7 +4042,7 @@ export function App({
       ]
       setAttachments([])
     }
-    // real LLM configured → let the agent read context and propose operations;
+    // UniWork AI offered → let the agent read context and propose operations;
     // otherwise fall back to the local, deterministic regex planner
     // (kept for offline use and for the fixed micro-DSL it still supports).
     if (agentConfigured) {

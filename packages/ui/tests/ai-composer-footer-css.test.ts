@@ -73,17 +73,10 @@ describe('composer footer: model picker and usage chip', () => {
     document.body.append(host)
     const root = createRoot(host)
     try {
-      const settings = { ...defaultAiSettings(), provider: 'anthropic' as const }
+      // the model UniWork AI serves, as the host reports it
       const longModel = 'claude-sonnet-5-5-extended-thinking-preview-2026'
-      settings.providers.anthropic = {
-        ...settings.providers.anthropic,
-        apiKey: 'sk-ant-test',
-        model: longModel,
-      }
-      const bridge: AiModelPickerBridge = {
-        getSettings: async () => settings,
-        setSettings: async () => {},
-      }
+      const settings = { ...defaultAiSettings(), uniworkModel: longModel }
+      const bridge: AiModelPickerBridge = { getSettings: async () => settings }
       await act(async () => {
         root.render(createElement(AiModelPicker, { bridge, lang: 'en' }))
       })

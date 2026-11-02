@@ -246,13 +246,13 @@ const ERROR_TEXT: Record<UniworkCloudErrorCode, string> = {
   signed_out:
     'UniWork cloud AI needs a UniWork sign-in; ask the user to sign in under Settings (Account)',
   entitlement_required:
-    "The organization's UniWork plan does not include UniWork cloud AI; tell the user to ask an organization admin about the plan, or to set up their own provider under Settings (AI Media); never offer a purchase",
+    "The organization's UniWork plan does not include UniWork cloud AI; tell the user to ask an organization admin about the plan; never offer a purchase",
   subscription_inactive:
-    "The organization's UniWork subscription is not active; tell the user to ask an organization admin to renew it, or to set up their own provider under Settings (AI Media)",
+    "The organization's UniWork subscription is not active; tell the user to ask an organization admin to renew it",
   no_access:
-    'The user no longer has access to the selected UniWork organization; ask them to check the organization under Settings (Account) or set up their own provider under Settings (AI Media)',
+    'The user no longer has access to the selected UniWork organization; ask them to check the organization under Settings (Account)',
   credits_exhausted:
-    'The UniWork AI credits for this billing period are used up; tell the user their organization is out of credits (an organization admin can add credits, or they can use their own provider under Settings (AI Media))',
+    'The UniWork AI credits for this billing period are used up; tell the user their organization is out of credits (an organization admin can add credits)',
   cloud_unavailable: 'This UniWork cloud AI tool is unavailable right now; try again later',
   rate_limited: 'Too many UniWork cloud AI requests; wait a minute and try again',
   invalid_request: 'UniWork cloud AI rejected the request (check the input size and content)',
@@ -278,6 +278,13 @@ export interface UniworkCloudMedia {
   mime: string
   /** base64 without a data: prefix */
   dataBase64: string
+}
+
+/** media bytes as the tools hand them around (a generated image, a file to analyze) */
+export interface MediaBlob {
+  bytes: Uint8Array
+  mime: string
+  name?: string
 }
 
 export interface UniworkCloudSearchResult {

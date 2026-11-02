@@ -4,6 +4,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 // the loop is replaced by a fake whose run() asks one clarification and then finishes
 const loops = vi.hoisted(() => ({ last: null as null | { opts: any } }))
@@ -57,6 +58,7 @@ describe('answered clarify receipts (pdf)', () => {
     container = null
     delete (window as any).projectApi
     delete (window as any).pdfApi
+    resetUniworkAi()
   })
 
   const api = new Proxy(
@@ -81,7 +83,9 @@ describe('answered clarify receipts (pdf)', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    const render = (filePath: string | undefined, nonce = 1) =>
+    const render = (filePath: string | undefined, nonce = 1) => {
+      // every turn runs on UniWork AI: its disclosure is acknowledged for the document first
+      readyUniworkAi(filePath ?? null)
       act(() =>
         root!.render(
           createElement(AiPanel, {
@@ -93,6 +97,7 @@ describe('answered clarify receipts (pdf)', () => {
           }),
         ),
       )
+    }
     return { render }
   }
 

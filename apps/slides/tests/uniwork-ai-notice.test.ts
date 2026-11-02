@@ -5,7 +5,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStreamNotice } from '@genoffice/agent-core'
-import { aiUniworkText, clearUniworkAcks } from '@genoffice/ui'
+import { aiUniworkText } from '@genoffice/ui'
 
 const harness = vi.hoisted(() => ({
   events: null as null | {
@@ -61,13 +61,12 @@ vi.mock('react-konva', () => {
 
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 import { getLang, LocaleProvider, setModuleLang, t } from '../src/renderer/i18n/locale'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const settings: AiSettings = {
-  provider: 'anthropic',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: 'k', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  provider: 'uniwork',
+  providers: {},
 }
 
 const mounted: Array<{ root: Root; container: HTMLElement }> = []
@@ -80,7 +79,7 @@ const flush = () =>
 const ui = (key: Parameters<typeof aiUniworkText>[1], params?: Record<string, string | number>) =>
   aiUniworkText(getLang(), key, params)
 
-async function startRun(provider: AiSettings['provider'] = 'anthropic'): Promise<HTMLElement> {
+async function startRun(): Promise<HTMLElement> {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -93,11 +92,10 @@ async function startRun(provider: AiSettings['provider'] = 'anthropic'): Promise
             slides: [],
             current: 0,
             selectedIds: [],
-            images: new Map(),
             applySlide: () => {},
             applyDeck: () => {},
             fitWidthPx: 960,
-            settings: { ...settings, provider },
+            settings,
             open: true,
             onExpand: () => {},
             onCollapse: () => {},
@@ -108,16 +106,8 @@ async function startRun(provider: AiSettings['provider'] = 'anthropic'): Promise
     )
   const preset = { text: 'tighten it', nonce: 1, autoRun: true }
   mounted.push({ root, container })
-  if (provider === 'uniwork') {
-    // a preset is refused until the UniWork disclosure is acknowledged (S8): mount, acknowledge
-    // the way a user does, then fire the preset
-    render()
-    await flush()
-    act(() => {
-      container.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
-    })
-    await flush()
-  }
+  // every turn runs on UniWork AI: a preset is refused until its disclosure is acknowledged (S8)
+  readyUniworkAi()
   render(preset)
   await flush()
   expect(harness.run).toHaveBeenCalled()
@@ -157,7 +147,7 @@ beforeEach(() => {
 afterEach(() => {
   setModuleLang('zh')
   // the in-memory empty-account ack must not leak into the next test
-  clearUniworkAcks()
+  resetUniworkAi()
   for (const { root, container } of mounted.splice(0)) {
     act(() => root.unmount())
     container.remove()
@@ -303,7 +293,7 @@ describe('UniWork AI notices (slides panel)', () => {
   })
 
   it('when UniWork AI is selected, renders result chip as first words of answer node and announces once in panel live node', async () => {
-    const c = await startRun('uniwork')
+    const c = await startRun()
     const chatEl = c.querySelector('.ai-chat')
     expect(chatEl?.hasAttribute('aria-live')).toBe(false)
     expect(chatEl?.getAttribute('aria-busy')).toBe('true')
@@ -328,7 +318,7 @@ describe('UniWork AI notices (slides panel)', () => {
   })
 
   it('Stop before the first token on UniWork AI: no Answer chip and exactly one stopped line (RF2-1)', async () => {
-    const c = await startRun('uniwork')
+    const c = await startRun()
     await act(async () => harness.events!.onDone?.({ text: '', cancelled: true, turnLimit: false }))
     await flush()
     expect(c.querySelector('.ai-result-chip')).toBeNull()

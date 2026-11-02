@@ -5,9 +5,8 @@ export const ms = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'Baki kredit: {remaining} daripada {limit}',
   aiUniworkFooterSignIn: 'Log masuk ke UniWork untuk menggunakan UniWork AI',
-  aiUniworkSignedOut:
-    'Anda telah log keluar daripada UniWork. Pilih penyedia lain atau log masuk semula.',
-  aiUniworkOff: 'UniWork AI dimatikan untuk dokumen ini. Pilih penyedia lain.',
+  aiUniworkSignedOut: 'Anda telah log keluar daripada UniWork. Log masuk semula.',
+  aiUniworkOff: 'UniWork AI dimatikan untuk dokumen ini.',
   aiUniworkViewOnly:
     'Lihat sahaja: AI boleh menjawab tetapi tidak boleh menyunting atau menyimpan dokumen.',
 
@@ -40,7 +39,6 @@ export const ms = {
     'Dihentikan. Sebarang perubahan yang telah digunakan kekal dalam dokumen dan boleh dibuat asal.',
   aiRunRetry: 'Cuba lagi',
   aiRunAskAgain: 'Tanya lagi',
-  aiRunChooseOther: 'Pilih penyedia lain',
   aiRunOpenInApp: 'Buka dalam apl',
   aiConversationRestarted:
     'Perbualan sebelumnya telah tamat tempoh, jadi UniWork AI memulakan perbualan baharu dan tidak lagi mengingati giliran terdahulu. Hantar soalan anda semula untuk meneruskan.',
@@ -86,7 +84,7 @@ export const ms = {
   cloudCreditsLeft: 'Baki {remaining} / {limit}',
   cloudCreditsUnlimited: 'Tanpa had',
   cloudInactiveBody:
-    'Langganan UniWork organisasi anda tidak aktif, jadi AI awan dijeda. Minta pentadbir memperbaharuinya; pembekal anda sendiri di bawah terus berfungsi.',
+    'Langganan UniWork organisasi anda tidak aktif, jadi AI awan dijeda. Minta pentadbir memperbaharuinya.',
   acctSignIn: 'Log masuk',
   acctSignInAgain: 'Log masuk semula',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -100,7 +98,7 @@ export const ms = {
     'Buku kerja ini terlalu besar untuk AI di web. Buka dalam apl UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    'Pelan organisasi anda tidak termasuk UniWork AI. Tanya pentadbir organisasi tentang pelan tersebut, atau tambah kunci AI anda sendiri dalam Tetapan > Model AI.',
+    'Pelan organisasi anda tidak termasuk UniWork AI. Tanya pentadbir organisasi tentang pelan tersebut.',
   credits_exhausted:
-    'Organisasi anda telah menggunakan semua kredit AI untuk tempoh ini. Minta pentadbir organisasi menambah kredit, atau tambah kunci AI anda sendiri dalam Tetapan > Model AI.',
+    'Organisasi anda telah menggunakan semua kredit AI untuk tempoh ini. Minta pentadbir organisasi menambah kredit.',
 } satisfies Record<keyof typeof zh, string>

@@ -2,9 +2,6 @@ import type { zh } from './zh'
 import { sharedAskUni } from './shared'
 
 export const ru = {
-  askUniModeGroup: 'Режим',
-  askUniModeChat: 'Ассистент',
-  askUniModeAsk: 'Спросить UNI',
   askUniTitle: 'Спросить UNI',
   askUniDescription:
     'UNI отвечает только по данным, которые вы видите в этом рабочем пространстве, и указывает источники.',

@@ -5,8 +5,8 @@ export const he = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'קרדיטים שנותרו: {remaining} מתוך {limit}',
   aiUniworkFooterSignIn: 'התחבר ל-UniWork כדי להשתמש ב-UniWork AI',
-  aiUniworkSignedOut: 'התנתקת מ-UniWork. בחר ספק אחר או התחבר מחדש.',
-  aiUniworkOff: 'UniWork AI כבוי עבור המסמך הזה. בחר ספק אחר.',
+  aiUniworkSignedOut: 'התנתקת מ-UniWork. התחבר מחדש.',
+  aiUniworkOff: 'UniWork AI כבוי עבור המסמך הזה.',
   aiUniworkViewOnly: 'צפייה בלבד: ה-AI יכול לענות אבל לא לערוך או לשמור את המסמך.',
 
   // S8 disclosure
@@ -35,7 +35,6 @@ export const he = {
   aiRunStopped: 'נעצר. שינויים שכבר הוחלו נשארים במסמך וניתן לבטל אותם.',
   aiRunRetry: 'נסה שוב',
   aiRunAskAgain: 'שאל שוב',
-  aiRunChooseOther: 'בחירת ספק אחר',
   aiRunOpenInApp: 'פתיחה באפליקציה',
   aiConversationRestarted:
     'השיחה הקודמת פגה, ולכן UniWork AI התחיל שיחה חדשה ואינו זוכר עוד את התורות הקודמים. שלח שוב את השאלה כדי להמשיך.',
@@ -72,7 +71,7 @@ export const he = {
   cloudCreditsLeft: 'נותרו {remaining} / {limit}',
   cloudCreditsUnlimited: 'ללא הגבלה',
   cloudInactiveBody:
-    'מנוי UniWork של הארגון שלך אינו פעיל, ולכן ה-AI בענן מושהה. בקש ממנהל לחדש אותו; הספקים שלך למטה ממשיכים לעבוד.',
+    'מנוי UniWork של הארגון שלך אינו פעיל, ולכן ה-AI בענן מושהה. בקש ממנהל לחדש אותו.',
   acctSignIn: 'כניסה',
   acctSignInAgain: 'כניסה מחדש',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -84,8 +83,7 @@ export const he = {
   aiErrWorkbookTooLarge:
     'חוברת העבודה הזו גדולה מדי ל-AI באינטרנט. פתח אותה באפליקציית UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
-  not_entitled:
-    'התוכנית של הארגון שלך אינה כוללת את UniWork AI. פנה למנהל הארגון לגבי התוכנית, או הוסף מפתח AI משלך בהגדרות > מודל AI.',
+  not_entitled: 'התוכנית של הארגון שלך אינה כוללת את UniWork AI. פנה למנהל הארגון לגבי התוכנית.',
   credits_exhausted:
-    'הארגון שלך ניצל את כל קרדיטי ה-AI לתקופה זו. בקש ממנהל הארגון להוסיף קרדיטים, או הוסף מפתח AI משלך בהגדרות > מודל AI.',
+    'הארגון שלך ניצל את כל קרדיטי ה-AI לתקופה זו. בקש ממנהל הארגון להוסיף קרדיטים.',
 } satisfies Record<keyof typeof zh, string>

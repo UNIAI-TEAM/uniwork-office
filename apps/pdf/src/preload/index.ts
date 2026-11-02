@@ -14,14 +14,8 @@ import type { PdfApi, UiTheme } from '../shared/ipc'
 const api: PdfApi = {
   consumePending: () => ipcRenderer.invoke(PDF_CHANNELS.consumePending),
   consumeAiPreset: () => ipcRenderer.invoke(PDF_CHANNELS.consumeAiPreset),
-  onAiPreset: (handler) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      preset: { text: string; autoRun?: boolean; displayText?: string },
-    ) => handler(preset)
-    ipcRenderer.on('my-ai:ai-preset', listener)
-    return () => ipcRenderer.removeListener('my-ai:ai-preset', listener)
-  },
+  // the shell no longer pushes presets into a running editor (My AI is gone); only a web host does
+  onAiPreset: () => () => {},
   readFile: (path) => ipcRenderer.invoke(PDF_CHANNELS.readFile, path),
   save: (request) => ipcRenderer.invoke(PDF_CHANNELS.save, request),
   requestRedactionCopy: (path) => ipcRenderer.invoke(PDF_CHANNELS.requestRedactionCopy, path),
@@ -160,8 +154,7 @@ const api: PdfApi = {
     return () => ipcRenderer.removeListener('app:chrome-pressed', listener)
   },
   getAiSettings: () => ipcRenderer.invoke(AI_CHANNELS.getSettings),
-  setAiSettings: (settings, options) =>
-    ipcRenderer.invoke(AI_CHANNELS.setSettings, settings, options),
+  setAiSettings: (settings) => ipcRenderer.invoke(AI_CHANNELS.setSettings, settings),
   onAiSettingsChanged: (handler) => {
     const listener = () => handler()
     ipcRenderer.on(AI_CHANNELS.settingsChanged, listener)
@@ -199,7 +192,7 @@ installDropOpenBridge()
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
 installUniworkCommentsBridge()
 installAiRunBridge()
-// window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's provider list mirrors it)
+// window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's availability flag mirrors it)
 installUniworkAiFlagBridge()
 installUniworkCloudStatusBridge()
 // window.uniworkAskUniDoc: Ask UNI about this document (ids are derived in main, never sent from here)

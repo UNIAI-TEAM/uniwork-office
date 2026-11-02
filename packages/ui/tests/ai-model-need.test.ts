@@ -1,12 +1,11 @@
 /** @vitest-environment jsdom */
-// UNI-1232 FX2 (N3-01 / G-N1) + UNI-1240 (final3 F3-N2) + UNI-1395: while the chip reads "Choose
-// model" (a key without a known model, or a model without a key) the composer's send is off and says
-// why; with a model and a key it is untouched. (A web frame runs UniWork AI only, UNI-2289: no key
-// state there.)
+// UNI-1232 FX2 (N3-01 / G-N1) + UNI-1240 (final3 F3-N2) + UNI-2309: while UniWork AI, the one
+// provider, is not on here the composer's send is off and the hint says so (it opens the account
+// settings); once it is offered the composer is untouched. There is no key or model to ask for.
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { defaultAiSettings, type AiSettings } from '@genoffice/ai-provider'
+import { defaultAiSettings, setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { AiComposer } from '../src/AiComposer'
 import { AiModelPicker, type AiModelPickerBridge } from '../src/AiModelPicker'
 import { AI_MODEL_PICKER_STRINGS } from '../src/strings-ai-model-picker'
@@ -22,28 +21,19 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  setUniworkAiAvailable(false)
   vi.unstubAllGlobals()
 })
 
-function settingsWith(
-  provider: 'custom' | 'openai',
-  apiKey: string,
-  model: string,
-  baseUrl = 'https://router.example/v1',
-): AiSettings {
-  const settings = { ...defaultAiSettings(), uniAiAvailable: false, provider }
-  settings.providers[provider] = { ...settings.providers[provider], apiKey, model }
-  if (provider === 'custom') settings.providers.custom.baseUrl = baseUrl
-  return settings
-}
-
-async function mount(
-  settings: AiSettings,
-  opts: { iconOnly?: boolean; openModelSettings?: () => void } = {},
-) {
+async function mount(opts: { iconOnly?: boolean; openModelSettings?: () => void } = {}) {
+  const handlers = new Set<() => void>()
   const bridge: AiModelPickerBridge = {
-    getSettings: async () => settings,
-    setSettings: async () => {},
+    // every read answers a fresh object, as an IPC host does
+    getSettings: async () => defaultAiSettings(),
+    onSettingsChanged: (handler) => {
+      handlers.add(handler)
+      return () => handlers.delete(handler)
+    },
     ...(opts.openModelSettings ? { openModelSettings: opts.openModelSettings } : {}),
   }
   await act(async () => {
@@ -66,98 +56,51 @@ async function mount(
   })
   await act(async () => {})
   return {
-    send: host.querySelector('.ai-send-btn') as HTMLButtonElement,
-    hint: host.querySelector('.ai-input-hint')?.textContent ?? null,
-    chip: host.querySelector('.ai-model-chip-text')!.textContent,
+    send: () => host.querySelector('.ai-send-btn') as HTMLButtonElement,
+    hint: () => host.querySelector('.ai-input-hint')?.textContent ?? null,
+    emitChanged: async () => {
+      await act(async () => {
+        for (const h of handlers) h()
+      })
+      await act(async () => {})
+    },
   }
 }
 
-it('a stored key with no model: send is off, the hint says to choose a model', async () => {
-  const { send, hint, chip } = await mount(settingsWith('custom', '…abcd', ''))
-  expect(chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
-  expect(send.disabled).toBe(true)
-  expect(hint).toBe('Choose a model to send')
-  expect(send.title).toBe('Choose a model to send')
+const NOT_ON = AI_MODEL_PICKER_STRINGS.en.needModel
+
+it('UniWork AI not on here: send is off and the hint says so', async () => {
+  setUniworkAiAvailable(false)
+  const { send, hint } = await mount()
+  expect(send().disabled).toBe(true)
+  expect(hint()).toBe(NOT_ON)
+  expect(send().title).toBe(NOT_ON)
 })
 
-it('a known model keeps send on', async () => {
-  const { send, hint } = await mount(settingsWith('openai', '…abcd', 'gpt-x'))
-  expect(send.disabled).toBe(false)
-  expect(hint).toBe('Enter to send')
+it('UniWork AI offered: send is on', async () => {
+  setUniworkAiAvailable(true)
+  const { send, hint } = await mount()
+  expect(send().disabled).toBe(false)
+  expect(hint()).toBe('Enter to send')
 })
 
-it('a chosen vendor that cannot send yet says what is missing instead of becoming UniAI', async () => {
-  // UNI-1395: the chip and the request agree, so send is off with the hint
-  const key = await mount(settingsWith('openai', '', 'gpt-x'))
-  expect(key.chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
-  expect(key.send.disabled).toBe(true)
-  expect(key.hint).toBe('Add an API key in AI settings to use the assistant.')
-  expect(key.send.title).toBe(key.hint)
-})
-
-it('opening the chip reads the settings again', async () => {
-  let reads = 0
-  const settings = settingsWith('openai', '…abcd', 'gpt-x')
-  const bridge: AiModelPickerBridge = {
-    getSettings: async () => (reads++, settings),
-    setSettings: async () => {},
-  }
-  await act(async () => {
-    root.render(createElement(AiModelPicker, { bridge, lang: 'en' }))
-  })
-  await act(async () => {})
-  const before = reads
-  await act(async () => {
-    ;(host.querySelector('.ai-model-chip') as HTMLButtonElement).click()
-  })
-  expect(reads).toBeGreaterThan(before)
-})
-
-it('the icon-only composer shows the hint above the footer and it opens the AI settings', async () => {
+it('the icon-only composer shows the hint above the footer and it opens the account settings', async () => {
+  setUniworkAiAvailable(false)
   const open = vi.fn()
-  const { send } = await mount(settingsWith('openai', '', 'gpt-x'), {
-    iconOnly: true,
-    openModelSettings: open,
-  })
-  expect(send.disabled).toBe(true)
+  const { send } = await mount({ iconOnly: true, openModelSettings: open })
+  expect(send().disabled).toBe(true)
   const link = host.querySelector('.ai-input-need button') as HTMLButtonElement
-  expect(link.textContent).toBe('Add an API key in AI settings to use the assistant.')
+  expect(link.textContent).toBe(NOT_ON)
   act(() => link.click())
   expect(open).toHaveBeenCalledTimes(1)
 })
 
-it('the hint goes away once a key and a model are known', async () => {
-  const { send } = await mount(settingsWith('openai', '…abcd', 'gpt-x'), { iconOnly: true })
-  expect(send.disabled).toBe(false)
+it('the hint goes away once the host offers UniWork AI', async () => {
+  setUniworkAiAvailable(false)
+  const { send, emitChanged } = await mount({ iconOnly: true })
+  expect(host.querySelector('.ai-input-need')).not.toBeNull()
+  setUniworkAiAvailable(true)
+  await emitChanged()
+  expect(send().disabled).toBe(false)
   expect(host.querySelector('.ai-input-need')).toBeNull()
-})
-
-it('a host keeps send on for the default UniAI selection', async () => {
-  const { send, hint } = await mount({
-    ...defaultAiSettings(),
-    uniAiAvailable: false,
-    provider: 'genspark',
-  })
-  expect(send.disabled).toBe(false)
-  expect(hint).toBe('Enter to send')
-})
-
-it('custom with a model but no server URL asks for the URL, not an API key', async () => {
-  // UNI-1395 FE F2: a custom endpoint's key is optional, so "add an API key" pointed at the wrong field
-  const { send, hint, chip } = await mount(settingsWith('custom', '', 'llama3', ''))
-  expect(chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
-  expect(send.disabled).toBe(true)
-  expect(hint).toBe(AI_MODEL_PICKER_STRINGS.en.needBaseUrl)
-  expect(hint).not.toBe(AI_MODEL_PICKER_STRINGS.en.needKey)
-})
-
-it('every locale has all three hints', () => {
-  for (const [lang, strings] of Object.entries(AI_MODEL_PICKER_STRINGS)) {
-    expect(strings.needModel, lang).toBeTruthy()
-    expect(strings.needKey, lang).toBeTruthy()
-    expect(strings.needBaseUrl, lang).toBeTruthy()
-  }
-  expect(AI_MODEL_PICKER_STRINGS.en.needBaseUrl).toBe(
-    'Add the server URL in AI settings to use the assistant.',
-  )
 })

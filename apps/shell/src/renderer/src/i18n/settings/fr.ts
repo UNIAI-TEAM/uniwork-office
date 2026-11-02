@@ -3,14 +3,6 @@ import type { zh } from './zh'
 export const fr = {
   setClose: 'Fermer',
   setRetry: 'Réessayer',
-  setUnsavedTitle: 'Modifications non enregistrées',
-  setUnsavedBody: 'Quitter cette page sans enregistrer ? Vos modifications seront perdues.',
-  setUnsavedKeep: 'Continuer la modification',
-  setUnsavedDiscard: 'Abandonner les modifications',
-  setAiSaveFailed: 'Impossible d’enregistrer : {error}',
-  setAiCreditLeft: 'Crédits : {remain} restants · {used} utilisés',
-  setAiCreditUsedNoLimit: 'Crédits utilisés : {used} (clé sans limite)',
-  setAiCreditRate: '1 USD de solde de clé = 1 000 crédits IA',
   setGrpAppearance: 'Apparence',
   setGrpAiPanel: 'Panneau IA',
   setGrpFiles: 'Fichiers et enregistrement',
@@ -21,19 +13,6 @@ export const fr = {
   intgActionFailed:
     'Impossible de terminer. Vérifiez que le dossier est accessible en écriture, puis réessayez.',
   intgLoadFailed: 'Impossible de lire l’état de l’intégration.',
-
-  cwTitle: 'Crédits IA',
-  cwAddKey: 'Ajouter une clé',
-  cwNoKey: 'Aucune clé IA',
-  cwUpdating: 'Mise à jour…',
-  cwLoadFailed: 'Échec du chargement',
-  cwLeft: '{n} restants',
-  cwUsed: '{n} utilisés',
-  cwToday: 'Aujourd’hui ≈ {n}',
-  cwHistory: 'Historique d’utilisation de l’IA',
-  cwLogNote: 'Estimation sur cet appareil, pas votre facture.',
-  cwLogEmpty: 'Aucun appel IA enregistré pour l’instant.',
-  cwOpenHint: 'Clic pour les paramètres IA · clic droit pour la page d’utilisation',
 
   bkLead:
     'Les modules payants sauvegardent votre Plan de travail sur UniWork Cloud et ajoutent de l’espace de stockage. L’exportation et la restauration sur cet appareil restent toujours gratuites.',

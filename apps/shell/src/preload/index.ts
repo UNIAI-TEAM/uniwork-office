@@ -1,20 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
-import {
-  AI_PROVIDERS,
-  AI_SEARCH_PROVIDERS,
-  getProviderAdapter,
-  normalizeAiTestFailureKind,
-  normalizeUniworkCloudStatus,
-  setUniworkCloudStatus,
-  visibleMediaProviders,
-} from '@genoffice/ai-provider/browser'
-import type {
-  AiSettings,
-  CodexModelCatalog,
-  UniworkCloudStatus,
-} from '@genoffice/ai-provider/browser'
-import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
+import { normalizeUniworkCloudStatus } from '@genoffice/ai-provider/browser'
+import type { AiSettings } from '@genoffice/ai-provider/browser'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
 import { installUniworkDiscussionBridge } from '@genoffice/electron-utils/discussion-bridge'
@@ -31,12 +18,9 @@ import type {
   AccountLoginEvent,
   DeskDraft,
   DeskToolResult,
-  AiConnectionTestResult,
   AccountSetServerResult,
   AccountStatus,
   AttachmentAddResult,
-  AttachmentImageResult,
-  AttachmentReadResult,
   CliLinkState,
   DefaultAppStatus,
   FolderListing,
@@ -51,8 +35,6 @@ import type {
   RenameResult,
   UiLanguage,
   FileSearchPage,
-  FileSearchRerank,
-  FileSearchSettings,
   UniworkArchiveImpact,
   UniworkConflictReply,
   UniworkConflictView,
@@ -658,38 +640,12 @@ function asUniworkConflictReply(raw: unknown): UniworkConflictReply {
   return { kind: 'closed' }
 }
 
-/** a connection test answer for the renderer: the failure kind only, never the provider's raw text (that stays in the main process log) */
-function testResultOf(raw: unknown): AiConnectionTestResult {
-  const r = (raw ?? {}) as { ok?: unknown; errorKind?: unknown }
-  return r.ok === true
-    ? { ok: true }
-    : { ok: false, errorKind: normalizeAiTestFailureKind(r.errorKind) }
-}
-
 const homeApi: HomeApi = {
   async recents(query) {
     return asRecentPage(await ipcRenderer.invoke(HOME_CHANNELS.recents, query))
   },
   async searchFiles(query) {
     return asSearchPage(await ipcRenderer.invoke(HOME_CHANNELS.searchFiles, query))
-  },
-  async rerankSearch(query) {
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.rerankSearch, query)
-    return result && typeof result === 'object' && Array.isArray((result as FileSearchRerank).order)
-      ? (result as FileSearchRerank)
-      : null
-  },
-  async getFileSearchSettings() {
-    return (await ipcRenderer.invoke(HOME_CHANNELS.getFileSearchSettings)) as FileSearchSettings
-  },
-  async setFileSearchSettings(patch) {
-    return (await ipcRenderer.invoke(
-      HOME_CHANNELS.setFileSearchSettings,
-      patch,
-    )) as FileSearchSettings
-  },
-  async testFileSearchRerank(input) {
-    return testResultOf(await ipcRenderer.invoke(HOME_CHANNELS.testFileSearchRerank, input))
   },
   async starred(query) {
     return asRecentPage(await ipcRenderer.invoke(HOME_CHANNELS.starred, query))
@@ -712,39 +668,6 @@ const homeApi: HomeApi = {
   async openPath(path) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')
     await ipcRenderer.invoke(HOME_CHANNELS.openPath, path)
-  },
-  async fileExcerpts(paths) {
-    if (!Array.isArray(paths)) return []
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.fileExcerpts, paths)
-    return Array.isArray(result) ? (result as import('../shared/file-excerpt').FileExcerpt[]) : []
-  },
-  async activeOfficeTab() {
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.activeOfficeTab)
-    if (!result || typeof result !== 'object') return null
-    const tab = result as { id?: unknown; kind?: unknown; title?: unknown; path?: unknown }
-    if (
-      typeof tab.id !== 'string' ||
-      typeof tab.kind !== 'string' ||
-      typeof tab.title !== 'string'
-    ) {
-      return null
-    }
-    return {
-      id: tab.id,
-      kind: tab.kind,
-      title: tab.title,
-      ...(typeof tab.path === 'string' ? { path: tab.path } : {}),
-    }
-  },
-  async pushAiPreset(input) {
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.pushAiPreset, input)
-    return (result ?? { ok: false }) as {
-      ok: boolean
-      tabId?: string
-      kind?: string
-      title?: string
-      path?: string
-    }
   },
   async browse() {
     await ipcRenderer.invoke(HOME_CHANNELS.browse)
@@ -1150,137 +1073,23 @@ const homeApi: HomeApi = {
     ipcRenderer.on('app:document-theme-changed', listener)
     return () => ipcRenderer.removeListener('app:document-theme-changed', listener)
   },
-  async openCreditUsage() {
-    await ipcRenderer.invoke(HOME_CHANNELS.openCreditUsage)
-  },
   // AI settings channels are registered once by the shell's aggregated docs handlers
   onAiSettingsChanged(handler) {
     const listener = () => handler()
     ipcRenderer.on('ai:settings-changed', listener)
     return () => ipcRenderer.removeListener('ai:settings-changed', listener)
   },
-  async getAiSettings(options) {
-    return (await ipcRenderer.invoke(
-      'ai:get-settings',
-      options?.includeUniworkPick ? { includeUniworkPick: true } : undefined,
-    )) as AiSettings
+  async getAiSettings() {
+    return (await ipcRenderer.invoke('ai:get-settings')) as AiSettings
   },
-  async setAiSettings(settings, options) {
-    const sent = {
-      ...(options?.includeUniworkPick ? { includeUniworkPick: true } : {}),
-      ...(options?.modelPick ? { modelPick: options.modelPick } : {}),
-      ...(options?.modelPicks?.length ? { modelPicks: options.modelPicks } : {}),
-    }
-    await ipcRenderer.invoke(
-      'ai:set-settings',
-      settings,
-      Object.keys(sent).length > 0 ? sent : undefined,
-    )
-  },
-  getAiProviders() {
-    return AI_PROVIDERS.map((meta) => {
-      let defaultBaseUrl = ''
-      // genspark routes by model, uniwork rides the session adapter, custom has no default — all stay ''
-      if (
-        meta.id !== 'genspark' &&
-        meta.id !== 'uniwork' &&
-        !meta.needsBaseUrl &&
-        !meta.needsCliPath
-      ) {
-        defaultBaseUrl = getProviderAdapter(meta.id).resolveEndpoint({
-          apiKey: '',
-          model: meta.defaultModel,
-        }).baseUrl
-      }
-      return { ...meta, defaultBaseUrl }
-    })
-  },
-  async getCodexModels(cliPath) {
-    return (await ipcRenderer.invoke('ai:codex-models', cliPath)) as CodexModelCatalog
-  },
-  async getCustomModels(baseUrl, apiKey) {
-    return (await ipcRenderer.invoke('ai:custom-models', { baseUrl, apiKey })) as CodexModelCatalog
-  },
-  async testAiSettings(settings) {
-    return testResultOf(
-      await ipcRenderer.invoke('ai:settings-test', {
-        settings,
-        system: 'You are a connectivity test. Reply with the single word OK.',
-        user: 'ping',
-      }),
-    )
-  },
-  async probeOpenRouterKey(apiKey) {
-    return (await ipcRenderer.invoke(
-      'ai:openrouter-key-status',
-      apiKey,
-    )) as import('@genoffice/ai-provider').OpenRouterKeyStatus
-  },
-  async aiChat(input) {
-    const settings = input.settings ?? ((await ipcRenderer.invoke('ai:get-settings')) as AiSettings)
-    const result: unknown = await ipcRenderer.invoke('ai:chat', {
-      settings,
-      system: input.system,
-      user: input.user,
-    })
-    const raw = (result ?? {}) as {
-      ok?: unknown
-      content?: unknown
-      error?: unknown
-      uniworkCode?: unknown
-    }
-    if (raw.ok === true) {
-      return {
-        ok: true,
-        ...(typeof raw.content === 'string' ? { content: raw.content } : {}),
-      }
-    }
-    return {
-      ok: false,
-      error: typeof raw.error === 'string' ? raw.error : 'AI request failed',
-      ...(typeof raw.uniworkCode === 'string' ? { uniworkCode: raw.uniworkCode } : {}),
-    }
-  },
-  aiStream(request: AiStreamRequest) {
-    return ipcRenderer.invoke('ai:stream', request) as Promise<void>
-  },
-  aiStreamCancel(requestId: string) {
-    return ipcRenderer.invoke('ai:stream-cancel', requestId) as Promise<void>
-  },
-  onAiStream(handler: (chunk: AiStreamChunk) => void) {
-    const listener = (_event: IpcRendererEvent, chunk: AiStreamChunk) => handler(chunk)
-    ipcRenderer.on('ai:stream-chunk', listener)
-    return () => ipcRenderer.removeListener('ai:stream-chunk', listener)
+  async setAiSettings(settings) {
+    await ipcRenderer.invoke('ai:set-settings', settings)
   },
   pickAttachments() {
     return ipcRenderer.invoke('files:pick') as Promise<AttachmentAddResult | null>
   },
-  addAttachmentPaths(paths: string[]) {
-    return ipcRenderer.invoke('files:add', paths) as Promise<AttachmentAddResult>
-  },
-  addPastedImage(data: ArrayBuffer, ext: string) {
-    return ipcRenderer.invoke('files:add-pasted-image', data, ext) as Promise<AttachmentAddResult>
-  },
-  readAttachment(path: string, offset: number, maxChars: number) {
-    return ipcRenderer.invoke('files:read', path, offset, maxChars) as Promise<AttachmentReadResult>
-  },
-  readAttachmentImage(path: string) {
-    return ipcRenderer.invoke('files:read-image', path) as Promise<AttachmentImageResult>
-  },
   getPathForFile(file: File) {
     return webUtils.getPathForFile(file)
-  },
-  getAiMediaProviders() {
-    return visibleMediaProviders()
-  },
-  getAiSearchProviders() {
-    return AI_SEARCH_PROVIDERS
-  },
-  async testAiSearchSettings(input) {
-    return testResultOf(await ipcRenderer.invoke('ai:search-test', input))
-  },
-  async testAiMediaSettings(input) {
-    return testResultOf(await ipcRenderer.invoke('ai:media-test', input))
   },
   wb: {
     async loadAll() {
@@ -1919,18 +1728,6 @@ const homeApi: HomeApi = {
     return driveApi.getHistory(input)
   },
 }
-
-// Mirror the cloud status into this preload's seam, so getAiMediaProviders()
-// lists the UniWork cloud entry only while the user is signed in + entitled.
-const mirrorCloudStatus = (status: unknown) =>
-  setUniworkCloudStatus(normalizeUniworkCloudStatus(status) satisfies UniworkCloudStatus)
-ipcRenderer.on(HOME_CHANNELS.uniworkCloudStatusEvent, (_event, status: unknown) =>
-  mirrorCloudStatus(status),
-)
-void ipcRenderer
-  .invoke(HOME_CHANNELS.uniworkCloudStatus)
-  .then(mirrorCloudStatus)
-  .catch(() => undefined)
 
 contextBridge.exposeInMainWorld('aiOffice', homeApi)
 // UNI-2052: the folder / multi-file upload as the renderer reads it (the same calls as above)

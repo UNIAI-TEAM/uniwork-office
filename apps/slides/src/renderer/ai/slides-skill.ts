@@ -134,18 +134,13 @@ export interface DeckAccess {
   searchImages?(query: string, maxResults: number): Promise<string[]>
   /** Whether cloud single-page generation is available (kill switch + gsk login state) */
   isCloudPageGenEnabled?(): Promise<boolean>
-  /** live predicate (gsk login && cloud-tools toggle, or a BYOK media key); false hides generate_image */
+  /** live predicate (UniWork sign-in && cloud-tools toggle); false hides generate_image */
   imageGenAvailable?(): boolean
   /** same for analyze_media */
   mediaAnalysisAvailable?(): boolean
   /** live predicate: the deck is a view-only UniWork document, so only the read-only tools run */
   readOnly?(): boolean
-  /**
-   * live predicate: the deck is a UniWork-bound document, so nothing is written outside it
-   * (no style sidecar next to the working copy); generated pages stay unsaved in the editor
-   */
-  uniworkBound?(): boolean
-  /** live predicate: the active AI provider is UniWork AI (absent = BYOK); read before every model request */
+  /** live predicate: the turn runs on UniWork AI; read before every model request */
   uniworkAi?(): boolean
   /**
    * the host reaches the UniWork AI writer route (the web frame), so a UniWork AI turn can write
@@ -155,8 +150,8 @@ export interface DeckAccess {
   uniworkWriterRoute?(): boolean
   /**
    * image URLs this run's image_search / generate_image returned, reset at every run. Recording only:
-   * UniWork AI turns are not offered insert_web_image / replace_image at all, and BYOK keeps today's
-   * rules (no enforcement), so no slides tool consults it for a refusal.
+   * UniWork AI turns are not offered insert_web_image / replace_image at all, so no slides tool
+   * consults it for a refusal.
    */
   imageUrls?: ImageUrlRegistry
   /**
@@ -183,7 +178,7 @@ export interface DeckAccess {
     signal?: AbortSignal
   }): Promise<{ ok: boolean; marker?: string; error?: string }>
   /**
-   * Local single-page generation (used when cloud is unavailable, e.g. BYOK without gsk):
+   * Local single-page generation (used when cloud page generation is unavailable):
    * same inputs and marker contract as generatePageCloud, but the page is produced entirely
    * locally — one LLM request writes a structured slide spec and the main process builds it
    * directly into a one-slide pptx (no HTML intermediate).
@@ -245,11 +240,6 @@ export interface DeckAccess {
     outline?: { core_hook?: unknown; pages?: unknown }
     error?: string
   }>
-  /**
-   * Persist the current draft's Style Skill as a sidecar file (same directory and name as the draft, .styleskill.json).
-   * fail-open: failure doesn't block the main path.
-   */
-  saveSidecar?(data: { topic: string; styleSkill: string; createdAt: string }): Promise<void>
   /**
    * Save styleSkill into userData/style-templates/<name>.json for later reuse.
    * `layout` is the deck's extracted chrome skeleton (title/brand-image slots,
@@ -401,7 +391,7 @@ const TOOLS: AgentToolDef[] = [
   {
     name: 'generate_image',
     description:
-      'AI image generation/editing. Text-to-image, or pass referenceImageUrls for image editing; returns an image URL. NEW imagery: insert with insert_web_image. Editing an EXISTING slide picture (background removal/upscaling/etc.): swap it in place with replace_image — do not insert a duplicate. Use for custom illustrations/icons/backgrounds, style-consistent imagery; for real photos/screenshots still use image_search. NEVER use it to recreate an image the user attached (logo, photo) — embed the original with insert_web_image / replace_image and url=attachment://<file name>. Icons/logos/cutouts that must sit on slide content need transparentBackground:true — asking for a transparent background in the prompt does NOT work (models paint a fake gray checkerboard into the pixels).',
+      'AI image generation/editing. Text-to-image, or pass referenceImageUrls for image editing; returns an image URL. NEW imagery: insert with insert_web_image. Editing an EXISTING slide picture (background removal/upscaling/etc.): swap it in place with replace_image — do not insert a duplicate. Use for custom illustrations/icons/backgrounds, style-consistent imagery; for real photos/screenshots still use image_search. NEVER use it to recreate an image the user attached (logo, photo) — embed the original with insert_web_image / replace_image and url=attachment://<file name>. Generated images always have an opaque background: asking for a transparent background in the prompt does NOT work (models paint a fake gray checkerboard into the pixels), so place icons/logos on a matching color block instead.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -423,11 +413,6 @@ const TOOLS: AgentToolDef[] = [
         aspectRatio: {
           type: 'string',
           description: 'Aspect ratio: 1:1|4:3|16:9|9:16|3:4|2:3|3:2|auto',
-        },
-        transparentBackground: {
-          type: 'boolean',
-          description:
-            'Set true when the result must have a real transparent background (icons, logos, cutouts placed over slide content). The app strips the background automatically after generation; never rely on the prompt for transparency.',
         },
       },
       required: ['prompt'],
@@ -1098,7 +1083,7 @@ export function formatSlideDump(slide: RenderSlide): string {
   return `Canvas ${slide.widthPx}×${slide.heightPx}px (1 px = ${pxToEmu} EMU)\n${parts.join('\n---\n') || '(no elements on this page)'}${colorNote}`
 }
 
-/** tools that need a media provider: Genspark login + cloud tools, or a BYOK media key in Settings */
+/** tools that need a media provider: UniWork sign-in + cloud tools */
 function hiddenMediaTools(access: DeckAccess): Set<string> {
   const hidden = new Set<string>()
   if (access.imageGenAvailable?.() === false) hidden.add('generate_image')
@@ -1106,7 +1091,7 @@ function hiddenMediaTools(access: DeckAccess): Set<string> {
   return hidden
 }
 
-/** every tool withheld this request: media tools, plus (provider = UniWork AI only; BYOK keeps them) the UniWork set */
+/** every tool withheld this request: media tools, plus the UniWork AI set */
 function hiddenTools(access: DeckAccess): Set<string> {
   const hidden = hiddenMediaTools(access)
   if (access.uniworkAi?.()) for (const n of uniworkHiddenTools(access)) hidden.add(n)
@@ -1144,7 +1129,7 @@ function mediaToolsOffNote(hidden: Set<string>, uniworkAi: boolean): string {
   // insert_web_image is one of the tools UniWork AI turns hide, so it cannot be the fallback there
   const fallback = uniworkAi ? 'image_search' : 'image_search + insert_web_image'
 
-  return `\n\nNote: ${[...hidden].join(' and ')} ${plural ? 'are' : 'is'} currently unavailable (no image/media provider: signed out of UniWork or cloud tools off, and no media API key in Settings). Do not call or promise ${plural ? 'them' : 'it'}; for imagery use ${fallback} instead.`
+  return `\n\nNote: ${[...hidden].join(' and ')} ${plural ? 'are' : 'is'} currently unavailable (signed out of UniWork, or the UniWork cloud tools are off). Do not call or promise ${plural ? 'them' : 'it'}; for imagery use ${fallback} instead.`
 }
 
 /** the only tools a view-only deck may run: none of them changes the deck */
@@ -1657,7 +1642,6 @@ async function executeTool(
         model: call.input.model ? String(call.input.model) : undefined,
         referenceImageUrls: refs,
         aspectRatio: call.input.aspectRatio ? String(call.input.aspectRatio) : undefined,
-        transparentBackground: call.input.transparentBackground === true,
       })
       if (!r.url) return fail(t('aiFailGenImage'), r.error ?? 'Generation failed')
       access.imageUrls?.register(r.url, 'generate_image')
@@ -1710,7 +1694,7 @@ async function executeTool(
         if (!resolved.ok) return fail(t('aiFailInsertImage'), resolved.error)
         payload = { base64: resolved.base64, ext: resolved.ext }
       } else {
-        // file:// = a BYOK-generated image in the local store (the main process only resolves its own files)
+        // file:// = a generated image in the local store (the main process only resolves its own files)
         if (!/^(https?|file):\/\//.test(url)) return fail(t('aiFailInsertImage'), 'Invalid url')
         payload = { url }
       }
@@ -1905,7 +1889,7 @@ async function executeTool(
         }
       }
       // Cloud first when enabled; a cloud failure (free plan / credits / outage) falls back
-      // to the local BYOK pipeline instead of failing the redo outright.
+      // to the local pipeline instead of failing the redo outright.
       if (regenUseCloud && access.generatePageCloud) {
         await runRegen(access.generatePageCloud)
         if (!marker && access.generatePageLocal) await runRegen(access.generatePageLocal)
@@ -1942,11 +1926,11 @@ async function executeTool(
       //   1) Plan: use pages if passed; with topic, the tool plans the outline via LLM (batched recursion over threshold) — fixes missing pages at the input side.
       //   2) Generate: batched concurrent page generation (one retry per page), **each batch lands immediately → frontend shows pages one by one**.
       //      Cloud (gsk slide_generate) when available; otherwise fully local — the LLM (app AI
-      //      transport, works with BYOK) writes a slide spec that is built directly into a pptx.
+      //      transport) writes a slide spec that is built directly into a pptx.
       const useCloud =
         !!access.generatePageCloud && !!(await access.isCloudPageGenEnabled?.().catch(() => false))
       // Cloud can still fail mid-run (free plan / exhausted credits / outage). When it does
-      // the deck finishes on the local BYOK pipeline instead; cloudActive tracks that switch.
+      // the deck finishes on the local pipeline instead; cloudActive tracks that switch.
       let cloudActive = useCloud
       if (!useCloud && !access.generatePageLocal)
         return fail(
@@ -2382,7 +2366,7 @@ async function executeTool(
           ...(skeleton ? { skeleton } : {}),
           ...(signal ? { signal } : {}),
         }
-        // Cloud first when enabled; on failure fall back to the local BYOK pipeline and stay
+        // Cloud first when enabled; on failure fall back to the local pipeline and stay
         // there — a cloud failure is normally account-wide (free plan / exhausted credits /
         // expired key / outage), so retrying the cloud for every remaining page only wastes
         // time. Both paths return a marker for the same one-slide pptx landing contract.
@@ -2564,20 +2548,6 @@ async function executeTool(
 
       if (state) state.htmlGenerated = true
 
-      // ── Sidecar persistence (fail-open): write styleSkill to .styleskill.json next to the draft
-      // (never for a UniWork-bound deck: the file next to it is outside the document)
-      if (landedPages > 0 && access.saveSidecar && styleSkill && !access.uniworkBound?.()) {
-        try {
-          await access.saveSidecar({
-            topic: topic || coreHook || '',
-            styleSkill,
-            createdAt: new Date().toISOString(),
-          })
-        } catch {
-          /* fail-open: a sidecar failure doesn't block */
-        }
-      }
-
       // Pages not in the deck, by number (generation or landing failed, or never started)
       const stillFailed: number[] = []
       for (let i = 0; i < total; i++) if (!doneFlags[i]) stillFailed.push(i + 1)
@@ -2601,7 +2571,7 @@ async function executeTool(
           t('aiFailGenDeck'),
           runLimited
             ? `No page was made.${runLimitMsg}`
-            : `All ${total} pages failed to generate; retry or check the AI model configuration.`,
+            : `All ${total} pages failed to generate; retry, or check that UniWork AI is available.`,
         )
       }
 
@@ -2618,7 +2588,7 @@ async function executeTool(
       // Faithfully report all unfinished pages (both HTML generation failures and conversion/landing failures; all already retried once)
       const briefErr = (s?: string) => (s ? (s.length > 80 ? `${s.slice(0, 80)}…` : s) : '')
       const cloudNote = cloudFallbackReason
-        ? ` Cloud page generation was unavailable (${briefErr(cloudFallbackReason)}); the deck was generated locally with your configured AI model instead.`
+        ? ` Cloud page generation was unavailable (${briefErr(cloudFallbackReason)}); the deck was generated page by page with UniWork AI instead.`
         : ''
       const okMsg = `Self-driven generation produced ${landedPages}/${total} pages (HTML written page by page, displayed as generated; failed pages were auto-retried).`
       const failDetail = stillFailed

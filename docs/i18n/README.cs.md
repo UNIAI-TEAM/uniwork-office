@@ -48,11 +48,7 @@ provede požadovanou úpravu a přesně vám ukáže, čeho se dotkl.
 - **Lokální už z principu.** Soubory se otevírají, upravují, ukládají
   i převádějí přímo na vašem počítači. PDF → Word / Excel / PowerPoint
   a Markdown → Word i HTML → Word běží celé na zařízení. Zařízení opouštějí
-  jen volání AI, a to k poskytovateli, kterého si sami vyberete.
-- **Vaše klíče, nebo žádné.** Přihlaste se přes Genspark a klíče nepotřebujete,
-  nebo použijte vlastní klíč pro Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM,
-  Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty nebo jakýkoli OpenAI
-  kompatibilní endpoint, včetně lokálních serverů.
+  jen volání AI, a to do UniWork AI.
 - **Skriptovatelný a připravený pro agenty.** Aplikace obsahuje příkazový
   řádek `genoffice` a skill pro Claude Code, Codex, Cursor, Gemini CLI,
   GitHub Copilot, OpenCode a Windsurf, takže kódovací agent může na vašem
@@ -181,7 +177,7 @@ přes stejné enginy jako aplikace, aniž by otevřely jediné okno.
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="Nastavení GenOffice, stránka Integrace: skill genoffice nainstalovaný do Claude Code, s tlačítky Instalovat u položek Codex a Cursor"></td>
 </tr>
 <tr>
-<td><b>Jeden prompt vašemu agentovi</b> — „Vytvoř osmisnímkovou prezentaci o sluneční soustavě.“ Agent si přečte skill, napíše stylový list, osnovu a jednu specifikaci stránky na snímek, vygeneruje obě fotografie pomocí <code>genoffice image</code> a nechá <code>genoffice slides check</code> odmítnout vše, co přetéká nebo se překrývá, než <code>genoffice create</code> sestaví soubor <code>.pptx</code> a <code>slides render</code> vrátí ke kontrole jeden PNG na snímek.</td>
+<td><b>Jeden prompt vašemu agentovi</b> — „Vytvoř osmisnímkovou prezentaci o sluneční soustavě.“ Agent si přečte skill, napíše stylový list, osnovu a jednu specifikaci stránky na snímek a nechá <code>genoffice slides check</code> odmítnout vše, co přetéká nebo se překrývá, než <code>genoffice create</code> sestaví soubor <code>.pptx</code> a <code>slides render</code> vrátí ke kontrole jeden PNG na snímek.</td>
 <td><b>Nainstalujte jednou, v Nastavení → Integrace</b> — GenOffice vypíše kódovací agenty, které na tomto počítači najde, a zapíše skill do každého, který vyberete. Nebo si skill stáhněte jako zip, případně spusťte <code>npx skills add genspark-ai/genoffice</code>. Příkazy a celý pracovní postup najdete v sekci <a href="#command-line-and-agent-skill">Příkazový řádek a agentní skill</a>.</td>
 </tr>
 </table>
@@ -195,15 +191,11 @@ plus referenční příručky k operacím jako zdroje (resources). Druhý,
 HTTP server uvnitř aplikace umožňuje agentovi sestavit dokument Word přímo
 ve viditelné záložce editoru, zatímco se díváte.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Zrychlený záznam toho, jak Claude Code staví osmislajdovou investorskou prezentaci o obnovitelné energii přes MCP server genoffice: hledá obrázky a fotografie, kontroluje každou kandidátní fotografii pomocí media, deck_start zapíše stylový list a osnovu, deck_page přidává vždy jednu zkontrolovanou stránku, deck_build sestaví .pptx a slides_render vrátí obrázek každého slajdu; hotová prezentace se pak otevře v GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides zobrazuje osmislajdovou prezentaci Renewable Energy 2026, kterou Claude Code postavil přes MCP server genoffice: titulní slajd s fotografií větrné farmy na ploše a osm miniatur vlevo"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="Nastavení GenOffice, stránka Integrations, část MCP: jednořádkový příkaz claude mcp add pro Claude Code, blok JSON pro Cursor, Claude Desktop a další MCP klienty, a níže možnost lokálního HTTP serveru"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="Nastavení GenOffice, stránka Integrations, část MCP: jednořádkový příkaz claude mcp add pro Claude Code, blok JSON pro Cursor, Claude Desktop a další MCP klienty, a níže možnost lokálního HTTP serveru"></td>
 </tr>
 <tr>
-<td><b>Jeden prompt, 38 volání nástrojů, žádný shell</b> — „Vytvoř osmislajdovou investorskou prezentaci o obnovitelné energii v roce 2026, se skutečnou fotografií na titulní straně a všude, kde fotografie pomůže.“ Agent stáhne obrázky a fotografie pomocí <code>search</code>, zeptá se <code>media</code>, zda je každá kandidátní fotografie skutečnou fotografií, zavolá <code>deck_start</code> se stylovým listem a osnovou, poté <code>deck_page</code> pro každý slajd; každá stránka je zkontrolována proti osnově a paletě, než je přijata, <code>deck_build</code> sestaví <code>.pptx</code>, <code>slides_audit</code> hledá přetečení, <code>slides_render</code> vrátí PNG pro každý slajd jako obrazový obsah, na který se model může podívat, a <code>deck_replace</code> opraví tři stránky, které se mu nelíbily.</td>
 <td><b>Připojte se jednou, z Nastavení → Integrace</b> — zkopírujte řádek <code>claude mcp add</code> pro Claude Code, nebo blok JSON do Cursoru, Claude Desktop či jiného MCP klienta. Možnost B zapíná lokální HTTP server pro viditelný editor Word. Obojí je popsáno v sekci <a href="#mcp-server">MCP server</a>.</td>
 </tr>
 </table>
@@ -220,9 +212,6 @@ ve viditelné záložce editoru, zatímco se díváte.
 - **AI, která upravuje dokument přímo.** Sledované změny v Docs, živé vzorce
   a grafy v Sheets, prezentace kreslené přímo na plochu, každý krok AI je
   snapshot, ke kterému se lze vrátit.
-- **Vlastní model, vlastní klíč.** Přihlaste se přes Genspark, nebo použijte
-  klíč pro Claude, OpenAI, Gemini, DeepSeek a další, včetně lokálních serverů
-  a jakéhokoli OpenAI kompatibilního endpointu.
 - **PDF udělané správně.** Upravujte text přímo na stránce a převádějte PDF
   do Word, Excel nebo PowerPoint na zařízení, se systémovým OCR pro skeny.
 - **Také Markdown a HTML**, se stejným panelem AI a místním exportem do Word.
@@ -230,22 +219,6 @@ ve viditelné záložce editoru, zatímco se díváte.
   server dávají každý engine do služeb Claude Code, Claude Desktop, Codex,
   Cursor a dalších agentů, stále na zařízení.
 - **Zdarma**, pro jednotlivce i týmy.
-
-## AI backendy
-
-**Přihlaste se přes Genspark** a nemusíte nic nastavovat: volání modelů
-prochází přes proxy Genspark (rodiny Claude, GPT a Gemini) a agenti získávají
-webové a obrázkové vyhledávání, generování obrázků a analýzu
-obrázků/zvuku/videa.
-
-**Nebo použijte vlastní klíč.** Nastavení → AI nabízí Claude, OpenAI, Gemini,
-DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty
-a OpenCode Zen/Go, plus vlastní slot pro jakýkoli OpenAI kompatibilní
-endpoint (base URL + klíč), včetně lokálních serverů s modely. Vyhledávání
-a média mají vlastní poskytovatele pro každou schopnost pod **AI Media
-& Search**: Serper nebo Tavily pro webové vyhledávání a OpenAI, Gemini,
-Doubao/Seedream, GLM, Grok, Qwen, MiniMax nebo jakýkoli OpenAI kompatibilní
-endpoint pro obrázky, generování obrázků a analýzu obrázků/videa.
 
 Celý balík nabízí světlý, tmavý a systémový vzhled. Vzhledy mění pouze to,
 co je vidět na obrazovce: exporty, tisky a uložené soubory si vždy zachovávají
@@ -305,9 +278,8 @@ v Claude Code. Agent za ní postupoval podle fázovaného pracovního postupu ze
 skillu a CLI zkontrolovalo každou fázi, než začala další:
 
 ```bash
-genoffice capabilities --json                        # which cloud tools GenOffice has configured
+genoffice capabilities --json                        # whether the app is installed
 genoffice guide slides design                        # the deck workflow and layout library
-genoffice image "the eight planets in a row …" --aspect 16:9 --out deck/assets/cover.jpg
 genoffice slides check deck/outline.json --json      # 8 pages, no findings
 genoffice slides check deck/pages/01.json --json     # builds one slide, audits overflow and overlap
 …                                                    # one page file per slide, fixed until each check is clean
@@ -331,10 +303,10 @@ pro asistenty, kteří neumí spustit terminál nebo kterým byste ho raději
 nedávali. Vedou k tomu dvě cesty, obě ukázané s připravenými fragmenty ke
 zkopírování v **Nastavení → Integrace → MCP**:
 
-| Cesta                                | Co to je                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **A · `genoffice mcp`** (doporučeno) | stdio server, který si asistent spustí sám; GenOffice nemusí být otevřené. Jeden nástroj na příkaz (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `search`, `image`, `media`, `open`) plus fázovaný postup sestavování prezentace `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Operace, specifikace a Markdown se předávají přímo v argumentech, takže funguje i klient bez souborového systému. |
-| **B · Lokální HTTP server**          | Běží uvnitř aplikace GenOffice na `http://127.0.0.1:3093/mcp` (Streamable HTTP, se starším SSE). Jeho nástroje ovládají viditelnou záložku editoru Word: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session` — a vy sledujete, jak dokument vzniká. Ve výchozím stavu vypnutý; zapíná se ve stejném panelu nastavení.                                                                                                                                                                 |
+| Cesta                                | Co to je                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A · `genoffice mcp`** (doporučeno) | stdio server, který si asistent spustí sám; GenOffice nemusí být otevřené. Jeden nástroj na příkaz (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `open`) plus fázovaný postup sestavování prezentace `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Operace, specifikace a Markdown se předávají přímo v argumentech, takže funguje i klient bez souborového systému. |
+| **B · Lokální HTTP server**          | Běží uvnitř aplikace GenOffice na `http://127.0.0.1:3093/mcp` (Streamable HTTP, se starším SSE). Jeho nástroje ovládají viditelnou záložku editoru Word: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session` — a vy sledujete, jak dokument vzniká. Ve výchozím stavu vypnutý; zapíná se ve stejném panelu nastavení.                                                                                                                                     |
 
 ```bash
 # Claude Code
@@ -351,34 +323,8 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 nastavení vypíše přesnou cestu pro vaši instalaci). Server nese vlastní
 instrukce k pracovnímu postupu a zpřístupňuje referenční příručky k operacím
 jako zdroje `genoffice://guide/*`, takže skill není potřeba; skill a MCP
-server mohou koexistovat a asistent si jeden z nich vybere. Cloudové funkce
-(`search`, `image`, `media`) stále jdou přes poskytovatele nastaveného v
-GenOffice; všechno ostatní běží lokálně a `GENOFFICE_ALLOWED_ROOTS` omezuje
+server mohou koexistovat a asistent si jeden z nich vybere. `GENOFFICE_ALLOWED_ROOTS` omezuje
 každý nástroj na složky, které uvedete.
-
-Prezentace o obnovitelné energii z dema výše je to, jak jeden prompt v
-Claude Code s připojeným pouze MCP serverem `genoffice` vypadá ze strany
-protokolu:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-Osmatřicet volání, zhruba třináct minut, a asistent se ani jednou nedotkl
-shellu: obrázky, fotografie, průvodci, kontroly i rendery cestovaly jako
-výsledky volání MCP nástrojů. Pouze `search` a `media` opustily počítač, k
-poskytovateli nastavenému v GenOffice.
 
 <a id="download"></a>
 
@@ -500,8 +446,7 @@ zpět beze změny, takže dokumenty dál fungují v Microsoft Office.
 
 Úprava dokumentů je zcela lokální — soubory neopustí váš počítač při
 otevírání, úpravách, ukládání ani konverzi. AI funkce (agenti, vyhledávání,
-nástroje pro obrázky) potřebují síťové připojení, buď s přihlášením přes
-Genspark, nebo s vlastním API klíčem k modelu.
+nástroje pro obrázky) potřebují síťové připojení a účet UniWork.
 
 </details>
 
@@ -520,17 +465,6 @@ Ano — zcela na zařízení: extrakce na úrovni znaků přes PDFium plus anal�
 rozvržení na základě geometrie, žádná cloudová služba, žádné nahrávání.
 Skenované stránky jsou také podporovány: na macOS a Windows je čte systémové
 OCR, takže se převedou na editovatelný text, ne na obrázek stránky.
-
-</details>
-
-<details>
-<summary><b>Můžu použít vlastní AI model nebo API klíč?</b></summary>
-
-Ano. Kromě bezklíčového přihlášení Genspark GenOffice podporuje vlastní klíč
-pro Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok,
-Mistral, OpenRouter, Requesty a OpenCode Zen/Go, plus jakýkoli OpenAI kompatibilní
-endpoint — včetně lokálních serverů s modely. Vyhledávání, generování obrázků
-a analýza obrázků/videa mají vlastní klíče pod Nastavení → AI Media & Search.
 
 </details>
 

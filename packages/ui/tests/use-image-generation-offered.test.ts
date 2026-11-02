@@ -2,13 +2,13 @@
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { defaultAiMediaSettings, defaultAiSettings, type AiSettings } from '@genoffice/ai-provider'
+import { defaultAiSettings, type AiSettings } from '@genoffice/ai-provider'
 import { useImageGenerationOffered } from '../src/use-image-generation-offered'
 
 /**
  * The visible image-generation entries (Slides "AI Image" buttons, the "Regenerate with AI" chip)
- * are offered only with the host grant AND a live way to generate, the rule the generate_image
- * tool uses.
+ * are offered only with the host grant AND the UniWork cloud (signed in, cloud tools on): the rule
+ * the generate_image tool uses. There is no image model of the person's own (UNI-2309).
  */
 
 let host: HTMLDivElement
@@ -40,28 +40,14 @@ function Probe(props: ProbeProps) {
 
 const render = (props: ProbeProps) => act(async () => root.render(createElement(Probe, props)))
 
-/** the person's own OpenAI image model: works without any UniWork cloud sign-in */
-function ownKey(): AiSettings {
-  const media = defaultAiMediaSettings()
-  media.imageProvider = 'openai'
-  media.providers.openai = { apiKey: 'sk-test', imageModel: 'gpt-image-2', analysisModel: '' }
-  const base = defaultAiSettings()
-  return { ...base, media }
-}
-
-it('grant off: hidden even with a key, and the cloud is never read', async () => {
+it('grant off: hidden even while signed in, and the cloud is never read', async () => {
   const read = vi.fn(async () => ({ loggedIn: true }))
-  await render({ granted: false, settings: ownKey(), read })
+  await render({ granted: false, settings: defaultAiSettings(), read })
   expect(offered).toBe(false)
   expect(read).not.toHaveBeenCalled()
 })
 
-it('grant on, own provider key: shown without a cloud sign-in', async () => {
-  await render({ granted: true, settings: ownKey(), read: async () => ({ loggedIn: false }) })
-  expect(offered).toBe(true)
-})
-
-it('grant on, no key: shown only while the UniWork cloud answers signed in with tools on', async () => {
+it('grant on: shown only while the UniWork cloud answers signed in with tools on', async () => {
   const settings = defaultAiSettings()
   await render({ granted: true, settings, read: async () => ({ loggedIn: false }) })
   expect(offered).toBe(false)

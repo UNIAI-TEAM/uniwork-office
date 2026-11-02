@@ -14,7 +14,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 import { App } from '../src/renderer/App'
 import { LocaleProvider, setModuleLang, t } from '../src/renderer/i18n/locale'
 import { resetCapabilitiesForTest } from '../src/renderer/capabilities'
@@ -41,10 +41,8 @@ const WATERMARK_HEADER_XML =
   '</w:pict></w:r></w:p></w:hdr>'
 
 const harnessSettings: AiSettings = {
-  provider: 'anthropic',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: 'k', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  provider: 'uniwork',
+  providers: {},
 }
 
 const winHost = window as unknown as { desktop?: Record<string, unknown> }

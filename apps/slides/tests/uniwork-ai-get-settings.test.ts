@@ -1,18 +1,18 @@
 // @vitest-environment node
 /**
- * No silent fallback: a saved `uniwork` provider stays `uniwork` through ai:get-settings while
- * UniWork AI is not offered (the picker shows the S7 reason and Send is blocked), and a send with
- * it never reaches another provider. The real handlers run with electron mocked.
+ * UniWork AI is the only provider (slides, standalone): ai:get-settings always answers `uniwork`
+ * whatever the file holds, ai:set-settings keeps only the cloud-tools opt-out, and a send is
+ * refused with ai_disabled without any provider request. The real handlers run with electron mocked.
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-const { handlers, dirs, streamForProvider } = vi.hoisted(() => ({
+const { handlers, dirs, fetchSpy } = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
   dirs: { userData: '' },
-  streamForProvider: vi.fn(async () => undefined),
+  fetchSpy: vi.fn(),
 }))
 
 vi.mock('electron', () => ({
@@ -27,7 +27,7 @@ vi.mock('electron', () => ({
     ),
     on: vi.fn(),
   },
-  net: { fetch: vi.fn() },
+  net: { fetch: fetchSpy },
   webContents: { fromId: vi.fn(), getAllWebContents: () => [] },
 }))
 vi.mock('@genoffice/ai-search', () => ({
@@ -53,53 +53,80 @@ vi.mock('../src/main/session-state', () => ({
   scheduleHistoryNotify: () => {},
   sessions: new Map(),
 }))
-vi.mock('@genoffice/ai-provider', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@genoffice/ai-provider')>()),
-  streamForProvider,
-}))
-
 import { setUniworkAiAvailable, type AiSettings } from '@genoffice/ai-provider'
 import { registerAiIpc } from '../src/main/ai-ipc'
 
-const storeProvider = (provider: string): void =>
-  writeFileSync(
-    join(dirs.userData, 'ai-settings.json'),
-    JSON.stringify({
-      provider,
-      providers: { anthropic: { apiKey: 'sk-own', model: 'claude-test' } },
-    }),
-  )
+const storeFile = (content: unknown): void =>
+  writeFileSync(join(dirs.userData, 'ai-settings.json'), JSON.stringify(content))
 const getSettings = () =>
   Promise.resolve(handlers.get('ai:get-settings')!({})) as Promise<AiSettings>
 
-describe('slides ai:get-settings keeps uniwork', () => {
+describe('slides ai:get-settings is UniWork AI only', () => {
   beforeAll(() => {
     dirs.userData = mkdtempSync(join(tmpdir(), 'slides-uniwork-choice-'))
+    vi.stubGlobal('fetch', fetchSpy)
     registerAiIpc()
   })
   afterEach(() => {
     setUniworkAiAvailable(false)
-    streamForProvider.mockClear()
+    fetchSpy.mockClear()
   })
-  afterAll(() => rmSync(dirs.userData, { recursive: true, force: true }))
+  afterAll(() => {
+    vi.unstubAllGlobals()
+    rmSync(dirs.userData, { recursive: true, force: true })
+  })
 
-  it('a stored uniwork stays uniwork while UniWork AI is unavailable, never UniAI', async () => {
-    storeProvider('uniwork')
-    setUniworkAiAvailable(false)
+  it('answers uniwork whatever provider the file holds, offered or not', async () => {
+    storeFile({ provider: 'anthropic', providers: { anthropic: { apiKey: 'sk-own' } } })
     expect((await getSettings()).provider).toBe('uniwork')
+    storeFile({ provider: 'nonsense' })
     setUniworkAiAvailable(true)
     expect((await getSettings()).provider).toBe('uniwork')
   })
 
-  it('a BYOK provider and an unknown id behave as before', async () => {
-    storeProvider('anthropic')
-    expect((await getSettings()).provider).toBe('anthropic')
-    storeProvider('nonsense')
-    expect((await getSettings()).provider).toBe('genspark')
+  it('keeps the stored cloud-tools opt-out and nothing else', async () => {
+    storeFile({ provider: 'openai', gskToolsEnabled: false })
+    expect((await getSettings()).gskToolsEnabled).toBe(false)
+    await handlers.get('ai:set-settings')!(
+      {},
+      { provider: 'openai', providers: { openai: { apiKey: 'sk-3' } }, gskToolsEnabled: true },
+    )
+    const written = readFileSync(join(dirs.userData, 'ai-settings.json'), 'utf8')
+    expect(JSON.parse(written)).toEqual({
+      provider: 'uniwork',
+      providers: {},
+      gskToolsEnabled: true,
+    })
+    expect(written).not.toContain('sk-')
   })
 
-  it('a send with uniwork selected is refused without any provider request', async () => {
-    storeProvider('uniwork')
+  it('registering scrubs an old provider key from the file and leaves no removed channel', () => {
+    storeFile({
+      provider: 'openrouter',
+      providers: { openrouter: { apiKey: 'sk-or-old', model: 'm' } },
+      gskToolsEnabled: false,
+    })
+    registerAiIpc()
+    const written = readFileSync(join(dirs.userData, 'ai-settings.json'), 'utf8')
+    expect(JSON.parse(written)).toEqual({
+      provider: 'uniwork',
+      providers: {},
+      gskToolsEnabled: false,
+    })
+    expect(written).not.toContain('sk-')
+    for (const channel of [
+      'ai:chat',
+      'ai:settings-test',
+      'ai:search-test',
+      'ai:media-test',
+      'ai:codex-models',
+      'ai:custom-models',
+      'ai:openrouter-key-status',
+    ])
+      expect(handlers.has(channel)).toBe(false)
+  })
+
+  it('a send is refused without any provider request', async () => {
     const settings = await getSettings()
     const chunks: Array<{ type: string; uniworkCode?: string }> = []
     const event = {
@@ -117,6 +144,6 @@ describe('slides ai:get-settings keeps uniwork', () => {
       messages: [{ role: 'user', content: 'hi' }],
     })
     expect(chunks.map((c) => [c.type, c.uniworkCode])).toEqual([['error', 'ai_disabled']])
-    expect(streamForProvider).not.toHaveBeenCalled()
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })

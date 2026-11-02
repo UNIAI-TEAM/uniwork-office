@@ -211,8 +211,6 @@ import {
   setDocsLegacyOpenHook,
   setSessionPathResolver,
   setUniworkAiHost,
-  setUniworkAiChoiceStore,
-  setUniworkAiEditorSender,
   defaultSaveDir,
   uniquePathIn,
   authorizeMcpDocWrite,
@@ -355,13 +353,10 @@ import type {
   UiTheme,
   FileSearchPage,
   FileSearchQuery,
-  FileSearchRerank,
-  FileSearchSettings,
 } from '../shared/home-api'
 import { HOME_CHANNELS } from '../shared/home-api'
 import { UNIWORK_DOC_CHANNELS } from '../shared/home-api'
 import { OPEN_DIALOG_EXTENSIONS } from '../shared/open-extensions'
-import { extractAllowedFileExcerpts } from './file-excerpts'
 import { isAllowedWbKey, type WbKvMap } from './workbench-db'
 import { ACTIVE_WORKSPACE_STORE_KEY } from './uniwork-askuni/service'
 import { WorkbenchAccounts, loadWorkbenchSnapshot } from './workbench-accounts'
@@ -435,12 +430,10 @@ import {
 import extractWorkerPath from './file-index/extract-worker?modulePath'
 import { FileIndexer } from './file-index/indexer'
 import { FileIndexStore } from './file-index/store'
-import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './file-index/rerank'
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { isVersionRequest } from './version-flag'
 import { clearAiRun, isAiRunning, registerAiRunIpc } from './ai-run-registry'
 import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
-import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
 import { canonicalPath, TabManager } from './tab-manager'
 import {
   tabMenuTemplate,
@@ -465,6 +458,7 @@ import {
   SHELL_WINDOW_MIN_WIDTH,
 } from './window-bounds'
 import { installShellCloseGuard } from './window-close-guard'
+import { scrubFileSearchSetting } from './app-settings-scrub'
 import { openShellSettingsView } from './settings-view'
 import {
   beginEditLockWillQuit,
@@ -777,9 +771,6 @@ function currentAiPanelPrefs(): AiPanelPrefs {
 }
 
 // ---- first-run onboarding ----
-// Token Hub (OpenRouter) credits page opened from the Home credit wallet.
-// Kept main-side so the renderer never supplies the URL.
-const CREDIT_USAGE_URL = 'https://openrouter.ai/settings/credits'
 
 const tMain = createI18n({
   zh: {
@@ -3413,9 +3404,6 @@ function syncWorkbenchOwner(): void {
   if (!workbenchAccounts().setOwner(owner)) return
   const wc = shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null
   if (wc && !wc.isDestroyed()) wc.send(HOME_CHANNELS.wbBucketChanged, workbenchAccounts().bucket())
-  // the UniWork AI pick is per account: every panel re-reads which provider is selected
-  for (const other of webContents.getAllWebContents())
-    if (!other.isDestroyed()) other.send('ai:settings-changed')
 }
 let tabManager: TabManager | null = null
 
@@ -3751,11 +3739,6 @@ const folderWatchers = new Map<string, FolderWatcher>()
 
 let fileIndexStore: FileIndexStore | null = null
 let fileIndexer: FileIndexer | null = null
-let searchReranker: SearchReranker | null = null
-
-function readFileSearchSettings(): FileSearchSettings {
-  return normalizeFileSearchSettings(readAppSettings(APP_SETTINGS_PATH()).fileSearch)
-}
 
 /** the search index lives in userData and follows the save folder plus recents/starred */
 function ensureFileIndexer(): FileIndexer | null {
@@ -5102,6 +5085,12 @@ function registerHomeIpc(): void {
   // UniWork account (desktop PKCE sign-in): the manager in ./uniwork-auth owns
   // tokens and state; the renderer only gets AccountStatus pushes.
   configureUniworkAccount({ settingsPath: APP_SETTINGS_PATH })
+  // the decision-model file search is gone; drop the provider keys it left in app-settings.json
+  try {
+    scrubFileSearchSetting(APP_SETTINGS_PATH())
+  } catch (err) {
+    console.warn('[app-settings] could not drop the old file-search keys:', err)
+  }
   registerAccountIpc(
     guardedIpc,
     () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null),
@@ -5262,47 +5251,6 @@ function registerHomeIpc(): void {
     }
   })
 
-  guardedIpc.handle(
-    HOME_CHANNELS.rerankSearch,
-    async (_event, raw: unknown): Promise<FileSearchRerank | null> => {
-      const settings = readFileSearchSettings()
-      if (!settings.rerank) return null
-      const query = (raw && typeof raw === 'object' ? raw : {}) as { q?: unknown; paths?: unknown }
-      const q = typeof query.q === 'string' ? query.q.trim().slice(0, 200) : ''
-      const paths = Array.isArray(query.paths)
-        ? query.paths.filter((p): p is string => typeof p === 'string').slice(0, 20)
-        : []
-      if (!q || paths.length < 2 || !ensureFileIndexer() || !fileIndexStore) return null
-      searchReranker ??= new SearchReranker(fileIndexStore)
-      return searchReranker.rerank(q, paths, settings)
-    },
-  )
-
-  guardedIpc.handle(HOME_CHANNELS.getFileSearchSettings, (): FileSearchSettings =>
-    readFileSearchSettings(),
-  )
-
-  guardedIpc.handle(
-    HOME_CHANNELS.setFileSearchSettings,
-    (_event, patch: unknown): FileSearchSettings => {
-      const current = readFileSearchSettings()
-      const p = (patch && typeof patch === 'object' ? patch : {}) as Partial<FileSearchSettings>
-      const next = normalizeFileSearchSettings({
-        ...current,
-        ...p,
-        keys: { ...current.keys, ...(p.keys ?? {}) },
-      })
-      writeAppSetting(APP_SETTINGS_PATH(), 'fileSearch', next)
-      return next
-    },
-  )
-
-  guardedIpc.handle(HOME_CHANNELS.testFileSearchRerank, async (_event, input: unknown) => {
-    const result = await probeDecision(normalizeFileSearchSettings(input))
-    if (!result.ok) console.warn('[file-index] rerank test failed:', result.error)
-    return result
-  })
-
   // Starred files sort by mtime, which requires stat-ing them all first; they
   // are hand-picked and few, so this is fine. The Starred view's group pills
   // scope the whole query (totals included) through the group map.
@@ -5331,10 +5279,6 @@ function registerHomeIpc(): void {
     openDocumentPath(path)
     fileIndexer?.refresh()
   })
-
-  guardedIpc.handle(HOME_CHANNELS.fileExcerpts, (_event, paths: unknown) =>
-    extractAllowedFileExcerpts(paths, tabManager?.openFilePaths() ?? []),
-  )
 
   guardedIpc.handle(HOME_CHANNELS.wbLoadAll, () =>
     loadWorkbenchSnapshot(workbenchAccounts(), syncWorkbenchOwner),
@@ -5420,44 +5364,6 @@ function registerHomeIpc(): void {
       return { ok: false as const, error: err instanceof Error ? err.message : String(err) }
     }
   })
-
-  guardedIpc.handle(HOME_CHANNELS.activeOfficeTab, () => {
-    const tab = tabManager?.activeOfficeTab()
-    if (!tab) return null
-    return {
-      id: tab.id,
-      kind: tab.kind,
-      title: tab.title,
-      ...(tab.path ? { path: tab.path } : {}),
-    }
-  })
-
-  guardedIpc.handle(
-    HOME_CHANNELS.pushAiPreset,
-    (
-      _event,
-      input?: {
-        text?: string
-        autoRun?: boolean
-        displayText?: string
-        tabId?: string
-      },
-    ) => {
-      if (!input || typeof input.text !== 'string' || !input.text.trim()) {
-        return { ok: false as const }
-      }
-      return (
-        tabManager?.pushAiPresetToOfficeTab(
-          {
-            text: input.text.trim(),
-            autoRun: input.autoRun !== false,
-            ...(typeof input.displayText === 'string' ? { displayText: input.displayText } : {}),
-          },
-          typeof input.tabId === 'string' ? input.tabId : undefined,
-        ) ?? { ok: false as const }
-      )
-    },
-  )
 
   guardedIpc.handle(HOME_CHANNELS.browse, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? shellWindow
@@ -6111,12 +6017,6 @@ function registerHomeIpc(): void {
     writeAppSetting(APP_SETTINGS_PATH(), DEFAULT_SAVE_DIR_KEY, picked)
     ensureFolderWatchers()
     return picked
-  })
-
-  guardedIpc.handle(HOME_CHANNELS.openCreditUsage, () => {
-    shell.openExternal(CREDIT_USAGE_URL).catch(() => {
-      // no browser handler available; nothing actionable for the user here
-    })
   })
 }
 
@@ -7278,7 +7178,7 @@ function installBackToHomeItems(): void {
  *  ⌘, lands on it from anywhere in the suite. The window comes back first if
  *  it was hidden or minimized, and asking again re-opens the same panel —
  *  the renderer keeps one. */
-function openSettingsView(section: 'general' | 'aiModel' | 'skills' = 'general'): void {
+function openSettingsView(section: 'general' | 'account' | 'skills' = 'general'): void {
   openShellSettingsView(
     {
       ensureTabManager,
@@ -7310,7 +7210,7 @@ function installDockMenu(): void {
 }
 
 // On mainland-China networks the main process's Node fetch (undici) bypasses the system proxy,
-// so direct calls to overseas LLM/image-search APIs time out or get region-blocked (403).
+// so direct calls to overseas APIs (the UniWork API, image search) time out or get region-blocked (403).
 // Prefer proxy env vars (terminal launch); a packaged app launched from Finder inherits no shell
 // env vars, so fall back to the system HTTP proxy. The renderer uses Chromium's system proxy and
 // is unaffected. Same bootstrap as slides-main startSlidesStandalone.
@@ -7326,11 +7226,13 @@ async function installMainProcessProxy(): Promise<void> {
   ].find((v) => v && /^https?:\/\//.test(v))
   if (!proxyUrl) {
     try {
-      // PAC/rule proxies answer per-host: probe the Token Hub host the
-      // default chat route targets
-      const resolved = await session.defaultSession.resolveProxy('https://openrouter.ai/')
-      const m = /PROXY\s+([^;\s]+)/.exec(resolved)
-      if (m) proxyUrl = `http://${m[1]}`
+      // PAC/rule proxies answer per-host: probe the UniWork API host every main-process call targets
+      const apiOrigin = uniworkDeploymentProfile()?.apiOrigin
+      if (apiOrigin) {
+        const resolved = await session.defaultSession.resolveProxy(apiOrigin)
+        const m = /PROXY\s+([^;\s]+)/.exec(resolved)
+        if (m) proxyUrl = `http://${m[1]}`
+      }
     } catch {
       /* no system proxy */
     }
@@ -7413,7 +7315,7 @@ installNavigationGuard(app)
 installContextMenu(app, () => contextMenuLabels(currentLang()))
 registerAiIpc()
 guardedIpc.handle('ai:open-model-settings', () => {
-  openSettingsView('aiModel')
+  openSettingsView('account')
 })
 guardedIpc.handle('ai:open-skills-settings', () => {
   openSettingsView('skills')
@@ -7442,10 +7344,8 @@ registerDroppedFilesIpc()
 registerUserSkillsIpc(guardedIpc)
 // editors report a running AI turn per webContents (TabManager.editorDirtyStates reads it)
 registerAiRunIpc(guardedIpc)
-// the renderers' own provider lists learn whether UniWork AI is offered (pull + push)
+// the renderers learn whether UniWork AI is offered (pull + push)
 registerUniworkAiFlagIpc(guardedIpc)
-// "UniWork AI" is picked per account (the account store), BYOK settings stay in ai-settings.json
-setUniworkAiChoiceStore(createUniworkAiChoiceStore(workbenchAccounts()))
 setUniworkAiFlagListener((available) =>
   broadcastUniworkAiFlag(available, webContents.getAllWebContents()),
 )
@@ -7726,11 +7626,6 @@ app.whenReady().then(async () => {
     }
     return null
   }
-  // the account's UniWork AI pick reaches editor tabs only (My AI, email, Settings keep BYOK)
-  setUniworkAiEditorSender((senderId) => {
-    const kind = describeAiSender(senderId)?.kind
-    return kind !== undefined && kind !== 'home'
-  })
   if (uniworkDocsHandle) {
     const uniworkAi = startUniworkAiChat({
       describe: describeAiSender,

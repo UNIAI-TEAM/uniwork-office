@@ -323,7 +323,7 @@ describe('openShellSettingsView (main-process Settings action)', () => {
         ensureTabManager: () => ({ openHomeTab }),
         getShellWindow: () => mockWin,
       },
-      'aiModel',
+      'account',
     )
 
     expect(mockWin.restore).toHaveBeenCalledOnce()
@@ -331,7 +331,7 @@ describe('openShellSettingsView (main-process Settings action)', () => {
     expect(mockWin.focus).toHaveBeenCalledOnce()
     expect(openHomeTab).toHaveBeenCalledOnce()
     expect(mockWin.webContents.send).toHaveBeenCalledWith(HOME_CHANNELS.openSettings, {
-      section: 'aiModel',
+      section: 'account',
     })
   })
 
@@ -359,7 +359,7 @@ describe('openShellSettingsView (main-process Settings action)', () => {
     }
 
     openShellSettingsView(deps, 'general')
-    openShellSettingsView(deps, 'aiModel')
+    openShellSettingsView(deps, 'account')
     openShellSettingsView(deps, 'general')
 
     expect(mockWin.webContents.once).toHaveBeenCalledTimes(1)

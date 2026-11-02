@@ -7,8 +7,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { after, test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import {
   BASE_FILE,
+  DROPPED_UPSTREAM_PATHS,
+  WATCH,
   codeSpan,
   defaultChecks,
   parsePorcelainZ,
@@ -346,8 +349,74 @@ test('--exclude leaves paths out of the patch and lists them', () => {
   const s = run(fork, upstream, { exclude: ['c.txt'] })
   assert.equal(s.exitCode, 0)
   assert.deepEqual(s.excluded, ['c.txt'])
+  assert.deepEqual(s.dropped, [])
   assert.equal(existsSync(join(fork, 'c.txt')), false)
+  const report = renderReport(s)
+  assert.match(report, /## Left out by --exclude \(1, port by hand\)/)
+  assert.doesNotMatch(report, /Removed in the fork/)
 })
+
+/** A fork that deleted `gone` and an upstream that edits it and adds `added` beside it. */
+function setupDropped({ gone, added }) {
+  const upstream = join(TMP, `dropped-upstream-${++counter}`)
+  mkdirSync(upstream, { recursive: true })
+  git(upstream, 'init', '-q')
+  write(upstream, { ...BASE_TREE, [gone]: lines(5) })
+  const base = commitAll(upstream, 'upstream base')
+  write(upstream, { [gone]: lines(5, ' upstream'), [added]: 'export const vendor = 1\n' })
+  commitAll(upstream, 'upstream: provider work')
+  const fork = join(TMP, `fork-${++counter}`)
+  mkdirSync(fork, { recursive: true })
+  git(fork, 'init', '-q')
+  write(fork, { ...BASE_TREE, [BASE_FILE]: `${base}\n` })
+  commitAll(fork, 'fork: the own-key AI is gone')
+  return { fork, upstream }
+}
+
+test('an upstream edit to a file the fork removed with the own-key AI is left out, not failed', () => {
+  const gone = 'packages/ai-provider/src/codex-app-server.ts'
+  const added = 'packages/ai-provider/src/new-vendor.ts'
+  const { fork, upstream } = setupDropped({ gone, added })
+  const s = run(fork, upstream)
+  // removed in the fork is its own list: nothing to port, unlike a caller's --exclude
+  assert.deepEqual(s.dropped, [gone])
+  assert.deepEqual(s.excluded, [])
+  assert.deepEqual(s.apply.failed, [])
+  assert.equal(existsSync(join(fork, gone)), false)
+  const report = renderReport(s)
+  assert.match(report, /## Removed in the fork \(1, do not port\)/)
+  assert.match(report, /protocols\/openai-sse\.ts/)
+  assert.doesNotMatch(report, /Left out by --exclude/)
+  assert.doesNotMatch(report, /port what the fork needs/)
+  const hit = s.watch.find((w) => w.path === added)
+  assert.ok(hit, 'the new provider file is on the watch list')
+  assert.match(hit.note, /UniWork AI only/)
+})
+
+test('an upstream edit to the model chip is on the watch list: the provider chooser stays out', () => {
+  for (const path of [
+    'packages/ui/src/AiModelPicker.tsx',
+    'packages/ui/src/strings-ai-model-picker.ts',
+  ]) {
+    const hit = WATCH.find((w) => w.test(path))
+    assert.ok(hit, path)
+    assert.match(hit.note, /provider chooser removed; UniWork AI only/)
+  }
+})
+
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+
+test(
+  'DROPPED_UPSTREAM_PATHS never names a file the fork still ships',
+  // a sync runs these tests from a copy of tools/ alone, outside the checkout
+  { skip: existsSync(join(REPO, 'packages')) ? false : 'not run from a checkout' },
+  () => {
+    assert.ok(DROPPED_UPSTREAM_PATHS.includes('packages/ai-provider/src/codex-app-server.ts'))
+    for (const glob of DROPPED_UPSTREAM_PATHS) {
+      assert.equal(git(REPO, 'ls-files', '--', `:(glob)${glob}`), '', glob)
+    }
+  },
+)
 
 test('a failing or crashing check makes the run exit 2 instead of aborting', () => {
   const { fork, upstream } = setup({ upstreamChanges: CLEAN_CHANGES })

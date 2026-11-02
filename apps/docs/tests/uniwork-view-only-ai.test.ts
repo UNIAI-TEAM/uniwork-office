@@ -10,13 +10,11 @@ import { READ_ONLY_TOOLS, createDocsSkill } from '../src/renderer/ai/docs-skill'
 import { AGENT_TOOLS } from '../src/renderer/ai/tools'
 import { autoSaveToggleVisible } from '../src/renderer/uniwork-doc-state'
 import { strings } from '../src/renderer/i18n/strings'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 
 const settings: AiSettings = {
-  provider: 'anthropic',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  provider: 'uniwork',
+  providers: {},
 }
 
 function createEditor(): Editor {
@@ -36,11 +34,7 @@ function createEditor(): Editor {
   })
 }
 
-function renderPanel(
-  editor: Editor,
-  readOnly: boolean,
-  provider: AiSettings['provider'] = 'anthropic',
-) {
+function renderPanel(editor: Editor, readOnly: boolean) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -49,7 +43,7 @@ function renderPanel(
       createElement(AiPanel, {
         editor,
         blocks: [],
-        settings: { ...settings, provider },
+        settings,
         open: true,
         onExpand: () => {},
         onCollapse: () => {},
@@ -189,22 +183,13 @@ describe('AI agent on a view-only document', () => {
 })
 
 describe('AI panel on a view-only document', () => {
-  it('shows the reason, drops the track-changes toggle and the edit starters for BYOK', () => {
+  it('shows the UniWork AI view-only line under the composer, drops the track-changes toggle and the edit starters', () => {
     const editor = createEditor()
     const { container, cleanup } = renderPanel(editor, true)
-    expect(container.querySelector('.ai-readonly-notice')).not.toBeNull()
-    expect(container.querySelector('.ai-uniwork-view-only')).toBeNull()
-    expect(container.querySelector('.ai-track-btn')).toBeNull()
-    expect(container.querySelectorAll('.ai-starter').length).toBe(1)
-    cleanup()
-    editor.destroy()
-  })
-
-  it('replaces ai-readonly-notice above composer with ai-uniwork-view-only sub-line under composer when UniWork AI is selected', () => {
-    const editor = createEditor()
-    const { container, cleanup } = renderPanel(editor, true, 'uniwork')
     expect(container.querySelector('.ai-readonly-notice')).toBeNull()
     expect(container.querySelector('.ai-uniwork-view-only')).not.toBeNull()
+    expect(container.querySelector('.ai-track-btn')).toBeNull()
+    expect(container.querySelectorAll('.ai-starter').length).toBe(1)
     cleanup()
     editor.destroy()
   })

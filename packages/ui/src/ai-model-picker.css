@@ -1,5 +1,5 @@
-/* Composer model chip + its upward popover (AiModelPicker). Chrome tokens only;
- * each app imports this next to its other @genoffice/ui sheets. */
+/* Composer model chip + its upward popover (AiModelPicker): UniWork AI, its credits and the cloud
+ * state. Chrome tokens only; each app imports this next to its other @genoffice/ui sheets. */
 
 .ai-model-picker {
   display: inline-flex;
@@ -82,57 +82,14 @@
   font-size: 12px;
 }
 
-.ai-model-pop-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.ai-model-group + .ai-model-group {
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.ai-model-group-head {
+/* the one row: UniWork AI (or the model it serves), with the credit line under it */
+.ai-model-current {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 8px 3px;
-  color: var(--text-dim);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.ai-model-item {
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  width: 100%;
-  min-height: 24px;
-  padding: 5px 8px 5px 28px;
-  border: none;
-  border-radius: var(--radius-6);
-  background: none;
+  padding: 5px 8px;
   color: var(--text);
-  font-family: inherit;
   font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.ai-model-item:hover {
-  background: var(--hover);
-}
-
-.ai-model-item.selected {
-  background: var(--accent-soft);
-}
-
-.ai-model-item:focus-visible,
-.ai-model-item.selected:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
 }
 
 .ai-model-item-body {
@@ -160,10 +117,6 @@
   word-break: break-word;
 }
 
-.ai-model-item.selected .ai-model-item-sub {
-  color: var(--text);
-}
-
 .ai-model-sr-only {
   position: absolute;
   width: 1px;
@@ -174,15 +127,6 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-.ai-model-manage {
-  flex-shrink: 0;
-  margin-top: 4px;
-  padding-left: 8px;
-  border-top: 1px solid var(--border-subtle);
-  border-radius: 0 0 var(--radius-6) var(--radius-6);
-  color: var(--text-secondary);
 }
 
 .ai-model-footer {
@@ -232,7 +176,6 @@
 
 @media (pointer: coarse) {
   .ai-model-chip,
-  .ai-model-item,
   .ai-model-footer-action {
     min-height: 44px;
     min-width: 44px;
@@ -243,13 +186,13 @@
   }
 }
 
-/* a disabled Send button (nothing typed, or "Choose a model to send"): its brand art is a pale
+/* a disabled Send button (nothing typed, or UniWork AI not on here): its brand art is a pale
  * square, which on a dark surface reads as the active control; the token dims it in dark themes */
 .ai-send-btn:disabled img {
   filter: var(--ai-send-off-filter, none);
 }
 
-/* icon-only composer: the no-key / no-model hint above the footer (send is off meanwhile). The
+/* icon-only composer: the "UniWork AI is not on" hint above the footer (send is off meanwhile). The
  * inline padding is the textarea's own (14px), so the link starts where the placeholder text starts. */
 .ai-input-need {
   padding: 0 14px 4px;
@@ -258,7 +201,7 @@
   user-select: none;
 }
 
-/* the add-a-key action is a link: the app's accent, underlined (the same pattern as the other
+/* the hint opens the account settings: a link in the app's accent, underlined (the same pattern as the other
  * in-panel text links), with a visible keyboard focus */
 .ai-input-need-link {
   padding: 0;
@@ -292,16 +235,4 @@
   line-height: 1.4;
   color: var(--text-dim);
   background: var(--hover);
-}
-
-/* forced colors drop the accent fill: the selected option keeps a 2px Highlight border so it still
- * reads as chosen; the border is always reserved (transparent) so the row does not shift */
-@media (forced-colors: active) {
-  .ai-model-item {
-    border: 2px solid transparent;
-  }
-
-  .ai-model-item.selected {
-    border-color: Highlight;
-  }
 }

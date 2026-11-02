@@ -3,7 +3,7 @@ import { t } from '../i18n/locale'
 
 /**
  * Web-search AgentSkill (same source as docs/slides web_search):
- * the main process queries Serper/DuckDuckGo; the renderer only receives
+ * the main process queries the UniWork cloud; the renderer only receives
  * titles/links/snippets.
  */
 

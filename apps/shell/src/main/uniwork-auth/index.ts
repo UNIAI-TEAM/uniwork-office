@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import {
   app,
   BrowserWindow,
@@ -16,7 +17,6 @@ import {
   setUniworkCloudStatus,
   setUniworkCloudTransport,
   uniworkChatTransport,
-  uniworkCloudEnabled,
   uniworkConversations,
 } from '@genoffice/ai-provider'
 import { safeExternalUrl } from '@genoffice/electron-utils'
@@ -57,6 +57,7 @@ import {
 } from './ai-chat'
 import type { CapabilityRead } from '../uniwork-sync/capability/cache'
 import { AccountManager } from './manager'
+import { uniworkToolPolicy } from './tool-policy'
 import { TransportError, createUniworkTransport } from './transport'
 
 export {
@@ -421,13 +422,12 @@ export function startUniworkAiChat(deps: {
         },
       }),
     available: (scope, orgId) => availability.available(orgId, scope.format),
-    // cloud tools go out with a turn only while the org has office.ai_cloud
-    toolPolicy: () => ({ cloudTools: uniworkCloudEnabled() }),
+    // cloud tools go out with a turn only while the org has office.ai_cloud and the switch is on
+    toolPolicy: () => uniworkToolPolicy(join(app.getPath('userData'), 'ai-settings.json')),
   })
   aiStreams = streams
-  // the provider entry (picker, Settings, selectedProvider) shows only while the
-  // selected org offers UniWork AI for some format; re-read on account and cloud
-  // changes and once per capability TTL
+  // UniWork AI is available only while the selected org offers it for some
+  // format; re-read on account and cloud changes and once per capability TTL
   let generation = 0
   const publishAvailability = () => {
     const run = ++generation
@@ -440,7 +440,7 @@ export function startUniworkAiChat(deps: {
       .then((available) => {
         if (run !== generation) return
         setUniworkAiAvailable(available)
-        // each renderer has its own provider list: tell them when the flag moves
+        // each renderer mirrors the flag: tell them when it moves
         if (available !== lastAiFlag) {
           lastAiFlag = available
           aiFlagListener?.(available)

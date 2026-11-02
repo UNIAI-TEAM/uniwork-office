@@ -129,8 +129,6 @@ export const vi = {
   aiOverloadedError: 'Dịch vụ AI hiện đang bận — vui lòng thử lại sau giây lát',
   aiNetworkError:
     'Sự cố mạng: không thể kết nối tới dịch vụ AI. Kiểm tra kết nối của bạn và thử lại',
-  aiCreditsExhausted:
-    'Tín dụng UniWork của bạn đã hết. Truy cập uniworkos.com/pricing để nạp thêm, rồi thử lại',
   aiSumReadAttachment: 'Đọc tệp đính kèm',
   aiSumImageAttachment: 'Hình ảnh đính kèm {name}',
   aiSumRead: 'Đọc {name}',
@@ -197,7 +195,6 @@ export const vi = {
   aiCmdImages: 'Đã cập nhật {count} hình ảnh',
   aiCmdToc: 'Đã chèn mục lục ({count} mục)',
   aiCmdSkipped: ' (đã bỏ qua {count} khối được bảo vệ)',
-  aiOpenSettingsBtn: 'Mở cài đặt AI',
   aiViewOnlyNotice:
     'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
   aiClarifyTitle: 'Vài câu hỏi trước khi tiếp tục',

@@ -81,22 +81,3 @@ describe('the Home "Open local file" hint', () => {
     expect(home).not.toMatch(/'\.docx \/ \.xlsx/)
   })
 })
-
-/**
- * FD-14 regression guard: only the Open pickers narrow to UniWork Office
- * formats. The My AI chat attachment input stays unrestricted, because images
- * are intended attachments there.
- */
-describe('the My AI chat attachment input', () => {
-  const src = readFileSync(join(__dirname, '../src/renderer/src/NewChatPane.tsx'), 'utf8')
-  const input = src.match(/<input\s[^>]*?ref=\{fileInputRef\}[\s\S]*?onChange/)?.[0] ?? ''
-
-  it('is a multi-file input', () => {
-    expect(input).toMatch(/type="file"/)
-    expect(input).toMatch(/\bmultiple\b/)
-  })
-
-  it('has no accept list, so images (and everything else) can still be attached', () => {
-    expect(input).not.toMatch(/\baccept=/)
-  })
-})

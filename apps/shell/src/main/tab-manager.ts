@@ -107,7 +107,7 @@ export class TabManager {
     { id: HOME_ID, kind: 'home', view: null, title: 'UniWork Office' },
   ]
   private activeId: string = HOME_ID
-  /** Last activated Office editor tab (Home/My AI stays active while user chats). */
+  /** Last activated Office editor tab (Home stays active meanwhile). */
   private lastOfficeId: string | null = null
   private nextId = 1
   /** G8-11: the width the shell renderer draws the Discussion panel at (0 = closed) */
@@ -434,13 +434,13 @@ export class TabManager {
     )
   }
 
-  /** Path of the focused Office tab, or the last Office tab if Home/My AI is active. */
+  /** Path of the focused Office tab, or the last Office tab if Home is active. */
   activeFilePath(): string | undefined {
     return this.activeOfficeTab()?.path
   }
 
   /**
-   * Best Office tab for My AI “continue / summarize this file”.
+   * Best Office tab for “the current file”.
    * Prefers the currently active editor; falls back to the last activated Office tab.
    */
   activeOfficeTab(): {
@@ -484,42 +484,6 @@ export class TabManager {
       }
     }
     return null
-  }
-
-  /** Activate an Office tab and push an AI panel preset (create or continue). */
-  pushAiPresetToOfficeTab(
-    preset: { text: string; autoRun?: boolean; displayText?: string },
-    tabId?: string,
-  ): { ok: boolean; tabId?: string; kind?: TabKind; title?: string; path?: string } {
-    const tab = tabId
-      ? this.tabs.find((t) => t.id === tabId)
-      : (() => {
-          const info = this.activeOfficeTab()
-          return info ? this.tabs.find((t) => t.id === info.id) : undefined
-        })()
-    if (!tab || !this.isOfficeTab(tab) || !tab.view || tab.view.webContents.isDestroyed()) {
-      return { ok: false }
-    }
-    this.activateTab(tab.id)
-    const payload = {
-      text: preset.text,
-      autoRun: preset.autoRun !== false,
-      ...(preset.displayText ? { displayText: preset.displayText } : {}),
-    }
-    if (tab.kind === 'docs') queueDocsAiPreset(tab.view.webContents.id, payload)
-    else if (tab.kind === 'slides') queueSlidesAiPreset(tab.view.webContents.id, payload)
-    else if (tab.kind === 'sheets') queueSheetsAiPreset(tab.view.webContents.id, payload)
-    else if (tab.kind === 'pdf') queuePdfAiPreset(tab.view.webContents.id, payload)
-    if (!tab.view.webContents.isDestroyed()) {
-      tab.view.webContents.send('my-ai:ai-preset', payload)
-    }
-    return {
-      ok: true,
-      tabId: tab.id,
-      kind: tab.kind,
-      title: tab.title,
-      ...(tab.filePath ? { path: tab.filePath } : {}),
-    }
   }
 
   /**

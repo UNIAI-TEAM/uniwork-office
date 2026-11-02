@@ -87,9 +87,6 @@ const README_FENCE_OPTION_OMISSIONS = new Set([
   'track',
   'index',
   'fingerprint',
-  'size',
-  'ref',
-  'model',
   'block',
 ])
 
@@ -115,6 +112,17 @@ describe('cli help/registry/readme/skill sync', () => {
       expect(def.usage.startsWith(def.name), `${def.name} usage must start with its name`).toBe(
         true,
       )
+    }
+  })
+
+  it('has no cloud commands: search, image and media are gone', async () => {
+    const names = defaultRegistry()
+      .list()
+      .map((d) => d.name)
+    for (const gone of ['search', 'image', 'media']) expect(names).not.toContain(gone)
+    const help = norm(await helpFor(['help']))
+    for (const gone of ['search', 'image', 'media']) {
+      expect(help).not.toMatch(new RegExp(`\\bgenoffice ${gone}\\b`))
     }
   })
 

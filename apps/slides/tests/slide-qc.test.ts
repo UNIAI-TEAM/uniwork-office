@@ -9,12 +9,9 @@ import {
   generatedPageRange,
   mergeQcPages,
   createSlideFixSkill,
-  isUnsupportedImageInputError,
   isQcEnabled,
   qcSlidePage,
-  settingsSupportVision,
 } from '../src/renderer/ai/slide-qc'
-import { defaultAiSettings, type AiProviderId, type AiSettings } from '@genoffice/ai-provider'
 import type { DeckAccess } from '../src/renderer/ai/slides-skill'
 
 const access: DeckAccess = {
@@ -86,8 +83,8 @@ describe('createSlideFixSkill', () => {
     expect(r.output).toContain('Canvas 1280×720px')
   })
 
-  it('uses a geometry-only prompt when no screenshot can be sent', () => {
-    const skill = createSlideFixSkill(access, false)
+  it('uses the geometry-only prompt: no screenshot is ever sent', () => {
+    const skill = createSlideFixSkill(access)
     expect(skill.systemPrompt).toContain('NO rendered screenshot is attached')
     expect(skill.systemPrompt).toContain('DO NOT judge or change contrast')
   })
@@ -103,54 +100,7 @@ describe('isQcEnabled', () => {
   })
 })
 
-describe('vision capability fallback', () => {
-  it('sends MiniMax-M3 screenshots while keeping MiniMax-M2.7 text-only', () => {
-    const settings = { ...defaultAiSettings(), provider: 'minimax' as const }
-    settings.providers.minimax.model = 'MiniMax-M3'
-    expect(settingsSupportVision(settings)).toBe(true)
-    settings.providers.minimax.model = 'MiniMax-M2.7'
-    expect(settingsSupportVision(settings)).toBe(false)
-  })
-
-  it('uses the selected model when a provider mixes text and vision models', () => {
-    const withProvider = (provider: AiProviderId) => ({ ...defaultAiSettings(), provider })
-    const deepseek = withProvider('deepseek')
-    expect(settingsSupportVision(deepseek)).toBe(false)
-    deepseek.providers.deepseek.model = 'deep-seek-v4.1-flash'
-    expect(settingsSupportVision(deepseek)).toBe(true)
-    expect(settingsSupportVision(withProvider('glm'))).toBe(false)
-    expect(settingsSupportVision(withProvider('gemini'))).toBe(true)
-  })
-
-  it('does not send screenshots to text-only models under a vision-capable provider', () => {
-    const settings = defaultAiSettings()
-    settings.providers.genspark.model = 'deep-seek-v4-flash'
-    expect(settingsSupportVision(settings)).toBe(false)
-    settings.providers.genspark.model = 'claude-opus-4-7'
-    expect(settingsSupportVision(settings)).toBe(true)
-  })
-
-  it('decides from the model main will use: the source chosen model before the slot', () => {
-    // the slot holds a vision-capable model; the source names a text-only one
-    const settings: AiSettings = { ...defaultAiSettings(), provider: 'anthropic' }
-    settings.providers.anthropic.model = 'claude-opus-4-7'
-    settings.modelSources = { anthropic: { chosen: 'deep-seek-v4-flash' } }
-    expect(settingsSupportVision(settings)).toBe(false)
-    // and the other way round: a text-only slot, a vision-capable source model
-    settings.providers.anthropic.model = 'deep-seek-v4-flash'
-    settings.modelSources = { anthropic: { chosen: 'claude-opus-4-7' } }
-    expect(settingsSupportVision(settings)).toBe(true)
-    // a source without a chosen model falls back to the slot
-    settings.modelSources = { anthropic: { chosen: '' } }
-    expect(settingsSupportVision(settings)).toBe(false)
-  })
-
-  it('recognizes image-capability errors from optimistic custom endpoints', () => {
-    expect(isUnsupportedImageInputError('This model does not support image')).toBe(true)
-    expect(isUnsupportedImageInputError('Vision input is not supported by this model')).toBe(true)
-    expect(isUnsupportedImageInputError('HTTP 500: temporary provider failure')).toBe(false)
-  })
-
+describe('geometry-only QC (UniWork AI takes no screenshot in a QC turn)', () => {
   it('skips the model entirely when a geometry-only page passes the deterministic audit', async () => {
     let streamed = false
     const transport: AgentTransport = {
@@ -174,7 +124,6 @@ describe('vision capability fallback', () => {
       access: one,
       transport,
       pageIndex: 0,
-      screenshot: null,
     })
     expect(result).toMatchObject({ ok: true, edited: false, reply: 'OK' })
     expect(streamed).toBe(false)
@@ -213,7 +162,6 @@ describe('vision capability fallback', () => {
       access: one,
       transport,
       pageIndex: 0,
-      screenshot: null,
     })
     expect(result.error).toBeUndefined()
     const message = request?.messages[0]

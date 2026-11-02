@@ -60,8 +60,6 @@ export const ar = {
   aiOverloadedError: 'خدمة الذكاء الاصطناعي مشغولة حاليًا — يرجى المحاولة مرة أخرى بعد قليل',
   aiNetworkError:
     'مشكلة في الشبكة: تعذّر الوصول إلى خدمة الذكاء الاصطناعي. تحقق من الاتصال وحاول مجددًا',
-  aiCreditsExhausted:
-    'نفدت أرصدة UniWork لديك. يرجى إعادة الشحن عبر uniworkos.com/pricing ثم المحاولة مجددًا',
   aiToolWorkbookContext: 'قراءة معلومات المصنف',
   aiToolReadRange: 'قراءة النطاق',
   aiToolReadRangeOf: 'قراءة النطاق {range}',

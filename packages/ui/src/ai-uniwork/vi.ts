@@ -5,8 +5,8 @@ export const vi = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'Còn {remaining} trên {limit} tín dụng',
   aiUniworkFooterSignIn: 'Đăng nhập UniWork để dùng UniWork AI',
-  aiUniworkSignedOut: 'Phiên UniWork đã đăng xuất. Chọn nhà cung cấp khác hoặc đăng nhập lại.',
-  aiUniworkOff: 'UniWork AI đang tắt cho tài liệu này. Chọn nhà cung cấp khác.',
+  aiUniworkSignedOut: 'Phiên UniWork đã đăng xuất. Hãy đăng nhập lại.',
+  aiUniworkOff: 'UniWork AI đang tắt cho tài liệu này.',
   aiUniworkViewOnly: 'Chế độ chỉ xem: AI trả lời được nhưng không sửa hoặc lưu tài liệu.',
 
   // S8 disclosure
@@ -36,7 +36,6 @@ export const vi = {
   aiRunStopped: 'Đã dừng. Thay đổi đã áp dụng (nếu có) vẫn trong tài liệu và hoàn tác được.',
   aiRunRetry: 'Thử lại',
   aiRunAskAgain: 'Hỏi tiếp',
-  aiRunChooseOther: 'Chọn nhà cung cấp khác',
   aiRunOpenInApp: 'Mở bằng ứng dụng',
   aiConversationRestarted:
     'Cuộc trò chuyện trước đã hết hạn nên UniWork AI bắt đầu cuộc mới và không còn nhớ các lượt trước. Gửi lại câu hỏi để tiếp tục.',
@@ -77,7 +76,7 @@ export const vi = {
   cloudCreditsLeft: 'Còn {remaining} / {limit}',
   cloudCreditsUnlimited: 'Không giới hạn',
   cloudInactiveBody:
-    'Gói đăng ký UniWork của tổ chức bạn không hoạt động nên AI đám mây đang tạm dừng. Hãy nhờ quản trị viên gia hạn; nhà cung cấp riêng bên dưới vẫn hoạt động.',
+    'Gói đăng ký UniWork của tổ chức bạn không hoạt động nên AI đám mây đang tạm dừng. Hãy nhờ quản trị viên gia hạn.',
   acctSignIn: 'Đăng nhập',
   acctSignInAgain: 'Đăng nhập lại',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -90,7 +89,7 @@ export const vi = {
     'Bảng tính này quá lớn để AI xử lý trên web. Mở bằng ứng dụng UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    'Gói của tổ chức bạn chưa bao gồm UniWork AI. Hãy liên hệ quản trị viên tổ chức về gói, hoặc thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI.',
+    'Gói của tổ chức bạn chưa bao gồm UniWork AI. Hãy liên hệ quản trị viên tổ chức về gói.',
   credits_exhausted:
-    'Tổ chức của bạn đã dùng hết tín dụng AI trong kỳ này. Hãy nhờ quản trị viên tổ chức bổ sung, hoặc thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI.',
+    'Tổ chức của bạn đã dùng hết tín dụng AI trong kỳ này. Hãy nhờ quản trị viên tổ chức bổ sung.',
 } satisfies Record<keyof typeof zh, string>

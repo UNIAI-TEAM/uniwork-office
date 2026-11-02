@@ -125,7 +125,7 @@ function KindIcon({ kind }: { kind: AskUniCitationKind }): ReactElement {
 }
 
 /**
- * Ask UNI: the workspace-level question mode of the Home My AI pane. One conversation per
+ * Ask UNI: the workspace-level question pane of Home. One conversation per
  * session (the id from the server is kept across turns, New chat drops it); the answer renders
  * as safe Markdown with a Sources list under it. The Home keeps the pane mounted while the chat
  * mode is on (`visible` false), so the turns, conversation and draft survive the switch.

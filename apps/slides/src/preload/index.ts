@@ -155,14 +155,8 @@ const api: SlidesApi = {
   openPptxPath: (path, fitWidthPx) => ipcRenderer.invoke('slides:open-path', path, fitWidthPx),
   consumePendingOpen: (fitWidthPx) => ipcRenderer.invoke('slides:consume-pending-open', fitWidthPx),
   consumeAiPreset: () => ipcRenderer.invoke('slides:consume-ai-preset'),
-  onAiPreset: (handler) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      preset: { text: string; autoRun?: boolean; displayText?: string },
-    ) => handler(preset)
-    ipcRenderer.on('my-ai:ai-preset', listener)
-    return () => ipcRenderer.removeListener('my-ai:ai-preset', listener)
-  },
+  // the shell no longer pushes presets into a running editor (My AI is gone); only a web host does
+  onAiPreset: () => () => {},
   consumeHeadlessExport: () => ipcRenderer.invoke('slides:consume-headless-export'),
   headlessExportDone: (result: { ok: boolean; error?: string }) =>
     ipcRenderer.send('slides:headless-export-done', result),
@@ -425,7 +419,7 @@ const api: SlidesApi = {
     return () => ipcRenderer.removeListener('slides:renamed', listener)
   },
   getAiSettings: () => ipcRenderer.invoke('ai:get-settings'),
-  setAiSettings: (settings, options) => ipcRenderer.invoke('ai:set-settings', settings, options),
+  setAiSettings: (settings) => ipcRenderer.invoke('ai:set-settings', settings),
   onAiSettingsChanged: (handler: () => void) => {
     const listener = () => handler()
     ipcRenderer.on('ai:settings-changed', listener)
@@ -467,7 +461,6 @@ const api: SlidesApi = {
     referenceImageUrls?: string[]
     aspectRatio?: string
     imageSize?: string
-    transparentBackground?: boolean
   }) => ipcRenderer.invoke('ai:generate-image', op),
   analyzeMedia: (op: { mediaUrls: string[]; requirements: string }) =>
     ipcRenderer.invoke('ai:analyze-media', op),
@@ -476,8 +469,6 @@ const api: SlidesApi = {
     ipcRenderer.on('ai:stream-chunk', listener)
     return () => ipcRenderer.removeListener('ai:stream-chunk', listener)
   },
-  saveStyleSidecar: (data: { topic: string; styleSkill: string; createdAt: string }) =>
-    ipcRenderer.invoke('ai:save-sidecar', data),
   saveStyleTemplate: (
     name: string,
     data: { topic: string; styleSkill: string; createdAt: string; layout?: unknown },
@@ -538,7 +529,7 @@ installDropOpenBridge()
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
 installUniworkCommentsBridge()
 installAiRunBridge()
-// window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's provider list mirrors it)
+// window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's availability flag mirrors it)
 installUniworkAiFlagBridge()
 installUniworkCloudStatusBridge()
 // window.uniworkAskUniDoc: Ask UNI about the open document (main derives the document from this tab)

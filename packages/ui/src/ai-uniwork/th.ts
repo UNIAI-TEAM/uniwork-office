@@ -5,8 +5,8 @@ export const th = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'เครดิตคงเหลือ {remaining} จาก {limit}',
   aiUniworkFooterSignIn: 'ลงชื่อเข้าใช้ UniWork เพื่อใช้ UniWork AI',
-  aiUniworkSignedOut: 'คุณออกจากระบบ UniWork แล้ว เลือกผู้ให้บริการอื่นหรือลงชื่อเข้าใช้อีกครั้ง',
-  aiUniworkOff: 'UniWork AI ปิดอยู่สำหรับเอกสารนี้ เลือกผู้ให้บริการอื่น',
+  aiUniworkSignedOut: 'คุณออกจากระบบ UniWork แล้ว ลงชื่อเข้าใช้อีกครั้ง',
+  aiUniworkOff: 'UniWork AI ปิดอยู่สำหรับเอกสารนี้',
   aiUniworkViewOnly: 'ดูอย่างเดียว: AI ตอบได้แต่แก้ไขหรือบันทึกเอกสารไม่ได้',
 
   // S8 disclosure
@@ -36,7 +36,6 @@ export const th = {
   aiRunStopped: 'หยุดแล้ว การเปลี่ยนแปลงที่นำไปใช้แล้ว (ถ้ามี) ยังอยู่ในเอกสารและเลิกทำได้',
   aiRunRetry: 'ลองอีกครั้ง',
   aiRunAskAgain: 'ถามต่อ',
-  aiRunChooseOther: 'เลือกผู้ให้บริการอื่น',
   aiRunOpenInApp: 'เปิดในแอป',
   aiConversationRestarted:
     'การสนทนาก่อนหน้าหมดอายุ UniWork AI จึงเริ่มการสนทนาใหม่และจำข้อความก่อนหน้าไม่ได้แล้ว ส่งคำถามอีกครั้งเพื่อดำเนินการต่อ',
@@ -75,7 +74,7 @@ export const th = {
   cloudCreditsLeft: 'เหลือ {remaining} / {limit}',
   cloudCreditsUnlimited: 'ไม่จำกัด',
   cloudInactiveBody:
-    'การสมัครสมาชิก UniWork ขององค์กรไม่ได้ใช้งานอยู่ AI บนคลาวด์จึงหยุดชั่วคราว โปรดให้ผู้ดูแลต่ออายุ ผู้ให้บริการของคุณเองด้านล่างยังใช้งานได้ตามปกติ',
+    'การสมัครสมาชิก UniWork ขององค์กรไม่ได้ใช้งานอยู่ AI บนคลาวด์จึงหยุดชั่วคราว โปรดให้ผู้ดูแลต่ออายุ',
   acctSignIn: 'เข้าสู่ระบบ',
   acctSignInAgain: 'เข้าสู่ระบบอีกครั้ง',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -86,8 +85,6 @@ export const th = {
   aiResultCellsMetaNoOverwrite: 'เซลล์ที่เขียน: {written} ({range})',
   aiErrWorkbookTooLarge: 'เวิร์กบุ๊กนี้ใหญ่เกินไปสำหรับ AI บนเว็บ เปิดในแอป UniWork Office',
   // S7 composer notice keys (not_entitled, credits_exhausted)
-  not_entitled:
-    'แผนขององค์กรคุณไม่รวม UniWork AI โปรดสอบถามผู้ดูแลองค์กรเกี่ยวกับแผน หรือเพิ่มคีย์ AI ของคุณเองใน การตั้งค่า > โมเดล AI',
-  credits_exhausted:
-    'องค์กรของคุณใช้เครดิต AI ของรอบนี้หมดแล้ว โปรดให้ผู้ดูแลองค์กรเติมเครดิต หรือเพิ่มคีย์ AI ของคุณเองใน การตั้งค่า > โมเดล AI',
+  not_entitled: 'แผนขององค์กรคุณไม่รวม UniWork AI โปรดสอบถามผู้ดูแลองค์กรเกี่ยวกับแผน',
+  credits_exhausted: 'องค์กรของคุณใช้เครดิต AI ของรอบนี้หมดแล้ว โปรดให้ผู้ดูแลองค์กรเติมเครดิต',
 } satisfies Record<keyof typeof zh, string>

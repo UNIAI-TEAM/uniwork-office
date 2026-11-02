@@ -5,9 +5,8 @@ export const fr = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'Crédits restants : {remaining} sur {limit}',
   aiUniworkFooterSignIn: 'Connectez-vous à UniWork pour utiliser UniWork AI',
-  aiUniworkSignedOut:
-    'Vous êtes déconnecté d’UniWork. Choisissez un autre fournisseur ou reconnectez-vous.',
-  aiUniworkOff: 'UniWork AI est désactivé pour ce document. Choisissez un autre fournisseur.',
+  aiUniworkSignedOut: 'Vous êtes déconnecté d’UniWork. Reconnectez-vous.',
+  aiUniworkOff: 'UniWork AI est désactivé pour ce document.',
   aiUniworkViewOnly:
     'Lecture seule : l’IA peut répondre mais ne peut ni modifier ni enregistrer le document.',
 
@@ -40,7 +39,6 @@ export const fr = {
     'Arrêté. Les modifications déjà appliquées restent dans le document et peuvent être annulées.',
   aiRunRetry: 'Réessayer',
   aiRunAskAgain: 'Redemander',
-  aiRunChooseOther: 'Choisir un autre fournisseur',
   aiRunOpenInApp: 'Ouvrir dans l’application',
   aiConversationRestarted:
     'La conversation précédente a expiré : UniWork AI en a commencé une nouvelle et ne se souvient plus des échanges précédents. Renvoyez votre question pour continuer.',
@@ -88,7 +86,7 @@ export const fr = {
   cloudCreditsLeft: '{remaining} / {limit} restants',
   cloudCreditsUnlimited: 'Illimité',
   cloudInactiveBody:
-    'L’abonnement UniWork de votre organisation n’est pas actif : l’IA cloud est suspendue. Demandez à un administrateur de le renouveler ; vos propres fournisseurs ci-dessous continuent de fonctionner.',
+    'L’abonnement UniWork de votre organisation n’est pas actif : l’IA cloud est suspendue. Demandez à un administrateur de le renouveler.',
   acctSignIn: 'Se connecter',
   acctSignInAgain: 'Se reconnecter',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -102,7 +100,7 @@ export const fr = {
     'Ce classeur est trop volumineux pour l’IA sur le web. Ouvrez-le dans l’application UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    'L’offre de votre organisation n’inclut pas UniWork AI. Renseignez-vous auprès d’un administrateur de l’organisation ou ajoutez votre propre clé IA dans Paramètres > Modèle IA.',
+    'L’offre de votre organisation n’inclut pas UniWork AI. Renseignez-vous auprès d’un administrateur de l’organisation.',
   credits_exhausted:
-    'Votre organisation a utilisé tous ses crédits IA pour cette période. Demandez à un administrateur de l’organisation d’ajouter des crédits ou ajoutez votre propre clé IA dans Paramètres > Modèle IA.',
+    'Votre organisation a utilisé tous ses crédits IA pour cette période. Demandez à un administrateur de l’organisation d’ajouter des crédits.',
 } satisfies Record<keyof typeof zh, string>

@@ -46,7 +46,6 @@ import {
   dialog,
   ipcMain,
   nativeImage,
-  net,
   session,
   shell,
   webContents,
@@ -105,53 +104,18 @@ import { parseFileToText } from '@genoffice/file-parse'
 import { convertHtmlToDocx } from '../../../../packages/html2docx/src'
 import { ElectronBrowserDriver } from '../../../../packages/html2docx/src/drivers/electron'
 import {
-  aiChatFailure,
-  aiChatFailureFromError,
-  aiStreamErrorFields,
-  AI_PROVIDERS,
-  chatForProvider,
+  aiSettingsFileOf,
   defaultAiSettings,
-  probeOpenRouterKey,
-  testMediaProvider,
-  type AiMediaProviderConfig,
-  type AiMediaProviderId,
-  type AiSearchProviderId,
   refreshUniworkCloudStatus,
-  resolveAiSettings,
-  selectedProvider,
   uniworkAiAvailable,
-  maxOutputTokensOf,
-  sanitizeAiSettings,
-  sanitizeCliPath,
-  aiNoticeBody,
-  aiTestFailure,
-  testChatConnection,
-  noModelMessage,
-  setAiUserAgent,
-  setRescueFetch,
-  streamForProvider,
-  withUniAiOpenRouterAuth,
-  type AiChatFailure,
-  type AiChatRequest,
-  type AiChatResponse,
-  type AiModelSource,
-  type AiProviderConfig,
-  type AiProviderId,
   type AiSettings,
   type AiStreamChunk,
   type AiStreamRequest,
-  type AiTestFailureKind,
-  type AiTestResult,
   type GenSparkAccountStatus,
-  type LegacyAiSettings,
 } from '@genoffice/ai-provider'
-import { listCodexModels, shutdownCodexAppServers } from '@genoffice/ai-provider/codex-app-server'
-import { isProviderUsable } from '@genoffice/ai-provider/browser'
-import { listCustomModelsForIpc } from '@genoffice/ai-provider/custom-models'
-import { ProviderModelCache } from '@genoffice/ai-provider/provider-models'
+import { saveAiSettingsFile, scrubAiSettingsFile } from '@genoffice/ai-provider/settings-file'
 import {
   generateImageTool,
-  testSearchProvider,
   gskLoginInfo,
   hasGskAuth,
   webSearchTool,
@@ -281,9 +245,6 @@ const tMain = createI18n({
     errParseFailed: '文件解析失败',
     errImageNoText: '图片附件不提供文本,已作为图像随用户消息发送,直接看图即可',
     errNotImage: '不是支持的图片类型',
-    errNoApiKey: '未配置 {provider} 的 API Key',
-    errAiBusy: 'AI 服务当前繁忙，请稍后重试',
-    errNoModel: '未配置模型名称',
     menuFile: '文件',
     menuNewDoc: '新建文档',
     menuNewWindow: '新建窗口',
@@ -376,8 +337,7 @@ const tMain = createI18n({
     menuDocsHelp: 'UniWork Docs 帮助',
     errSaveOriginalFormat: '请另存为 .{ext} 文件。此应用无法按原文件的格式保存。',
   },
-  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no AI model set up yet); the other locales keep
-  // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
+  // en and vi are ours (UniWork wording); the other locales keep upstream's wording.
   en: {
     dlgOpenDoc: 'Open Document',
     filterWord: 'Word Documents',
@@ -416,10 +376,6 @@ const tMain = createI18n({
     errParseFailed: 'Failed to parse file',
     errImageNoText: 'Image attachments have no text; the image is sent along with the user message',
     errNotImage: 'not a supported image type',
-    errNoApiKey:
-      'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.',
-    errAiBusy: 'The AI service is busy right now — please try again in a moment',
-    errNoModel: 'No model name configured',
     menuFile: 'File',
     menuNewDoc: 'New Document',
     menuNewWindow: 'New Window',
@@ -552,10 +508,6 @@ const tMain = createI18n({
     errImageNoText:
       'Tệp đính kèm hình ảnh không có văn bản; hình ảnh được gửi cùng với tin nhắn của người dùng',
     errNotImage: 'loại hình ảnh không được hỗ trợ',
-    errNoApiKey:
-      'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.',
-    errAiBusy: 'Dịch vụ AI hiện đang bận — vui lòng thử lại sau giây lát',
-    errNoModel: 'Chưa cấu hình tên mô hình',
     menuFile: 'Tệp',
     menuNewDoc: 'Tài liệu mới',
     menuNewWindow: 'Cửa sổ mới',
@@ -687,9 +639,6 @@ const tMain = createI18n({
     errImageNoText:
       '画像の添付ファイルはテキストを提供しません。画像としてユーザーメッセージと一緒に送信されるため、そのまま画像をご確認ください',
     errNotImage: 'サポートされていない画像形式です',
-    errNoApiKey: '{provider} の API キーが設定されていません',
-    errAiBusy: 'AI サービスが混み合っています。しばらくしてからもう一度お試しください',
-    errNoModel: 'モデル名が設定されていません',
     menuFile: 'ファイル',
     menuNewDoc: '新規文書',
     menuNewWindow: '新規ウィンドウ',
@@ -822,9 +771,6 @@ const tMain = createI18n({
     errImageNoText:
       '이미지 첨부 파일은 텍스트를 제공하지 않으며, 이미지 형태로 사용자 메시지와 함께 전송되므로 이미지를 직접 확인하면 됩니다',
     errNotImage: '지원되지 않는 이미지 형식입니다',
-    errNoApiKey: '{provider}의 API 키가 설정되지 않았습니다',
-    errAiBusy: 'AI 서비스가 혼잡합니다. 잠시 후 다시 시도해 주세요',
-    errNoModel: '모델 이름이 설정되지 않았습니다',
     menuFile: '파일',
     menuNewDoc: '새 문서',
     menuNewWindow: '새 창',
@@ -958,9 +904,6 @@ const tMain = createI18n({
     errImageNoText:
       "Les pièces jointes image ne fournissent pas de texte ; l'image est envoyée avec le message de l'utilisateur, consultez-la directement",
     errNotImage: "type d'image non pris en charge",
-    errNoApiKey: 'Aucune clé API configurée pour {provider}',
-    errAiBusy: "Le service d'IA est actuellement surchargé — réessayez dans un instant",
-    errNoModel: 'Aucun nom de modèle configuré',
     menuFile: 'Fichier',
     menuNewDoc: 'Nouveau document',
     menuNewWindow: 'Nouvelle fenêtre',
@@ -1094,9 +1037,6 @@ const tMain = createI18n({
     errImageNoText:
       'Bildanlagen liefern keinen Text; das Bild wird mit der Benutzernachricht gesendet und kann direkt betrachtet werden',
     errNotImage: 'kein unterstütztes Bildformat',
-    errNoApiKey: 'Kein API-Schlüssel für {provider} konfiguriert',
-    errAiBusy: 'Der KI-Dienst ist derzeit überlastet — bitte gleich erneut versuchen',
-    errNoModel: 'Kein Modellname konfiguriert',
     menuFile: 'Datei',
     menuNewDoc: 'Neues Dokument',
     menuNewWindow: 'Neues Fenster',
@@ -1229,10 +1169,6 @@ const tMain = createI18n({
     errImageNoText:
       'Las imágenes adjuntas no proporcionan texto; la imagen se envía junto con el mensaje del usuario, puedes verla directamente',
     errNotImage: 'no es un tipo de imagen compatible',
-    errNoApiKey: 'No hay clave de API configurada para {provider}',
-    errAiBusy:
-      'El servicio de IA está saturado en este momento; inténtalo de nuevo en unos instantes',
-    errNoModel: 'No se ha configurado el nombre del modelo',
     menuFile: 'Archivo',
     menuNewDoc: 'Nuevo documento',
     menuNewWindow: 'Nueva ventana',
@@ -1364,9 +1300,6 @@ const tMain = createI18n({
     errImageNoText:
       'สิ่งที่แนบเป็นรูปภาพไม่มีข้อความ รูปจะถูกส่งไปพร้อมข้อความของผู้ใช้ ดูรูปได้โดยตรง',
     errNotImage: 'ไม่ใช่ชนิดรูปภาพที่รองรับ',
-    errNoApiKey: 'ยังไม่ได้ตั้งค่า API Key ของ {provider}',
-    errAiBusy: 'บริการ AI มีผู้ใช้งานจำนวนมากในขณะนี้ โปรดลองอีกครั้งในอีกสักครู่',
-    errNoModel: 'ยังไม่ได้ตั้งค่าชื่อโมเดล',
     menuFile: 'ไฟล์',
     menuNewDoc: 'เอกสารใหม่',
     menuNewWindow: 'หน้าต่างใหม่',
@@ -1499,9 +1432,6 @@ const tMain = createI18n({
     errImageNoText:
       'Lampiran gambar tidak menyediakan teks; gambar dikirim bersama pesan pengguna dan dapat dilihat langsung',
     errNotImage: 'bukan jenis gambar yang didukung',
-    errNoApiKey: 'API Key untuk {provider} belum dikonfigurasi',
-    errAiBusy: 'Layanan AI sedang sibuk — silakan coba lagi sebentar lagi',
-    errNoModel: 'Nama model belum dikonfigurasi',
     menuFile: 'File',
     menuNewDoc: 'Dokumen Baru',
     menuNewWindow: 'Jendela Baru',
@@ -1634,9 +1564,6 @@ const tMain = createI18n({
     errImageNoText:
       'Вложенные изображения не содержат текста; изображение отправляется вместе с сообщением пользователя, смотрите его напрямую',
     errNotImage: 'неподдерживаемый тип изображения',
-    errNoApiKey: 'API-ключ для {provider} не настроен',
-    errAiBusy: 'Сервис ИИ сейчас перегружен — повторите попытку чуть позже',
-    errNoModel: 'Не указано имя модели',
     menuFile: 'Файл',
     menuNewDoc: 'Создать документ',
     menuNewWindow: 'Новое окно',
@@ -1769,9 +1696,6 @@ const tMain = createI18n({
     errImageNoText:
       'مرفقات الصور لا توفر نصًا؛ تُرسل الصورة مع رسالة المستخدم ويمكن الاطلاع عليها مباشرة',
     errNotImage: 'ليس نوع صورة مدعومًا',
-    errNoApiKey: 'لم يتم تكوين مفتاح API لـ {provider}',
-    errAiBusy: 'خدمة الذكاء الاصطناعي مشغولة حاليًا — يرجى المحاولة مرة أخرى بعد قليل',
-    errNoModel: 'لم يتم تكوين اسم النموذج',
     menuFile: 'ملف',
     menuNewDoc: 'مستند جديد',
     menuNewWindow: 'نافذة جديدة',
@@ -1903,9 +1827,6 @@ const tMain = createI18n({
     errImageNoText:
       'Anexos de imagem não fornecem texto; a imagem é enviada junto com a mensagem do usuário, basta vê-la diretamente',
     errNotImage: 'não é um tipo de imagem suportado',
-    errNoApiKey: 'Nenhuma chave de API configurada para {provider}',
-    errAiBusy: 'O serviço de IA está sobrecarregado no momento — tente novamente em instantes',
-    errNoModel: 'Nenhum nome de modelo configurado',
     menuFile: 'Arquivo',
     menuNewDoc: 'Novo Documento',
     menuNewWindow: 'Nova Janela',
@@ -2038,9 +1959,6 @@ const tMain = createI18n({
     errImageNoText:
       "Gli allegati immagine non forniscono testo; l'immagine viene inviata insieme al messaggio dell'utente, basta guardarla direttamente",
     errNotImage: 'tipo di immagine non supportato',
-    errNoApiKey: 'Nessuna chiave API configurata per {provider}',
-    errAiBusy: 'Il servizio IA è momentaneamente sovraccarico — riprova tra poco',
-    errNoModel: 'Nessun nome di modello configurato',
     menuFile: 'File',
     menuNewDoc: 'Nuovo documento',
     menuNewWindow: 'Nuova finestra',
@@ -2173,9 +2091,6 @@ const tMain = createI18n({
     errImageNoText:
       'Załączniki graficzne nie zawierają tekstu; obraz jest wysyłany razem z wiadomością użytkownika, wystarczy na niego spojrzeć',
     errNotImage: 'nieobsługiwany typ obrazu',
-    errNoApiKey: 'Nie skonfigurowano klucza API dla {provider}',
-    errAiBusy: 'Usługa AI jest obecnie przeciążona — spróbuj ponownie za chwilę',
-    errNoModel: 'Nie skonfigurowano nazwy modelu',
     menuFile: 'Plik',
     menuNewDoc: 'Nowy dokument',
     menuNewWindow: 'Nowe okno',
@@ -2308,9 +2223,6 @@ const tMain = createI18n({
     errImageNoText:
       'Obrázkové přílohy neobsahují text; obrázek se odesílá spolu se zprávou uživatele',
     errNotImage: 'nepodporovaný typ obrázku',
-    errNoApiKey: 'Pro {provider} není nakonfigurován žádný klíč API',
-    errAiBusy: 'Služba AI je právě zaneprázdněna — zkuste to prosím za chvíli znovu',
-    errNoModel: 'Není nakonfigurován název modelu',
     menuFile: 'Soubor',
     menuNewDoc: 'Nový dokument',
     menuNewWindow: 'Nové okno',
@@ -2443,9 +2355,6 @@ const tMain = createI18n({
     errImageNoText:
       'Afbeeldingsbijlagen bevatten geen tekst; de afbeelding wordt samen met het gebruikersbericht verzonden en kan direct worden bekeken',
     errNotImage: 'geen ondersteund afbeeldingstype',
-    errNoApiKey: 'Geen API-sleutel geconfigureerd voor {provider}',
-    errAiBusy: 'De AI-service is momenteel overbelast — probeer het zo opnieuw',
-    errNoModel: 'Geen modelnaam geconfigureerd',
     menuFile: 'Bestand',
     menuNewDoc: 'Nieuw document',
     menuNewWindow: 'Nieuw venster',
@@ -2578,9 +2487,6 @@ const tMain = createI18n({
     errImageNoText:
       'Lampiran imej tidak menyediakan teks; imej dihantar bersama mesej pengguna dan boleh dilihat terus',
     errNotImage: 'bukan jenis imej yang disokong',
-    errNoApiKey: 'Kunci API untuk {provider} belum dikonfigurasikan',
-    errAiBusy: 'Perkhidmatan AI sedang sibuk — sila cuba lagi sebentar lagi',
-    errNoModel: 'Nama model belum dikonfigurasikan',
     menuFile: 'Fail',
     menuNewDoc: 'Dokumen Baharu',
     menuNewWindow: 'Tetingkap Baharu',
@@ -2712,9 +2618,6 @@ const tMain = createI18n({
     errImageNoText:
       'קבצים מצורפים מסוג תמונה אינם מספקים טקסט; התמונה נשלחת יחד עם הודעת המשתמש וניתן לצפות בה ישירות',
     errNotImage: 'סוג תמונה שאינו נתמך',
-    errNoApiKey: 'לא הוגדר מפתח API עבור {provider}',
-    errAiBusy: 'שירות ה-AI עמוס כרגע — נסו שוב בעוד רגע',
-    errNoModel: 'לא הוגדר שם מודל',
     menuFile: 'קובץ',
     menuNewDoc: 'מסמך חדש',
     menuNewWindow: 'חלון חדש',
@@ -2846,9 +2749,6 @@ const tMain = createI18n({
     errImageNoText:
       'छवि अनुलग्नक टेक्स्ट प्रदान नहीं करते; छवि उपयोगकर्ता संदेश के साथ भेजी जाती है, उसे सीधे देखें',
     errNotImage: 'समर्थित छवि प्रकार नहीं है',
-    errNoApiKey: '{provider} के लिए कोई API कुंजी कॉन्फ़िगर नहीं है',
-    errAiBusy: 'AI सेवा अभी व्यस्त है — कृपया थोड़ी देर बाद फिर से प्रयास करें',
-    errNoModel: 'कोई मॉडल नाम कॉन्फ़िगर नहीं है',
     menuFile: 'फ़ाइल',
     menuNewDoc: 'नया दस्तावेज़',
     menuNewWindow: 'नई विंडो',
@@ -2979,9 +2879,6 @@ const tMain = createI18n({
     errParseFailed: '檔案解析失敗',
     errImageNoText: '圖片附件不提供文字,已作為影像隨使用者訊息傳送,直接看圖即可',
     errNotImage: '不是支援的圖片類型',
-    errNoApiKey: '未設定 {provider} 的 API Key',
-    errAiBusy: 'AI 服務目前繁忙，請稍後重試',
-    errNoModel: '未設定模型名稱',
     menuFile: '檔案',
     menuNewDoc: '新增文件',
     menuNewWindow: '新增視窗',
@@ -3983,56 +3880,6 @@ export function setUniworkAiHost(host: UniworkAiHost | null): void {
   uniworkAiHost = host
 }
 
-/**
- * Whether the active UniWork account chose "UniWork AI" as its provider. The shell backs it with
- * the per-account store (key `uniwork.ai.uniwork-choice`); ai-settings.json only ever holds the
- * BYOK provider, so a pick of `uniwork` is routed here and the file keeps the previous BYOK one.
- */
-export interface UniworkAiChoiceStore {
-  read(): boolean
-  write(on: boolean): void
-}
-
-let uniworkAiChoiceStore: UniworkAiChoiceStore | null = null
-export function setUniworkAiChoiceStore(store: UniworkAiChoiceStore | null): void {
-  uniworkAiChoiceStore = store
-}
-
-/**
- * Whether a webContents is an editor tab (the same tab lookup the UniWork AI scope resolver uses).
- * Only editor panels run UniWork AI; My AI, email, one-click actions and the settings test read
- * the file's BYOK/UniAI provider. Unset (this module on its own): no sender gets the pick.
- */
-let uniworkAiEditorSender: ((senderId: number) => boolean) | null = null
-export function setUniworkAiEditorSender(isEditor: ((senderId: number) => boolean) | null): void {
-  uniworkAiEditorSender = isEditor
-}
-
-function isUniworkAiEditor(event: unknown): boolean {
-  const id = (event as { sender?: { id?: unknown } } | null)?.sender?.id
-  return typeof id === 'number' && uniworkAiEditorSender?.(id) === true
-}
-
-/**
- * The home Settings window reads (and saves) the account pick too, so its AI pane shows what an
- * editor tab uses. Everything else on the home window (My AI, email, one-click) keeps the file
- * provider: it never passes this option.
- */
-function wantsUniworkPick(options: unknown): boolean {
-  return (
-    (options as { includeUniworkPick?: unknown } | null | undefined)?.includeUniworkPick === true
-  )
-}
-
-/** the non-`uniwork` provider ai-settings.json holds for ai:set-settings (normal saves put the `uniwork` pick in the account store; a hand-edited `uniwork` in the file stays `uniwork` on read per no-silent-fallback, while writes keep a non-`uniwork` slot in the file) */
-function fileAiProvider(): AiProviderId {
-  const provider = resolveAiSettings(
-    readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {}),
-    defaultAiSettings(),
-  ).provider
-  return provider === 'uniwork' ? defaultAiSettings().provider : provider
-}
-
 /** every renderer (tabs, home) re-reads ai-settings.json — the composer chip and
  *  the settings page edit the same file from different windows */
 function broadcastAiSettingsChanged(): void {
@@ -4040,49 +3887,22 @@ function broadcastAiSettingsChanged(): void {
     if (!wc.isDestroyed()) wc.send('ai:settings-changed')
 }
 
-/** live `/models` per provider for the model chip, listed in the background (10 min TTL) */
-const providerModelCache = new ProviderModelCache()
-
 /**
- * Per provider that can send: the model chosen in the Settings pane (this file) and the provider's
- * live list. The list never blocks the read: a first call answers `loading` and starts the
- * listing, which announces itself through `ai:settings-changed` when it lands.
- */
-function modelSourcesOf(settings: AiSettings): Partial<Record<AiProviderId, AiModelSource>> {
-  const sources: Partial<Record<AiProviderId, AiModelSource>> = {}
-  for (const meta of AI_PROVIDERS) {
-    const id = meta.id
-    // UniWork AI has no model to choose; its row text is `uniworkModel`
-    if (id === 'uniwork' || !isProviderUsable(settings, id)) continue
-    const config = withUniAiOpenRouterAuth(settings, id, settings.providers[id])
-    sources[id] = {
-      chosen: (settings.providers[id]?.model ?? '').trim(),
-      ...providerModelCache.read(id, config, broadcastAiSettingsChanged),
-    }
-  }
-  return sources
-}
-
-/**
- * AI settings + chat/stream proxy handlers. Split out so the shell can
+ * AI settings + stream proxy handlers. Split out so the shell can
  * register them exactly once for all window types (docs, sheets, home) —
  * sheets' standalone AI handlers use the same channel names.
+ * UniWork AI is the only provider: ai-settings.json holds `gskToolsEnabled` and nothing else.
  */
 export function registerAiIpc(): void {
-  app.once('before-quit', shutdownCodexAppServers)
-  ipcMain.handle('ai:get-settings', async (event, options?: unknown): Promise<AiSettings> => {
-    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
-    const settings = resolveAiSettings(stored, defaultAiSettings())
-    // derived, never saved: what the model chip shows besides the catalog
-    settings.modelSources = modelSourcesOf(settings)
-    // the stored provider stays selected even while its config is incomplete (the picker and
-    // Settings show what is missing); only an unknown id degrades to genspark
-    // the account's UniWork AI pick overlays the file's BYOK provider; while the entry is not
-    // offered it stays `uniwork` (no silent switch to UniAI): the panel shows the unavailable
-    // state and Send is blocked until it returns
-    if ((isUniworkAiEditor(event) || wantsUniworkPick(options)) && uniworkAiChoiceStore?.read())
-      settings.provider = 'uniwork'
-    settings.provider = selectedProvider(settings)
+  // scrub what older builds stored (provider keys, base URLs, CLI paths, media/search keys)
+  scrubAiSettingsFile(SETTINGS_PATH())
+
+  ipcMain.handle('ai:get-settings', async (): Promise<AiSettings> => {
+    const { gskToolsEnabled } = aiSettingsFileOf(readJson<unknown>(SETTINGS_PATH(), {}))
+    const settings: AiSettings = {
+      ...defaultAiSettings(),
+      ...(gskToolsEnabled === undefined ? {} : { gskToolsEnabled }),
+    }
     const uniworkModel = uniworkAiAvailable() ? uniworkAiHost?.uniworkModel().trim() : ''
     if (uniworkModel) settings.uniworkModel = uniworkModel
     return settings
@@ -4102,143 +3922,33 @@ export function registerAiIpc(): void {
     },
   )
 
-  /** Editor AI panels: jump to Home → Settings → AI Model (where the user adds their own key). */
-  ipcMain.handle('ai:open-billing', () => {
-    shellHooks?.openSettings?.('aiModel')
-  })
-
-  ipcMain.handle('ai:set-settings', (event, settings: AiSettings, options?: unknown) => {
-    // SECURITY.md: payloads are schema-checked in the main process. The settings
-    // file feeds cliPath into spawn() and baseUrl receives a bearer token,
-    // so the renderer's copy is sanitized before it touches disk.
-    // (it also drops the derived `modelSources` / `uniworkModel` the renderer spreads back in)
-    const sanitized = sanitizeAiSettings(settings)
-    if (!sanitized) {
-      console.warn('[ai] rejected invalid ai:set-settings payload')
-      return
-    }
-    if (sanitized.provider === 'uniwork') {
-      // saved per account, never in the file: the file keeps the BYOK provider it had; while the
-      // entry is hidden the renderer still holds `uniwork` and saves it back, which keeps the pick
-      uniworkAiChoiceStore?.write(true)
-      sanitized.provider = fileAiProvider()
-    } else if (
-      // a window without the pick (home: My AI) clears it only by changing the provider; an editor
-      // tab and the Settings window both saw the pick, so any provider they save is the choice
-      isUniworkAiEditor(event) ||
-      wantsUniworkPick(options) ||
-      sanitized.provider !== fileAiProvider()
-    ) {
-      uniworkAiChoiceStore?.write(false)
-    }
-    writeJsonAtomic(SETTINGS_PATH(), sanitized)
+  ipcMain.handle('ai:set-settings', (_event, settings: unknown) => {
+    // the file keeps only the cloud-tools opt-out: every other field of the renderer's copy is dropped
+    saveAiSettingsFile(SETTINGS_PATH(), settings)
     broadcastAiSettingsChanged()
   })
 
-  ipcMain.handle('ai:openrouter-key-status', async (_event, apiKey: unknown) => {
-    return probeOpenRouterKey(typeof apiKey === 'string' ? apiKey : '')
-  })
-
-  ipcMain.handle('ai:codex-models', async (_event, cliPath: unknown) => {
-    // the probe spawns the path directly, so it gets the same metacharacter and
-    // existence check as the stored setting (anything else: auto-detect)
-    return listCodexModels(sanitizeCliPath(cliPath))
-  })
-
-  ipcMain.handle('ai:custom-models', (_event, input: unknown) => listCustomModelsForIpc(input))
-
   ipcMain.handle('ai:stream', async (event, request: AiStreamRequest) => {
-    // per-request settings get the same schema check as the persisted ones: a
-    // compromised renderer could otherwise hand cliPath/baseUrl straight to
-    // the provider layer without ever touching the settings file
-    const settings = sanitizeAiSettings(request.settings)
-    if (!settings) {
-      event.sender.send('ai:stream-chunk', {
-        requestId: request.requestId,
-        type: 'error',
-        error: 'invalid AI settings payload',
-      } satisfies AiStreamChunk)
-      return
-    }
-    const { requestId, system, messages } = request
-    const tools = request.tools ?? []
-    const maxTokens = request.maxTokens ?? maxOutputTokensOf(settings)
-    const provider = settings.provider
+    const { requestId } = request
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:stream-chunk', chunk)
     }
-    if (provider === 'uniwork') {
-      // no key, no model: the UniWork session and the server's policy decide
-      const host = uniworkAiHost
-      if (!host) {
-        send({
-          requestId,
-          type: 'error',
-          error: 'UniWork AI is not available here.',
-          uniworkCode: 'ai_disabled',
-        })
-        return
-      }
-      const controller = new AbortController()
-      activeAiStreams.set(requestId, controller)
-      const unwatchSender = abortOnDestroyed(event.sender, controller)
-      try {
-        await host.stream({ senderId: event.sender.id, request, send, signal: controller.signal })
-      } finally {
-        unwatchSender()
-        activeAiStreams.delete(requestId)
-      }
-      return
-    }
-
-    const streamConfig = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
-    if (!streamConfig || (provider !== 'codex' && !streamConfig.apiKey)) {
+    // no key, no model: the UniWork session and the server's policy decide
+    const host = uniworkAiHost
+    if (!host) {
       send({
         requestId,
         type: 'error',
-        error: noModelMessage(getUiLang(), tm('errNoApiKey', { provider })),
+        error: 'UniWork AI is not available here.',
+        uniworkCode: 'ai_disabled',
       })
-      return
-    }
-    if (provider !== 'codex' && !streamConfig.model) {
-      send({ requestId, type: 'error', error: tm('errNoModel') })
       return
     }
     const controller = new AbortController()
     activeAiStreams.set(requestId, controller)
     const unwatchSender = abortOnDestroyed(event.sender, controller)
-    // wire-activity keepalive: lets the renderer's silence watchdog tell a slow turn from a dead one
-    let lastPing = 0
-    const ping = () => {
-      const now = Date.now()
-      if (now - lastPing < 5_000) return
-      lastPing = now
-      send({ requestId, type: 'ping' })
-    }
     try {
-      let stopReason: string | undefined
-      await streamForProvider(provider, streamConfig, system, messages, tools, maxTokens, {
-        ...(request.sessionId ? { sessionId: request.sessionId } : {}),
-        signal: controller.signal,
-        onDelta: (text) => send({ requestId, type: 'delta', text }),
-        onReasoningDelta: (text) => send({ requestId, type: 'reasoning', text }),
-        onToolCall: (toolCall) => send({ requestId, type: 'tool-call', toolCall }),
-        onActivity: ping,
-        onStopReason: (reason) => {
-          stopReason = reason
-        },
-        onUsage: (usage) => send({ requestId, type: 'usage', usage }),
-      })
-      send({ requestId, type: 'done', stopReason })
-    } catch (err) {
-      if (controller.signal.aborted) {
-        send({ requestId, type: 'done' })
-      } else {
-        const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
-        // the panel gets the product message; the provider's own text stays in the log
-        console.warn(`[ai-stream] ${requestId} (${provider}/${streamConfig.model}) failed:`, raw)
-        send({ requestId, type: 'error', ...fields })
-      }
+      await host.stream({ senderId: event.sender.id, request, send, signal: controller.signal })
     } finally {
       unwatchSender()
       activeAiStreams.delete(requestId)
@@ -4249,7 +3959,7 @@ export function registerAiIpc(): void {
     activeAiStreams.get(requestId)?.abort()
   })
 
-  // shared search tools (content + images): Serper with DuckDuckGo fallback (same source as slides/sheets)
+  // shared search tools (content + images): UniWork cloud tools (same source as slides/sheets)
   ipcMain.handle('ai:web-search', async (_event, query: string, maxResults?: number) => {
     try {
       return await webSearchTool(
@@ -4273,8 +3983,8 @@ export function registerAiIpc(): void {
     }
   })
 
-  // media understanding (pictures in the document, attachments, local files): BYOK media
-  // provider when one is configured, otherwise the UniWork cloud route (signed in + entitled).
+  // media understanding (pictures in the document, attachments, local files): UniWork cloud
+  // route (signed in + entitled, cloud tools on).
   // docs-prefixed: slides registers its own ai:analyze-media in the same shell process.
   ipcMain.handle(
     'docs:analyze-media',
@@ -4337,128 +4047,6 @@ export function registerAiIpc(): void {
         { mediaRoots: docsMediaRoots(event.sender.id) },
       ),
   )
-
-  // a failed settings test keeps its raw detail here (the log); the renderer only gets the kind
-  const logAiTest = (what: string, provider: string, result: AiTestResult): AiTestResult => {
-    if (!result.ok) console.warn(`[ai] ${what} test failed (${provider}):`, result.error)
-    return result
-  }
-
-  ipcMain.handle('ai:search-test', async (_event, input: unknown) => {
-    const { provider, apiKey } = (input ?? {}) as { provider?: AiSearchProviderId; apiKey?: string }
-    // `auto` is the keyless free chain: nothing to test
-    if (!provider || provider === 'auto') return { ok: true }
-    return logAiTest('search', provider, await testSearchProvider(provider, String(apiKey ?? '')))
-  })
-
-  // settings-UI connection test for the media provider (the UniWork cloud entry shows only while signed in + entitled)
-  ipcMain.handle('ai:media-test', async (_event, input: unknown) => {
-    const { provider, config } = (input ?? {}) as {
-      provider?: AiMediaProviderId
-      config?: AiMediaProviderConfig
-    }
-    if (!provider || provider === 'genspark') {
-      return hasGskAuth()
-        ? { ok: true }
-        : logAiTest('media', 'cloud', aiTestFailure('failed', 'No media provider configuration'))
-    }
-    if (!config) {
-      return logAiTest(
-        'media',
-        provider,
-        aiTestFailure('failed', 'No media provider configuration'),
-      )
-    }
-    return logAiTest('media', provider, await testMediaProvider(provider, config))
-  })
-
-  // one-shot chat; `errorKind` says why a failure failed for the settings test (other callers ignore it).
-  // `error` is a product message in the UI language; the provider's raw text is `rawError` and goes to the log
-  type AiChatOutcome = AiChatResponse & {
-    errorKind?: AiTestFailureKind
-    rawError?: string
-    uniworkCode?: string
-  }
-  const failedChat = (failure: AiChatFailure): AiChatOutcome => {
-    console.warn('[ai] chat failed:', failure.raw)
-    return {
-      ok: false,
-      error: failure.error,
-      errorKind: failure.errorKind,
-      rawError: failure.raw,
-    }
-  }
-  // the request's provider config, or the reason there is none
-  const chatConfigOf = (
-    request: AiChatRequest,
-  ): { config: AiProviderConfig; provider: AiProviderId } | AiChatOutcome => {
-    // same schema check as ai:stream: one-shot requests would otherwise act on
-    // the renderer's settings copy verbatim
-    const settings = sanitizeAiSettings(request.settings)
-    if (!settings) return { ok: false, error: 'invalid AI settings payload', errorKind: 'failed' }
-    // UniWork AI runs only as an editor panel's agent turn: a one-shot caller with `uniwork` gets
-    // a typed refusal instead of silently calling another provider
-    if (settings.provider === 'uniwork') {
-      return {
-        ok: false,
-        error: 'UniWork AI is not available here.',
-        errorKind: 'unavailable',
-        uniworkCode: 'ai_disabled',
-      }
-    }
-    const provider = settings.provider
-    const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
-    if (!config || (provider !== 'codex' && !config.apiKey)) {
-      return {
-        ok: false,
-        // one-shot callers (settings test, email, one-click actions) print the string as is, so no notice code
-        error: aiNoticeBody(noModelMessage(getUiLang(), tm('errNoApiKey', { provider }))),
-        errorKind: 'invalid_key',
-      }
-    }
-    if (provider !== 'codex' && !config.model) {
-      return { ok: false, error: tm('errNoModel'), errorKind: 'failed' }
-    }
-    return { config, provider }
-  }
-
-  const runAiChat = async (request: AiChatRequest): Promise<AiChatOutcome> => {
-    const target = chatConfigOf(request)
-    if (!('config' in target)) return target
-    try {
-      const result = await chatForProvider(
-        target.provider,
-        target.config,
-        request.system,
-        request.user,
-      )
-      // the one-shot path reports HTTP failures as ok:false with the raw body
-      return result.ok ? result : failedChat(aiChatFailure(result, getUiLang(), tm('errAiBusy')))
-    } catch (err) {
-      return failedChat(aiChatFailureFromError(err, getUiLang(), tm('errAiBusy')))
-    }
-  }
-
-  ipcMain.handle('ai:chat', (_event, request: AiChatRequest) => runAiChat(request))
-
-  // settings > AI model "Test": one streamed ping through the same endpoint and wire as the chat panel;
-  // a failure keeps its raw text in the log
-  ipcMain.handle('ai:settings-test', async (_event, request: AiChatRequest) => {
-    const target = chatConfigOf(request)
-    let result: AiChatOutcome
-    if ('config' in target) {
-      const test = await testChatConnection(target.provider, target.config)
-      result = test.ok ? test : failedChat(aiChatFailure(test, getUiLang(), tm('errAiBusy')))
-    } else {
-      result = target
-    }
-    if (result.ok) return { ok: true }
-    return logAiTest(
-      'model',
-      String(request?.settings?.provider ?? ''),
-      aiTestFailure(result.errorKind ?? 'failed', result.rawError ?? result.error ?? ''),
-    )
-  })
 }
 
 // ── project-store IPC (shared across docs / slides / sheets) ──────────────
@@ -4784,10 +4372,6 @@ const reissuedDoc = (
 export function registerDocsIpc(): void {
   registerZoteroIpc()
   void app.whenReady().then(registerLazyMediaProtocol)
-  // Node fetch (undici) direct connections get reset under VPN/tun setups; retry over Chromium's stack
-  setRescueFetch((url, init) => net.fetch(url, init))
-  setAiUserAgent(`UniWorkOffice/${app.getVersion()}`)
-
   // shared with the other editor modules — last (identical) registration wins
   ipcMain.removeHandler('app:get-language')
   ipcMain.handle('app:get-language', () => getUiLang())

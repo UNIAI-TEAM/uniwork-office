@@ -11,6 +11,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { defaultAiSettings, setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
+import { readyUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const harness = vi.hoisted(() => ({
   runs: [] as string[],
@@ -70,13 +71,8 @@ describe('pdf AI panel: a preset from outside', () => {
     delete (window as { pdfApi?: unknown }).pdfApi
   })
 
-  function mount(provider: 'uniwork' | 'openai') {
-    const settings = { ...defaultAiSettings(), uniAiAvailable: false, provider }
-    settings.providers.openai = {
-      ...settings.providers.openai,
-      apiKey: 'test-key',
-      model: 'gpt-test',
-    }
+  function mount() {
+    const settings = defaultAiSettings()
     ;(window as { pdfApi?: unknown }).pdfApi = {
       getAiSettings: async () => settings,
       onAiSettingsChanged: () => () => {},
@@ -113,7 +109,8 @@ describe('pdf AI panel: a preset from outside', () => {
   }
 
   it('runs the text word for word, shows the display words, and Retry sends the text again', async () => {
-    const render = mount('openai')
+    readyUniworkAi('/docs/a.pdf')
+    const render = mount()
     render(null)
     await flush()
     await flush()
@@ -129,8 +126,8 @@ describe('pdf AI panel: a preset from outside', () => {
     await flush()
     expect(harness.runs).toEqual([JOB])
 
-    // both Retry entries send the text again: the "not sent" bubble's (another provider's failure)
-    // and the error answer's own (a UniWork AI error)
+    // both Retry entries send the text again: the "not sent" bubble's (a failure with no UniWork
+    // error code) and the error answer's own (a UniWork AI error)
     act(() => harness.fail!('network down'))
     await flush()
     act(() =>
@@ -138,18 +135,7 @@ describe('pdf AI panel: a preset from outside', () => {
     )
     await flush()
     await flush()
-    // the turn now runs on UniWork AI (the S9 action reads the provider when the window takes focus)
-    setUniworkAiAvailable(true)
-    ;(window as unknown as { pdfApi: { getAiSettings: unknown } }).pdfApi.getAiSettings =
-      async () => ({ ...defaultAiSettings(), provider: 'uniwork' })
-    await act(async () => {
-      window.dispatchEvent(new Event('focus'))
-    })
-    await flush()
     act(() => harness.fail!('UniWork AI is not available right now.', 'aiErrUnavailable'))
-    await flush()
-    const ack = container!.querySelector<HTMLButtonElement>('.ai-uniwork-disclosure-ack')
-    if (ack) act(() => ack.click())
     await flush()
     act(() =>
       container!
@@ -166,7 +152,7 @@ describe('pdf AI panel: a preset from outside', () => {
 
   it('UniWork AI not acknowledged: the text waits in the composer and nothing is sent', async () => {
     setUniworkAiAvailable(true)
-    const render = mount('uniwork')
+    const render = mount()
     render(null)
     await flush()
     await flush()
@@ -178,17 +164,24 @@ describe('pdf AI panel: a preset from outside', () => {
     expect(container!.querySelector<HTMLTextAreaElement>('textarea.ai-input')!.value).toBe(JOB)
   })
 
-  it('a host job on another provider than UniWork AI when it would run waits in the focused composer', async () => {
-    const render = mount('openai')
+  it('a host job runs on UniWork AI; a preset refused while that run is going waits in the focused composer', async () => {
+    readyUniworkAi('/docs/a.pdf')
+    const render = mount()
     render(null)
     await flush()
     await flush()
     render({ text: JOB, nonce: 1, uniworkOnly: true })
     await flush()
     await flush()
-    expect(harness.runs).toEqual([])
+    expect(harness.runs).toEqual([JOB])
+
     const box = container!.querySelector<HTMLTextAreaElement>('textarea.ai-input')!
-    expect(box.value).toBe(JOB)
+    act(() => box.blur())
+    render({ text: 'Summarise it', nonce: 2 })
+    await flush()
+    await flush()
+    expect(harness.runs).toEqual([JOB])
+    expect(box.value).toBe('Summarise it')
     expect(document.activeElement).toBe(box)
   })
 })

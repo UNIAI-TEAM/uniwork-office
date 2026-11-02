@@ -64,10 +64,19 @@ vi.mock('@genoffice/agent-core', async (orig) => {
     reset(): void {}
     restore(): void {}
   }
-  return { ...real, AgentLoop: FakeLoop }
+  // every turn runs on UniWork AI, whose image URL rule has its own tests (g6-09b-image-url-rule*):
+  // here a scripted insert_image URL counts as one the run found
+  const createImageUrlRegistry = real.createImageUrlRegistry as (o: object) => unknown
+  return {
+    ...real,
+    AgentLoop: FakeLoop,
+    createImageUrlRegistry: (opts: object) =>
+      createImageUrlRegistry({ ...opts, enforce: () => false }),
+  }
 })
 
 import { AiPanel, type MarkdownAiDeps } from '../src/renderer/ai/AiPanel'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const PNG_BASE64 = btoa('\x89PNG\r\n\x1a\n-fake-image-bytes')
 
@@ -94,9 +103,11 @@ describe('markdown AI Roll back and the images the run saved', () => {
     editor = null
     harness.scripts.length = 0
     vi.unstubAllGlobals()
+    resetUniworkAi()
   })
 
   async function mount() {
+    readyUniworkAi('/docs/a.md')
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
     // the fake asset store: every save is a new pending file; discard records what it was asked for
@@ -112,7 +123,7 @@ describe('markdown AI Roll back and the images the run saved', () => {
         store.discarded.push([...names])
         return { deleted: names, preserved: [], errors: [] }
       }),
-      getAiSettings: vi.fn(async () => ({ ...usableAiSettings(), provider: 'openai' })),
+      getAiSettings: vi.fn(async () => usableAiSettings()),
     }
     vi.stubGlobal(
       'markdownApi',

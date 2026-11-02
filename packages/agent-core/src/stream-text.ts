@@ -22,7 +22,7 @@ export interface StreamTextOptions {
   extract(raw: string): { text: string; complete?: boolean }
   /** cumulative extracted text; throttle on the caller's side */
   onProgress?(text: string): void
-  /** the same request as a UniWork AI writer (kind + input); BYOK keeps reading system/user */
+  /** the same request as a UniWork AI writer (kind + input) */
   writer?: WriterCall | undefined
 }
 

@@ -1,8 +1,8 @@
 /// Availability flag of UniWork AI, from the shell main process to every renderer.
 ///
-/// The main process decides whether the `uniwork` provider entry is offered (signed in, plan,
-/// organization capability, module format) and calls setUniworkAiAvailable there. Each renderer
-/// has its own AI_PROVIDERS, so the flag reaches it like the cloud status does: main answers a
+/// The main process decides whether UniWork AI is offered (signed in, plan, organization
+/// capability, module format) and calls setUniworkAiAvailable there. Each renderer has its own
+/// module instances, so the flag reaches it like the cloud status does: main answers a
 /// pull and pushes every change to all webContents; each preload exposes window.uniworkAiFlag
 /// (./uniwork-ai-flag-bridge); the renderer mirrors it (mirrorUniworkAiFlag in ai-provider).
 ///

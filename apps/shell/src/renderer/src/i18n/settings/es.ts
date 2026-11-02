@@ -3,14 +3,6 @@ import type { zh } from './zh'
 export const es = {
   setClose: 'Cerrar',
   setRetry: 'Reintentar',
-  setUnsavedTitle: 'Cambios sin guardar',
-  setUnsavedBody: '¿Salir de esta página sin guardar? Se perderán tus cambios.',
-  setUnsavedKeep: 'Seguir editando',
-  setUnsavedDiscard: 'Descartar cambios',
-  setAiSaveFailed: 'No se pudo guardar: {error}',
-  setAiCreditLeft: 'Créditos: quedan {remain} · usados {used}',
-  setAiCreditUsedNoLimit: 'Créditos usados: {used} (clave sin límite)',
-  setAiCreditRate: '1 USD de saldo de la clave = 1000 créditos de IA',
   setGrpAppearance: 'Apariencia',
   setGrpAiPanel: 'Panel de IA',
   setGrpFiles: 'Archivos y guardado',
@@ -21,19 +13,6 @@ export const es = {
   intgActionFailed:
     'No se pudo completar. Comprueba que se pueda escribir en la carpeta y vuelve a intentarlo.',
   intgLoadFailed: 'No se pudo leer el estado de la integración.',
-
-  cwTitle: 'Créditos de IA',
-  cwAddKey: 'Añadir clave',
-  cwNoKey: 'Aún no hay clave de IA',
-  cwUpdating: 'Actualizando…',
-  cwLoadFailed: 'Error al cargar',
-  cwLeft: 'Quedan {n}',
-  cwUsed: '{n} usados',
-  cwToday: 'Hoy ≈ {n}',
-  cwHistory: 'Historial de uso de IA',
-  cwLogNote: 'Estimado en este dispositivo; no es tu factura.',
-  cwLogEmpty: 'Aún no hay llamadas de IA registradas.',
-  cwOpenHint: 'Clic para la configuración de IA · clic derecho para la página de uso',
 
   bkLead:
     'Los complementos de pago hacen copias de seguridad de tu Mesa de trabajo en UniWork Cloud y añaden espacio de almacenamiento. Exportar y restaurar en este dispositivo siempre es gratis.',

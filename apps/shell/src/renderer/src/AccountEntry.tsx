@@ -67,7 +67,6 @@ export function AccountEntry({
   onCloseSettings,
   skillUpdate,
   onSkillUpdateDue,
-  onFileSearchSettingsChange,
   target,
 }: {
   onStatusChange?: (status: AccountStatus | null) => void
@@ -77,8 +76,7 @@ export function AccountEntry({
   onCloseSettings: () => void
   skillUpdate: boolean
   onSkillUpdateDue: (due: boolean) => void
-  onFileSearchSettingsChange?: () => void
-  /** open on this section / block (e.g. the home list's rerank button) */
+  /** open on this section instead of the account page */
   target?: SettingsTarget | null
 }) {
   const { t } = useI18n()
@@ -164,7 +162,6 @@ export function AccountEntry({
         <SettingsModal
           account={account}
           onClose={onCloseSettings}
-          onFileSearchChange={onFileSearchSettingsChange}
           skillUpdateDue={skillUpdate}
           onSkillUpdateDue={onSkillUpdateDue}
           initialSection={settingsSection}

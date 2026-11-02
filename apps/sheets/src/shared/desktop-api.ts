@@ -28,10 +28,7 @@ import {
   workbookVisualEditSchema,
 } from '@genoffice/xlsx-gateway/shared/edit-schemas'
 import type {
-  AiChatRequest,
-  AiChatResponse,
   AiSettings,
-  AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
   GenSparkAccountStatus,
@@ -2654,66 +2651,15 @@ export type WorkbookPivotAdd = z.infer<typeof workbookPivotAddSchema>
 export type WorkbookCellStyle = z.infer<typeof cellStyleSchema>
 export type WorkbookConditionalRule = z.infer<typeof conditionalRuleSchema>
 
-// ---- AI settings + chat/stream: canonical types live in @genoffice/ai-provider,
+// ---- AI settings + stream: canonical types live in @genoffice/ai-provider,
 // shared with apps/docs. Validated here like every other renderer→main request in
-// this file; the validated shape is cast to AiSettings at the main-process call
-// site, which has every known provider key once merged through
-// resolveAiSettings/defaultAiSettings. ----
-
-const aiProviderConfigSchema = z
-  .object({
-    apiKey: z.string(),
-    model: z.string(),
-    baseUrl: z.string().optional(),
-    cliPath: z.string().optional(),
-  })
-  .strict()
-
-const aiMediaProviderConfigSchema = z
-  .object({
-    apiKey: z.string(),
-    baseUrl: z.string().optional(),
-    imageModel: z.string(),
-    analysisModel: z.string(),
-  })
-  .strict()
+// this file. UniWork AI is the only provider: no key, no model, no provider slots. ----
 
 export const aiSettingsInputSchema = z
   .object({
     provider: z.string().min(1),
-    providers: z.record(z.string(), aiProviderConfigSchema),
+    providers: z.object({}).strict(),
     gskToolsEnabled: z.boolean().optional(),
-    media: z
-      .object({
-        imageProvider: z.string().min(1).optional(),
-        analysisProvider: z.string().min(1).optional(),
-        videoAnalysisProvider: z.string().min(1).optional(),
-        // capabilities where the user picked the UniWork cloud entry explicitly
-        cloudPicked: z
-          .object({
-            image: z.boolean().optional(),
-            analysis: z.boolean().optional(),
-            video: z.boolean().optional(),
-          })
-          .strict()
-          .optional(),
-        // pre-catalog single choice, still accepted on read
-        provider: z.string().min(1).optional(),
-        providers: z.record(z.string(), aiMediaProviderConfigSchema),
-      })
-      .strict()
-      .optional(),
-    search: z
-      .object({
-        provider: z.string().min(1),
-        providers: z.record(z.string(), z.object({ apiKey: z.string() }).strict()),
-      })
-      .strict()
-      .optional(),
-    // bounds are enforced by clampMaxOutputTokens on read; the schema only
-    // rejects nonsense (this object is .strict(), so an omitted key here would
-    // make the whole settings save fail)
-    maxOutputTokens: z.number().int().positive().optional(),
   })
   .strict()
 
@@ -2774,14 +2720,6 @@ const agentToolDefSchema = z
 const MAX_AI_MESSAGES = 500
 const MAX_AI_TOOLS = 50
 
-export const aiChatRequestSchema = z
-  .object({
-    settings: aiSettingsInputSchema,
-    system: z.string(),
-    user: z.string(),
-  })
-  .strict()
-
 export const aiStreamRequestSchema = z
   .object({
     requestId: z.string().min(1),
@@ -2795,7 +2733,6 @@ export const aiStreamRequestSchema = z
   .strict()
 
 export type AiSettingsInput = z.infer<typeof aiSettingsInputSchema>
-export type AiChatRequestInput = z.infer<typeof aiChatRequestSchema>
 export type AiStreamRequestInput = z.infer<typeof aiStreamRequestSchema>
 
 const pdfPageVariantSchema = z
@@ -3156,7 +3093,7 @@ export interface DesktopApi {
   /// Returns true once when this tab was opened via "New Spreadsheet" from the
   /// shell home.
   consumeNewBlankWorkbook(): Promise<boolean>
-  /// One-shot AI panel preset queued by Home / My AI when opening a sheet
+  /// One-shot AI panel preset queued by Home when it opens a new sheet with an AI preset
   consumeAiPreset(): Promise<{ text: string; autoRun?: boolean; displayText?: string } | null>
   /// Live push of an AI preset while the tab is already open
   onAiPreset(
@@ -3199,19 +3136,18 @@ export interface DesktopApi {
   /// EL-1(b) fix6: explicit Save on a read-only bound workbook asks main to explain
   uniworkReadOnlySave?(path?: string): Promise<void>
   getAiSettings(): Promise<AiSettings>
-  setAiSettings(settings: AiSettings, options?: AiSettingsSaveOptions): Promise<void>
+  setAiSettings(settings: AiSettings): Promise<void>
   /// ai-settings.json was rewritten by any renderer; re-read it
   onAiSettingsChanged(handler: () => void): () => void
-  /// shell only: switch to Home and open Settings › AI Model (rejects in standalone)
+  /// shell only: switch to Home and open Settings › Account, UniWork AI sign-in (rejects in standalone)
   openAiModelSettings(): Promise<void>
-  aiChat(request: AiChatRequest): Promise<AiChatResponse>
   /// start a streaming AI call; deltas arrive via onAiStream with the same requestId
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>
   /// UniWork cloud sign-in state (signed in to UniWork + plan includes cloud AI);
   /// withEmail also returns the email
   aiGskStatus(withEmail?: boolean): Promise<GenSparkAccountStatus>
-  /// Web search (main-process Serper/DuckDuckGo, shared with docs/slides)
+  /// Web search (main-process UniWork cloud tool, shared with docs/slides)
   webSearch(query: string, maxResults?: number): Promise<WebSearchResult>
   /// Image search (same shared main-process channel as docs/slides)
   imageSearch(query: string, maxResults?: number): Promise<ImageSearchResponse>

@@ -422,7 +422,7 @@ describe('web_search backend failures', () => {
     const w = window as unknown as { desktop?: unknown }
     const saved = w.desktop
     w.desktop = {
-      webSearch: async () => ({ results: [], method: 'error', error: 'Serper 502' }),
+      webSearch: async () => ({ results: [], method: 'error', error: 'Search 502' }),
     }
     try {
       const exec = await executeTool(
@@ -431,7 +431,7 @@ describe('web_search backend failures', () => {
         NUM_IDS,
       )
       expect(exec.isError).toBe(true)
-      expect(exec.output).toContain('Serper 502')
+      expect(exec.output).toContain('Search 502')
       expect(exec.output).not.toContain('(no results)')
     } finally {
       w.desktop = saved

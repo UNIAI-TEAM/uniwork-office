@@ -61,7 +61,7 @@ const VIEW_ONLY_NOTE =
   '\n\nNote: this document is view-only. You can read it, search it and answer questions about it, but you cannot change it: no editing tools are available. If the user asks for a change, explain that the document is view-only and that they can save a copy to edit it.'
 
 const IMAGE_GEN_OFF_NOTE =
-  '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
+  '\n\nNote: generate_image is currently unavailable (signed out of UniWork, or the UniWork cloud tools are off). Do not call or promise it; use image_search for imagery.'
 
 const BOUND_NOTE =
   '\n\nNote: this document belongs to UniWork. create_document is unavailable here; do not call or promise it. Give results in your reply instead. The file-level page tools are unavailable too (insert_blank_page, set_page_size, crop_pages, replace_pages, extract_pages, split_pdf, split_pages, merge_pages); use the pending apply_ops ops (deletePage, setPageOrder, rotatePages) instead.'
@@ -120,7 +120,7 @@ function hiddenTools(deps: PdfAiDeps): Set<string> {
     hidden.add('create_document')
     for (const n of FILE_LEVEL_TOOLS) hidden.add(n)
   }
-  // provider = UniWork AI: the model must not be offered edit tools the host cannot run (BYOK keeps them)
+  // UniWork AI: the model must not be offered edit tools the host cannot run
   if (deps.uniworkAi?.()) {
     if (capabilityOff(deps, 'pdfTextEdit')) for (const n of TEXT_EDIT_TOOLS) hidden.add(n)
     if (capabilityOff(deps, 'pdfImageEdit')) for (const n of IMAGE_EDIT_TOOLS) hidden.add(n)

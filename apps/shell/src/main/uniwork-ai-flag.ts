@@ -1,7 +1,7 @@
 /**
  * Main half of the UniWork AI availability flag (see electron-utils uniwork-ai-flag): answers a
  * renderer's pull with the process flag and broadcasts every change to all webContents, so each
- * renderer's own provider list shows or hides the `uniwork` entry. The flag itself is computed in
+ * renderer's model chip and Send guard follow it. The flag itself is computed in
  * uniwork-auth (S7 conditions) and set with setUniworkAiAvailable.
  */
 import type { IpcMain, WebContents } from 'electron'

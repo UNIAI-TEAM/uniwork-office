@@ -2,9 +2,6 @@ import type { zh } from './zh'
 import { sharedAskUni } from './shared'
 
 export const id = {
-  askUniModeGroup: 'Mode',
-  askUniModeChat: 'Asisten',
-  askUniModeAsk: 'Tanya UNI',
   askUniTitle: 'Tanya UNI',
   askUniDescription:
     'UNI hanya menjawab dari data yang dapat Anda lihat di ruang kerja ini, lengkap dengan sumber.',

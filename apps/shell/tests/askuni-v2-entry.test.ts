@@ -485,7 +485,7 @@ describe('Ask UNI v2 entry points', () => {
       expect(isAskUniShortcut(ev({ key: 'j', code: 'KeyJ' }), 'win')).toBe(false)
     })
 
-    it('opens Home My AI in Ask UNI mode: activates the Home tab and files a request', async () => {
+    it('opens the Home Ask UNI pane: activates the Home tab and files a request', async () => {
       const seen: (number | null)[] = []
       await render(
         h('div', null, h(Shortcut, { platform: 'win' }), h(Probe, { onSeen: (s) => seen.push(s) })),

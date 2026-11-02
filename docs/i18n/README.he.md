@@ -46,12 +46,7 @@ Windows ו-Linux. היא פותחת ושומרת קבצי `.docx`,‏ `.xlsx` ו
   מודבקים. מצגות ועמודים נוצרים ישירות על הקנבס ונשארים ניתנים לעריכה מלאה.
 - **מקומי מטבעו.** פתיחה, עריכה, שמירה והמרה של קבצים מתבצעות על המחשב שלכם.
   ההמרות PDF → Word / Excel / PowerPoint,‏ Markdown → Word ו-HTML → Word —
-  כולן רצות באופן מקומי במכשיר. רק קריאות ה-AI עוזבות את המכשיר, אל הספק
-  שבחרתם.
-- **המפתחות שלכם, או בלי מפתחות בכלל.** התחברו עם Genspark ודלגו על הצורך
-  במפתח, או הביאו מפתח משלכם עבור Claude,‏ OpenAI,‏ Gemini,‏ DeepSeek,‏
-  Kimi,‏ GLM,‏ Qwen,‏ Doubao,‏ MiniMax,‏ Grok,‏ Mistral,‏ OpenRouter,‏ Requesty, או כל
-  endpoint תואם-OpenAI, כולל שרתים מקומיים.
+  כולן רצות באופן מקומי במכשיר. רק קריאות ה-AI עוזבות את המכשיר, אל UniWork AI.
 - **ניתן לסקריפטים ומוכן לסוכנים.** האפליקציה מגיעה עם שורת פקודה `genoffice`
   ועם skill עבור Claude Code,‏ Codex,‏ Cursor,‏ Gemini CLI,‏ GitHub Copilot,‏
   OpenCode ו-Windsurf, כך שסוכן קוד יכול ליצור, להמיר, לקרוא ולערוך קבצי
@@ -178,7 +173,7 @@ GenOffice מגיעה עם שורת פקודה `genoffice` ועם skill לסוכ�
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="הגדרות GenOffice, עמוד Integrations: ה-skill של genoffice מותקן ב-Claude Code, עם כפתורי Install ליד Codex ו-Cursor"></td>
 </tr>
 <tr>
-<td dir="rtl"><b>פרומפט אחד לסוכן שלכם</b> — ״בנו מצגת בת שמונה שקופיות על מערכת השמש.״ הסוכן קורא את ה-skill, כותב גיליון סטייל, מתווה ומפרט עמוד אחד לכל שקופית, מייצר את שתי התמונות עם <code>genoffice image</code>, ונותן ל-<code>genoffice slides check</code> לדחות כל דבר שגולש או חופף לפני ש-<code>genoffice create</code> מרכיב את ה-<code>.pptx</code> ו-<code>slides render</code> מחזיר PNG לכל שקופית להתרשמות.</td>
+<td dir="rtl"><b>פרומפט אחד לסוכן שלכם</b> — ״בנו מצגת בת שמונה שקופיות על מערכת השמש.״ הסוכן קורא את ה-skill, כותב גיליון סטייל, מתווה ומפרט עמוד אחד לכל שקופית, ונותן ל-<code>genoffice slides check</code> לדחות כל דבר שגולש או חופף לפני ש-<code>genoffice create</code> מרכיב את ה-<code>.pptx</code> ו-<code>slides render</code> מחזיר PNG לכל שקופית להתרשמות.</td>
 <td dir="rtl"><b>התקינו פעם אחת, מתוך הגדרות → שילובים</b> — GenOffice מציגה את סוכני הקוד שהיא מוצאת על המחשב הזה וכותבת את ה-skill לכל אחד שתבחרו. או הורידו את ה-skill כ-zip, או הריצו <code>npx skills add genspark-ai/genoffice</code>. הפקודות ותהליך העבודה המלא נמצאים ב<a href="#command-line-and-agent-skill">שורת הפקודה וה-skill לסוכנים</a>.</td>
 </tr>
 </table>
@@ -191,15 +186,11 @@ skill ובלי לפתוח חלון, ולקבל 29 כלים בתוספת מדרי
 (resources). שרת HTTP שני בתוך האפליקציה מאפשר לסוכן לבנות מסמך Word
 בלשונית עורך גלויה בזמן שאתם צופים.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="צילום מואץ של Claude Code בונה תדריך משקיעים בן שמונה שקופיות על אנרגיה מתחדשת דרך שרת ה-MCP של genoffice: מחפש איורים ותמונות, בודק כל תמונה מועמדת עם media, deck_start כותב את גיליון הסטייל והתווה, deck_page מוסיף עמוד מאומת אחד בכל פעם, deck_build מרכיב את קובץ ה-.pptx ו-slides_render מחזיר תמונה של כל שקופית; המצגת המוגמרת נפתחת לאחר מכן ב-GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides מציג את מצגת Renewable Energy 2026 בת שמונה השקופיות ש-Claude Code בנה דרך שרת ה-MCP של genoffice: שקופית השער עם תצלום של חוות רוח על הקנבס ושמונה תמונות ממוזערות בצד שמאל"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="הגדרות GenOffice, עמוד Integrations, חלק ה-MCP: פקודת claude mcp add בשורה אחת עבור Claude Code, בלוק ה-JSON עבור Cursor,‏ Claude Desktop ולקוחות MCP אחרים, ואפשרות שרת ה-HTTP המקומי מתחת"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="הגדרות GenOffice, עמוד Integrations, חלק ה-MCP: פקודת claude mcp add בשורה אחת עבור Claude Code, בלוק ה-JSON עבור Cursor,‏ Claude Desktop ולקוחות MCP אחרים, ואפשרות שרת ה-HTTP המקומי מתחת"></td>
 </tr>
 <tr>
-<td dir="rtl"><b>פרומפט אחד, 38 קריאות לכלים, בלי shell</b> — ״בנו תדריך משקיעים בן שמונה שקופיות על אנרגיה מתחדשת ב-2026, עם תמונה אמיתית על השער ובכל מקום שתמונה עוזרת.״ הסוכן מושך את האיורים והתמונות עם <code>search</code>, שואל את <code>media</code> אם כל תמונה מועמדת היא תצלום אמיתי, קורא ל-<code>deck_start</code> עם גיליון סטייל ותווה, ואז <code>deck_page</code> פעם אחת לכל שקופית; כל עמוד נבדק מול התווה והפלטה לפני שהוא נשמר, <code>deck_build</code> מרכיב את ה-<code>.pptx</code>, <code>slides_audit</code> מחפש גלישות, <code>slides_render</code> מחזיר PNG לכל שקופית כתוכן תמונה שהמודל יכול להסתכל עליו, ו-<code>deck_replace</code> מתקן את שלושת העמודים שלא מצאו חן בעיניו.</td>
 <td dir="rtl"><b>התחברו פעם אחת, מתוך הגדרות → שילובים</b> — העתיקו את שורת <code>claude mcp add</code> עבור Claude Code, או את בלוק ה-JSON אל Cursor,‏ Claude Desktop או כל לקוח MCP אחר. אפשרות B מפעילה את שרת ה-HTTP המקומי עבור עורך ה-Word הגלוי. שתיהן מתוארות ב<a href="#mcp-server">שרת MCP</a>.</td>
 </tr>
 </table>
@@ -214,9 +205,6 @@ skill ובלי לפתוח חלון, ולקבל 29 כלים בתוספת מדרי
 - **AI שעורך את המסמך עצמו.** מעקב שינויים ב-Docs, נוסחאות וגרפים חיים
   ב-Sheets, שקופיות המצוירות ישירות על הקנבס, כל תור של ה-AI הוא תמונת מצב
   שאפשר לחזור אליה.
-- **המודל שלך, המפתח שלך.** התחברו עם Genspark, או הביאו מפתח משלכם
-  ל-Claude, OpenAI, Gemini, DeepSeek ועוד, כולל שרתים מקומיים וכל endpoint
-  תואם-OpenAI.
 - **PDF שמטופל כמו שצריך.** ערכו טקסט ישירות בתוך העמוד, והמירו PDF ל-Word,
   Excel או PowerPoint במכשיר עצמו, עם OCR מובנה למסמכים סרוקים.
 - **גם Markdown ו-HTML**, עם אותו פאנל AI וייצוא מקומי ל-Word.
@@ -224,20 +212,6 @@ skill ובלי לפתוח חלון, ולקבל 29 כלים בתוספת מדרי
   מעמידים כל מנוע לרשות Claude Code,‏ Claude Desktop,‏ Codex,‏ Cursor וסוכנים
   אחרים, עדיין על המכשיר.
 - **חינם**, גם ליחידים וגם לצוותים.
-
-## ספקי ה-AI
-
-**התחברות עם Genspark** לא מצריכה שום הגדרה: קריאות המודל עוברות דרך
-ה-proxy של Genspark (משפחות Claude,‏ GPT ו-Gemini), והסוכנים מקבלים חיפוש
-רשת ותמונות, יצירת תמונות, וניתוח תמונה/אודיו/וידאו.
-
-**או הביאו מפתח משלכם.** בתפריט Settings → AI מופיעים Claude,‏ OpenAI,‏
-Gemini,‏ DeepSeek,‏ Kimi,‏ GLM,‏ Qwen,‏ Doubao,‏ MiniMax,‏ Grok,‏ Mistral,‏
-OpenRouter,‏ Requesty ו-OpenCode Zen/Go, ובנוסף שדה מותאם אישית לכל endpoint
-תואם-OpenAI (כתובת בסיס + מפתח), כולל שרתי מודלים מקומיים. לחיפוש ולמדיה יש
-ספקים נפרדים לפי יכולת תחת **AI Media & Search**: Serper או Tavily לחיפוש
-ברשת, ו-OpenAI,‏ Gemini,‏ Doubao/Seedream,‏ GLM,‏ Grok,‏ Qwen,‏ MiniMax או
-כל endpoint תואם-OpenAI ליצירת תמונות ולניתוח תמונה/וידאו.
 
 כל החבילה מגיעה עם ערכות עיצוב בהיר, כהה ומצב מערכת. ערכות העיצוב משנות רק
 את מה שמוצג על המסך: קבצים מיוצאים, מודפסים ונשמרים תמיד שומרים על הצבעים
@@ -295,9 +269,8 @@ genoffice open sales.xlsx                          # hand the result to the edit
 לפני שהשלב הבא התחיל:
 
 ```bash
-genoffice capabilities --json                        # which cloud tools GenOffice has configured
+genoffice capabilities --json                        # whether the app is installed
 genoffice guide slides design                        # the deck workflow and layout library
-genoffice image "the eight planets in a row …" --aspect 16:9 --out deck/assets/cover.jpg
 genoffice slides check deck/outline.json --json      # 8 pages, no findings
 genoffice slides check deck/pages/01.json --json     # builds one slide, audits overflow and overlap
 …                                                    # one page file per slide, fixed until each check is clean
@@ -320,10 +293,10 @@ genoffice open deck/solar-system.pptx
 שתי דרכים להתחבר, שתיהן מוצגות עם קטעי קוד מוכנים להעתקה ב-**הגדרות →
 שילובים → MCP**:
 
-| דרך                              | מה זה                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **A ·‏ `genoffice mcp`** (מומלץ) | שרת stdio שהעוזר מפעיל בעצמו; אין צורך ש-GenOffice יהיה פתוח. כלי אחד לכל פקודה (`info`,‏ `convert`,‏ `create_docx`,‏ `create_xlsx`,‏ `create_pptx`,‏ `create_pdf`,‏ `docs_read` / `docs_apply` / `docs_check`,‏ `sheet_*`,‏ `slides_*`,‏ `render`,‏ `guide`,‏ `search`,‏ `image`,‏ `media`,‏ `open`) ובנוסף תהליך המצגת המדורג `deck_start` → `deck_page` → `deck_build` → `deck_replace`. פעולות, מפרטים ו-Markdown מועברים ישירות בקריאה, כך שגם לקוח בלי מערכת קבצים עובד. |
-| **B · שרת HTTP מקומי**           | רץ בתוך אפליקציית GenOffice בכתובת `http://127.0.0.1:3093/mcp` (Streamable HTTP, עם SSE ישן לתאימות). הכלים שלו מפעילים לשונית עורך Word גלויה: `create_session`,‏ `insert_content`,‏ `replace_blocks`,‏ `apply_ops`,‏ `read_document`,‏ `save_session`, ואתם צופים במסמך מקבל צורה. כבוי כברירת מחדל; הפעילו אותו באותה חלונית הגדרות.                                                                                                                                        |
+| דרך                              | מה זה                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A ·‏ `genoffice mcp`** (מומלץ) | שרת stdio שהעוזר מפעיל בעצמו; אין צורך ש-GenOffice יהיה פתוח. כלי אחד לכל פקודה (`info`,‏ `convert`,‏ `create_docx`,‏ `create_xlsx`,‏ `create_pptx`,‏ `create_pdf`,‏ `docs_read` / `docs_apply` / `docs_check`,‏ `sheet_*`,‏ `slides_*`,‏ `render`,‏ `guide`,‏ `open`) ובנוסף תהליך המצגת המדורג `deck_start` → `deck_page` → `deck_build` → `deck_replace`. פעולות, מפרטים ו-Markdown מועברים ישירות בקריאה, כך שגם לקוח בלי מערכת קבצים עובד. |
+| **B · שרת HTTP מקומי**           | רץ בתוך אפליקציית GenOffice בכתובת `http://127.0.0.1:3093/mcp` (Streamable HTTP, עם SSE ישן לתאימות). הכלים שלו מפעילים לשונית עורך Word גלויה: `create_session`,‏ `insert_content`,‏ `replace_blocks`,‏ `apply_ops`,‏ `read_document`,‏ `save_session`, ואתם צופים במסמך מקבל צורה. כבוי כברירת מחדל; הפעילו אותו באותה חלונית הגדרות.                                                                                                         |
 
 ```bash
 # Claude Code
@@ -340,31 +313,8 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 ההגדרות מציגה את הנתיב המדויק להתקנה שלכם). השרת נושא הוראות תהליך עבודה
 משלו וחושף את מדריכי הפעולות כמשאבי `genoffice://guide/*`, כך שאין צורך
 ב-skill; ה-skill ושרת ה-MCP יכולים להתקיים זה לצד זה, והעוזר בוחר אחד
-מהם. יכולות הענן (`search`,‏ `image`,‏ `media`) עדיין עוברות דרך הספק
-שהוגדר ב-GenOffice; כל השאר רץ מקומית, ו-`GENOFFICE_ALLOWED_ROOTS` מגביל
+מהם. `GENOFFICE_ALLOWED_ROOTS` מגביל
 כל כלי לתיקיות שציינתם.
-
-מצגת האנרגיה המתחדשת בהדגמה למעלה היא איך שנראה פרומפט אחד ב-Claude Code
-עם שרת ה-MCP של `genoffice` בלבד מחובר, מצד הפרוטוקול:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-שלושים ושמונה קריאות, כשלוש עשרה דקות, והעוזר מעולם לא נגע בטרמינל: האיורים,
-התמונות, כל המדריכים, הבדיקות והרינדורים עברו כתוצאות של קריאות לכלי MCP. רק
-`search` ו-`media` יצאו מהמכונה, אל הספק המוגדר ב-GenOffice.
 
 <a id="download"></a>
 
@@ -485,9 +435,8 @@ GenOffice נמצאת בפיתוח פעיל, והמשוב שלכם מעצב או�
 <summary><b>האם GenOffice עובדת באופן לא מקוון?</b></summary>
 
 עריכת מסמכים מתבצעת באופן מקומי מלא — קבצים לעולם לא עוזבים את המכשיר שלכם
-כדי להיפתח, להיערך, להישמר או להיות מומרים. תכונות ה-AI (סוכנים, חיפוש,
-כלי תמונה) דורשות חיבור לרשת, עם התחברות ל-Genspark או עם מפתח API של מודל
-משלכם.
+כדי להיפתח, להיערך, להישמר או להיות מומרים. תכונות ה-AI (סוכנים, חיפוש, כלי
+תמונה) דורשות חיבור לרשת וחשבון UniWork.
 
 </details>
 
@@ -506,17 +455,6 @@ GenOffice נמצאת בפיתוח פעיל, והמשוב שלכם מעצב או�
 פריסה מבוסס גאומטריה, בלי שירות cloud ובלי העלאה. גם עמודים סרוקים מכוסים:
 ב-macOS וב-Windows ה-OCR של המערכת קורא אותם, כך שהם מומרים לטקסט הניתן
 לעריכה במקום לתמונת עמוד.
-
-</details>
-
-<details>
-<summary><b>האם אפשר להשתמש במודל AI או במפתח API משלי?</b></summary>
-
-כן. מעבר להתחברות ל-Genspark שאינה דורשת מפתח, GenOffice מאפשרת להביא מפתח
-משלכם עבור Claude,‏ OpenAI,‏ Gemini,‏ DeepSeek,‏ Kimi,‏ GLM,‏ Qwen,‏ Doubao,‏
-MiniMax,‏ Grok,‏ Mistral,‏ OpenRouter,‏ Requesty ו-OpenCode Zen/Go, וכן כל endpoint
-תואם-OpenAI — כולל שרתי מודלים מקומיים. חיפוש, יצירת תמונות וניתוח
-תמונה/וידאו דורשים מפתחות נפרדים תחת Settings → AI Media & Search.
 
 </details>
 

@@ -48,11 +48,7 @@ GenOffice는 macOS, Windows, Linux에서 사용할 수 있는 무료 오픈소�
 - **로컬 우선으로 설계되었습니다.** 파일은 사용자의 기기에서 열리고,
   편집되고, 저장되고, 변환됩니다. PDF → Word / Excel / PowerPoint,
   Markdown → Word, HTML → Word 변환 모두 기기 내에서 실행됩니다. 오직
-  AI 호출만 사용자가 선택한 공급자로 전송됩니다.
-- **API 키가 있어도, 없어도 됩니다.** Genspark로 로그인하면 키 없이 바로
-  사용할 수 있고, 원한다면 Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM,
-  Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty는 물론 OpenAI
-  호환 엔드포인트(로컬 서버 포함)까지 직접 가져올 수 있습니다.
+  AI 호출만 UniWork AI로 전송됩니다.
 - **스크립트로 다룰 수 있고, 에이전트가 바로 쓸 수 있습니다.** 앱에는
   `genoffice` 명령줄과 Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot,
   OpenCode, Windsurf용 스킬이 함께 제공되어, 코딩 에이전트가 창 하나 열지
@@ -181,7 +177,7 @@ Windsurf가 앱과 동일한 엔진을 통해 창을 열지 않고도 실제 Off
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="GenOffice 설정의 연동 페이지: genoffice 스킬이 Claude Code에 설치되어 있고, Codex와 Cursor 옆에는 설치 버튼이 표시된 화면"></td>
 </tr>
 <tr>
-<td><b>에이전트에게 프롬프트 하나</b> — "태양계에 관한 8장짜리 덱을 만들어줘." 에이전트는 스킬을 읽고 스타일 시트, 개요, 슬라이드마다 하나씩의 페이지 스펙을 작성하고, <code>genoffice image</code>로 사진 두 장을 생성하고, <code>genoffice slides check</code>가 넘치거나 겹치는 요소를 걸러낸 뒤, <code>genoffice create</code>로 <code>.pptx</code>를 조립하고 <code>slides render</code>로 슬라이드마다 PNG 한 장을 받아 확인합니다.</td>
+<td><b>에이전트에게 프롬프트 하나</b> — "태양계에 관한 8장짜리 덱을 만들어줘." 에이전트는 스킬을 읽고 스타일 시트, 개요, 슬라이드마다 하나씩의 페이지 스펙을 작성하고, <code>genoffice slides check</code>가 넘치거나 겹치는 요소를 걸러낸 뒤, <code>genoffice create</code>로 <code>.pptx</code>를 조립하고 <code>slides render</code>로 슬라이드마다 PNG 한 장을 받아 확인합니다.</td>
 <td><b>설정 → 연동에서 한 번만 설치</b> — GenOffice가 이 컴퓨터에서 찾은 코딩 에이전트를 나열하고, 선택한 각 에이전트에 스킬을 기록합니다. 스킬을 zip으로 내려받거나 <code>npx skills add genspark-ai/genoffice</code>를 실행해도 됩니다. 명령과 전체 워크플로는 <a href="#command-line-and-agent-skill">명령줄과 에이전트 스킬</a>에 있습니다.</td>
 </tr>
 </table>
@@ -194,15 +190,11 @@ Cursor 및 다른 모든 MCP 클라이언트는 스킬을 설치하거나 창을
 얻을 수 있습니다. 앱 내부의 두 번째 HTTP 서버를 사용하면 에이전트가 눈에
 보이는 편집기 탭에서 Word 문서를 만드는 과정을 지켜볼 수도 있습니다.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Claude Code가 genoffice MCP 서버로 8장짜리 재생에너지 투자 브리핑 덱을 만드는 과정의 타임랩스: search로 도표와 사진을 찾고 media로 각 후보 사진을 확인한 뒤, deck_start가 스타일 시트와 개요를 작성하고, deck_page가 검사를 마친 페이지를 한 장씩 추가하며, deck_build가 .pptx를 조립하고 slides_render가 슬라이드마다 이미지를 돌려줍니다. 완성된 덱은 이후 GenOffice Slides에서 열립니다" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides가 Claude Code가 genoffice MCP 서버로 만든 8장짜리 재생에너지 2026 덱을 보여주는 화면: 캔버스에는 풍력 발전 단지 사진이 있는 표지 슬라이드, 왼쪽에는 여덟 개의 축소판"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice 설정의 연동 페이지, MCP 부분: Claude Code용 한 줄짜리 claude mcp add 명령, Cursor, Claude Desktop 및 다른 MCP 클라이언트용 JSON 블록, 그 아래의 로컬 HTTP 서버 옵션"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice 설정의 연동 페이지, MCP 부분: Claude Code용 한 줄짜리 claude mcp add 명령, Cursor, Claude Desktop 및 다른 MCP 클라이언트용 JSON 블록, 그 아래의 로컬 HTTP 서버 옵션"></td>
 </tr>
 <tr>
-<td><b>프롬프트 하나, 도구 호출 서른여덟 번, 터미널 없이</b> — "2026년 재생에너지에 관한 8장짜리 투자 브리핑을 만들어줘. 표지와 사진이 도움이 될 만한 곳에는 실제 사진을 넣어줘." 에이전트는 <code>search</code>로 도표와 사진을 가져오고, <code>media</code>로 각 후보 사진이 실제 사진인지 확인한 다음, 스타일 시트와 개요를 담아 <code>deck_start</code>를 호출하고, 이어서 슬라이드마다 <code>deck_page</code>를 호출합니다. 모든 페이지는 개요와 팔레트에 맞는지 검사를 통과해야 유지되며, <code>deck_build</code>가 <code>.pptx</code>를 조립하고, <code>slides_audit</code>이 넘치는 부분을 찾고, <code>slides_render</code>가 모델이 볼 수 있는 이미지 콘텐츠로 슬라이드마다 PNG를 돌려주면, 마지막으로 <code>deck_replace</code>가 마음에 들지 않았던 세 페이지를 고칩니다.</td>
 <td><b>설정 → 연동에서 한 번만 연결</b> — Claude Code용 <code>claude mcp add</code> 명령을 복사하거나, JSON 블록을 Cursor, Claude Desktop 또는 다른 MCP 클라이언트에 붙여넣으세요. 옵션 B는 눈에 보이는 Word 편집기를 위한 로컬 HTTP 서버를 켭니다. 두 방법 모두 <a href="#mcp-server">MCP 서버</a>에 설명되어 있습니다.</td>
 </tr>
 </table>
@@ -217,9 +209,6 @@ Cursor 및 다른 모든 MCP 클라이언트는 스킬을 설치하거나 창을
 - **문서를 직접 편집하는 AI.** Docs에서는 변경 내용 추적, Sheets에서는 실시간으로
   동작하는 수식과 차트, 슬라이드는 캔버스 위에 그려지며, AI가 한 번 작업할 때마다
   되돌릴 수 있는 스냅샷이 남습니다.
-- **내 모델, 내 키.** Genspark로 로그인하거나 Claude, OpenAI, Gemini, DeepSeek
-  등의 키를 사용할 수 있으며, 로컬 서버와 모든 OpenAI 호환 엔드포인트도 지원합니
-  다.
 - **PDF도 제대로.** 페이지 안에서 텍스트를 직접 편집하고, 기기 내에서 PDF를
   Word, Excel, PowerPoint로 변환하며, 스캔 문서는 시스템 OCR을 사용합니다.
 - **Markdown과 HTML도 지원**하며, 동일한 AI 패널과 로컬 Word 내보내기를 사용합
@@ -228,22 +217,6 @@ Cursor 및 다른 모든 MCP 클라이언트는 스킬을 설치하거나 창을
   서버가 모든 엔진을 Claude Code, Claude Desktop, Codex, Cursor 및 다른
   에이전트가 쓸 수 있게 하며, 이 역시 기기 내에서 동작합니다.
 - **무료**로 개인과 팀 모두 사용할 수 있습니다.
-
-## AI 백엔드
-
-**Genspark로 로그인**하면 별도 설정이 전혀 필요 없습니다. 모델 호출은
-Genspark 프록시(Claude, GPT, Gemini 계열)를 거치고, 에이전트는 웹 및
-이미지 검색, 이미지 생성, 이미지/오디오/비디오 분석 기능까지 사용할 수
-있습니다.
-
-**직접 키를 가져올 수도 있습니다.** 설정 → AI에는 Claude, OpenAI, Gemini,
-DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty,
-OpenCode Zen/Go가 있으며, 로컬 모델 서버를 포함한 모든 OpenAI 호환
-엔드포인트(기본 URL + 키)를 위한 사용자 지정 슬롯도 제공됩니다. 검색과
-미디어는 **AI 미디어 및 검색**에서 기능별로 별도 공급자를 설정할 수
-있습니다: 웹 검색은 Serper 또는 Tavily, 이미지 생성과 이미지/비디오
-분석은 OpenAI, Gemini, Doubao/Seedream, GLM, Grok, Qwen, MiniMax 또는
-OpenAI 호환 이미지 엔드포인트 중에서 선택합니다.
 
 전체 제품군은 라이트, 다크, 시스템 테마를 지원합니다. 테마는 화면에
 보이는 모습만 바꿀 뿐입니다: 내보내기, 인쇄, 저장된 파일은 항상 문서
@@ -302,9 +275,8 @@ genoffice open sales.xlsx                          # hand the result to the edit
 넘어가기 전에 매 단계를 검사했습니다:
 
 ```bash
-genoffice capabilities --json                        # which cloud tools GenOffice has configured
+genoffice capabilities --json                        # whether the app is installed
 genoffice guide slides design                        # the deck workflow and layout library
-genoffice image "the eight planets in a row …" --aspect 16:9 --out deck/assets/cover.jpg
 genoffice slides check deck/outline.json --json      # 8 pages, no findings
 genoffice slides check deck/pages/01.json --json     # builds one slide, audits overflow and overlap
 …                                                    # one page file per slide, fixed until each check is clean
@@ -328,10 +300,10 @@ GenOffice나 PowerPoint에서 열립니다.
 어시스턴트를 위한 방법입니다. 연결 방법은 두 가지이며, 둘 다 **설정 → 연동 →
 MCP**에 바로 복사할 수 있는 코드 조각으로 안내되어 있습니다:
 
-| 방법                          | 설명                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A · `genoffice mcp`**(권장) | 어시스턴트가 직접 실행하는 stdio 서버로, GenOffice가 열려 있을 필요가 없습니다. 명령마다 도구가 하나씩 있습니다(`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `search`, `image`, `media`, `open`). 여기에 단계별 덱 흐름 `deck_start` → `deck_page` → `deck_build` → `deck_replace`가 더해집니다. Ops, 스펙, Markdown이 모두 인라인으로 전달되므로 파일 시스템이 없는 클라이언트도 문제없이 동작합니다. |
-| **B · 로컬 HTTP 서버**        | GenOffice 앱 내부에서 `http://127.0.0.1:3093/mcp`(Streamable HTTP, 레거시 SSE 지원)로 실행됩니다. 이 도구들은 눈에 보이는 Word 편집기 탭을 움직입니다: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`이며, 문서가 만들어지는 과정을 직접 지켜볼 수 있습니다. 기본값은 꺼짐이며, 같은 설정 화면에서 켤 수 있습니다.                                                                                                                                                       |
+| 방법                          | 설명                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A · `genoffice mcp`**(권장) | 어시스턴트가 직접 실행하는 stdio 서버로, GenOffice가 열려 있을 필요가 없습니다. 명령마다 도구가 하나씩 있습니다(`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `open`). 여기에 단계별 덱 흐름 `deck_start` → `deck_page` → `deck_build` → `deck_replace`가 더해집니다. Ops, 스펙, Markdown이 모두 인라인으로 전달되므로 파일 시스템이 없는 클라이언트도 문제없이 동작합니다. |
+| **B · 로컬 HTTP 서버**        | GenOffice 앱 내부에서 `http://127.0.0.1:3093/mcp`(Streamable HTTP, 레거시 SSE 지원)로 실행됩니다. 이 도구들은 눈에 보이는 Word 편집기 탭을 움직입니다: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`이며, 문서가 만들어지는 과정을 직접 지켜볼 수 있습니다. 기본값은 꺼짐이며, 같은 설정 화면에서 켤 수 있습니다.                                                                                                                           |
 
 ```bash
 # Claude Code
@@ -348,30 +320,8 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 화면에서 실제 설치 경로를 확인할 수 있습니다). 이 서버는 자체 워크플로
 안내를 담고 있고, 작업 레퍼런스를 `genoffice://guide/*` 리소스로 노출하므로
 별도의 스킬이 필요 없습니다. 스킬과 MCP 서버는 함께 존재할 수 있으며,
-어시스턴트가 둘 중 하나를 선택해 사용합니다. 클라우드 기능(`search`,
-`image`, `media`)은 여전히 GenOffice에 설정된 공급자를 거치며, 그 밖의
-모든 기능은 로컬에서 동작하고, `GENOFFICE_ALLOWED_ROOTS`가 모든 도구를
+어시스턴트가 둘 중 하나를 선택해 사용합니다. `GENOFFICE_ALLOWED_ROOTS`가 모든 도구를
 지정한 폴더로 제한합니다.
-
-위의 데모에 나온 재생에너지 덱은, `genoffice` MCP 서버만 연결한 Claude
-Code에서 프롬프트 하나가 프로토콜 수준에서 어떻게 보이는지를 보여줍니다:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-서른여덟 번의 호출, 약 13분, 그리고 어시스턴트는 터미널을 한 번도 건드리지 않았습니다: 도표, 사진, 가이드, 검사, 렌더링 결과가 모두 MCP 도구 결과로 오갔습니다. 기기를 벗어난 것은 `search`와 `media`뿐이며, GenOffice에 설정된 제공업체로 전달되었습니다.
 
 <a id="download"></a>
 
@@ -492,10 +442,8 @@ GenOffice는 활발히 개발되고 있으며, 여러분의 피드백이 그 방
 <details>
 <summary><b>GenOffice는 오프라인에서도 동작하나요?</b></summary>
 
-문서 편집은 완전히 로컬에서 이루어집니다 — 파일을 열고, 편집하고,
-저장하고, 변환하는 과정에서 파일이 기기를 벗어나지 않습니다. AI
-기능(에이전트, 검색, 이미지 도구)은 네트워크 연결이 필요하며, Genspark
-로그인 또는 직접 발급받은 모델 API 키가 있어야 합니다.
+문서 편집은 완전히 로컬에서 이루어집니다 — 파일을 열고, 편집하고, 저장하고, 변환하는 과정에서 파일이 기기를 벗어나지 않습니다. AI
+기능(에이전트, 검색, 이미지 도구)은 네트워크 연결과 UniWork 계정이 필요합니다.
 
 </details>
 
@@ -515,18 +463,6 @@ GenOffice는 활발히 개발되고 있으며, 여러분의 피드백이 그 방
 기하학 기반 레이아웃 분석만 사용하며, 클라우드 서비스나 업로드가 필요
 없습니다. 스캔된 페이지도 지원합니다: macOS와 Windows에서는 시스템 OCR이
 텍스트를 인식해 페이지 이미지가 아니라 편집 가능한 텍스트로 변환됩니다.
-
-</details>
-
-<details>
-<summary><b>제 AI 모델이나 API 키를 직접 사용할 수 있나요?</b></summary>
-
-네. 키가 필요 없는 Genspark 로그인 외에도, GenOffice는 Claude, OpenAI,
-Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral,
-OpenRouter, Requesty, OpenCode Zen/Go를 위한 직접 키 사용을 지원하며, 로컬 모델
-서버를 포함한 모든 OpenAI 호환 엔드포인트도 사용할 수 있습니다. 검색,
-이미지 생성, 이미지/비디오 분석은 설정 → AI 미디어 및 검색에서 별도의
-키를 설정합니다.
 
 </details>
 

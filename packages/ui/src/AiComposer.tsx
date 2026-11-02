@@ -107,16 +107,13 @@ export function AiComposer({
   const autoSentenceId = `ai-uniwork-disclosure-sentence-${autoId}`
   const autoNeedsAckId = `ai-uniwork-send-needs-ack-${autoId}`
 
-  // no key or no known model (web): send stays off and the hint says why
+  // UniWork AI is not on here: send stays off and the hint says why
   const needModelHint = useAiModelNeedHint()
   const needModelAction = useAiModelNeedAction()
   const { spellcheck } = useAiPanelPrefs()
 
   const hasUniworkFeatures = uniwork !== undefined || viewOnly !== undefined
-  const uniworkActive = Boolean(
-    uniwork &&
-    (uniwork.active ?? (uniwork.provider === undefined || uniwork.provider === 'uniwork')),
-  )
+  const uniworkActive = uniwork !== undefined
   const resolvedLang: Lang = uniwork?.lang ?? lang ?? 'vi'
   const resolvedViewOnly = Boolean(viewOnly ?? uniwork?.viewOnly)
   const resolvedPopupOpen = Boolean(popupOpen ?? uniwork?.popupOpen)
@@ -131,7 +128,11 @@ export function AiComposer({
   const renderInlineDisclosure = Boolean(disclosureCfg && (disclosureCfg.renderInline ?? true))
   const sentenceId = disclosureCfg?.sentenceId ?? autoSentenceId
 
-  const canSend = value.trim().length > 0 && !busy && needModelHint === null && !unacked
+  // a composer note means UniWork AI cannot answer (signed out, no credits, …): Send waits for it,
+  // as in Slides, unless the panel answers without UniWork AI then (Sheets' fixed planner)
+  const noteBlocksSend = Boolean(uniwork?.note) && uniwork?.noteGatesSend !== false
+  const canSend =
+    value.trim().length > 0 && !busy && needModelHint === null && !unacked && !noteBlocksSend
 
   // the panel's queue honours the same disclosure gate as Send: a held message must not reach
   // UniWork AI before the user has acknowledged the disclosure
@@ -257,7 +258,7 @@ export function AiComposer({
         }}
       />
       {iconOnly && needModelHint !== null && !busy && (
-        // the icon-only footer has no room for the hint line: it sits above it, and opens the AI settings
+        // the icon-only footer has no room for the hint line: it sits above it, and opens the account settings
         <div className="ai-input-need" role="status">
           {needModelAction ? (
             <button type="button" className="ai-input-need-link" onClick={needModelAction}>
@@ -329,10 +330,7 @@ export function AiComposer({
         <UniworkComposerNote
           note={uniwork.note}
           lang={resolvedLang}
-          provider={uniwork.provider ?? (uniworkActive ? 'uniwork' : 'other')}
           onAction={uniwork.onNoteAction}
-          onChooseProvider={uniwork.onChooseProvider}
-          onChooseOtherProvider={uniwork.onChooseOtherProvider}
           onSignIn={uniwork.onSignIn}
           onAnnounce={announce}
         />

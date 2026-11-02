@@ -61,6 +61,12 @@ export interface HtmlDocAccess {
   getEditFence?(): readonly number[] | null
   /** live predicate: the page is a UniWork working copy (hides the whole-page writers, C-BOUND) */
   uniworkBound?(): boolean
+  /**
+   * live predicate: the host reaches the UniWork AI writer route (the web frame). The desktop has
+   * none: false hides and refuses the whole-page writers (BOUND_HIDDEN_TOOLS) and says so in the
+   * prompt. Unset reads as true.
+   */
+  uniworkWriterRoute?(): boolean
 }
 
 export type PlanMode = 'new' | 'redesign' | 'restyle' | 'extract'
@@ -1022,6 +1028,14 @@ function refuseBound(name: string): ToolExecution {
 const VIEW_ONLY_NOTE =
   '\n\nNote: this document is view-only. You can read it and answer questions about it, but you cannot edit it: no edit tools are available. If the user asks for a change, explain that the document is view-only and that they can save a copy to edit it.'
 
+/** the page and document writers run only where the host reaches the UniWork AI writer route */
+const WRITER_OFF_NOTE =
+  '\n\nNote: plan_page and write_document are not available here. Edit the open page with the editing tools; do not offer to generate a new page in one go.'
+
+function refuseWriter(name: string): ToolExecution {
+  return { output: `${name} is not available here`, isError: true, mutated: false, summary: name }
+}
+
 const BOUND_NOTE =
   '\n\nNote: this is a UniWork document. plan_page and write_document are unavailable on it; do not call or promise them. Do restyles, theme changes and structural edits with apply_ops on the existing page (incl. the --brief-* CSS variables); never replace the whole document.'
 
@@ -1033,22 +1047,26 @@ export function createHtmlSkill(
   isReadOnly?: () => boolean,
 ): AgentSkill {
   const core = createHtmlSkillCore(access, isReadOnly)
+  const writerRoute = (): boolean => access.uniworkWriterRoute?.() ?? true
   return {
     id: 'html',
     // live: the predicate is re-read before every model request
     get systemPrompt() {
       const prompt = typeof systemPrompt === 'string' ? systemPrompt : systemPrompt.systemPrompt
+      const bound = access.uniworkBound?.() === true
       return (
         prompt +
         (isReadOnly?.() ? VIEW_ONLY_NOTE : '') +
-        (access.uniworkBound?.() && !isReadOnly?.() ? BOUND_NOTE : '')
+        (bound && !isReadOnly?.() ? BOUND_NOTE : '') +
+        // the bound note already says the writers are gone
+        (!bound && !isReadOnly?.() && !writerRoute() ? WRITER_OFF_NOTE : '')
       )
     },
     get tools() {
       // a bound page keeps the editing tools but loses the whole-page writers;
       // a view-only bound page still reads only (the narrower list wins)
       if (isReadOnly?.()) return AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name))
-      if (access.uniworkBound?.() === true)
+      if (access.uniworkBound?.() === true || !writerRoute())
         return AGENT_TOOLS.filter((t) => !BOUND_HIDDEN_TOOLS.has(t.name))
       return AGENT_TOOLS
     },
@@ -1056,6 +1074,7 @@ export function createHtmlSkill(
     executeTool: (call, signal) => {
       if (access.uniworkBound?.() === true && BOUND_HIDDEN_TOOLS.has(call.name))
         return refuseBound(call.name)
+      if (!writerRoute() && BOUND_HIDDEN_TOOLS.has(call.name)) return refuseWriter(call.name)
       if (isReadOnly?.() && !READ_ONLY_TOOLS.has(call.name)) {
         return {
           output: 'This document is view-only; it cannot be edited.',

@@ -8,7 +8,6 @@ export const ja = {
   aiStarterPolishAll: '全文を推敲してよりプロフェッショナルな文体に',
   aiStarterContinue: '今の内容の続きを書いて',
   aiStarterFillTemplate: '文書内のプレースホルダーを見つけて埋めて',
-  aiOpenSettingsBtn: 'AI 設定を開く',
   aiPanelTitle: 'UniAI',
   aiOpenAssistant: 'AI アシスタントを開く',
   aiSummarizeBtn: 'AI 要約',
@@ -130,8 +129,6 @@ export const ja = {
   aiOverloadedError: 'AI サービスが混み合っています。しばらくしてからもう一度お試しください',
   aiNetworkError:
     'ネットワークに問題があり、AI サービスに接続できません。接続を確認して再試行してください',
-  aiCreditsExhausted:
-    'UniWorkクレジットを使い切りました。uniworkos.com/pricing でチャージしてから再試行してください',
   aiSumReadAttachment: '添付ファイルを読み取り',
   aiSumImageAttachment: '画像添付 {name}',
   aiSumRead: '{name} を読み取り',

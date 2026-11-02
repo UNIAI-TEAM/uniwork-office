@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   AiStreamChunk,
   AiStreamRequest,
@@ -6,14 +9,17 @@ import type {
   UniworkChatRequest,
   UniworkChatTransport,
   UniworkScope,
+  UniworkCloudStatus,
   UniworkTurnRequest,
 } from '@genoffice/ai-provider'
 import {
   UniworkError,
   defaultAiSettings,
+  setUniworkCloudStatus,
   streamUniwork,
   uniworkErrorKey,
 } from '@genoffice/ai-provider'
+import { uniworkToolPolicy } from '../src/main/uniwork-auth/tool-policy'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { TransportError, type FetchLike } from '../src/main/uniwork-auth/transport'
 import {
@@ -677,5 +683,40 @@ describe('ai:stream uniwork runner', () => {
     cloud = true
     await run(streams).done
     expect(policies).toEqual([{ cloudTools: false }, { cloudTools: true }])
+  })
+})
+
+describe('uniworkToolPolicy', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'uniwork-tool-policy-'))
+  const file = join(dir, 'ai-settings.json')
+  afterEach(() => setUniworkCloudStatus(null))
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  const ready = {
+    state: 'ready',
+    enabled: true,
+    tools: { web_search: true, image_search: true, image_generate: true, media_analyze: true },
+    credits: null,
+  } as unknown as UniworkCloudStatus
+
+  it('offers cloud tools while the org has cloud AI and the switch is on (or never set)', () => {
+    setUniworkCloudStatus(ready)
+    writeFileSync(file, JSON.stringify({ provider: 'uniwork', providers: {} }))
+    expect(uniworkToolPolicy(file)).toEqual({ cloudTools: true })
+    writeFileSync(file, JSON.stringify({ gskToolsEnabled: true }))
+    expect(uniworkToolPolicy(file)).toEqual({ cloudTools: true })
+  })
+
+  it('withholds cloud tools when the switch is off even though the org has cloud AI', () => {
+    setUniworkCloudStatus(ready)
+    writeFileSync(
+      file,
+      JSON.stringify({ provider: 'uniwork', providers: {}, gskToolsEnabled: false }),
+    )
+    expect(uniworkToolPolicy(file)).toEqual({ cloudTools: false })
+  })
+
+  it('withholds cloud tools without office.ai_cloud whatever the switch says', () => {
+    writeFileSync(file, JSON.stringify({ gskToolsEnabled: true }))
+    expect(uniworkToolPolicy(file)).toEqual({ cloudTools: false })
   })
 })

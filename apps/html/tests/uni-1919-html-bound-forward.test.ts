@@ -8,8 +8,10 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { AgentStreamCallbacks, AgentStreamRequest } from '@genoffice/agent-core'
 import { buildParseMap } from '../src/renderer/document/parse-map'
+import { resetForTest } from '../src/renderer/capabilities'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { usableAiSettings } from './helpers/ai-settings'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 /**
  * What the panel's transport sees. `reply` decides what the first non-one-shot
@@ -91,16 +93,23 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
     root = null
     container = null
     vi.unstubAllGlobals()
+    resetForTest()
+    resetUniworkAi()
   })
 
   /**
    * Mounts the panel over a one-section document (or a blank one). `bound` is
    * what App feeds deps.access.uniworkBound (the shared uniworkBoundForAi
    * rule); `flip` changes it later on the same mounted panel. Returns a spy on
-   * replaceAll: on a bound page no tool may rewrite the document.
+   * replaceAll: on a bound page no tool may rewrite the document. `web` mounts it as the web frame,
+   * the one host that reaches the UniWork AI writer route; the desktop has none (UNI-2309).
    */
-  async function mount(initialBound: boolean, opts: { blank?: boolean; readOnly?: boolean } = {}) {
+  async function mount(
+    initialBound: boolean,
+    opts: { blank?: boolean; readOnly?: boolean; web?: boolean } = {},
+  ) {
     let bound = initialBound
+    readyUniworkAi('/tmp/page.html')
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', {
@@ -108,7 +117,10 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
       setItem: () => {},
       removeItem: () => {},
     })
-    const bridgeStubs: Record<string, unknown> = {}
+    const bridgeStubs: Record<string, unknown> = opts.web
+      ? { capabilities: { platform: 'web' } }
+      : {}
+    resetForTest()
     vi.stubGlobal(
       'htmlApi',
       new Proxy(bridgeStubs, {
@@ -191,8 +203,8 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
     expect(names).toContain('get_outline')
   })
 
-  it('an unbound page still offers the whole-page writers', async () => {
-    await mount(false)
+  it('an unbound page in the web frame still offers the whole-page writers', async () => {
+    await mount(false, { web: true })
     harness.reset('text')
     enqueueInComposer(container!, 'improve the heading')
     await pumpUntil(() => harness.requests.length >= 1, 'first turn request')
@@ -222,7 +234,7 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
   })
 
   it('follows a bound flip on one mounted panel: writers offered, then gone, with the note', async () => {
-    const { flip } = await mount(false)
+    const { flip } = await mount(false, { web: true })
     harness.reset('text')
     enqueueInComposer(container!, 'improve the heading')
     await pumpUntil(() => harness.requests.length >= 1, 'turn 1 request')
@@ -264,7 +276,7 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
       )
 
     it('an unbound blank page keeps both intent cards and the WRITE directive', async () => {
-      await mount(false, { blank: true })
+      await mount(false, { blank: true, web: true })
       expect(intentCards()).toHaveLength(2)
       const write = container!.querySelectorAll<HTMLElement>('.ai-intent-card')[1]
       act(() => write.click())
@@ -280,8 +292,23 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
       expect(container!.querySelector('.ai-intent-bar')).toBeNull()
     })
 
+    it('an unbound blank page on the desktop shows no intent bar and sends no WRITE directive (UNI-2309)', async () => {
+      await mount(false, { blank: true })
+      expect(container!.querySelector('.ai-intent-bar')).toBeNull()
+      harness.reset('text')
+      enqueueInComposer(container!, 'draft a memo')
+      await pumpUntil(() => harness.requests.length >= 1, 'first turn request')
+      const request = harness.requests[0]
+      const first = request.messages.find((m) => m.role === 'user')
+      expect(first && first.role === 'user' ? first.text : '').not.toContain('WRITE CONTENT')
+      const names = request.tools.map((tool) => tool.name)
+      expect(names).not.toContain('plan_page')
+      expect(names).not.toContain('write_document')
+      expect(request.system).toContain('plan_page and write_document are not available here')
+    })
+
     it('a write intent picked before the page became bound is dropped from the next turn', async () => {
-      const { flip } = await mount(false, { blank: true })
+      const { flip } = await mount(false, { blank: true, web: true })
       const write = container!.querySelectorAll<HTMLElement>('.ai-intent-card')[1]
       act(() => write.click())
       flip(true)
@@ -295,7 +322,7 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
     })
 
     it('a stale write intent keeps the design empty-state copy once the page is bound', async () => {
-      const { flip } = await mount(false, { blank: true })
+      const { flip } = await mount(false, { blank: true, web: true })
       const write = container!.querySelectorAll<HTMLElement>('.ai-intent-card')[1]
       act(() => write.click())
       flip(true)

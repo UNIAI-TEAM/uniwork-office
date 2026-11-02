@@ -2,9 +2,6 @@ import type { zh } from './zh'
 import { sharedAskUni } from './shared'
 
 export const ko = {
-  askUniModeGroup: '모드',
-  askUniModeChat: '어시스턴트',
-  askUniModeAsk: 'UNI에게 질문',
   askUniTitle: 'UNI에게 질문',
   askUniDescription: 'UNI는 이 워크스페이스에서 볼 수 있는 데이터만 근거로 출처와 함께 답합니다.',
   askUniWorkspace: '워크스페이스',

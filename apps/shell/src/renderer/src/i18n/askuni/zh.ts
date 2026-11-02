@@ -1,6 +1,6 @@
 import { sharedAskUni } from './shared'
 
-/** Ask UNI mode of the shell Home My AI: workspace Q&A with sources; zh defines the key set */
+/** Ask UNI pane of the shell Home: workspace Q&A with sources; zh defines the key set */
 export const zh = {
   // frame: header, history, composer, pickers, empty state
   askUniV2Untitled: '新对话',
@@ -64,9 +64,6 @@ export const zh = {
   askUniV2SuggestionOverdue: '哪些任务已逾期？',
   askUniV2SuggestionMeetings: '本周的会议讨论了什么？',
   askUniV2SuggestionChat: '哪些消息需要回复？',
-  askUniModeGroup: '模式',
-  askUniModeChat: '助手',
-  askUniModeAsk: '问 UNI',
   askUniTitle: '问 UNI',
   askUniDescription: 'UNI 只根据你在此工作区可查看的数据回答，并附上来源。',
   askUniWorkspace: '工作区',
