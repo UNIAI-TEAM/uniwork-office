@@ -128,7 +128,11 @@ export function AiComposer({
   const renderInlineDisclosure = Boolean(disclosureCfg && (disclosureCfg.renderInline ?? true))
   const sentenceId = disclosureCfg?.sentenceId ?? autoSentenceId
 
-  const canSend = value.trim().length > 0 && !busy && needModelHint === null && !unacked
+  // a composer note means UniWork AI cannot answer (signed out, no credits, …): Send waits for it,
+  // as in Slides, unless the panel answers without UniWork AI then (Sheets' fixed planner)
+  const noteBlocksSend = Boolean(uniwork?.note) && uniwork?.noteGatesSend !== false
+  const canSend =
+    value.trim().length > 0 && !busy && needModelHint === null && !unacked && !noteBlocksSend
 
   // the panel's queue honours the same disclosure gate as Send: a held message must not reach
   // UniWork AI before the user has acknowledged the disclosure

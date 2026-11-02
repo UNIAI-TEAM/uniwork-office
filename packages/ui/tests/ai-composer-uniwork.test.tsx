@@ -217,6 +217,26 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
     expect(viewOnlyEl).not.toBeNull()
     expect(viewOnlyEl!.textContent).toBe(aiUniworkText('vi', 'aiUniworkViewOnly'))
   })
+
+  it('keeps Send and Enter off while a composer note shows, unless the note does not gate Send (Sheets) (UNI-2309)', () => {
+    const signedOut = composerNoteFor({ uniworkSelected: true, cloudState: 'signed-out' })!
+    const blocked = renderComposer({ uniwork: { note: signedOut } })
+    const send = host.querySelector<HTMLButtonElement>('.ai-send-btn')!
+    expect(send.disabled).toBe(true)
+    const textarea = host.querySelector<HTMLTextAreaElement>('textarea')!
+    act(() => {
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    expect(blocked.onSend).not.toHaveBeenCalled()
+
+    // Sheets: its fixed planner answers while UniWork AI cannot, so the note only informs
+    const open = renderComposer({ uniwork: { note: signedOut, noteGatesSend: false } })
+    const sheetsSend = host.querySelector<HTMLButtonElement>('.ai-send-btn')!
+    expect(host.querySelector('.ai-uniwork-composer-note')).not.toBeNull()
+    expect(sheetsSend.disabled).toBe(false)
+    act(() => sheetsSend.click())
+    expect(open.onSend).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('AiComposer — First-use disclosure & local-file variant (S8 + G05BE-6)', () => {

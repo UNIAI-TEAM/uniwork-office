@@ -1226,6 +1226,8 @@ export function AiChatPanel({
             uniwork={{
               lang,
               note: composerNoteState,
+              // the note only informs here: the fixed planner answers while UniWork AI cannot
+              noteGatesSend: false,
               onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
               onAnnounce: setComposerAnnouncement,
               onSendBlockedChange: uniworkGate.onSendBlockedChange,

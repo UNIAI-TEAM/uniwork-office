@@ -288,8 +288,13 @@ export interface AiComposerUniworkDisclosureConfig {
 export interface AiComposerUniworkProps {
   /** UI language for `ai-uniwork` strings (default `'vi'`) */
   readonly lang?: Lang | undefined
-  /** Active composer note above the composer (from `composerNoteFor`) */
+  /** Active composer note above the composer (from `composerNoteFor`); Send stays off while it is set */
   readonly note?: ComposerNote | null | undefined
+  /**
+   * false: the note only informs and Send stays open while it shows (Sheets answers then with its
+   * fixed planner). Default true
+   */
+  readonly noteGatesSend?: boolean | undefined
   /** Invoked when the user clicks the composer note's action button */
   readonly onNoteAction?: ((action: ComposerNoteAction, note: ComposerNote) => void) | undefined
   /** Invoked when the user clicks "Đăng nhập" on a `signed-out` composer note */

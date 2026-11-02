@@ -5,7 +5,13 @@
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defaultAiSettings, setUniworkAiAvailable, type AiSettings } from '@genoffice/ai-provider'
+import {
+  composerNoteFor,
+  defaultAiSettings,
+  setUniworkAiAvailable,
+  type AiSettings,
+  type ComposerNote,
+} from '@genoffice/ai-provider'
 import { AiComposer } from '../src/AiComposer'
 import { AiModelPicker, type AiModelPickerBridge } from '../src/AiModelPicker'
 import { AI_MODEL_PICKER_STRINGS } from '../src/strings-ai-model-picker'
@@ -31,6 +37,7 @@ async function mountPickerAndComposer(
   settings: AiSettings,
   bridgeOverrides: Partial<AiModelPickerBridge> = {},
   gatesSend = true,
+  note: ComposerNote | null = null,
 ) {
   const bridge: AiModelPickerBridge = {
     getSettings: async () => settings,
@@ -50,6 +57,7 @@ async function mountPickerAndComposer(
         onChange: () => {},
         onSend: () => {},
         onStop: () => {},
+        ...(note ? { uniwork: { lang: 'en' as const, note } } : {}),
       }),
     )
   })
@@ -86,6 +94,29 @@ describe('AiModelPicker: UniWork AI is the one provider', () => {
     // the chip no longer closes Send here; a panel's composer note does, and says why
     expect(send.disabled).toBe(false)
     expect(hint).toBe('Enter to send')
+  })
+
+  it('desktop: the host flag is off in every cloud state but ready, so credits used up shows the note alone and keeps Send off', async () => {
+    // the shell offers UniWork AI only while the cloud reads ready; its snapshot has no
+    // hasCompletedRead (it is null until the first read completed)
+    setUniworkAiAvailable(false)
+    const { send, hint } = await mountPickerAndComposer(
+      defaultAiSettings(),
+      {
+        getCloudStatus: async () => ({
+          state: 'credits-exhausted',
+          signedIn: true,
+          enabled: true,
+        }),
+      },
+      true,
+      composerNoteFor({ uniworkSelected: true, cloudState: 'credits-exhausted', signedOut: false }),
+    )
+    expect(hint).toBe('Enter to send')
+    expect(host.querySelector('.ai-uniwork-composer-note')?.getAttribute('data-note-kind')).toBe(
+      'credits-exhausted',
+    )
+    expect(send.disabled).toBe(true)
   })
 
   it('signed out gives no hint either, though the host flag is off: the composer note asks to sign in', async () => {

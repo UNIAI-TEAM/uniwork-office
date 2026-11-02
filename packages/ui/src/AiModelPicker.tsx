@@ -203,11 +203,18 @@ export function AiModelPicker({
 
   // UniWork AI cannot answer while the host does not offer it (no organization, the capability or
   // the format off): the composer's send stays off and the hint says so, with the account settings
-  // as the way out. Signed out, out of credits or unavailable is the composer note's to name, so
-  // the hint stays away rather than give a second, contradicting reason
-  const signedOut = cloudStatus?.state === 'signed-out' || cloudStatus?.signedIn === false
+  // as the way out. Once a cloud read has completed in any state but ready (signed out, not
+  // entitled, inactive, out of credits, unavailable) the composer note names the reason and keeps
+  // Send off, so the hint stays away rather than give a second, contradicting reason. The desktop
+  // flag is off in all of those states, so the flag alone cannot tell them apart
+  const cloudNoteOwnsReason =
+    cloudStatus !== null &&
+    cloudStatus.hasCompletedRead !== false &&
+    (cloudStatus.state !== 'ready' || cloudStatus.signedIn === false)
   const needHint =
-    gatesSend && settings !== null && !uniworkAiAvailable() && !signedOut ? strings.needModel : null
+    gatesSend && settings !== null && !uniworkAiAvailable() && !cloudNoteOwnsReason
+      ? strings.needModel
+      : null
   const openSettings = bridge.openModelSettings
   const openSettingsOnce = useCallback(() => {
     void openSettings?.()
