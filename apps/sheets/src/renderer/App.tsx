@@ -88,7 +88,6 @@ import {
   isUniworkRefusalErrorKey,
   useAutoSavePref,
   useCloudSignedIn,
-  useAiModelNeedHint,
   addTokenUsage,
   ImageViewer,
   type AiTokenUsageView,
@@ -1250,9 +1249,6 @@ export function App({
   const { loggedInRef: gskLoggedInRef, refresh: refreshGskStatus } = useCloudSignedIn(() =>
     window.desktopApi?.aiGskStatus(),
   )
-  // UniWork AI not offered keeps every send entry of the open panel closed - presets, retry, queue
-  // and selection ask included - the hint says why
-  const needModelHint = useAiModelNeedHint()
   const [aiBusy, setAiBusy] = useState(false)
   /** ask_clarification card waiting for the user; its resolver unblocks the tool */
   const [aiClarify, setAiClarify] = useState<readonly ClarifyQuestion[] | null>(null)
@@ -3976,7 +3972,7 @@ export function App({
     displayText?: string,
   ): boolean {
     const instruction = (overrideInstruction ?? prompt).trim()
-    if (needModelHint !== null || !instruction || aiBusy) return false
+    if (!instruction || aiBusy) return false
     // nothing can run before the AI settings are read (the regex planner would answer a question
     // meant for the model), nor while the loop is busy or a run is still starting: the caller keeps
     // the text (a preset waits in the composer)

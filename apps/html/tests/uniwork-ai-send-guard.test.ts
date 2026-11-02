@@ -10,7 +10,7 @@ import { aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/
 import { buildParseMap } from '../src/renderer/document/parse-map'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { usableAiSettings } from './helpers/ai-settings'
-import { ackUniworkDisclosure } from '../../../packages/ui/tests/helpers/uniwork-ack'
+import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const harness = vi.hoisted(() => ({
   runs: [] as string[],
@@ -100,7 +100,7 @@ describe('html panel send entry while UniWork AI cannot send', () => {
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
     setUniworkAiAvailable(opts.offered)
-    if (opts.acked) ackUniworkDisclosure('/tmp/page.html')
+    if (opts.acked) ackUniworkDisclosureInFile('/tmp/page.html')
     const stubs: Record<string, ReturnType<typeof vi.fn>> = {}
     vi.stubGlobal(
       'htmlApi',

@@ -1,5 +1,5 @@
 import './ai-uniwork-composer.css'
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useState } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import type { ComposerNote, ComposerNoteAction } from '@genoffice/ai-provider/browser'
 import { aiUniworkText, type AiUniworkStringKey } from '../strings-ai-uniwork'
@@ -30,8 +30,6 @@ export interface UniworkComposerNoteProps {
   readonly note: ComposerNote | null | undefined
   /** UI language for translating `ai-uniwork` keys and action labels (default `'vi'`) */
   readonly lang?: Lang | undefined
-  /** Current provider id; changing away from `'uniwork'` clears the note */
-  readonly provider?: string | undefined
   /** Invoked when the user clicks the note's action button (also clears the note) */
   readonly onAction?: ((action: ComposerNoteAction, note: ComposerNote) => void) | undefined
   /** Invoked when the user clicks "Đăng nhập" (`acctSignIn`) on a `signed-out` note */
@@ -41,38 +39,22 @@ export interface UniworkComposerNoteProps {
 }
 
 /**
- * S7–S9 Composer note above the composer (one at a time, no auto-hide, clears on action or
- * provider change, announced once through a persistent polite live region). Only the signed-out
+ * S7–S9 Composer note above the composer (one at a time, no auto-hide, clears on its action,
+ * announced once through a persistent polite live region). Only the signed-out
  * note has an action (sign in); a plan or availability note informs, with no button: UniWork AI
  * is the one provider, so there is nothing to switch to.
  */
 export function UniworkComposerNote({
   note,
   lang = 'vi',
-  provider = 'uniwork',
   onAction,
   onSignIn,
   onAnnounce,
 }: UniworkComposerNoteProps): React.JSX.Element | null {
-  const [dismissed, setDismissed] = useState<{ provider: string; kind: string } | null>(null)
+  const [dismissedKind, setDismissedKind] = useState<string | null>(null)
   const [localLiveText, setLocalLiveText] = useState('')
-  const prevProviderRef = useRef(provider)
 
-  useEffect(() => {
-    if (prevProviderRef.current !== provider) {
-      prevProviderRef.current = provider
-      setDismissed(null)
-    }
-  }, [provider])
-
-  const isDismissed =
-    dismissed !== null &&
-    dismissed.provider === provider &&
-    note !== null &&
-    note !== undefined &&
-    dismissed.kind === note.kind
-
-  const visibleNote = note && provider === 'uniwork' && !isDismissed ? note : null
+  const visibleNote = note && note.kind !== dismissedKind ? note : null
   const bodyText = visibleNote ? resolveComposerNoteText(visibleNote, lang) : ''
 
   useEffect(() => {
@@ -95,7 +77,7 @@ export function UniworkComposerNote({
   const action = visibleNote.action
   const handleActionClick = () => {
     if (!action) return
-    setDismissed({ provider, kind: visibleNote.kind })
+    setDismissedKind(visibleNote.kind)
     onAction?.(action, visibleNote)
     onSignIn?.()
   }
@@ -304,10 +286,6 @@ export interface AiComposerUniworkDisclosureConfig {
 }
 
 export interface AiComposerUniworkProps {
-  /** Whether UniWork AI (`uniwork`) is the active provider (default true when `uniwork` object is passed) */
-  readonly active?: boolean | undefined
-  /** Current provider id (used to clear the composer note on provider change) */
-  readonly provider?: string | undefined
   /** UI language for `ai-uniwork` strings (default `'vi'`) */
   readonly lang?: Lang | undefined
   /** Active composer note above the composer (from `composerNoteFor`) */

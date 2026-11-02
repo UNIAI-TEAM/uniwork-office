@@ -9,10 +9,8 @@ import {
   generatedPageRange,
   mergeQcPages,
   createSlideFixSkill,
-  isUnsupportedImageInputError,
   isQcEnabled,
   qcSlidePage,
-  SLIDE_SCREENSHOT_SENT,
 } from '../src/renderer/ai/slide-qc'
 import type { DeckAccess } from '../src/renderer/ai/slides-skill'
 
@@ -102,17 +100,7 @@ describe('isQcEnabled', () => {
   })
 })
 
-describe('vision capability fallback', () => {
-  it('sends no screenshot: UniWork AI takes no image in a QC turn (UNI-2309)', () => {
-    expect(SLIDE_SCREENSHOT_SENT).toBe(false)
-  })
-
-  it('recognizes image-capability errors from optimistic custom endpoints', () => {
-    expect(isUnsupportedImageInputError('This model does not support image')).toBe(true)
-    expect(isUnsupportedImageInputError('Vision input is not supported by this model')).toBe(true)
-    expect(isUnsupportedImageInputError('HTTP 500: temporary provider failure')).toBe(false)
-  })
-
+describe('geometry-only QC (UniWork AI takes no screenshot in a QC turn)', () => {
   it('skips the model entirely when a geometry-only page passes the deterministic audit', async () => {
     let streamed = false
     const transport: AgentTransport = {

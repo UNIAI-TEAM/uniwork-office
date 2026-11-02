@@ -85,6 +85,8 @@ const REMOVED_CHANNELS = [
   'ai:codex-models',
   'ai:custom-models',
   'ai:openrouter-key-status',
+  // the panels open the account settings from the model chip, not a billing button
+  'ai:open-billing',
 ]
 
 /** a fresh userData with `content` as the settings file (none when undefined), then the handlers register */
@@ -156,7 +158,7 @@ describe('ai-settings.json holds the cloud-tools opt-out only', () => {
   it('has no handler left for the BYOK channels', () => {
     register(OLD_FILE)
     for (const channel of REMOVED_CHANNELS) expect(handlers.has(channel)).toBe(false)
-    for (const channel of ['ai:get-settings', 'ai:set-settings', 'ai:stream', 'ai:open-billing'])
+    for (const channel of ['ai:get-settings', 'ai:set-settings', 'ai:stream'])
       expect(handlers.has(channel)).toBe(true)
   })
 })

@@ -10,7 +10,7 @@ import { Editor } from '@tiptap/core'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
-import { ackUniworkDisclosure } from '../../../packages/ui/tests/helpers/uniwork-ack'
+import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AI_PROVIDERS, type AiPresetPayload, type AiSettings } from '../src/shared/ipc'
 import { resetCapabilitiesForTest } from '../src/renderer/capabilities'
@@ -210,7 +210,7 @@ describe('docs AI panel: a preset that cannot run waits in the composer', () => 
 describe('docs AI panel: one question per preset', () => {
   it('a panel remounted for another document key does not run the preset it already took', async () => {
     setUniworkAiAvailable(true)
-    ackUniworkDisclosure('local')
+    ackUniworkDisclosureInFile('local')
     const settings = settingsFor('uniwork')
     stubDesktop({
       capabilities: { platform: 'desktop' },
@@ -285,7 +285,7 @@ describe('docs app: a preset that arrives before the document has loaded', () =>
     const settings = settingsFor('uniwork')
     // every turn runs on UniWork AI: offered here, its disclosure acknowledged for the document
     setUniworkAiAvailable(true)
-    ackUniworkDisclosure('/docs/job.docx')
+    ackUniworkDisclosureInFile('/docs/job.docx')
     ;(window as unknown as { desktop?: unknown }).desktop = {
       ...(web ? { capabilities: { platform: 'web' } } : {}),
       consumePendingOpenDocx: () => opened,

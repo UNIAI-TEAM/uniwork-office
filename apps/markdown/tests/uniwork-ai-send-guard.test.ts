@@ -11,7 +11,7 @@ import { aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/
 import { buildExtensions } from '../src/renderer/editor/extensions'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { usableAiSettings } from './helpers/ai-settings'
-import { ackUniworkDisclosure } from '../../../packages/ui/tests/helpers/uniwork-ack'
+import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const harness = vi.hoisted(() => ({
   runs: [] as string[],
@@ -104,7 +104,7 @@ describe('markdown panel send entry while UniWork AI cannot send', () => {
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
     setUniworkAiAvailable(opts.offered)
-    if (opts.acked) ackUniworkDisclosure('/docs/a.md')
+    if (opts.acked) ackUniworkDisclosureInFile('/docs/a.md')
     const stubs: Record<string, ReturnType<typeof vi.fn>> = {}
     vi.stubGlobal(
       'markdownApi',

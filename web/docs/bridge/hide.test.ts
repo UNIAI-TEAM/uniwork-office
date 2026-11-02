@@ -187,10 +187,9 @@ describe('AI / search / image bridge stays stubbed with a typed "unavailable" an
     expect(await ai.fetchImage('https://example.com/a.png')).toBeNull()
   })
 
-  it('account / billing entries are inert and report signed-out', async () => {
+  it('the account entry is inert and reports signed-out', async () => {
     expect(await ai.aiGskStatus()).toEqual({ loggedIn: false })
     expect(await ai.aiGskStatus(true)).toEqual({ loggedIn: false })
-    await expect(ai.aiOpenBilling()).resolves.toBeUndefined()
   })
 
   it('getAiSettings is a valid empty config and setAiSettings persists nothing', async () => {

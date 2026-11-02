@@ -84,17 +84,7 @@ import {
   slidePageWriter,
   writerRefusalIsFinal,
 } from './llm-request'
-import { renderSlidesToPngBase64 } from '../export-render'
-import {
-  isQcEnabled,
-  isUnsupportedImageInputError,
-  mergeQcPages,
-  NO_SCREENSHOT_NOTE,
-  qcSlidePage,
-  QC_MAX_PAGES,
-  screenshotAllowed,
-  SLIDE_SCREENSHOT_SENT,
-} from './slide-qc'
+import { isQcEnabled, mergeQcPages, qcSlidePage, QC_MAX_PAGES } from './slide-qc'
 import {
   AskUniModeBody,
   AskUniModeToggle,
@@ -332,22 +322,18 @@ interface AiPanelProps {
   selectedIds: string[]
   /** no slide carries real content yet — the empty-state copy offers generation instead of polish */
   deckEmpty?: boolean
-  /** Decoded image cache from App (SlideThumb needs it) — powers AI-vision slide screenshots */
-  images: Map<string, HTMLImageElement>
   applySlide: (slideIndex: number, updated: RenderSlide) => void
   applyDeck: (slides: RenderSlide[], goTo?: number) => void
   fitWidthPx: number
   settings: AiSettings
   /** Preset instruction pushed from the ribbon/start screen; sent immediately when autoRun. When displayText exists the chat bubble shows only it while the full text still goes to the model.
-      attachments are local files added in the start-screen input, taking effect with the first message.
-      slideShot attaches a rendering of the current slide so the model sees what it's editing (AI Beautify) */
+      attachments are local files added in the start-screen input, taking effect with the first message. */
   preset?: {
     text: string
     nonce: number
     autoRun?: boolean
     displayText?: string
     attachments?: AttachmentMeta[]
-    slideShot?: boolean
     scope?: AiScopeQuoteData
     /** a web host's job: it runs only while the panel is on UniWork AI (read when it would run) */
     uniworkOnly?: boolean
@@ -462,7 +448,6 @@ export function AiPanel({
   current,
   selectedIds,
   deckEmpty,
-  images,
   applySlide,
   applyDeck,
   fitWidthPx,
@@ -657,8 +642,6 @@ export function AiPanel({
     () => window.slidesApi?.aiGskStatus(),
     open,
   )
-  const imagesRef = useRef(images)
-  imagesRef.current = images
   const attachmentsRef = useRef(attachments)
   attachmentsRef.current = attachments
   /** attachments consumed by the most recent send — retry resends the same set */
@@ -1708,10 +1691,11 @@ export function AiPanel({
     const take = () => {
       if (preset.autoRun !== true) toComposer(false)
       else if (
-        !runWith(preset.text, preset.displayText, {
-          slideShot: preset.slideShot ?? false,
-          ...(preset.scope ? { scope: preset.scope } : {}),
-        })
+        !runWith(
+          preset.text,
+          preset.displayText,
+          preset.scope ? { scope: preset.scope } : undefined,
+        )
       )
         toComposer(true)
     }
@@ -1816,33 +1800,10 @@ export function AiPanel({
     return images
   }
 
-  /** Current slide rendered at pixelRatio 1 (vision-friendly size); null when rendering fails */
-  /**
-   * A rendered picture of the slide, when sending one is safe.
-   *
-   * A screenshot is the one outbound path that no text projection can reach:
-   * the renderer tints a withheld run, it does not replace it, so the words are
-   * in the bitmap. There is no mask to put over them — a picture has no spans.
-   * So a slide that withholds anything gets no picture, and the caller says so,
-   * rather than the model receiving an image it was never shown the text of.
-   */
-  const captureSlideShot = async (pageIndex: number): Promise<AgentImage | null> => {
-    const slide = slidesRef.current[pageIndex]
-    if (!slide) return null
-    if (!screenshotAllowed(slide)) return null
-    try {
-      const [png] = await renderSlidesToPngBase64([slide], imagesRef.current, 1)
-      return png ? { base64: png, mime: 'image/png' } : null
-    } catch {
-      return null
-    }
-  }
-
   const runWith = (
     instruction: string,
     displayText?: string,
     opts?: {
-      slideShot?: boolean
       attachments?: AttachmentMeta[]
       scope?: AiScopeQuoteData
       /** resend of the last message: quote what it quoted */
@@ -1914,25 +1875,11 @@ export function AiPanel({
     persistMessage('user', shown, undefined, sentAtts, scope)
     void collectImageAttachments(sentAtts)
       .then(async (images) => {
-        // AI Beautify sends the current slide's rendering along, so the model sees what it edits;
-        // the note rides on the model instruction only — the chat bubble stays the localized preset text
-        let modelInstruction = instruction
-        if (opts?.slideShot && SLIDE_SCREENSHOT_SENT) {
-          const shot = await captureSlideShot(currentRef.current)
-          if (shot) {
-            images.push(shot)
-            modelInstruction += `\n\n(Attached image: the current rendering of this slide, slideIndex ${currentRef.current}. Use it to spot visual issues the element inventory can't show.)`
-          } else {
-            // said rather than omitted: a model told nothing assumes it has the
-            // rendering and reasons about text it cannot see
-            modelInstruction += `\n\n(${NO_SCREENSHOT_NOTE})`
-          }
-        }
         // Clear the flag before run: loop.run sets running synchronously, leaving no re-entry window
         runStartingRef.current = false
         await onBeforeRunRef.current?.()
         if (await window.slidesApi.beginHistoryBatch()) historyBatchActiveRef.current = true
-        loop.run(modelInstruction, images)
+        loop.run(instruction, images)
       })
       .catch(() => {
         runStartingRef.current = false
@@ -2043,8 +1990,8 @@ export function AiPanel({
 
   /**
    * Post-generation layout QC: each page landed by this run gets one focused pass in a fresh
-   * AgentLoop. Vision models receive screenshot + inventory; text-only models receive only
-   * deterministic geometry evidence. Each page's edits sit in their own history batch; if the
+   * AgentLoop with the inventory and the deterministic geometry evidence (UniWork AI takes no
+   * screenshot in these turns). Each page's edits sit in their own history batch; if the
    * deterministic audit says the page got worse, that batch is rolled back. Progress streams
    * into one assistant chat entry.
    */
@@ -2075,38 +2022,18 @@ export function AiPanel({
     // First kept QC batch — the run's own batch takes precedence (it is earlier,
     // so restoring it rewinds past the QC edits too)
     let qcSnapshotId: number | null = null
-    // A custom endpoint may claim generic OpenAI-compatible vision support but reject the
-    // first image. Fall back for that page and keep the rest of this pass geometry-only.
-    let forceGeometryOnly = false
     try {
       for (const page of capped) {
         if (controller.signal.aborted) break
-        const useScreenshot = !forceGeometryOnly && SLIDE_SCREENSHOT_SENT
-        const shot = useScreenshot ? await captureSlideShot(page) : null
-        if (useScreenshot && !shot) {
-          if (slidesRef.current[page]) lines.push(tGlobal('aiQcPageSkipped', { n: page + 1 }))
-          continue
-        }
         const batchOpened = await window.slidesApi.beginHistoryBatch()
-        let result = await qcSlidePage({
+        const result = await qcSlidePage({
           access,
           transport,
           pageIndex: page,
-          screenshot: shot,
+          screenshot: null,
           systemSuffix: aiLangDirective,
           signal: controller.signal,
         })
-        if (shot && result.error && isUnsupportedImageInputError(result.error)) {
-          forceGeometryOnly = true
-          result = await qcSlidePage({
-            access,
-            transport,
-            pageIndex: page,
-            screenshot: null,
-            systemSuffix: aiLangDirective,
-            signal: controller.signal,
-          })
-        }
         const batchId = batchOpened ? await window.slidesApi.endHistoryBatch() : null
         if (controller.signal.aborted) break
         if (result.error) {

@@ -8,7 +8,6 @@ export const de = {
   aiStarterPolishAll: 'Das ganze Dokument für einen professionelleren Ton überarbeiten',
   aiStarterContinue: 'Dort weiterschreiben, wo das Dokument aufhört',
   aiStarterFillTemplate: 'Platzhalter im Dokument finden und ausfüllen',
-  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'UniAI',
   aiOpenAssistant: 'KI-Assistenten öffnen',
   aiSummarizeBtn: 'KI-Zusammenfassung',

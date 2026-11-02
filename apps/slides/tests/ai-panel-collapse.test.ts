@@ -59,7 +59,6 @@ function panelProps(overrides: Record<string, unknown> = {}) {
     slides: [],
     current: 0,
     selectedIds: [],
-    images: new Map<string, HTMLImageElement>(),
     applySlide: () => {},
     applyDeck: () => {},
     fitWidthPx: 960,

@@ -46,19 +46,6 @@ export function isQcEnabled(): boolean {
 export const QC_MAX_PAGES = 20
 
 /**
- * Whether a QC or AI Beautify turn carries the slide's rendering. UniWork AI takes no image in
- * these turns, so it never does: the model works from the element inventory and the geometry.
- */
-export const SLIDE_SCREENSHOT_SENT = false
-
-/** Custom/OpenAI-compatible endpoints can still reject images despite optimistic metadata. */
-export function isUnsupportedImageInputError(error: string): boolean {
-  return /(?:does not support|doesn't support|unsupported).{0,40}(?:image|vision)|(?:image|vision).{0,40}(?:not supported|unsupported)/i.test(
-    error,
-  )
-}
-
-/**
  * Pages produced by a landGeneratedPages/regenerateSlide call, as 0-based indexes.
  * replace lands a whole new deck; append starts at appendedFrom; insert_at/replace_at touch one page.
  */

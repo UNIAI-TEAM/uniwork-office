@@ -8,7 +8,6 @@ export const zhTW = {
   aiStarterPolishAll: '潤飾全文,使語氣更專業',
   aiStarterContinue: '接著現有內容往下寫',
   aiStarterFillTemplate: '找出並填寫文件裡的佔位符',
-  aiOpenSettingsBtn: '開啟 AI 設定',
   aiPanelTitle: 'UniAI',
   aiOpenAssistant: '開啟 AI 助手',
   aiSummarizeBtn: 'AI 總結',

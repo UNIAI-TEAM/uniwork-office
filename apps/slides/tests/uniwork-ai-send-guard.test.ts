@@ -8,7 +8,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { ack, aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
-import { ackUniworkDisclosure } from '../../../packages/ui/tests/helpers/uniwork-ack'
+import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const harness = vi.hoisted(() => ({
   runs: [] as string[],
@@ -127,7 +127,7 @@ describe('slides panel send entry while UniWork AI cannot send', () => {
    * account goes through `ack` before the mount), then fire a preset */
   async function mountThenPreset(opts: { offered: boolean; acked: boolean }) {
     setUniworkAiAvailable(opts.offered)
-    if (opts.acked) ackUniworkDisclosure('local')
+    if (opts.acked) ackUniworkDisclosureInFile('local')
     ;(window as any).slidesApi = {
       getAiSettings: vi.fn(async () => settings),
       aiGskStatus: vi.fn(async () => ({ loggedIn: false })),
@@ -150,7 +150,6 @@ describe('slides panel send entry while UniWork AI cannot send', () => {
             slides: [],
             current: 0,
             selectedIds: [],
-            images: new Map(),
             applySlide: () => {},
             applyDeck: () => {},
             fitWidthPx: 960,

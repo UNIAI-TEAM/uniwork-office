@@ -678,8 +678,6 @@ export interface DesktopApi {
   aiStreamCancel(requestId: string): Promise<void>
   /** UniWork cloud account status (internal gsk name); loggedIn = signed in to UniWork + plan includes cloud AI */
   aiGskStatus(withEmail?: boolean): Promise<GenSparkAccountStatus>
-  /** Focus Home → Settings → Account (AI plan purchase UI) */
-  aiOpenBilling(): Promise<void>
   webSearch(
     query: string,
     maxResults?: number,

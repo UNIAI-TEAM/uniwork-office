@@ -582,7 +582,6 @@ export function App() {
     autoRun?: boolean
     displayText?: string
     attachments?: AttachmentMeta[]
-    slideShot?: boolean
     /** a web host's job (`ai.start`): it runs only while the panel is on UniWork AI */
     uniworkOnly?: boolean
   } | null>(null)
@@ -1505,7 +1504,6 @@ export function App() {
       autoRun = true,
       displayText?: string,
       attachments?: AttachmentMeta[],
-      slideShot?: boolean,
       scope?: AiScopeQuoteData,
     ) => {
       setShowAi(() => {
@@ -1519,7 +1517,6 @@ export function App() {
         autoRun,
         displayText,
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
-        ...(slideShot ? { slideShot } : {}),
         ...(scope ? { scope } : {}),
       })
     },
@@ -3579,7 +3576,7 @@ export function App() {
         onToggleThumbs={() => setShowThumbs((v) => !v)}
         aiOpen={aiDockOpen}
         onToggleAi={toggleAi}
-        onAiPreset={(text, opts) => pushAiPreset(text, true, undefined, undefined, opts?.slideShot)}
+        onAiPreset={(text) => pushAiPreset(text)}
         onPickShape={pickShape}
         onInsertImage={() => void insertImage()}
         onFormatBackground={openBgFormat}
@@ -3897,7 +3894,6 @@ export function App() {
                   current={current}
                   selectedIds={selectedIds}
                   deckEmpty={deckEmpty}
-                  images={images}
                   applySlide={applySlide}
                   applyDeck={applyDeck}
                   fitWidthPx={FIT_WIDTH}
@@ -4314,15 +4310,7 @@ export function App() {
                                   <button
                                     className="stage-ai-btn"
                                     data-tip={t('aiBeautifyBtn')}
-                                    onClick={() =>
-                                      pushAiPreset(
-                                        t('aiBeautifyPrompt'),
-                                        true,
-                                        undefined,
-                                        undefined,
-                                        true,
-                                      )
-                                    }
+                                    onClick={() => pushAiPreset(t('aiBeautifyPrompt'))}
                                   >
                                     <IconAiBeautify size={14} />
                                     <span>{t('aiBeautifyBtn')}</span>
@@ -5036,7 +5024,6 @@ export function App() {
                     buildSelectionInstruction(current, askTargets, instruction),
                     true,
                     instruction,
-                    undefined,
                     undefined,
                     askScopeQuote(),
                   )

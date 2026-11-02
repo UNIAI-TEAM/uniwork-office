@@ -53,7 +53,6 @@ function mount(): HTMLElement {
         slides: [],
         current: 0,
         selectedIds: [],
-        images: new Map<string, HTMLImageElement>(),
         applySlide: () => {},
         applyDeck: () => {},
         fitWidthPx: 960,

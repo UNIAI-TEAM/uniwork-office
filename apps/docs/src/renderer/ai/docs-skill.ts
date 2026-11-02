@@ -16,6 +16,7 @@ import {
   AGENT_TOOLS,
   executeTool,
   markDocSeen,
+  WRITER_UNAVAILABLE,
   type AiCommentsAccess,
   type AiHeaderFooterAccess,
   type FrozenSelection,
@@ -184,7 +185,7 @@ const WRITER_OFF_NOTE =
 
 function refuseWriter(): ToolExecution {
   return {
-    output: 'document writing is not available here',
+    output: WRITER_UNAVAILABLE,
     isError: true,
     mutated: false,
     summary: 'write document',

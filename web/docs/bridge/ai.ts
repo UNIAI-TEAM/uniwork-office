@@ -20,7 +20,6 @@
  * | aiGenerateImage             | { error }                                           |
  * | fetchImage                  | null (cross-origin fetch is not possible in a page) |
  * | aiGskStatus                 | { loggedIn: false }                                 |
- * | aiOpenBilling               | no-op                                               |
  * | getAiSettings               | empty provider config, Genspark tools off           |
  * | setAiSettings               | accepted and dropped (nothing is persisted)         |
  *
@@ -105,7 +104,6 @@ export default {
   },
 
   aiGskStatus: async () => ({ loggedIn: false }),
-  aiOpenBilling: async () => {},
 
   webSearch: async () => ({
     results: [],

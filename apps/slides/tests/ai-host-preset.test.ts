@@ -118,7 +118,6 @@ describe('slides AI panel: a preset from outside', () => {
             slides: [],
             current: 0,
             selectedIds: [],
-            images: new Map(),
             applySlide: () => {},
             applyDeck: () => {},
             fitWidthPx: 960,

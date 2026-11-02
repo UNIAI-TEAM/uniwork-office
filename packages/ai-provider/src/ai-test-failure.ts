@@ -8,18 +8,12 @@ import { isAiNetworkError } from './network-error'
  *
  * `not_entitled` and `credits_exhausted` are the plan states of the notice
  * mapping in `ai-notice.ts` (the UniWork cloud's `entitlement_required` and
- * `credits_exhausted` reasons); the rest are about the user's own provider.
+ * `credits_exhausted` reasons); the rest are about the service the test reached.
  * `misconfigured` is a settings field the test cannot work without (a service
  * address, an account id): it is known before any request is sent.
  */
 export type AiTestFailureKind =
-  | AiNoticeKind
-  | 'invalid_key'
-  | 'network'
-  | 'limit'
-  | 'unavailable'
-  | 'misconfigured'
-  | 'failed'
+  AiNoticeKind | 'invalid_key' | 'network' | 'limit' | 'unavailable' | 'misconfigured' | 'failed'
 
 export interface AiTestResult {
   ok: boolean
@@ -68,9 +62,9 @@ export function aiTestFailureKindForCloudCode(code: string): AiTestFailureKind {
 }
 
 /**
- * An HTTP status from the user's own provider (`cloud` false) or from a UniWork
- * cloud tool (`cloud` true: 402 is the organization out of credits, 403 the plan
- * without cloud AI; for a provider both are about the provider account).
+ * An HTTP status from the service a settings test reached (`cloud` false) or from a
+ * UniWork cloud tool (`cloud` true: 402 is the organization out of credits, 403 the
+ * plan without cloud AI; for another service both are about that service's account).
  */
 export function aiTestFailureKindForStatus(status: number, cloud = false): AiTestFailureKind {
   if (cloud && status === 402) return 'credits_exhausted'

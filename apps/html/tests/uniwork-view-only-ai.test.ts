@@ -9,6 +9,7 @@ import { createDocumentSkill } from '../src/renderer/ai/html-skill'
 import { AGENT_TOOLS, READ_ONLY_TOOLS, type HtmlDocAccess } from '../src/renderer/ai/tools'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { strings } from '../src/renderer/i18n/strings'
+import { resetForTest } from '../src/renderer/capabilities'
 
 beforeEach(() => vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true))
 const cleanups: Array<() => void> = []
@@ -112,8 +113,22 @@ describe('view-only skill (UniWork copy the user may only read)', () => {
   })
 })
 
-function renderRibbon(extra: { uniworkBound?: boolean; readOnly?: boolean; autoSave?: boolean }) {
+function renderRibbon({
+  web = false,
+  ...extra
+}: {
+  uniworkBound?: boolean
+  readOnly?: boolean
+  autoSave?: boolean
+  /** the web frame: Restyle and Theme show only there (UNI-2309) */
+  web?: boolean
+}) {
   stubHtmlApi()
+  if (web)
+    (window as unknown as { htmlApi: Record<string, unknown> }).htmlApi.capabilities = {
+      platform: 'web',
+    }
+  resetForTest()
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -168,7 +183,7 @@ describe('Ribbon AI buttons on a view-only copy', () => {
   const label = (b: HTMLButtonElement) => b.textContent?.trim()
 
   it('keeps summarize and turns the editing presets off with the reason as tooltip', () => {
-    const buttons = aiButtons(renderRibbon({ uniworkBound: true, readOnly: true }))
+    const buttons = aiButtons(renderRibbon({ uniworkBound: true, readOnly: true, web: true }))
     const summarize = buttons.find((b) => label(b) === strings.en.aiSummarizeBtn)!
     expect(summarize.disabled).toBe(false)
     const editing = buttons.filter((b) => b !== summarize)
@@ -180,7 +195,8 @@ describe('Ribbon AI buttons on a view-only copy', () => {
   })
 
   it('leaves every preset on for an editable copy', () => {
-    for (const b of aiButtons(renderRibbon({ uniworkBound: true }))) expect(b.disabled).toBe(false)
+    for (const b of aiButtons(renderRibbon({ uniworkBound: true, web: true })))
+      expect(b.disabled).toBe(false)
   })
 })
 

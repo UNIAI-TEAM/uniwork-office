@@ -8,7 +8,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { AI_RUN_IDLE_GRACE_MS } from '@genoffice/agent-core'
 import { aiUniworkText, clearUniworkAcks } from '@genoffice/ui'
-import { ackUniworkDisclosure } from '../../../packages/ui/tests/helpers/uniwork-ack'
+import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 import { getLang, LocaleProvider, setModuleLang, t } from '../src/renderer/i18n/locale'
@@ -82,7 +82,7 @@ describe('UniWork AI notices (docs panel)', () => {
     document.body.appendChild(container)
     root = createRoot(container)
     // every turn runs on UniWork AI: its disclosure is acknowledged for the document first
-    ackUniworkDisclosure('/docs/a.docx')
+    ackUniworkDisclosureInFile('/docs/a.docx')
     act(() =>
       root!.render(
         createElement(LocaleProvider, {

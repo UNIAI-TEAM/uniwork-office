@@ -8,12 +8,15 @@ import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Ribbon } from '../src/renderer/components/Ribbon'
 import { appStrings } from '../src/renderer/i18n/strings-app'
+import { resetForTest } from '../src/renderer/capabilities'
+import { strings } from '../src/renderer/i18n/strings'
 
 beforeEach(() => vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true))
 const cleanups: Array<() => void> = []
 afterEach(() => {
   cleanups.splice(0).forEach((cleanup) => cleanup())
   vi.unstubAllGlobals()
+  resetForTest()
 })
 
 function renderRibbon(extra: Record<string, unknown>) {
@@ -78,7 +81,7 @@ describe('ribbon without a host AI grant', () => {
     expect(onAiPreset).not.toHaveBeenCalled()
   })
 
-  it('has no hint entry when AI is granted (the normal four AI buttons show)', () => {
+  it('has no hint entry when AI is granted (the normal AI buttons show)', () => {
     const box = renderRibbon({ showAi: true })
     expect(box.querySelector('.ai-off')).toBeNull()
     expect(box.querySelectorAll('.ai-entry').length).toBeGreaterThan(1)
@@ -91,5 +94,29 @@ describe('ribbon without a host AI grant', () => {
       expect(dict.aiNotEnabled, lang).not.toMatch(/UNI-|GO-\d|git/i)
       if (lang !== 'en') expect(dict.aiNotEnabled, lang).not.toBe(dicts.en!.aiNotEnabled)
     }
+  })
+})
+
+describe('ribbon presets that ask for plan_page (UNI-2309)', () => {
+  // no LocaleProvider here: the ribbon speaks the module default, zh
+  const zh = strings.zh
+  const labels = (box: HTMLElement) =>
+    [...box.querySelectorAll<HTMLButtonElement>('button.ai-entry')].map((b) =>
+      b.textContent?.trim(),
+    )
+
+  it('the desktop has no Restyle or Theme: only the web frame reaches the page planner', () => {
+    const shown = labels(renderRibbon({ showAi: true }))
+    expect(shown).not.toContain(zh.aiRestyleBtn)
+    expect(shown).not.toContain(zh.aiThemeBtn)
+    expect(shown).toContain(zh.aiSummarizeBtn)
+  })
+
+  it('the web frame keeps both', () => {
+    vi.stubGlobal('htmlApi', { capabilities: { platform: 'web' } })
+    resetForTest()
+    const shown = labels(renderRibbon({ showAi: true }))
+    expect(shown).toContain(zh.aiRestyleBtn)
+    expect(shown).toContain(zh.aiThemeBtn)
   })
 })

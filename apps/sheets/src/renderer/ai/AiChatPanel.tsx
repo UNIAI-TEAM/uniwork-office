@@ -22,7 +22,6 @@ import {
   type AiScopeQuoteData,
   type AiTokenUsageView,
   uniworkErrorForEntry,
-  useAiModelNeedHint,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
@@ -411,7 +410,6 @@ export function AiChatPanel({
   const { t, lang } = useI18n()
   const askUni = useAskUniMode(lang, askUniBindingKey)
   const leaveAskUni = askUni.leave
-  const needModelHint = useAiModelNeedHint()
   // the UniWork disclosure gate of every send entry: the composer feeds it, the queue pump asks it
   // silently, and retry (and, through ExcelShell, presets and ribbon runs) refuse through it
   const ownGate = useUniworkSendGate()
@@ -426,7 +424,6 @@ export function AiChatPanel({
   const msgQueue = useChatRunQueue<readonly AttachmentMeta[]>({
     busy: aiBusy,
     submit: (text, atts) => {
-      if (needModelHint !== null) return false
       // held until the user acknowledges the UniWork disclosure, as Send is
       if (uniworkGate.isBlocked()) return false
       return onSendQueued?.(text, atts) ?? false
@@ -1245,7 +1242,8 @@ export function AiChatPanel({
             }}
             footerStart={
               <>
-                <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+                {/* UniWork AI not offered never closes a send entry here: the fixed planner answers */}
+                <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} gatesSend={false} />
                 {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
                 {cap('attachments') && (
                   <button

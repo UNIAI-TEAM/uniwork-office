@@ -164,6 +164,20 @@ describe('AiModelPicker: a UniWork AI chip', () => {
     expect(host.textContent).not.toMatch(/Manage models/)
   })
 
+  it('opening the chip mounts no live region: the panel owns the one polite node', async () => {
+    const { getChip, getPop } = await mountPicker(
+      { getCloudStatus: async () => READY({ remaining: 10, limit: 20 }) },
+      'en',
+    )
+    expect(document.querySelectorAll('[aria-live]')).toHaveLength(0)
+    await openPopup(getChip())
+    expect(getPop()).not.toBeNull()
+    expect(document.querySelectorAll('[aria-live]')).toHaveLength(0)
+    expect(document.querySelectorAll('[role="status"], [role="alert"], [role="log"]')).toHaveLength(
+      0,
+    )
+  })
+
   it('the web reads the credits from window.uniworkCloudStatus', async () => {
     ;(window as unknown as { uniworkCloudStatus?: unknown }).uniworkCloudStatus = {
       get: async () => ({

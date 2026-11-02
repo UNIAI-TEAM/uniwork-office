@@ -3989,11 +3989,6 @@ export function registerAiIpc(): void {
     },
   )
 
-  /** Editor AI panels: jump to Home → Settings → Account (plan and credit). */
-  ipcMain.handle('ai:open-billing', () => {
-    shellHooks?.openSettings?.('account')
-  })
-
   ipcMain.handle('ai:set-settings', (_event, settings: unknown) => {
     // the file keeps only the cloud-tools opt-out: every other field of the renderer's copy is dropped
     saveAiSettingsFile(SETTINGS_PATH(), settings)

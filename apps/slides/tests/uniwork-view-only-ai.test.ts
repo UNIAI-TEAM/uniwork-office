@@ -255,7 +255,6 @@ describe('AI panel of a view-only deck', () => {
     slides: [],
     current: 0,
     selectedIds: [],
-    images: new Map<string, HTMLImageElement>(),
     applySlide: () => {},
     applyDeck: () => {},
     fitWidthPx: 960,

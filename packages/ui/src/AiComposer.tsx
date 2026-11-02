@@ -113,10 +113,7 @@ export function AiComposer({
   const { spellcheck } = useAiPanelPrefs()
 
   const hasUniworkFeatures = uniwork !== undefined || viewOnly !== undefined
-  const uniworkActive = Boolean(
-    uniwork &&
-    (uniwork.active ?? (uniwork.provider === undefined || uniwork.provider === 'uniwork')),
-  )
+  const uniworkActive = uniwork !== undefined
   const resolvedLang: Lang = uniwork?.lang ?? lang ?? 'vi'
   const resolvedViewOnly = Boolean(viewOnly ?? uniwork?.viewOnly)
   const resolvedPopupOpen = Boolean(popupOpen ?? uniwork?.popupOpen)
@@ -329,7 +326,6 @@ export function AiComposer({
         <UniworkComposerNote
           note={uniwork.note}
           lang={resolvedLang}
-          provider={uniwork.provider ?? (uniworkActive ? 'uniwork' : 'other')}
           onAction={uniwork.onNoteAction}
           onSignIn={uniwork.onSignIn}
           onAnnounce={announce}

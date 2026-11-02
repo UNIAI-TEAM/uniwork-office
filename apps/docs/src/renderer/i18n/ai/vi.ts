@@ -197,7 +197,6 @@ export const vi = {
   aiCmdImages: 'Đã cập nhật {count} hình ảnh',
   aiCmdToc: 'Đã chèn mục lục ({count} mục)',
   aiCmdSkipped: ' (đã bỏ qua {count} khối được bảo vệ)',
-  aiOpenSettingsBtn: 'Mở cài đặt AI',
   aiViewOnlyNotice:
     'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
   aiClarifyTitle: 'Vài câu hỏi trước khi tiếp tục',

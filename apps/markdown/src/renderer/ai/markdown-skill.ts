@@ -8,6 +8,7 @@ import {
   buildDocContext,
   executeTool,
   markDocSeen,
+  WRITER_UNAVAILABLE,
   type AskClarification,
   type FrontmatterAccess,
 } from './tools'
@@ -181,7 +182,7 @@ export function createMarkdownSkill(
       }
       if (call.name === 'write_document' && !writerRoute()) {
         return {
-          output: 'document writing is not available here',
+          output: WRITER_UNAVAILABLE,
           isError: true,
           summary: call.name,
         }

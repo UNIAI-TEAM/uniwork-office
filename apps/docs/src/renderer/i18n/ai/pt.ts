@@ -8,7 +8,6 @@ export const pt = {
   aiStarterPolishAll: 'Aprimore o documento inteiro com um tom mais profissional',
   aiStarterContinue: 'Continue escrevendo de onde o documento parou',
   aiStarterFillTemplate: 'Encontre e preencha os espaços reservados do documento',
-  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'UniAI',
   aiOpenAssistant: 'Abrir assistente de IA',
   aiSummarizeBtn: 'Resumo IA',

@@ -9,7 +9,7 @@ import { setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { defaultAiSettings } from '@genoffice/ai-provider'
-import { ackUniworkDisclosure } from '../../../packages/ui/tests/helpers/uniwork-ack'
+import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const harness = vi.hoisted(() => ({
   runs: [] as string[],
@@ -98,7 +98,7 @@ describe('pdf panel send entry while UniWork AI cannot send', () => {
   async function mountThenPreset(opts: { offered: boolean; acked: boolean }) {
     Element.prototype.scrollTo = () => {}
     setUniworkAiAvailable(opts.offered)
-    if (opts.acked) ackUniworkDisclosure('/docs/a.pdf')
+    if (opts.acked) ackUniworkDisclosureInFile('/docs/a.pdf')
     const settings = defaultAiSettings()
     ;(window as any).pdfApi = {
       getAiSettings: async () => settings,

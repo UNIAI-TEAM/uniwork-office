@@ -94,7 +94,6 @@ async function startRun(): Promise<HTMLElement> {
             slides: [],
             current: 0,
             selectedIds: [],
-            images: new Map(),
             applySlide: () => {},
             applyDeck: () => {},
             fitWidthPx: 960,

@@ -313,8 +313,7 @@ export interface Props {
   aiOpen: boolean
   onToggleAi: () => void
   /** Push a preset instruction to the AI panel and expand it (autoRun executes immediately) */
-  /** slideShot: attach the current slide's rendering so the model sees the page (AI Beautify) */
-  onAiPreset: (text: string, opts?: { slideShot?: boolean }) => void
+  onAiPreset: (text: string) => void
   /** Shape gallery / Text Box pick: enter canvas draw mode (crosshair; click = default size, drag = custom, Esc cancels) */
   onPickShape: (kind: InsertKind) => void
   /** Open the image picker dialog and insert into the current page */

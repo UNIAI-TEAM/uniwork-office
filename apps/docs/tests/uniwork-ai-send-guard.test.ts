@@ -8,7 +8,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
-import { ackUniworkDisclosure } from '../../../packages/ui/tests/helpers/uniwork-ack'
+import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { defaultAiSettings } from '@genoffice/ai-provider'
 
@@ -104,7 +104,7 @@ describe('docs panel send entry while UniWork AI cannot send', () => {
    */
   async function mountThenPreset(opts: { offered: boolean; acked: boolean }) {
     setUniworkAiAvailable(opts.offered)
-    if (opts.acked) ackUniworkDisclosure('local')
+    if (opts.acked) ackUniworkDisclosureInFile('local')
     editor = new Editor({
       element: document.createElement('div'),
       extensions: editorExtensions,

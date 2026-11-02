@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-// UniWork AI not offered keeps every send entry closed (spec S7 / RF1-4 / RF3-3): AiChatPanel's
-// queue submit must refuse to dequeue when the model-need hint is on, and App.tsx's handleSend
-// (which cannot be mounted in jsdom because of Univer) is pinned from source to return false on the
-// same hint. UniWork AI is the one provider (UNI-2309), so its disclosure gates every entry too.
+// Sheets answers without UniWork AI: while it is not offered, the fixed planner does (UNI-2309), so
+// no need hint closes Send, the queue or App.tsx's handleSend (which cannot be mounted in jsdom
+// because of Univer, so it is pinned from source). UniWork AI is the one provider, so its
+// disclosure gates every send entry.
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,9 +11,15 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { ack, aiUniworkText, createUniworkSendGate, setAiModelNeedHint } from '@genoffice/ui'
+import { InMemoryWorkbookAdapter } from '@genoffice/xlsx-gateway/domain/in-memory-workbook'
 import { AiChatPanel, type AiChatMessage } from '../src/renderer/ai/AiChatPanel'
+import { agentConfigured } from '../src/renderer/ai/agent-configured'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
-import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
+import { runDeterministicPlan, type PlanContext } from '../src/renderer/plan-operations'
+import {
+  ackUniworkDisclosureInFile,
+  resetUniworkAi,
+} from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const flush = async (): Promise<void> => {
   await act(async () => {
@@ -21,7 +27,7 @@ const flush = async (): Promise<void> => {
   })
 }
 
-describe('sheets panel send entry and queue submit with model-need hint (RF3-3)', () => {
+describe('sheets panel send entry and queue submit (RF3-3)', () => {
   let root: Root | null = null
   let container: HTMLElement | null = null
 
@@ -40,9 +46,10 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     vi.unstubAllGlobals()
   })
 
-  it('a queued item stays queued and sends no request when the model-need hint turns on before settle (RF3-3)', async () => {
+  it('UniWork AI not offered holds no queued item: it goes out on settle for the fixed planner (RF3-3)', async () => {
     const runs: string[] = []
-    readyUniworkAi()
+    // not offered (the default here), the disclosure acknowledged
+    ackUniworkDisclosureInFile()
     vi.stubGlobal(
       'desktopApi',
       new Proxy(
@@ -124,13 +131,11 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     expect(container.querySelector('.ai-queue-strip')).not.toBeNull()
     expect(runs).toEqual([])
 
-    act(() => setAiModelNeedHint('UniWork AI is not on here'))
     render(false, '')
     await flush()
     await flush()
 
-    expect(runs).toEqual([])
-    expect(container.querySelector('.ai-queue-strip')).not.toBeNull()
+    expect(runs).toEqual(['queued follow-up'])
   })
 
   it('a queued item stays queued while the disclosure is unacknowledged, and sends after the ack (RF4-1)', async () => {
@@ -235,14 +240,10 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     expect(container.querySelector('.ai-queue-strip')).not.toBeNull()
     expect(runs).toEqual([])
 
-    // the hint holds the item while the run settles, then another account signs in: its
-    // disclosure is not acknowledged yet
-    act(() => setAiModelNeedHint('UniWork AI is not on here'))
-    render(false, '')
-    await flush()
+    // another account signs in while the run is going: its disclosure is not acknowledged yet
     act(() => push?.(snapshot('acc-2')))
     await flush()
-    act(() => setAiModelNeedHint(null))
+    render(false, '')
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 900))
     })
@@ -436,15 +437,124 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     expect(shell.match(/onSendRaw\(/g)).toHaveLength(1)
   })
 
-  it('App.tsx handleSend returns false while needModelHint is set (App.tsx cannot be mounted in jsdom)', () => {
+  it('App.tsx handleSend reads no need hint: without UniWork AI the fixed planner answers (App.tsx cannot be mounted in jsdom)', () => {
     const app = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/App.tsx'),
       'utf8',
     )
+    expect(app).not.toContain('needModelHint')
+    expect(app).not.toContain('useAiModelNeedHint')
     const start = app.indexOf('  function handleSend(')
     expect(start).toBeGreaterThan(-1)
     const body = app.slice(start, app.indexOf('runToolsRef.current = []', start))
-    expect(body).toMatch(/if \(needModelHint !== null \|\| !instruction \|\| aiBusy\) return false/)
+    expect(body).toMatch(/if \(!instruction \|\| aiBusy\) return false/)
+    expect(app.slice(start)).toMatch(
+      /if \(agentConfigured\) \{\s*runAgent\(instruction, sentAtts\)[\s\S]*?runDeterministicPlan\(instruction\)/,
+    )
+  })
+
+  it('UniWork AI not offered: Send stays open, the composer sends, and the fixed planner answers in the panel', async () => {
+    // not offered (the default here), the settings loaded, the disclosure acknowledged
+    ackUniworkDisclosureInFile()
+    const settings = { provider: 'uniwork', providers: {} }
+    vi.stubGlobal(
+      'desktopApi',
+      new Proxy(
+        {},
+        {
+          get: (_t, prop: string) =>
+            prop === 'getAiSettings'
+              ? () => Promise.resolve(settings)
+              : /^on[A-Z]/.test(prop)
+                ? () => () => {}
+                : () => Promise.resolve(undefined),
+        },
+      ),
+    )
+    // App's handleSend, without its Univer runtime: no agent, so the regex planner answers
+    const planCtx: PlanContext = {
+      adapterRef: {
+        current: new InMemoryWorkbookAdapter({
+          revision: 0,
+          sheets: [{ id: 'sheet-1', name: 'Sheet1', cells: {} }],
+        }),
+      },
+      univerRef: { current: null },
+      lazyWorkbookRef: { current: null },
+      lazyPreviewRef: { current: null },
+      setPreview: () => {},
+      autoApplySafePlan: async () => ({ ok: true }),
+    }
+    let chat: AiChatMessage[] = []
+    let prompt = 'set A1 to 5'
+    const replies: Array<{ text: string; isError?: boolean }> = []
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    const render = () =>
+      act(() =>
+        root!.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'en', children: null },
+            createElement(AiChatPanel, {
+              isOpen: true,
+              hasContent: true,
+              chat,
+              attachments: [],
+              attachNotice: null,
+              onPickAttachments: () => {},
+              onAddAttachmentPaths: () => {},
+              onAddPastedImage: () => {},
+              onRemoveAttachment: () => {},
+              prompt,
+              preview: null,
+              aiBusy: false,
+              onPromptChange: (next) => {
+                prompt = next
+              },
+              onSend: (text) => {
+                const instruction = (text ?? prompt).trim()
+                expect(agentConfigured(settings as never)).toBe(false)
+                const outcome = runDeterministicPlan(planCtx, instruction)
+                replies.push(outcome)
+                chat = [
+                  ...chat,
+                  { role: 'user', text: instruction, tools: [] },
+                  { role: 'assistant', text: outcome.text, tools: [], isError: outcome.isError },
+                ]
+                prompt = ''
+                return true
+              },
+              onStop: () => {},
+              onNewChat: () => {},
+              onUndo: () => {},
+              scopeRange: null,
+              scopeColumns: null,
+              scopeLocked: false,
+              onScopeDismiss: () => {},
+              onCitation: () => {},
+              onExpand: () => {},
+              onCollapse: () => {},
+            }),
+          ),
+        ),
+      )
+    render()
+    await flush()
+    await flush()
+
+    const send = container.querySelector<HTMLButtonElement>('.ai-send-btn')!
+    expect(send.disabled).toBe(false)
+    expect(container.querySelector('.ai-input-need')).toBeNull()
+    act(() => send.click())
+    render()
+    await flush()
+
+    // the planner made a preview for the instruction, and its reply is the answer on screen
+    expect(replies).toHaveLength(1)
+    expect(replies[0]!.isError).toBeFalsy()
+    expect(container.querySelector('.ai-msg-answer')?.textContent).toContain(replies[0]!.text)
   })
 
   it('App.tsx handleSend sends nothing (no bubble, no regex planner) while the settings are unread or a run is busy or starting (UNI-2264)', () => {

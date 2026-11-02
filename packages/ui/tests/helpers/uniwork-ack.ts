@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { clearUniworkAcks, useUniworkDisclosureAck } from '@genoffice/ui'
 
-export function ackUniworkDisclosure(path: string | null = 'local'): void {
+export function ackUniworkDisclosureInFile(path: string | null = 'local'): void {
   function Ack(): null {
     const { acknowledge } = useUniworkDisclosureAck({
       account: '',
@@ -28,7 +28,7 @@ export function ackUniworkDisclosure(path: string | null = 'local'): void {
  */
 export function readyUniworkAi(...paths: (string | null)[]): void {
   setUniworkAiAvailable(true)
-  for (const path of paths.length > 0 ? paths : ['local']) ackUniworkDisclosure(path)
+  for (const path of paths.length > 0 ? paths : ['local']) ackUniworkDisclosureInFile(path)
 }
 
 export function resetUniworkAi(): void {

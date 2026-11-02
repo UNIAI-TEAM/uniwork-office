@@ -126,9 +126,15 @@ function restoreChipFocusUnlessMoved(
 export function AiModelPicker({
   bridge,
   lang,
+  gatesSend = true,
 }: {
   readonly bridge: AiModelPickerBridge
   readonly lang: Lang
+  /**
+   * false: the chip never publishes the need hint, so Send, the queue and every other send entry
+   * stay open while UniWork AI is not offered (Sheets answers then with its fixed planner)
+   */
+  readonly gatesSend?: boolean
 }): React.JSX.Element | null {
   const strings = AI_MODEL_PICKER_STRINGS[lang] ?? AI_MODEL_PICKER_STRINGS.en
   const [settings, setSettings] = useState<AiSettings | null>(null)
@@ -195,14 +201,13 @@ export function AiModelPicker({
     inside: () => [chipRef.current, popRef.current],
   })
 
-  // UniWork AI cannot answer while the host does not offer it (signed out, no organization, the
-  // capability off) or the cloud reports a state other than ready: the composer's send stays off
-  // and the hint says so, with the account settings as the way out
-  const offeredByCloud =
-    cloudStatus === null ||
-    cloudStatus.hasCompletedRead === false ||
-    (cloudStatus.state === 'ready' && cloudStatus.enabled !== false)
-  const needHint = settings !== null && !(uniworkAiAvailable() && offeredByCloud) ? strings.needModel : null
+  // UniWork AI cannot answer while the host does not offer it (no organization, the capability or
+  // the format off): the composer's send stays off and the hint says so, with the account settings
+  // as the way out. Signed out, out of credits or unavailable is the composer note's to name, so
+  // the hint stays away rather than give a second, contradicting reason
+  const signedOut = cloudStatus?.state === 'signed-out' || cloudStatus?.signedIn === false
+  const needHint =
+    gatesSend && settings !== null && !uniworkAiAvailable() && !signedOut ? strings.needModel : null
   const openSettings = bridge.openModelSettings
   const openSettingsOnce = useCallback(() => {
     void openSettings?.()

@@ -8,7 +8,6 @@ export const en = {
   aiStarterPolishAll: 'Polish the whole document for a more professional tone',
   aiStarterContinue: 'Continue writing from where the document leaves off',
   aiStarterFillTemplate: 'Find and fill in the placeholders in this document',
-  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'UniAI',
   aiOpenAssistant: 'Open AI assistant',
   aiSummarizeBtn: 'AI Summarize',
