@@ -572,7 +572,7 @@ export function App() {
   const [showBgFormat, setShowBgFormat] = useState(false)
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null)
   // the image-generation entries (ribbon + stage bar buttons, remove-background chip): host grant
-  // AND a live way to generate, the same rule as the generate_image tool
+  // AND the UniWork cloud (signed in, cloud tools on), the same rule as the generate_image tool
   const imageGenerationOffered = useImageGenerationOffered(cap('imageGeneration'), aiSettings, () =>
     window.slidesApi?.aiGskStatus(),
   )

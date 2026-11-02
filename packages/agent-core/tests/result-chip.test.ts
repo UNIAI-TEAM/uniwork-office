@@ -114,8 +114,9 @@ describe('resultChip deterministic priority table', () => {
     expect(creditsErr.labelKey).toBe('aiResultError')
     expect(creditsErr.tone).toBe('error')
     expect(creditsErr.errorLine?.key).toBe('aiErrCredits')
-    expect(creditsErr.errorLine?.action).toBe('choose-provider')
-    expect(creditsErr.errorLine?.actionKey).toBe('aiRunChooseOther')
+    // UniWork AI is the one provider: a plan state names itself and offers no action (UNI-2309)
+    expect(creditsErr.errorLine?.action).toBeNull()
+    expect(creditsErr.errorLine?.actionKey).toBeNull()
 
     const sessionErr = resultChip({
       text: '',
@@ -198,17 +199,6 @@ describe('resultChip deterministic priority table', () => {
     expect(res.meta?.warnings).toContain('Không thể tự tính công thức mảng động trên phạm vi này.')
   })
 
-  it('returns null chip when provider is BYOK (isUniwork === false)', () => {
-    const res = resultChip({
-      isUniwork: false,
-      provider: 'anthropic',
-      text: 'BYOK answer',
-      mutated: true,
-    })
-    expect(res.chip).toBeNull()
-    expect(res.labelKey).toBeNull()
-  })
-
   it('extractSheetsCellsMeta extracts range and cell counts from tool summaries/outputs', () => {
     const meta = extractSheetsCellsMeta([
       {
@@ -286,8 +276,8 @@ describe('resultChip deterministic priority table', () => {
       })
       expect(res.chip).toBe('error')
       expect(res.errorLine?.key, `code=${code}`).toBe('aiErrCapabilityOff')
-      expect(res.errorLine?.action, `code=${code}`).toBe('choose-provider')
-      expect(res.errorLine?.actionKey, `code=${code}`).toBe('aiRunChooseOther')
+      expect(res.errorLine?.action, `code=${code}`).toBeNull()
+      expect(res.errorLine?.actionKey, `code=${code}`).toBeNull()
     }
 
     // Even an unknown error code maps to aiErrUnavailable rather than key: null + raw server text

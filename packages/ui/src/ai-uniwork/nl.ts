@@ -5,9 +5,8 @@ export const nl = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'Resterende credits: {remaining} van {limit}',
   aiUniworkFooterSignIn: 'Meld je aan bij UniWork om UniWork AI te gebruiken',
-  aiUniworkSignedOut:
-    'Je bent afgemeld bij UniWork. Kies een andere provider of meld je opnieuw aan.',
-  aiUniworkOff: 'UniWork AI staat uit voor dit document. Kies een andere provider.',
+  aiUniworkSignedOut: 'Je bent afgemeld bij UniWork. Meld je opnieuw aan.',
+  aiUniworkOff: 'UniWork AI staat uit voor dit document.',
   aiUniworkViewOnly:
     'Alleen weergeven: AI kan antwoorden maar het document niet bewerken of opslaan.',
 
@@ -40,7 +39,6 @@ export const nl = {
     'Gestopt. Al toegepaste wijzigingen blijven in het document en kunnen ongedaan worden gemaakt.',
   aiRunRetry: 'Opnieuw proberen',
   aiRunAskAgain: 'Opnieuw vragen',
-  aiRunChooseOther: 'Andere provider kiezen',
   aiRunOpenInApp: 'Openen in de app',
   aiConversationRestarted:
     'Het vorige gesprek is verlopen, dus UniWork AI is een nieuw gesprek begonnen en onthoudt eerdere beurten niet meer. Stuur je vraag opnieuw om verder te gaan.',
@@ -86,7 +84,7 @@ export const nl = {
   cloudCreditsLeft: '{remaining} / {limit} over',
   cloudCreditsUnlimited: 'Onbeperkt',
   cloudInactiveBody:
-    'Het UniWork-abonnement van je organisatie is niet actief, dus cloud-AI is gepauzeerd. Vraag een beheerder het te verlengen; je eigen providers hieronder blijven werken.',
+    'Het UniWork-abonnement van je organisatie is niet actief, dus cloud-AI is gepauzeerd. Vraag een beheerder het te verlengen.',
   acctSignIn: 'Inloggen',
   acctSignInAgain: 'Opnieuw inloggen',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -100,7 +98,7 @@ export const nl = {
     'Deze werkmap is te groot voor AI op het web. Open hem in de UniWork Office-app.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    'Het abonnement van je organisatie bevat geen UniWork AI. Vraag een organisatiebeheerder naar het abonnement of voeg je eigen AI-sleutel toe via Instellingen > AI-model.',
+    'Het abonnement van je organisatie bevat geen UniWork AI. Vraag een organisatiebeheerder naar het abonnement.',
   credits_exhausted:
-    'Je organisatie heeft alle AI-credits voor deze periode verbruikt. Vraag een organisatiebeheerder om credits toe te voegen of voeg je eigen AI-sleutel toe via Instellingen > AI-model.',
+    'Je organisatie heeft alle AI-credits voor deze periode verbruikt. Vraag een organisatiebeheerder om credits toe te voegen.',
 } satisfies Record<keyof typeof zh, string>

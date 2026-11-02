@@ -5,6 +5,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { buildParseMap } from '../src/renderer/document/parse-map'
 import { usableAiSettings } from './helpers/ai-settings'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 // the loop is replaced by a fake whose run() asks one clarification and then finishes
 vi.mock('@genoffice/agent-core', async (orig) => {
@@ -69,6 +70,7 @@ describe('answered clarify receipts (html)', () => {
     root = null
     container = null
     vi.unstubAllGlobals()
+    resetUniworkAi()
   })
 
   const text = '<!doctype html>\n<html><body><h1>Quarterly</h1></body></html>'
@@ -96,7 +98,9 @@ describe('answered clarify receipts (html)', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    const render = (filePath: string | null) =>
+    const render = (filePath: string | null) => {
+      // every turn runs on UniWork AI: its disclosure is acknowledged for the document first
+      readyUniworkAi(filePath)
       act(() =>
         root!.render(
           createElement(
@@ -117,6 +121,7 @@ describe('answered clarify receipts (html)', () => {
           ),
         ),
       )
+    }
     return { render }
   }
 

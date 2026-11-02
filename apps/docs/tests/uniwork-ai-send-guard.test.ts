@@ -1,15 +1,16 @@
-// A picked UniWork AI that is not offered keeps every send entry closed (spec S7 / RF1-4): the
-// composer already has Send off; a ribbon preset, retry, continue or queue run goes through the
-// same panel runWith() and must not start a turn (no bubble, no loop run) while the model-need
-// hint is on.
+// UniWork AI not offered keeps every send entry closed (spec S7 / RF1-4): the composer already has
+// Send off; a ribbon preset, retry, continue or queue run goes through the same panel runWith() and
+// must not start a turn (no bubble, no loop run) while the model-need hint is on. UniWork AI is the
+// one provider (UNI-2309), so its disclosure gates every send entry too.
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
+import { ackUniworkDisclosure } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { editorExtensions } from '../src/renderer/editor/extensions'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import { defaultAiSettings } from '@genoffice/ai-provider'
 
 const harness = vi.hoisted(() => ({
   runs: [] as string[],
@@ -54,16 +55,6 @@ vi.mock('@genoffice/agent-core', async (orig) => {
 
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 
-const settingsFor = (provider: AiSettings['provider']): AiSettings => ({
-  provider,
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [
-      p.id,
-      { apiKey: p.id === 'anthropic' ? 'test-key' : '', model: p.defaultModel },
-    ]),
-  ) as AiSettings['providers'],
-})
-
 const flush = async (): Promise<void> => {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -82,7 +73,7 @@ function enqueueInComposer(container: HTMLElement, text: string): void {
   })
 }
 
-describe('docs panel send entry with an unavailable UniWork AI pick', () => {
+describe('docs panel send entry while UniWork AI cannot send', () => {
   let root: Root | null = null
   let container: HTMLElement | null = null
   let editor: Editor | null = null
@@ -107,8 +98,13 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     delete (window as any).desktop
   })
 
-  /** mount with `provider` saved, let the picker publish its need, then fire an auto-run preset */
-  async function mountThenPreset(provider: AiSettings['provider']) {
+  /**
+   * mount (UniWork AI offered or not, its disclosure of the untitled document acknowledged or not),
+   * let the picker publish its need, then fire an auto-run preset
+   */
+  async function mountThenPreset(opts: { offered: boolean; acked: boolean }) {
+    setUniworkAiAvailable(opts.offered)
+    if (opts.acked) ackUniworkDisclosure('local')
     editor = new Editor({
       element: document.createElement('div'),
       extensions: editorExtensions,
@@ -126,7 +122,7 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    const settings = settingsFor(provider)
+    const settings = defaultAiSettings()
     const expand = vi.fn()
     // the model chip (and so the need hint) reads the saved settings through the preload bridge
     const stubs: Record<string, unknown> = { capabilities: { platform: 'desktop' } }
@@ -144,83 +140,63 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
         return target[prop]
       },
     })
-    const render = (nonce: number | null) =>
+    const render = (opts2: { nonce?: number; open?: boolean; filePath?: string }) =>
       act(() =>
         root!.render(
           createElement(AiPanel, {
             editor: editor!,
             blocks: [],
             settings,
-            open: true,
+            open: opts2.open ?? true,
             onExpand: expand,
-            ...(nonce === null ? {} : { preset: { text: 'rewrite it', autoRun: true, nonce } }),
+            ...(opts2.filePath ? { filePath: opts2.filePath } : {}),
+            ...(opts2.nonce === undefined
+              ? {}
+              : { preset: { text: 'rewrite it', autoRun: true, nonce: opts2.nonce } }),
           } as never),
         ),
       )
-    render(null)
+    render({})
     await flush()
     await flush()
-    render(1)
+    render({ nonce: 1 })
     await flush()
     await flush()
     return {
       expand,
-      /** the user picks `next` in the model picker: the panel gets new settings */
-      pick: async (next: AiSettings['provider'], nonce = 1) => {
-        const picked = settingsFor(next)
-        act(() =>
-          root!.render(
-            createElement(AiPanel, {
-              editor: editor!,
-              blocks: [],
-              settings: picked,
-              open: true,
-              onExpand: expand,
-              preset: { text: 'rewrite it', autoRun: true, nonce },
-            } as never),
-          ),
-        )
+      /** another document opens in the same panel: its disclosure is not acknowledged yet */
+      openDocument: async (filePath: string) => {
+        render({ nonce: 1, filePath })
         await flush()
       },
-      /** a fresh ribbon preset (a new nonce) with `provider` still picked */
+      /** a fresh ribbon preset (a new nonce) */
       firePreset: async (nonce: number, open = true) => {
-        act(() =>
-          root!.render(
-            createElement(AiPanel, {
-              editor: editor!,
-              blocks: [],
-              settings: settingsFor('uniwork'),
-              open,
-              onExpand: expand,
-              preset: { text: 'rewrite it', autoRun: true, nonce },
-            } as never),
-          ),
-        )
+        render({ nonce, open })
         await flush()
         await flush()
       },
     }
   }
 
-  it('uniwork picked and not offered: a preset starts no turn and leaves no bubble', async () => {
-    await mountThenPreset('uniwork')
+  it('not offered: a preset starts no turn and leaves no bubble', async () => {
+    await mountThenPreset({ offered: false, acked: true })
     expect(harness.runs).toEqual([])
     expect(container!.querySelector('.ai-msg-user')).toBeNull()
   })
 
-  it('a usable provider still runs the same preset (the guard is the hint, nothing else)', async () => {
-    await mountThenPreset('anthropic')
+  it('offered and acknowledged: the same preset runs (the guard is the hint, nothing else)', async () => {
+    await mountThenPreset({ offered: true, acked: true })
     expect(harness.runs).toHaveLength(1)
     expect(container!.querySelector('.ai-msg-user')).not.toBeNull()
   })
 
   it('a queued item stays queued and sends no request when the model-need hint turns on before settle (RF3-3)', async () => {
-    await mountThenPreset('anthropic')
+    await mountThenPreset({ offered: true, acked: true })
     expect(harness.runs).toEqual(['rewrite it'])
     enqueueInComposer(container!, 'queued follow-up')
     expect(container!.querySelector('.ai-queue-strip')).not.toBeNull()
 
-    act(() => setAiModelNeedHint('Choose a model to send'))
+    act(() => setAiModelNeedHint('UniWork AI is not on here'))
     act(() => harness.finishRun?.())
     await flush()
     await flush()
@@ -230,17 +206,17 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     expect(container!.querySelector('.ai-queue-strip')).not.toBeNull()
   })
 
-  it('a queued item stays queued while UniWork AI is picked with an unacknowledged disclosure, and sends after the ack (RF4-1)', async () => {
-    const panel = await mountThenPreset('anthropic')
+  it('a queued item stays queued while the disclosure is unacknowledged, and sends after the ack (RF4-1)', async () => {
+    const panel = await mountThenPreset({ offered: true, acked: true })
     expect(harness.runs).toEqual(['rewrite it'])
     enqueueInComposer(container!, 'queued follow-up')
 
-    // the hint holds the item while the run settles, then the user picks UniWork AI
-    act(() => setAiModelNeedHint('Choose a model to send'))
+    // the hint holds the item while the run settles, then a document the user has not
+    // acknowledged opens in the panel
+    act(() => setAiModelNeedHint('UniWork AI is not on here'))
     act(() => harness.finishRun?.())
     await flush()
-    setUniworkAiAvailable(true)
-    await panel.pick('uniwork')
+    await panel.openDocument('/docs/b.docx')
     act(() => setAiModelNeedHint(null))
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 900))
@@ -259,52 +235,42 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     expect(harness.runs).toEqual(['rewrite it', 'queued follow-up'])
   })
 
-  it('a preset with UniWork AI picked and the disclosure unacknowledged sends nothing, moves focus to the disclosure, and runs after the ack (core4b)', async () => {
-    const panel = await mountThenPreset('anthropic')
-    expect(harness.runs).toEqual(['rewrite it'])
-    act(() => harness.finishRun?.())
-    await flush()
-    setUniworkAiAvailable(true)
-    await panel.pick('uniwork')
+  it('a preset with the disclosure unacknowledged sends nothing, moves focus to the disclosure, and runs after the ack (core4b)', async () => {
+    const panel = await mountThenPreset({ offered: true, acked: false })
     act(() => setAiModelNeedHint(null))
 
     await panel.firePreset(2)
     const region = container!.querySelector<HTMLElement>('[role="region"]')
     expect(region).not.toBeNull()
-    expect(harness.runs).toEqual(['rewrite it'])
+    expect(harness.runs).toEqual([])
     expect(document.activeElement).toBe(region)
 
     act(() => {
       region!.querySelector<HTMLButtonElement>('button')!.click()
     })
     await panel.firePreset(3)
-    expect(harness.runs).toEqual(['rewrite it', 'rewrite it'])
+    expect(harness.runs).toEqual(['rewrite it'])
   })
 
   it('a preset that fires while the panel is collapsed to its rail is refused too: the gate does not need the composer mounted (core4b)', async () => {
-    const panel = await mountThenPreset('anthropic')
-    act(() => harness.finishRun?.())
-    await flush()
-    setUniworkAiAvailable(true)
-    await panel.pick('uniwork')
+    const panel = await mountThenPreset({ offered: true, acked: false })
     act(() => setAiModelNeedHint(null))
 
     await panel.firePreset(2, false)
     expect(container!.querySelector('[role="region"]')).toBeNull()
-    expect(harness.runs).toEqual(['rewrite it'])
+    expect(harness.runs).toEqual([])
   })
 
   it('a preset that fires while collapsed expands the panel, then announces the needs-ack line and focuses the disclosure; nothing is sent (RF5-1)', async () => {
-    const panel = await mountThenPreset('anthropic')
-    act(() => harness.finishRun?.())
-    await flush()
-    setUniworkAiAvailable(true)
-    await panel.pick('uniwork')
+    const panel = await mountThenPreset({ offered: true, acked: false })
     act(() => setAiModelNeedHint(null))
+    // mounted open, the first preset was refused there: collapse to the rail before the next one
+    await panel.firePreset(1, false)
+    panel.expand.mockClear()
 
     await panel.firePreset(2, false)
     expect(panel.expand).toHaveBeenCalledTimes(1)
-    expect(harness.runs).toEqual(['rewrite it'])
+    expect(harness.runs).toEqual([])
 
     // the host expands the panel in response: the reason is spoken and the disclosure is focused
     await panel.firePreset(2, true)
@@ -315,6 +281,6 @@ describe('docs panel send entry with an unavailable UniWork AI pick', () => {
     // no LocaleProvider here: the panel speaks the default zh
     expect(spoken).toContain(aiUniworkText('zh', 'aiUniworkSendNeedsAck'))
     expect(panel.expand).toHaveBeenCalledTimes(1)
-    expect(harness.runs).toEqual(['rewrite it'])
+    expect(harness.runs).toEqual([])
   })
 })

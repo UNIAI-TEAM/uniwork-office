@@ -246,7 +246,7 @@ describe('AI skill of a view-only deck', () => {
 
 describe('AI panel of a view-only deck', () => {
   const settings: AiSettings = {
-    provider: 'anthropic',
+    provider: 'uniwork',
     providers: Object.fromEntries(
       AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
     ) as AiSettings['providers'],
@@ -270,29 +270,18 @@ describe('AI panel of a view-only deck', () => {
     Element.prototype.scrollTo ??= () => {}
   })
 
-  it('shows the reason and no edit starters; an editable deck shows starters and no reason', () => {
+  it('shows the UniWork AI view-only line and no edit starters; an editable deck shows starters and no line', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
     act(() => root!.render(createElement(AiPanel as never, props({ readOnly: true }) as never)))
-    expect(container.querySelector('.ai-readonly-notice')?.textContent).toBeTruthy()
-    expect(container.querySelector('.ai-uniwork-view-only')).toBeNull()
+    expect(container.querySelector('.ai-readonly-notice')).toBeNull()
+    expect(container.querySelector('.ai-uniwork-view-only')?.textContent).toBeTruthy()
     expect(container.querySelectorAll('.ai-starter').length).toBe(0)
     expect(container.querySelector('.ai-tpl-gallery')).toBeNull()
 
-    act(() =>
-      root!.render(
-        createElement(
-          AiPanel as never,
-          props({ readOnly: true, settings: { ...settings, provider: 'uniwork' } }) as never,
-        ),
-      ),
-    )
-    expect(container.querySelector('.ai-readonly-notice')).toBeNull()
-    expect(container.querySelector('.ai-uniwork-view-only')?.textContent).toBeTruthy()
-
     act(() => root!.render(createElement(AiPanel as never, props({}) as never)))
-    expect(container.querySelector('.ai-readonly-notice')).toBeNull()
+    expect(container.querySelector('.ai-uniwork-view-only')).toBeNull()
     expect(container.querySelectorAll('.ai-starter').length).toBeGreaterThan(0)
   })
 })

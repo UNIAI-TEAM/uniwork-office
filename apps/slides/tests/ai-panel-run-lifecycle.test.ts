@@ -69,9 +69,10 @@ vi.mock('react-konva', () => {
 
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 import { AI_PROVIDERS, type AiSettings, type AttachmentMeta } from '../src/shared/ipc'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const settings: AiSettings = {
-  provider: 'anthropic',
+  provider: 'uniwork',
   providers: Object.fromEntries(
     AI_PROVIDERS.map((provider) => [provider.id, { apiKey: '', model: provider.defaultModel }]),
   ) as AiSettings['providers'],
@@ -80,6 +81,8 @@ const settings: AiSettings = {
 const mountedRoots: Array<{ root: Root; container: HTMLElement }> = []
 
 function mount(element: React.ReactElement): { root: Root; container: HTMLElement } {
+  // every turn runs on UniWork AI: its disclosure is acknowledged for the deck first
+  readyUniworkAi('/tmp/deck.pptx', null)
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -148,6 +151,7 @@ afterEach(() => {
     act(() => root.unmount())
     container.remove()
   }
+  resetUniworkAi()
   vi.restoreAllMocks()
 })
 

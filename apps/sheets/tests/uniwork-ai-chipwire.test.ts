@@ -109,7 +109,6 @@ describe('UniWork AI chip wiring (sheets panel)', () => {
   ]
 
   it.each([
-    ['aiErrCredits', 'aiRunChooseOther'],
     ['aiErrSession', 'acctSignInAgain'],
     ['aiErrUnavailable', 'aiRunRetry'],
     ['aiErrRunLimit', 'aiRunAskAgain'],
@@ -137,25 +136,19 @@ describe('UniWork AI chip wiring (sheets panel)', () => {
     expect(c.querySelector('.ai-error-action')).toBeNull()
   })
 
-  it('F1: Thử lại sends the question again, Chọn nhà cung cấp khác opens the model settings', async () => {
+  it('F1: Thử lại sends the question again', async () => {
     const c = await mount(errorTurn(ui('aiErrUnavailable'), 'aiErrUnavailable'))
     // a send entry refuses until the UniWork disclosure is acknowledged (S8)
     const ack = c.querySelector<HTMLButtonElement>('[role="region"] button')
     if (ack) await act(async () => ack.click())
     await act(async () => c.querySelector<HTMLButtonElement>('.ai-error-action button')!.click())
     expect(onSend).toHaveBeenCalledWith('sum column B', [], 0)
-    act(() => root!.unmount())
-    container!.remove()
-    const c2 = await mount(errorTurn(ui('aiErrCredits'), 'aiErrCredits'))
-    await act(async () => c2.querySelector<HTMLButtonElement>('.ai-error-action button')!.click())
-    expect(desktopApi.openAiSettings).toHaveBeenCalled()
   })
 
-  it('F1: a web frame has no other provider: a credits error offers no Chọn nhà cung cấp khác', async () => {
-    const c = await mount(errorTurn(ui('aiErrCredits'), 'aiErrCredits'), { platform: 'web' })
+  it('F1: a plan error (credits) names itself and offers no action: UniWork AI is the one provider', async () => {
+    const c = await mount(errorTurn(ui('aiErrCredits'), 'aiErrCredits'))
     expect(c.querySelector('.ai-result-chip')?.textContent).toBe(ui('aiResultError'))
-    expect(c.querySelector('[data-action="choose-provider"]')).toBeNull()
-    resetForTest()
+    expect(c.querySelector('.ai-error-action')).toBeNull()
   })
 
   it('F3: dropped calls on the turn read Chưa hỗ trợ with their reason', async () => {

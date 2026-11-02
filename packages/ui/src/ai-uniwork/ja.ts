@@ -5,9 +5,8 @@ export const ja = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: '{limit} クレジット中、残り {remaining}',
   aiUniworkFooterSignIn: 'UniWork AI を使うには UniWork にログインしてください',
-  aiUniworkSignedOut:
-    'UniWork からログアウトしています。別のプロバイダーを選ぶか、再ログインしてください。',
-  aiUniworkOff: 'このドキュメントでは UniWork AI がオフです。別のプロバイダーを選んでください。',
+  aiUniworkSignedOut: 'UniWork からログアウトしています。再ログインしてください。',
+  aiUniworkOff: 'このドキュメントでは UniWork AI がオフです。',
   aiUniworkViewOnly: '表示のみ：AI は回答できますが、ドキュメントの編集や保存はできません。',
 
   // S8 disclosure
@@ -37,7 +36,6 @@ export const ja = {
     '停止しました。すでに適用された変更（ある場合）はドキュメントに残り、元に戻せます。',
   aiRunRetry: '再試行',
   aiRunAskAgain: 'もう一度質問',
-  aiRunChooseOther: '別のプロバイダーを選択',
   aiRunOpenInApp: 'アプリで開く',
   aiConversationRestarted:
     '以前の会話の有効期限が切れたため、UniWork AI は新しい会話を始めました。以前のやり取りは覚えていません。続けるには質問をもう一度送信してください。',
@@ -79,7 +77,7 @@ export const ja = {
   cloudCreditsLeft: '残り {remaining} / {limit}',
   cloudCreditsUnlimited: '無制限',
   cloudInactiveBody:
-    '組織の UniWork サブスクリプションが有効でないため、クラウド AI は停止中です。管理者に更新を依頼してください。下の独自プロバイダーは引き続き使えます。',
+    '組織の UniWork サブスクリプションが有効でないため、クラウド AI は停止中です。管理者に更新を依頼してください。',
   acctSignIn: 'サインイン',
   acctSignInAgain: '再度サインイン',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -92,7 +90,7 @@ export const ja = {
     'このブックは大きすぎるため、Web 版では AI を使えません。UniWork Office アプリで開いてください。',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    '組織のプランに UniWork AI が含まれていません。プランについて組織の管理者に確認するか、「設定 > AI モデル」でご自身の AI キーを追加してください。',
+    '組織のプランに UniWork AI が含まれていません。プランについて組織の管理者に確認してください。',
   credits_exhausted:
-    '組織の今期の AI クレジットをすべて使い切りました。組織の管理者にクレジットの追加を依頼するか、「設定 > AI モデル」でご自身の AI キーを追加してください。',
+    '組織の今期の AI クレジットをすべて使い切りました。組織の管理者にクレジットの追加を依頼してください。',
 } satisfies Record<keyof typeof zh, string>

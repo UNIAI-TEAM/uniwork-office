@@ -107,7 +107,7 @@ import type {
   MergeDataSource,
   OpenDocxResult,
 } from '../shared/ipc'
-import { AI_PROVIDERS } from '../shared/ipc'
+import { defaultAiSettings } from '@genoffice/ai-provider/browser'
 import {
   buildMailMergeFiles,
   fieldInsertedLabel,
@@ -838,16 +838,6 @@ function makeGapNotesEl(
   return wrap
 }
 
-const DEFAULT_SETTINGS: AiSettings = {
-  provider: 'anthropic',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [
-      p.id,
-      { apiKey: '', model: p.defaultModel, baseUrl: p.needsBaseUrl ? '' : undefined },
-    ]),
-  ) as AiSettings['providers'],
-}
-
 /** Table menu items that are plain editor commands (the dialogs and Distribute Rows are handled inline) */
 const TABLE_MENU_COMMANDS: Partial<Record<MenuCommand, (widthPx: number) => Command>> = {
   'table-insert-rows-above': (w) => insertRowsOrColumns(1, 'above', w),
@@ -908,11 +898,11 @@ export function App() {
     errorKey: '' | 'appDocPwdWrong'
   } | null>(null)
   const [_recent, setRecent] = useState<string[]>([])
-  const [settings, setSettings] = useState<AiSettings>(DEFAULT_SETTINGS)
+  const [settings, setSettings] = useState<AiSettings>(defaultAiSettings)
   // capability-gated: when the platform has no AI the dock never shows, whatever
   // the stored preference or a stray setShowAi(true) says
   const aiEnabled = cap('ai')
-  // the selection popover's "Regenerate with AI" chip: host grant + a live way to generate
+  // the selection popover's "Regenerate with AI" chip: host grant + the UniWork cloud
   const imageGenerationOffered = useImageGenerationOffered(cap('imageGeneration'), settings, () =>
     window.desktop?.aiGskStatus?.(),
   )

@@ -11,8 +11,6 @@ export interface AiErrorActionProps {
   readonly waiting?: boolean | undefined
   /** Thử lại: send the turn again */
   readonly onRetry?: (() => void) | undefined
-  /** Chọn nhà cung cấp khác: open the model picker / settings */
-  readonly onChooseProvider?: (() => void) | undefined
   /** Đăng nhập lại: the existing UniWork sign-in action */
   readonly onSignIn?: (() => void) | undefined
   /** Hỏi tiếp: a new run in the same conversation */
@@ -31,7 +29,6 @@ export function AiErrorAction(props: AiErrorActionProps): React.JSX.Element | nu
   if (!line?.action || !line.actionKey) return null
   const handlers: Record<ResultChipErrorAction, (() => void) | undefined> = {
     retry: props.waiting ? undefined : props.onRetry,
-    'choose-provider': props.onChooseProvider,
     'sign-in': props.onSignIn,
     'ask-again': props.onAskAgain,
     'open-in-app': props.onOpenInApp,

@@ -1,8 +1,8 @@
 /**
- * Post-generation layout QC: each generated page gets one focused pass. Vision-capable
- * models receive screenshot + element inventory; text-only models receive deterministic
- * geometry evidence only. Runs in its own AgentLoop per page (fresh context, so the QC
- * cost doesn't ride on the main conversation), orchestrated by AiPanel.
+ * Post-generation layout QC: each generated page gets one focused pass. The model receives
+ * deterministic geometry evidence and the element inventory (UniWork AI takes no screenshot in
+ * these turns). Runs in its own AgentLoop per page (fresh context, so the QC cost doesn't ride on
+ * the main conversation), orchestrated by AiPanel.
  */
 import {
   AgentLoop,
@@ -10,12 +10,6 @@ import {
   type AgentSkill,
   type AgentTransport,
 } from '@genoffice/agent-core'
-import {
-  aiEffectiveModel,
-  getProviderAdapter,
-  modelLacksVision,
-  type AiSettings,
-} from '@genoffice/ai-provider/browser'
 import { auditSlideLayout } from '@genoffice/pipelines/slides/layout-audit'
 import { createSlidesSkill, formatSlideDump, type DeckAccess } from './slides-skill'
 import qcVisualPrompt from './prompts/qc-visual.md?raw'
@@ -51,18 +45,11 @@ export function isQcEnabled(): boolean {
 /** Cost ceiling per generation run — beyond this the tail pages are skipped (reported to the user) */
 export const QC_MAX_PAGES = 20
 
-/** Unknown providers are treated as text-only: omitting an image is safer than a user-visible 400. */
-export function settingsSupportVision(
-  settings: Pick<AiSettings, 'provider' | 'providers' | 'modelSources'>,
-): boolean {
-  try {
-    if (!getProviderAdapter(settings.provider).capabilities.vision) return false
-    // the model main will use: the source's chosen model, else the slot's
-    return !modelLacksVision(aiEffectiveModel(settings, settings.provider))
-  } catch {
-    return false
-  }
-}
+/**
+ * Whether a QC or AI Beautify turn carries the slide's rendering. UniWork AI takes no image in
+ * these turns, so it never does: the model works from the element inventory and the geometry.
+ */
+export const SLIDE_SCREENSHOT_SENT = false
 
 /** Custom/OpenAI-compatible endpoints can still reject images despite optimistic metadata. */
 export function isUnsupportedImageInputError(error: string): boolean {

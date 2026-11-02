@@ -5,8 +5,8 @@ export const pl = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'Pozostałe kredyty: {remaining} z {limit}',
   aiUniworkFooterSignIn: 'Zaloguj się do UniWork, aby korzystać z UniWork AI',
-  aiUniworkSignedOut: 'Wylogowano z UniWork. Wybierz innego dostawcę lub zaloguj się ponownie.',
-  aiUniworkOff: 'UniWork AI jest wyłączone dla tego dokumentu. Wybierz innego dostawcę.',
+  aiUniworkSignedOut: 'Wylogowano z UniWork. Zaloguj się ponownie.',
+  aiUniworkOff: 'UniWork AI jest wyłączone dla tego dokumentu.',
   aiUniworkViewOnly:
     'Tylko do odczytu: AI może odpowiadać, ale nie może edytować ani zapisywać dokumentu.',
 
@@ -37,7 +37,6 @@ export const pl = {
   aiRunStopped: 'Zatrzymano. Zastosowane już zmiany pozostają w dokumencie i można je cofnąć.',
   aiRunRetry: 'Spróbuj ponownie',
   aiRunAskAgain: 'Zapytaj ponownie',
-  aiRunChooseOther: 'Wybierz innego dostawcę',
   aiRunOpenInApp: 'Otwórz w aplikacji',
   aiConversationRestarted:
     'Poprzednia rozmowa wygasła, więc UniWork AI rozpoczęło nową i nie pamięta wcześniejszych wypowiedzi. Wyślij pytanie ponownie, aby kontynuować.',
@@ -79,7 +78,7 @@ export const pl = {
   cloudCreditsLeft: 'Pozostało {remaining} / {limit}',
   cloudCreditsUnlimited: 'Bez limitu',
   cloudInactiveBody:
-    'Subskrypcja UniWork Twojej organizacji jest nieaktywna, więc chmurowa AI jest wstrzymana. Poproś administratora o jej odnowienie; Twoi własni dostawcy poniżej nadal działają.',
+    'Subskrypcja UniWork Twojej organizacji jest nieaktywna, więc chmurowa AI jest wstrzymana. Poproś administratora o jej odnowienie.',
   acctSignIn: 'Zaloguj się',
   acctSignInAgain: 'Zaloguj się ponownie',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -93,7 +92,7 @@ export const pl = {
     'Ten skoroszyt jest za duży dla AI w przeglądarce. Otwórz go w aplikacji UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    'Plan Twojej organizacji nie obejmuje UniWork AI. Zapytaj administratora organizacji o plan lub dodaj własny klucz AI w Ustawienia > Model AI.',
+    'Plan Twojej organizacji nie obejmuje UniWork AI. Zapytaj administratora organizacji o plan.',
   credits_exhausted:
-    'Twoja organizacja wykorzystała wszystkie kredyty AI w tym okresie. Poproś administratora organizacji o doładowanie kredytów lub dodaj własny klucz AI w Ustawienia > Model AI.',
+    'Twoja organizacja wykorzystała wszystkie kredyty AI w tym okresie. Poproś administratora organizacji o doładowanie kredytów.',
 } satisfies Record<keyof typeof zh, string>

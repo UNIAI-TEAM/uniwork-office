@@ -1,20 +1,20 @@
 // UniWork AI result chip wiring in the docs panel (G6-05u visual r1 F1, F2, F3, F6, F11): an error turn offers
 // its labelled action, the announcement is the line on screen, dropped calls read Chưa hỗ trợ, and the
 // chip opens the answer paragraph. Same harness as uniwork-ai-notice.test.ts.
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { AI_RUN_IDLE_GRACE_MS } from '@genoffice/agent-core'
-import { aiUniworkText } from '@genoffice/ui'
+import { aiUniworkText, clearUniworkAcks } from '@genoffice/ui'
+import { ackUniworkDisclosure } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AiPanel } from '../src/renderer/ai/AiPanel'
-import { resetCapabilitiesForTest } from '../src/renderer/capabilities'
 import { getLang, LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
 const settings: AiSettings = {
-  provider: 'anthropic',
+  provider: 'uniwork',
   providers: Object.fromEntries(
     AI_PROVIDERS.map((p) => [p.id, { apiKey: 'k', model: p.defaultModel }]),
   ) as AiSettings['providers'],
@@ -80,6 +80,8 @@ describe('UniWork AI chip wiring (docs panel)', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
+    // every turn runs on UniWork AI: its disclosure is acknowledged for the document first
+    ackUniworkDisclosure('/docs/a.docx')
     act(() =>
       root!.render(
         createElement(LocaleProvider, {
@@ -112,6 +114,7 @@ describe('UniWork AI chip wiring (docs panel)', () => {
     delete (window as any).desktop
     delete (window as any).uniworkAiRun
     setModuleLang('zh')
+    clearUniworkAcks()
   })
 
   const root_ = () => container!
@@ -124,7 +127,7 @@ describe('UniWork AI chip wiring (docs panel)', () => {
           children: createElement(AiPanel, {
             editor: editor!,
             blocks: [],
-            settings: { ...settings, provider: 'uniwork' },
+            settings,
             open: true,
             filePath: '/docs/a.docx',
             preset: { text: 'summarize it', nonce: 1, autoRun: true },
@@ -159,7 +162,6 @@ describe('UniWork AI chip wiring (docs panel)', () => {
   }
 
   it.each([
-    ['credits_exhausted', 'aiErrCredits', 'aiRunChooseOther'],
     ['session_expired', 'aiErrSession', 'acctSignInAgain'],
     ['cloud_unavailable', 'aiErrUnavailable', 'aiRunRetry'],
     ['run_limit_reached', 'aiErrRunLimit', 'aiRunAskAgain'],
@@ -230,28 +232,11 @@ describe('UniWork AI chip wiring (docs panel)', () => {
     await finish()
   })
 
-  it('F1: Chọn nhà cung cấp khác opens the model settings', async () => {
-    const openSettings = vi.fn(async () => {})
-    ;(window as any).desktop.openAiModelSettings = openSettings
+  it('F1: a plan error (credits_exhausted) names itself and offers no action: UniWork AI is the one provider', async () => {
     await uniworkTurn()
     await failWith('credits_exhausted', 'aiErrCredits')
-    await clickAction()
-    expect(openSettings).toHaveBeenCalledTimes(1)
-  })
-
-  it('F1: a web frame has no other provider: a credits error offers no Chọn nhà cung cấp khác', async () => {
-    ;(window as any).desktop.capabilities = { platform: 'web' }
-    ;(window as any).desktop.openAiModelSettings = vi.fn(async () => {})
-    resetCapabilitiesForTest()
-    try {
-      await uniworkTurn()
-      await failWith('credits_exhausted', 'aiErrCredits')
-      expect(visibleErrorText()).toBe(ui('aiErrCredits'))
-      expect(root_().querySelector('[data-action="choose-provider"]')).toBeNull()
-    } finally {
-      delete (window as any).desktop.capabilities
-      resetCapabilitiesForTest()
-    }
+    expect(visibleErrorText()).toBe(ui('aiErrCredits'))
+    expect(root_().querySelector('.ai-error-action')).toBeNull()
   })
 
   it('F1: Hỏi tiếp returns to the composer for the next question', async () => {

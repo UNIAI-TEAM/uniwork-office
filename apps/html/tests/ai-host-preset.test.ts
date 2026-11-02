@@ -10,6 +10,7 @@ import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { buildParseMap } from '../src/renderer/document/parse-map'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { usableAiSettings } from './helpers/ai-settings'
+import { readyUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const harness = vi.hoisted(() => ({ runs: [] as string[] }))
 vi.mock('@genoffice/agent-core', async (orig) => {
@@ -57,7 +58,7 @@ describe('html AI panel: a preset from outside', () => {
     vi.unstubAllGlobals()
   })
 
-  function mount(provider: 'uniwork' | 'openai') {
+  function mount() {
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
     const stubs: Record<string, ReturnType<typeof vi.fn>> = {}
     vi.stubGlobal(
@@ -68,7 +69,7 @@ describe('html AI panel: a preset from outside', () => {
             target[prop] = /^on[A-Z]/.test(prop)
               ? vi.fn(() => () => {})
               : prop === 'getAiSettings'
-                ? vi.fn(async () => ({ ...usableAiSettings(), provider }))
+                ? vi.fn(async () => usableAiSettings())
                 : vi.fn(async () => undefined)
           }
           return target[prop]
@@ -124,7 +125,8 @@ describe('html AI panel: a preset from outside', () => {
   }
 
   it('runs the text word for word and shows the display words', async () => {
-    const render = mount('openai')
+    readyUniworkAi('/tmp/page.html')
+    const render = mount()
     render(null)
     await flush()
     await flush()
@@ -137,7 +139,7 @@ describe('html AI panel: a preset from outside', () => {
 
   it('UniWork AI not acknowledged: the text waits in the composer and nothing is sent', async () => {
     setUniworkAiAvailable(true)
-    const render = mount('uniwork')
+    const render = mount()
     render(null)
     await flush()
     await flush()
@@ -150,17 +152,24 @@ describe('html AI panel: a preset from outside', () => {
     expect(container!.querySelector<HTMLTextAreaElement>('textarea.ai-input')!.value).toBe(JOB)
   })
 
-  it('a host job on another provider than UniWork AI when it would run waits in the focused composer', async () => {
-    const render = mount('openai')
+  it('a host job runs on UniWork AI; a preset refused while that run is going waits in the focused composer', async () => {
+    readyUniworkAi('/tmp/page.html')
+    const render = mount()
     render(null)
     await flush()
     await flush()
     render({ text: JOB, nonce: 1, autoRun: true, uniworkOnly: true })
     await flush()
     await flush()
-    expect(harness.runs).toEqual([])
+    expect(harness.runs).toEqual([JOB])
+
     const box = container!.querySelector<HTMLTextAreaElement>('textarea.ai-input')!
-    expect(box.value).toBe(JOB)
+    act(() => box.blur())
+    render({ text: 'Summarise it', nonce: 2, autoRun: true })
+    await flush()
+    await flush()
+    expect(harness.runs).toEqual([JOB])
+    expect(box.value).toBe('Summarise it')
     expect(document.activeElement).toBe(box)
   })
 })

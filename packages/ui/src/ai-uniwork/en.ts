@@ -5,8 +5,8 @@ export const en = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: '{remaining} of {limit} credits left',
   aiUniworkFooterSignIn: 'Sign in to UniWork to use UniWork AI',
-  aiUniworkSignedOut: 'You’re signed out of UniWork. Choose another provider or sign in again.',
-  aiUniworkOff: 'UniWork AI is off for this document. Choose another provider.',
+  aiUniworkSignedOut: 'You’re signed out of UniWork. Sign in again.',
+  aiUniworkOff: 'UniWork AI is off for this document.',
   aiUniworkViewOnly: 'View only: AI can answer but can’t edit or save the document.',
 
   // S8 disclosure
@@ -35,7 +35,6 @@ export const en = {
   aiRunStopped: 'Stopped. Any changes already applied stay in the document and can be undone.',
   aiRunRetry: 'Retry',
   aiRunAskAgain: 'Ask again',
-  aiRunChooseOther: 'Choose another provider',
   aiRunOpenInApp: 'Open in the app',
   aiConversationRestarted:
     'The previous conversation expired, so UniWork AI started a new one and no longer remembers earlier turns. Send your question again to continue.',
@@ -75,7 +74,7 @@ export const en = {
   cloudCreditsLeft: '{remaining} / {limit} left',
   cloudCreditsUnlimited: 'Unlimited',
   cloudInactiveBody:
-    'Your organization’s UniWork subscription is not active, so cloud AI is paused. Ask an admin to renew it; your own providers below keep working.',
+    'Your organization’s UniWork subscription is not active, so cloud AI is paused. Ask an admin to renew it.',
   acctSignIn: 'Sign in',
   acctSignInAgain: 'Sign in again',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -89,7 +88,7 @@ export const en = {
     'This workbook is too large for AI on the web. Open it in the UniWork Office app.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    "Your organization's plan does not include UniWork AI. Ask an organization admin about the plan, or add your own AI key in Settings > AI Model.",
+    "Your organization's plan does not include UniWork AI. Ask an organization admin about the plan.",
   credits_exhausted:
-    'Your organization has used all its AI credits for this period. Ask an organization admin to add credits, or add your own AI key in Settings > AI Model.',
+    'Your organization has used all its AI credits for this period. Ask an organization admin to add credits.',
 } satisfies Record<keyof typeof zh, string>

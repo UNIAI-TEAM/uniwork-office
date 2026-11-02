@@ -1,22 +1,19 @@
 // @vitest-environment jsdom
-// A picked UniWork AI that is not offered keeps every send entry closed (spec S7 / RF1-4 / RF3-3):
-// AiChatPanel's queue submit must refuse to dequeue when the model-need hint is on, and App.tsx's
-// handleSend (which cannot be mounted in jsdom because of Univer) is pinned from source to return
-// false on the same hint.
+// UniWork AI not offered keeps every send entry closed (spec S7 / RF1-4 / RF3-3): AiChatPanel's
+// queue submit must refuse to dequeue when the model-need hint is on, and App.tsx's handleSend
+// (which cannot be mounted in jsdom because of Univer) is pinned from source to return false on the
+// same hint. UniWork AI is the one provider (UNI-2309), so its disclosure gates every entry too.
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import {
-  aiUniworkText,
-  clearUniworkAcks,
-  createUniworkSendGate,
-  setAiModelNeedHint,
-} from '@genoffice/ui'
+import { setUniworkAiAvailable } from '@genoffice/ai-provider'
+import { ack, aiUniworkText, createUniworkSendGate, setAiModelNeedHint } from '@genoffice/ui'
 import { AiChatPanel, type AiChatMessage } from '../src/renderer/ai/AiChatPanel'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const flush = async (): Promise<void> => {
   await act(async () => {
@@ -39,12 +36,13 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     container = null
     act(() => setAiModelNeedHint(null))
     // the in-memory empty-account ack must not leak into the next test
-    clearUniworkAcks()
+    resetUniworkAi()
     vi.unstubAllGlobals()
   })
 
   it('a queued item stays queued and sends no request when the model-need hint turns on before settle (RF3-3)', async () => {
     const runs: string[] = []
+    readyUniworkAi()
     vi.stubGlobal(
       'desktopApi',
       new Proxy(
@@ -52,7 +50,7 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
         {
           get: (_t, prop: string) =>
             prop === 'getAiSettings'
-              ? () => Promise.resolve({ provider: 'openai', providers: {} })
+              ? () => Promise.resolve({ provider: 'uniwork', providers: {} })
               : /^on[A-Z]/.test(prop)
                 ? () => () => {}
                 : () => Promise.resolve(undefined),
@@ -126,7 +124,7 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     expect(container.querySelector('.ai-queue-strip')).not.toBeNull()
     expect(runs).toEqual([])
 
-    act(() => setAiModelNeedHint('Choose a model to send'))
+    act(() => setAiModelNeedHint('UniWork AI is not on here'))
     render(false, '')
     await flush()
     await flush()
@@ -135,10 +133,27 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     expect(container.querySelector('.ai-queue-strip')).not.toBeNull()
   })
 
-  it('a queued item stays queued while UniWork AI is picked with an unacknowledged disclosure, and sends after the ack (RF4-1)', async () => {
+  it('a queued item stays queued while the disclosure is unacknowledged, and sends after the ack (RF4-1)', async () => {
     const runs: string[] = []
-    let saved = 'openai'
-    const changed: Array<() => void> = []
+    setUniworkAiAvailable(true)
+    const snapshot = (accountId: string) => ({
+      state: 'ready',
+      signedIn: true,
+      accountId,
+      orgId: 'org-1',
+      orgName: 'Acme',
+    })
+    let push: ((snap: unknown) => void) | null = null
+    vi.stubGlobal('uniworkCloudStatus', {
+      get: vi.fn(async () => snapshot('acc-1')),
+      onChange: (handler: (snap: unknown) => void) => {
+        push = handler
+        return () => {}
+      },
+      signIn: vi.fn(),
+    })
+    // the first account has acknowledged the disclosure for the workbook
+    ack({ account: 'acc-1', org: 'org-1', document: 'local' })
     vi.stubGlobal(
       'desktopApi',
       new Proxy(
@@ -146,15 +161,10 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
         {
           get: (_t, prop: string) =>
             prop === 'getAiSettings'
-              ? () => Promise.resolve({ provider: saved, providers: {} })
-              : prop === 'onAiSettingsChanged'
-                ? (handler: () => void) => {
-                    changed.push(handler)
-                    return () => {}
-                  }
-                : /^on[A-Z]/.test(prop)
-                  ? () => () => {}
-                  : () => Promise.resolve(undefined),
+              ? () => Promise.resolve({ provider: 'uniwork', providers: {} })
+              : /^on[A-Z]/.test(prop)
+                ? () => () => {}
+                : () => Promise.resolve(undefined),
         },
       ),
     )
@@ -225,13 +235,12 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     expect(container.querySelector('.ai-queue-strip')).not.toBeNull()
     expect(runs).toEqual([])
 
-    act(() => setAiModelNeedHint('Choose a model to send'))
+    // the hint holds the item while the run settles, then another account signs in: its
+    // disclosure is not acknowledged yet
+    act(() => setAiModelNeedHint('UniWork AI is not on here'))
     render(false, '')
     await flush()
-
-    // the user picks UniWork AI: the saved settings change and the panel is told
-    saved = 'uniwork'
-    act(() => changed.forEach((handler) => handler()))
+    act(() => push?.(snapshot('acc-2')))
     await flush()
     act(() => setAiModelNeedHint(null))
     await act(async () => {
@@ -251,7 +260,7 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     expect(runs).toEqual(['queued follow-up'])
   })
 
-  it('retry of an undelivered message with UniWork AI picked and the disclosure unacknowledged sends nothing, focuses the disclosure, and goes through after the ack (core4b)', async () => {
+  it('retry of an undelivered message with the disclosure unacknowledged sends nothing, focuses the disclosure, and goes through after the ack (core4b)', async () => {
     const sent: string[] = []
     vi.stubGlobal(
       'desktopApi',

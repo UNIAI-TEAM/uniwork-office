@@ -9,8 +9,8 @@ export const zh = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: '共 {limit}，剩余 {remaining} 额度',
   aiUniworkFooterSignIn: '登录 UniWork 以使用 UniWork AI',
-  aiUniworkSignedOut: '你已退出 UniWork。请选择其他服务商或重新登录。',
-  aiUniworkOff: '此文档已关闭 UniWork AI。请选择其他服务商。',
+  aiUniworkSignedOut: '你已退出 UniWork。请重新登录。',
+  aiUniworkOff: '此文档已关闭 UniWork AI。',
   aiUniworkViewOnly: '仅查看：AI 可以回答，但不能编辑或保存文档。',
 
   // S8 disclosure
@@ -39,7 +39,6 @@ export const zh = {
   aiRunStopped: '已停止。已应用的更改（如有）仍在文档中，可以撤销。',
   aiRunRetry: '重试',
   aiRunAskAgain: '继续提问',
-  aiRunChooseOther: '选择其他服务商',
   aiRunOpenInApp: '在应用中打开',
   aiConversationRestarted:
     '之前的对话已过期，因此 UniWork AI 开始了新对话，不再记得之前的轮次。请重新发送问题以继续。',
@@ -72,8 +71,7 @@ export const zh = {
   cloudStateInactive: '订阅未生效',
   cloudCreditsLeft: '剩余 {remaining} / {limit}',
   cloudCreditsUnlimited: '不限量',
-  cloudInactiveBody:
-    '你所在组织的 UniWork 订阅未生效，云端 AI 已暂停。请联系管理员续订；下方自己的服务商不受影响。',
+  cloudInactiveBody: '你所在组织的 UniWork 订阅未生效，云端 AI 已暂停。请联系管理员续订。',
   acctSignIn: '登录',
   acctSignInAgain: '重新登录',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -83,8 +81,6 @@ export const zh = {
   aiResultCellsMetaNoOverwrite: '已写入 {written} 个单元格（{range}）',
   aiErrWorkbookTooLarge: '此工作簿太大，无法在网页上使用 AI。请在 UniWork Office 应用中打开。',
   // S7 composer notice keys (not_entitled, credits_exhausted)
-  not_entitled:
-    '你所在组织的套餐不包含 UniWork AI。请联系组织管理员了解套餐，或在“设置 > AI 模型”中添加你自己的 AI 密钥。',
-  credits_exhausted:
-    '你所在组织本周期的 AI 额度已用完。请联系组织管理员补充额度，或在“设置 > AI 模型”中添加你自己的 AI 密钥。',
+  not_entitled: '你所在组织的套餐不包含 UniWork AI。请联系组织管理员了解套餐。',
+  credits_exhausted: '你所在组织本周期的 AI 额度已用完。请联系组织管理员补充额度。',
 }

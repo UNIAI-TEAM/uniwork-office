@@ -11,6 +11,7 @@ import { buildExtensions } from '../src/renderer/editor/extensions'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { strings } from '../src/renderer/i18n/strings'
 import { usableAiSettings } from './helpers/ai-settings'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 // the loop is replaced by a fake whose run() asks one clarification and then finishes
 vi.mock('@genoffice/agent-core', async (orig) => {
@@ -63,6 +64,7 @@ describe('answered clarify receipts (markdown)', () => {
     editor = null
     delete (window as any).projectApi
     vi.unstubAllGlobals()
+    resetUniworkAi()
   })
 
   function mount(history: 'none' | 'deferred' = 'none') {
@@ -110,7 +112,9 @@ describe('answered clarify receipts (markdown)', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    const render = (filePath: string | null) =>
+    const render = (filePath: string | null) => {
+      // every turn runs on UniWork AI: its disclosure is acknowledged for the document first
+      readyUniworkAi(filePath)
       act(() =>
         root!.render(
           createElement(
@@ -125,6 +129,7 @@ describe('answered clarify receipts (markdown)', () => {
           ),
         ),
       )
+    }
     return { render }
   }
 

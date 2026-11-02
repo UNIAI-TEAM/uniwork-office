@@ -1,39 +1,27 @@
-// The Sheets agent's readiness gate: UniWork AI is ready as it is; any other provider needs a model
-// and, except the built-in UniAI, a key in its slot (UNI-2289: no key reaches a web frame).
-import { describe, expect, it } from 'vitest'
-import { defaultAiSettings } from '@genoffice/ai-provider'
+// The Sheets agent's readiness gate: only UniWork AI sends, and only while the host offers it
+// (UNI-2309). When it is not offered (signed out, offline, the organization without UniWork AI)
+// the panel falls back to the fixed planner instead of the agent.
+import { afterEach, describe, expect, it } from 'vitest'
+import { defaultAiSettings, setUniworkAiAvailable } from '@genoffice/ai-provider'
 
 import { agentConfigured } from '../src/renderer/ai/agent-configured'
 
-const anthropicSlot = () => {
-  const s = defaultAiSettings()
-  s.provider = 'anthropic'
-  s.providers.anthropic = { ...s.providers.anthropic, apiKey: '', model: 'claude-slot' }
-  return s
-}
+afterEach(() => setUniworkAiAvailable(false))
 
 describe('agentConfigured', () => {
-  it('is ready on UniWork AI, which has no key and no model choice here (UNI-2264)', () => {
-    const s = defaultAiSettings()
-    s.provider = 'uniwork'
-    s.providers.uniwork = { apiKey: '…', model: '' }
-    expect(agentConfigured(s)).toBe(true)
+  it('is ready on UniWork AI while the host offers it', () => {
+    setUniworkAiAvailable(true)
+    expect(agentConfigured({ ...defaultAiSettings(), provider: 'uniwork' })).toBe(true)
   })
 
-  it('a provider with a model but no key in its slot is not ready (what a web frame holds)', () => {
-    expect(agentConfigured(anthropicSlot())).toBe(false)
+  it('is not ready on UniWork AI while the host does not offer it', () => {
+    setUniworkAiAvailable(false)
+    expect(agentConfigured({ ...defaultAiSettings(), provider: 'uniwork' })).toBe(false)
   })
 
-  it('a model source never stands in for the missing key', () => {
-    const s = anthropicSlot()
-    s.modelSources = { anthropic: { chosen: 'claude-source' } }
-    expect(agentConfigured(s)).toBe(false)
-  })
-
-  it('needs a key in the slot for a local provider', () => {
-    const s = anthropicSlot()
-    s.providers.anthropic = { ...s.providers.anthropic, apiKey: 'sk-test' }
-    expect(agentConfigured(s)).toBe(true)
+  it('is not ready without settings', () => {
+    setUniworkAiAvailable(true)
     expect(agentConfigured(null)).toBe(false)
+    expect(agentConfigured(undefined)).toBe(false)
   })
 })

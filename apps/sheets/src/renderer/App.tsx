@@ -1241,7 +1241,7 @@ export function App({
   }
 
   // ---- AI: real LLM agent (falls back to the deterministic planner above
-  // when no provider is configured — see isAgentConfigured/handleSend) ----
+  // while UniWork AI is not offered — see isAgentConfigured/handleSend) ----
   const [aiSettings, setAiSettingsState] = useState<AiSettings | null>(null)
   const aiSettingsRef = useRef<AiSettings | null>(null)
   aiSettingsRef.current = aiSettings
@@ -1250,8 +1250,8 @@ export function App({
   const { loggedInRef: gskLoggedInRef, refresh: refreshGskStatus } = useCloudSignedIn(() =>
     window.desktopApi?.aiGskStatus(),
   )
-  // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
-  // send entry closed - presets, retry, queue and selection ask included - the hint says why
+  // UniWork AI not offered keeps every send entry of the open panel closed - presets, retry, queue
+  // and selection ask included - the hint says why
   const needModelHint = useAiModelNeedHint()
   const [aiBusy, setAiBusy] = useState(false)
   /** ask_clarification card waiting for the user; its resolver unblocks the tool */
@@ -1297,10 +1297,10 @@ export function App({
   /** attachments of the message the running (or last) run was started with */
   const runAttachmentsRef = useRef<readonly AttachmentMeta[]>([])
   /** image URLs the AI may insert this run: image_search / generate_image results and the run's image
-   * attachments; UniWork AI turns refuse any other URL (BYOK keeps today's rules) */
+   * attachments; any other URL is refused */
   const imageUrlsRef = useRef(
     createImageUrlRegistry({
-      enforce: () => aiSettingsRef.current?.provider === 'uniwork',
+      enforce: () => true,
       attachments: () =>
         runAttachmentsRef.current
           .filter((a) => ATTACHMENT_IMAGE_EXTS.has(a.ext))
@@ -4028,7 +4028,7 @@ export function App({
       ]
       setAttachments([])
     }
-    // real LLM configured → let the agent read context and propose operations;
+    // UniWork AI offered → let the agent read context and propose operations;
     // otherwise fall back to the local, deterministic regex planner
     // (kept for offline use and for the fixed micro-DSL it still supports).
     if (agentConfigured) {

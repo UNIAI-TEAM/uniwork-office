@@ -1,7 +1,6 @@
 /** @vitest-environment jsdom */
-// G6-05u WI-A (UNI-1372): when the UniWork AI flag is on, `uniwork` (which has `models: []`) must
-// be listed by aiModelPickerGroups so the chip shows "UniWork AI" (not "Choose model") and web
-// frames (`providers.uniwork.apiKey = '…'`) do not resolve `needModel`.
+// G6-05u WI-A (UNI-1372), UNI-2309: the chip always names UniWork AI, the one provider; while the
+// host does not offer it (or the cloud says it cannot answer) Send stays off and the hint says so.
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -33,7 +32,6 @@ async function mountPickerAndComposer(
 ) {
   const bridge: AiModelPickerBridge = {
     getSettings: async () => settings,
-    setSettings: async () => {},
     ...bridgeOverrides,
   }
   await act(async () => {
@@ -61,59 +59,28 @@ async function mountPickerAndComposer(
   }
 }
 
-describe('AiModelPicker with UniWork AI selected', () => {
-  it('shows "UniWork AI" on the chip when the flag is on (desktop)', async () => {
+describe('AiModelPicker: UniWork AI is the one provider', () => {
+  it('shows "UniWork AI" on the chip and keeps Send on while UniWork AI is offered', async () => {
     setUniworkAiAvailable(true)
-    const settings: AiSettings = {
-      ...defaultAiSettings(),
-      uniAiAvailable: false,
-      provider: 'uniwork',
-    }
-    const { chip, send, hint } = await mountPickerAndComposer(settings)
+    const { chip, send, hint } = await mountPickerAndComposer(defaultAiSettings())
     expect(chip).toBe('UniWork AI')
     expect(send.disabled).toBe(false)
     expect(hint).toBe('Enter to send')
   })
 
-  it('does not resolve needModel on web when UniWork AI is offered and selected', async () => {
-    setUniworkAiAvailable(true)
-    const settings: AiSettings = {
-      ...defaultAiSettings(),
-      uniAiAvailable: false,
-      provider: 'uniwork',
-    }
-    settings.providers.uniwork = { apiKey: '…uw', model: '' }
-    const { chip, send, hint } = await mountPickerAndComposer(settings)
-    expect(chip).toBe('UniWork AI')
-    expect(hint).not.toBe(AI_MODEL_PICKER_STRINGS.en.needModel)
-    expect(send.disabled).toBe(false)
-    expect(hint).toBe('Enter to send')
-  })
-
-  it('shows "Choose model" and disables Send with needModel hint when the UniWork AI flag is off', async () => {
+  it('keeps the name, disables Send and says UniWork AI is not on while it is not offered', async () => {
     setUniworkAiAvailable(false)
-    const settings: AiSettings = {
-      ...defaultAiSettings(),
-      uniAiAvailable: false,
-      provider: 'uniwork',
-    }
-    const { chip, send, hint } = await mountPickerAndComposer(settings)
-    expect(chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
+    const { chip, send, hint } = await mountPickerAndComposer(defaultAiSettings())
+    expect(chip).toBe('UniWork AI')
     expect(send.disabled).toBe(true)
     expect(hint).toBe(AI_MODEL_PICKER_STRINGS.en.needModel)
   })
 
-  it('never silently falls back from a saved uniwork choice to UniAI when UniWork AI is unavailable even while UniAI is signed in', async () => {
-    setUniworkAiAvailable(false)
-    const settings: AiSettings = {
-      ...defaultAiSettings(),
-      uniAiAvailable: true,
-      provider: 'uniwork',
-    }
-    const { chip, send, hint } = await mountPickerAndComposer(settings, {
-      gskLoggedIn: async () => true,
+  it('a cloud state other than ready keeps Send off even while the host flag is on', async () => {
+    setUniworkAiAvailable(true)
+    const { send, hint } = await mountPickerAndComposer(defaultAiSettings(), {
+      getCloudStatus: async () => ({ state: 'credits-exhausted', hasCompletedRead: true }),
     })
-    expect(chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
     expect(send.disabled).toBe(true)
     expect(hint).toBe(AI_MODEL_PICKER_STRINGS.en.needModel)
   })

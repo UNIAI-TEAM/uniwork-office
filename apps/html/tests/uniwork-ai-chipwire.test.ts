@@ -7,6 +7,7 @@ import { aiUniworkText, setAiModelNeedHint } from '@genoffice/ui'
 import { createRoot, type Root } from 'react-dom/client'
 import { buildParseMap } from '../src/renderer/document/parse-map'
 import { usableAiSettings } from './helpers/ai-settings'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 // the loop is replaced by a harness that hands over its events and never finishes on its own
 const harness = vi.hoisted(() => ({ events: null as any, loop: null as any }))
@@ -29,7 +30,6 @@ vi.mock('@genoffice/agent-core', async (orig) => {
 })
 
 import { AiPanel, type HtmlAiDeps } from '../src/renderer/ai/AiPanel'
-import { resetForTest } from '../src/renderer/capabilities'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 
 const flush = async (): Promise<void> => {
@@ -69,6 +69,7 @@ describe('UniWork AI chip wiring (html panel)', () => {
     root = null
     container = null
     vi.unstubAllGlobals()
+    resetUniworkAi()
   })
 
   const text = '<!doctype html>\n<html><body><h1>Quarterly</h1></body></html>'
@@ -127,6 +128,7 @@ describe('UniWork AI chip wiring (html panel)', () => {
   /** mount, let the preset start its turn, return once the loop has handed over its events */
   async function started() {
     harness.events = null
+    readyUniworkAi('/docs/a.html')
     const m = mount()
     m.render('/docs/a.html')
     await flush()
@@ -169,7 +171,6 @@ describe('UniWork AI chip wiring (html panel)', () => {
   }
 
   it.each([
-    ['credits_exhausted', 'aiErrCredits', 'aiRunChooseOther'],
     ['session_expired', 'aiErrSession', 'acctSignInAgain'],
     ['run_limit_reached', 'aiErrRunLimit', 'aiRunAskAgain'],
   ] as const)(
@@ -225,11 +226,8 @@ describe('UniWork AI chip wiring (html panel)', () => {
     expect(paragraph.textContent).toContain('Câu trả lời ngắn.')
   })
 
-  it('F1: Thử lại sends the turn again, Chọn nhà cung cấp khác opens the model settings', async () => {
+  it('F1: Thử lại sends the turn again', async () => {
     await uniworkTurn()
-    const ackBtn = container!.querySelector<HTMLButtonElement>('[role="region"] button')
-    if (ackBtn) await act(async () => ackBtn.click())
-    await flush()
     await failWith('cloud_unavailable', 'aiErrUnavailable')
     // the panel may have rebuilt its loop for the UniWork pick: spy on the one it holds now
     const run = vi.spyOn(Object.getPrototypeOf(harness.loop), 'run')
@@ -246,24 +244,13 @@ describe('UniWork AI chip wiring (html panel)', () => {
     )
     await new Promise((r) => setTimeout(r, 50))
     expect(run).toHaveBeenCalledTimes(1)
-    await failWith('credits_exhausted', 'aiErrCredits')
-    await act(async () =>
-      root_().querySelector<HTMLButtonElement>('.ai-error-action button')!.click(),
-    )
-    expect((window as any).htmlApi.openAiModelSettings).toHaveBeenCalled()
   })
 
-  it('F1: a web frame has no other provider: a credits error offers no Chọn nhà cung cấp khác', async () => {
-    ;(window as any).htmlApi.capabilities = { platform: 'web' }
-    resetForTest()
-    try {
-      await uniworkTurn()
-      await failWith('credits_exhausted', 'aiErrCredits')
-      expect(visibleErrorText()).toBe(ui('aiErrCredits'))
-      expect(root_().querySelector('[data-action="choose-provider"]')).toBeNull()
-    } finally {
-      resetForTest()
-    }
+  it('F1: a plan error (credits_exhausted) names itself and offers no action: UniWork AI is the one provider', async () => {
+    await uniworkTurn()
+    await failWith('credits_exhausted', 'aiErrCredits')
+    expect(visibleErrorText()).toBe(ui('aiErrCredits'))
+    expect(root_().querySelector('.ai-error-action')).toBeNull()
   })
 
   // F12 (visual r2): the "not sent" bubble's own Retry sat next to the labelled S9 action on every UniWork
@@ -293,7 +280,7 @@ describe('UniWork AI chip wiring (html panel)', () => {
     },
   )
 
-  it('F12: a failure that is not a UniWork error (own key) keeps the bubble Retry', async () => {
+  it('F12: a failure with no UniWork error code keeps the bubble Retry', async () => {
     await started()
     await failRaw('upstream said no')
     expect(root_().querySelector('.ai-error-action')).toBeNull()

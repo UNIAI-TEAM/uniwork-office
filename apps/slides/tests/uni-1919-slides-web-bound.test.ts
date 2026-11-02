@@ -134,7 +134,7 @@ afterEach(() => {
 /** the web adapter's answer for an editable frame — must reach save consumers verbatim */
 const WEB_EDITABLE = { bound: false, readOnly: false }
 
-/** the UniWork AI selection: the provider switch is the whole signal DeckAccess.uniworkAi reads */
+/** the UniWork AI selection; every turn runs on UniWork AI, whatever a legacy file names (UNI-2309) */
 const uniworkSettings: AiSettings = { ...settings, provider: 'uniwork' }
 
 /** tools a web-frame UniWork AI turn never sees (signed policy; slides-skill UNIWORK_AI_HIDDEN_TOOLS) */
@@ -192,22 +192,23 @@ describe('the web slides frame is UniWork-bound for the AI', () => {
     expect(access().uniworkBound?.()).toBe(true)
   })
 
-  it('feeds the provider through uniworkAi so a UniWork AI turn loses the three hidden tools', async () => {
+  it('feeds uniworkAi so a UniWork AI turn loses the three hidden tools', async () => {
     installSlidesApi({ platform: 'web' })
     render({ uniworkBound: WEB_EDITABLE.bound, settings: uniworkSettings })
-    // RPB-1: the whole shape the skill reads — provider 'uniwork' must reach uniworkAi(),
-    // or the hidden tools are offered to a UniWork AI turn (the G7-08 failure class)
+    // RPB-1: the whole shape the skill reads — uniworkAi() must answer true, or the hidden
+    // tools are offered to a UniWork AI turn (the G7-08 failure class)
     expect(access().uniworkAi?.()).toBe(true)
-    let names = createSlidesSkill(access()).tools.map((t) => t.name)
+    const names = createSlidesSkill(access()).tools.map((t) => t.name)
     for (const n of UNIWORK_AI_HIDDEN) expect(names, n).not.toContain(n)
     for (const n of UNIWORK_AI_DECK_TOOLS) expect(names, n).toContain(n)
     expect(names).toContain('apply_ops')
     expect(createSlidesSkill(access()).systemPrompt).not.toContain('generate_deck is unavailable')
 
+    // a legacy settings file naming another provider still runs on UniWork AI, the one provider
     render({ uniworkBound: WEB_EDITABLE.bound })
-    expect(access().uniworkAi?.()).toBe(false)
-    names = createSlidesSkill(access()).tools.map((t) => t.name)
-    for (const n of UNIWORK_AI_HIDDEN) expect(names, n).toContain(n)
+    expect(access().uniworkAi?.()).toBe(true)
+    const legacy = createSlidesSkill(access()).tools.map((t) => t.name)
+    for (const n of UNIWORK_AI_HIDDEN) expect(legacy, n).not.toContain(n)
   })
 
   it('a desktop UniWork AI turn keeps the deck tools hidden and the "unavailable" sentence', async () => {
@@ -230,17 +231,15 @@ describe('the web slides frame is UniWork-bound for the AI', () => {
     expect(sidecars).toEqual([])
   })
 
-  it('desktop keeps the adapter answer verbatim (unbound writes the sidecar, bound does not)', async () => {
+  it('a desktop deck has no deck writer (UNI-2309): a forced generate_deck is refused and writes no sidecar, bound or not', async () => {
     installSlidesApi(undefined)
-    render({ uniworkBound: false })
-    const local = deckRun(access())
-    await createSlidesSkill(local.run).executeTool(deckCall)
-    expect(local.sidecars).toHaveLength(1)
-
-    render({ uniworkBound: true })
-    const bound = deckRun(access())
-    await createSlidesSkill(bound.run).executeTool(deckCall)
-    expect(bound.sidecars).toEqual([])
+    for (const uniworkBound of [false, true]) {
+      render({ uniworkBound })
+      const { run, sidecars } = deckRun(access())
+      const res = (await createSlidesSkill(run).executeTool(deckCall)) as { isError?: boolean }
+      expect(res.isError, `bound ${uniworkBound}`).toBe(true)
+      expect(sidecars).toEqual([])
+    }
   })
 })
 

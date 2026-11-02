@@ -52,7 +52,6 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
 
   describe('resolveEntryResultChip & getEntryResultChipView', () => {
     const answerChip: ResultChipOutput = resultChip({
-      provider: 'uniwork',
       text: 'A',
     })
 
@@ -73,7 +72,6 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
 
     it('resolves precomputed resultChip or computes from fallback input when turn ended', () => {
       const editedChip = resultChip({
-        provider: 'uniwork',
         mutated: true,
         stopped: true,
         text: 'A',
@@ -99,7 +97,6 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
         { role: 'assistant', text: 'Computed answer', streaming: false },
       ]
       const fallbackView = getEntryResultChipView(fallbackEntries, 1, false, mockTranslate, {
-        provider: 'uniwork',
       })
       expect(fallbackView?.chip.chip).toBe('answer')
       expect(fallbackView?.labelText).toBe('[aiResultAnswer]')
@@ -108,7 +105,6 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
 
     it('narrows labelKey !== null when user stopped before any write (stopped-only chip)', () => {
       const stoppedOnlyChip = resultChip({
-        provider: 'uniwork',
         stopped: true,
         text: '',
       })
@@ -137,7 +133,6 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
         { role: 'assistant', text: '(stopped filler)', streaming: false },
       ]
       const view = getEntryResultChipView(entries, 1, false, mockTranslate, {
-        provider: 'uniwork',
         stopped: true,
         hasStreamedText: false,
       })
@@ -214,7 +209,6 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
             text: longAnswer,
             streaming: false,
             resultChip: resultChip({
-              provider: 'uniwork',
               text: longAnswer,
             }),
           },
@@ -235,7 +229,7 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
             role: 'assistant',
             text: 'partial answer',
             streaming: false,
-            resultChip: resultChip({ provider: 'uniwork', stopped: true, text: 'partial answer' }),
+            resultChip: resultChip({ stopped: true, text: 'partial answer' }),
           },
         ],
         busy: false,
@@ -253,7 +247,6 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
             text: '',
             streaming: false,
             resultChip: resultChip({
-              provider: 'uniwork',
               error: { code: 'unavailable', message: 'down' },
             }),
           },
@@ -272,7 +265,7 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
         ],
         busy: false,
         translate: mockTranslate,
-        lastEntryChipInput: { provider: 'uniwork', stopped: true, hasStreamedText: false },
+        lastEntryChipInput: { stopped: true, hasStreamedText: false },
       })
       expect(announced).toBe('[aiRunStopped]')
     })
@@ -280,7 +273,6 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
     it('does not double terminal punctuation (. ! ? 。 ！ ？) when joining parts in vi, en and zh (RF3-4)', () => {
       const stoppedErrorChip: ResultChipOutput = {
         ...resultChip({
-          provider: 'uniwork',
           stopped: true,
           error: { code: 'unavailable', message: 'down' },
         }),
@@ -346,22 +338,6 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
         }),
       ).toBe('为什么停止？ 服务暂不可用。 已停止。')
     })
-
-    it('returns empty string on completion when provider is not UniWork (no resultChip)', () => {
-      const announced = panelLiveAnnouncement({
-        entries: [
-          { role: 'user', text: 'Hi' },
-          { role: 'assistant', text: 'BYOK reply', streaming: false },
-        ],
-        busy: false,
-        translate: mockTranslate,
-        lastEntryChipInput: {
-          provider: 'openai',
-          text: 'BYOK reply',
-        },
-      })
-      expect(announced).toBe('')
-    })
   })
 
   describe('the announcement says what the visible turn says (chipwire F2, F3)', () => {
@@ -377,7 +353,7 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
 
     it('a specific error key (the key of the visible line) is announced, never the generic line', () => {
       for (const key of ['aiErrCredits', 'aiErrSession', 'aiErrUnavailable', 'aiErrRunLimit']) {
-        expect(tail(resultChip({ provider: 'uniwork', error: key }))).toBe(
+        expect(tail(resultChip({ error: key }))).toBe(
           `[aiResultError]. [${key}]`,
         )
       }
@@ -385,12 +361,10 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
 
     it('an unsupported chip announces its reason after the label', () => {
       const viewOnly = resultChip({
-        provider: 'uniwork',
         droppedToolCalls: [{ name: 'insert_content', reason: 'view_only' }],
       })
       expect(tail(viewOnly)).toBe('[aiResultUnsupported]. [aiErrViewOnlyEdit]')
       const unsupported = resultChip({
-        provider: 'uniwork',
         droppedToolCalls: [{ name: 'cloud_search', reason: 'not_allowlisted', module: 'Docs' }],
       })
       expect(tail(unsupported)).toBe('[aiResultUnsupported]. [aiErrUnsupported:module=Docs]')
@@ -400,11 +374,11 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
   describe('uniworkErrorLineText (chipwire F11)', () => {
     const prefix = (e: string) => `Lỗi: ${e}`
     it('an error chip already says Error: the line is the bare message', () => {
-      const chip = resultChip({ provider: 'uniwork', error: 'aiErrCredits' })
+      const chip = resultChip({ error: 'aiErrCredits' })
       expect(uniworkErrorLineText(chip, 'Hết tín dụng', prefix)).toBe('Hết tín dụng')
     })
     it('any other chip (edited then failed) or no chip keeps the prefix', () => {
-      const edited = resultChip({ provider: 'uniwork', mutated: true, error: 'aiErrCredits' })
+      const edited = resultChip({ mutated: true, error: 'aiErrCredits' })
       expect(uniworkErrorLineText(edited, 'Hết tín dụng', prefix)).toBe('Lỗi: Hết tín dụng')
       expect(uniworkErrorLineText(null, 'boom', prefix)).toBe('Lỗi: boom')
     })

@@ -18,6 +18,7 @@ export {
   MIN_MAX_OUTPUT_TOKENS,
   clampMaxOutputTokens,
   aiEffectiveModel,
+  defaultAiSettings,
   isProviderUsable,
   providerNeed,
   selectedProvider,
@@ -78,13 +79,7 @@ export { uniworkConversations } from './uniwork/conversation'
 export { setUniworkAiAvailable, uniworkAiAvailable } from './providers'
 export { mirrorUniworkAiFlag } from './uniwork/flag-mirror'
 export type { UniworkAiFlagBridge } from './uniwork/flag-mirror'
-export {
-  aiNoticeBody,
-  aiNoticeKind,
-  aiNoticeKindForCloud,
-  aiNoticeText,
-  composerNoteFor,
-} from './ai-notice'
+export { aiNoticeText, composerNoteFor } from './ai-notice'
 export type {
   AiNoticeKind,
   AiNoticeLang,

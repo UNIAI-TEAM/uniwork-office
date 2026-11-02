@@ -8,17 +8,6 @@ import { markRunFailed } from '../src/renderer/ai/run-error'
 const user = (text: string): AiChatMessage => ({ role: 'user', text, tools: [] })
 
 describe('markRunFailed', () => {
-  it('a setup notice (no key) is not a send failure: no undelivered pill, the notice still shown', () => {
-    const chat: AiChatMessage[] = [
-      user('hi'),
-      { role: 'assistant', text: '', streaming: true, tools: [] },
-    ]
-    const notice = '[[ai-notice:no_model]] No AI key yet. Add an API key in AI settings.'
-    const next = markRunFailed(chat, notice)
-    expect(next[0]).toEqual(chat[0])
-    expect(next[1]).toMatchObject({ text: notice, isError: true, streaming: false })
-  })
-
   it('marks the last user message undelivered and puts the error in the assistant bubble', () => {
     const chat: AiChatMessage[] = [
       user('first'),
@@ -31,12 +20,12 @@ describe('markRunFailed', () => {
         tools: [{ id: 'a', name: 'x', running: true } as never, { id: 'b', name: 'y' } as never],
       },
     ]
-    const next = markRunFailed(chat, 'No key. Add one in AI settings.')
+    const next = markRunFailed(chat, 'The AI request failed.')
     expect(next[0]).toEqual(chat[0])
     expect(next[2]).toMatchObject({ role: 'user', undelivered: true })
     expect(next[3]).toMatchObject({
       role: 'assistant',
-      text: 'No key. Add one in AI settings.',
+      text: 'The AI request failed.',
       isError: true,
       streaming: false,
     })

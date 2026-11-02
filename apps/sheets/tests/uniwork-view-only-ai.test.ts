@@ -133,7 +133,7 @@ describe('view-only wiring', () => {
     vi.unstubAllGlobals()
   })
 
-  const renderPanel = async (provider: string, viewOnly: boolean) => {
+  const renderPanel = async (viewOnly: boolean) => {
     vi.stubGlobal(
       'desktopApi',
       new Proxy(
@@ -141,7 +141,7 @@ describe('view-only wiring', () => {
         {
           get: (_t, prop: string) =>
             prop === 'getAiSettings'
-              ? () => Promise.resolve({ provider, providers: {} })
+              ? () => Promise.resolve({ provider: 'uniwork', providers: {} })
               : /^on[A-Z]/.test(prop)
                 ? () => () => {}
                 : () => Promise.resolve(undefined),
@@ -196,21 +196,11 @@ describe('view-only wiring', () => {
     expect(appSrc).toContain('aiViewOnly={aiViewOnly}')
   })
 
-  it('disables the editing ribbon AI action and renders the composer notice for BYOK and viewOnly sub-line for UniWork AI (RF1-23b)', async () => {
+  it('disables the editing ribbon AI action and renders the UniWork AI view-only sub-line under the composer (RF1-23b)', async () => {
     expect(shellSrc).toMatch(/aiViewOnly \?[\s\S]*?disabled[\s\S]*?t\('aiViewOnlyNotice'\)/)
     expect(shellSrc).toContain('viewOnly={aiViewOnly}')
 
-    const byokDom = await renderPanel('openai', true)
-    const readonlyNotice = byokDom.querySelector('.ai-readonly-notice')
-    expect(readonlyNotice).not.toBeNull()
-    expect(readonlyNotice?.hasAttribute('role')).toBe(false)
-    expect(byokDom.querySelector('.ai-uniwork-view-only')).toBeNull()
-    act(() => root!.unmount())
-    byokDom.remove()
-    root = null
-    container = null
-
-    const uniworkDom = await renderPanel('uniwork', true)
+    const uniworkDom = await renderPanel(true)
     expect(uniworkDom.querySelector('.ai-readonly-notice')).toBeNull()
     const uniworkViewOnly = uniworkDom.querySelector('.ai-uniwork-view-only')
     expect(uniworkViewOnly).not.toBeNull()

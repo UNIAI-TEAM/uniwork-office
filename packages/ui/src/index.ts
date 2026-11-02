@@ -173,14 +173,6 @@ export {
 } from './wheel-zoom'
 export { AiModelPicker, type AiModelPickerBridge } from './AiModelPicker'
 export { setAiModelNeedHint, useAiModelNeedAction, useAiModelNeedHint } from './ai-model-need'
-export { aiPanelOnUniwork } from './ai-host-preset'
-export {
-  aiModelPickerGroups,
-  aiModelPickerSelection,
-  withAiModelSelection,
-  type AiModelPickerGroup,
-  type AiModelPickerSelection,
-} from './ai-model-picker-options'
 export { ProviderLogo } from './provider-logos'
 export { useRedactLabelField } from './use-redact-label'
 export type { RedactLabelField } from './use-redact-label'

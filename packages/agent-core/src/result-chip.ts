@@ -29,11 +29,10 @@ export type ResultChipErrorKey =
   | 'aiErrUnsupported'
   | 'aiErrGeneric'
 
-export type ResultChipErrorAction =
-  'ask-again' | 'choose-provider' | 'sign-in' | 'retry' | 'open-in-app'
+export type ResultChipErrorAction = 'ask-again' | 'sign-in' | 'retry' | 'open-in-app'
 
 export type ResultChipErrorActionKey =
-  'aiRunAskAgain' | 'aiRunChooseOther' | 'acctSignInAgain' | 'aiRunOpenInApp' | 'aiRunRetry'
+  'aiRunAskAgain' | 'acctSignInAgain' | 'aiRunOpenInApp' | 'aiRunRetry'
 
 export interface ResultChipToolExecution {
   readonly name: string
@@ -91,9 +90,6 @@ export interface ResultChipErrorLine {
 }
 
 export interface ResultChipInput {
-  /** Whether UniWork AI (`uniwork`) is active; when explicitly `false` (or `provider !== 'uniwork'`), returns `chip: null` */
-  readonly isUniwork?: boolean | undefined
-  readonly provider?: string | null | undefined
   readonly text?: string | null | undefined
   /** Alias for non-empty streamed text when `text` is omitted */
   readonly hasStreamedText?: boolean | undefined
@@ -172,11 +168,7 @@ export function classifyS9Error(
     lower === 'insufficient_credits' ||
     code === 'aiErrCredits'
   ) {
-    return {
-      key: 'aiErrCredits',
-      action: 'choose-provider',
-      actionKey: 'aiRunChooseOther',
-    }
+    return { key: 'aiErrCredits', action: null, actionKey: null }
   }
   if (
     lower === 'entitlement_required' ||
@@ -184,11 +176,7 @@ export function classifyS9Error(
     lower === 'not_entitled' ||
     code === 'aiErrEntitlement'
   ) {
-    return {
-      key: 'aiErrEntitlement',
-      action: 'choose-provider',
-      actionKey: 'aiRunChooseOther',
-    }
+    return { key: 'aiErrEntitlement', action: null, actionKey: null }
   }
   if (
     lower === 'office_capability_off' ||
@@ -199,11 +187,7 @@ export function classifyS9Error(
     lower === 'uniwork_off' ||
     code === 'aiErrCapabilityOff'
   ) {
-    return {
-      key: 'aiErrCapabilityOff',
-      action: 'choose-provider',
-      actionKey: 'aiRunChooseOther',
-    }
+    return { key: 'aiErrCapabilityOff', action: null, actionKey: null }
   }
   if (
     lower === 'session_expired' ||
@@ -512,23 +496,6 @@ function deduplicateDroppedCalls(
  * (6) `answer` otherwise (including §6.5 engine-cannot-compute with warning in meta).
  */
 export function resultChip(input: ResultChipInput): ResultChipOutput {
-  const isUniwork =
-    input.isUniwork ?? (input.provider === undefined ? true : input.provider === 'uniwork')
-
-  if (!isUniwork) {
-    return {
-      chip: null,
-      labelKey: null,
-      tone: null,
-      viewChangesKey: null,
-      editedHintKey: null,
-      meta: null,
-      errorLine: null,
-      stoppedLine: false,
-      stoppedKey: null,
-    }
-  }
-
   const hasWrite =
     Boolean(input.mutated) ||
     Boolean(input.toolExecutions?.some((t) => t.mutated === true && !t.isError))

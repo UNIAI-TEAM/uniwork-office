@@ -62,9 +62,8 @@ function renderComposer(props: Partial<AiComposerProps> = {}) {
 }
 
 describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence (S11)', () => {
-  it('renders one composer note above the composer for each note kind with its action button', () => {
+  it('renders the signed-out composer note above the composer with its sign-in button', () => {
     const onSignIn = vi.fn()
-    const onChooseProvider = vi.fn()
     const signedOutNote = composerNoteFor({ uniworkSelected: true, cloudState: 'signed-out' })!
     renderComposer({
       lang: 'vi',
@@ -73,7 +72,6 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
         provider: 'uniwork',
         note: signedOutNote,
         onSignIn,
-        onChooseProvider,
       },
     })
 
@@ -93,30 +91,23 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
     expect(liveEl!.textContent).toContain(aiUniworkText('vi', 'aiUniworkSignedOut'))
   })
 
-  it('maps not-entitled, subscription-inactive, credits-exhausted, unavailable and off to Choose another provider', () => {
+  it('shows not-entitled, subscription-inactive, credits-exhausted, unavailable and off as notes without a button (UNI-2309)', () => {
     const cases: Array<[ComposerNote, string]> = [
+      [{ kind: 'off', key: 'aiUniworkOff', action: null }, aiUniworkText('en', 'aiUniworkOff')],
       [
-        { kind: 'off', key: 'aiUniworkOff', action: 'choose-provider' },
-        aiUniworkText('en', 'aiUniworkOff'),
-      ],
-      [
-        { kind: 'not-entitled', key: 'not_entitled', action: 'choose-provider' },
+        { kind: 'not-entitled', key: 'not_entitled', action: null },
         aiNoticeText('not_entitled', 'en'),
       ],
       [
-        {
-          kind: 'subscription-inactive',
-          key: 'cloudInactiveBody',
-          action: 'choose-provider',
-        },
+        { kind: 'subscription-inactive', key: 'cloudInactiveBody', action: null },
         aiUniworkText('en', 'cloudInactiveBody'),
       ],
       [
-        { kind: 'credits-exhausted', key: 'credits_exhausted', action: 'choose-provider' },
+        { kind: 'credits-exhausted', key: 'credits_exhausted', action: null },
         aiNoticeText('credits_exhausted', 'en'),
       ],
       [
-        { kind: 'unavailable', key: 'aiErrUnavailable', action: 'choose-provider' },
+        { kind: 'unavailable', key: 'aiErrUnavailable', action: null },
         aiUniworkText('en', 'aiErrUnavailable'),
       ],
     ]
@@ -133,8 +124,9 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
       const noteEl = host.querySelector<HTMLElement>('.ai-uniwork-composer-note')
       expect(noteEl).not.toBeNull()
       expect(noteEl!.textContent).toContain(expectedBody)
-      const btn = noteEl!.querySelector<HTMLButtonElement>('button')
-      expect(btn!.textContent).toBe(aiUniworkText('en', 'aiRunChooseOther'))
+      expect(noteEl!.querySelector('button')).toBeNull()
+      // no way out but the organization: never another provider, a key or the AI Model settings
+      expect(noteEl!.textContent).not.toMatch(/provider|key|AI Model/i)
     }
   })
 
@@ -148,7 +140,7 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
         uniwork: {
           active: true,
           provider: 'uniwork',
-          note: { kind: 'not-entitled', key: 'not_entitled', action: 'choose-provider' },
+          note: { kind: 'not-entitled', key: 'not_entitled', action: null },
         },
       })
       const notEntitledText =
@@ -161,7 +153,7 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
         uniwork: {
           active: true,
           provider: 'uniwork',
-          note: { kind: 'credits-exhausted', key: 'credits_exhausted', action: 'choose-provider' },
+          note: { kind: 'credits-exhausted', key: 'credits_exhausted', action: null },
         },
       })
       const exhaustedText =
@@ -174,11 +166,11 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
   it('never auto-hides over time, clears when its action button is clicked, and resets when provider changes', () => {
     vi.useFakeTimers()
     try {
-      const onChooseProvider = vi.fn()
+      const onSignIn = vi.fn()
       const note: ComposerNote = {
-        kind: 'credits-exhausted',
-        key: 'credits_exhausted',
-        action: 'choose-provider',
+        kind: 'signed-out',
+        key: 'aiUniworkSignedOut',
+        action: 'sign-in',
       }
       renderComposer({
         lang: 'vi',
@@ -186,7 +178,7 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
           active: true,
           provider: 'uniwork',
           note,
-          onChooseProvider,
+          onSignIn,
         },
       })
 
@@ -202,7 +194,7 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
       act(() => {
         noteEl!.querySelector('button')!.click()
       })
-      expect(onChooseProvider).toHaveBeenCalledTimes(1)
+      expect(onSignIn).toHaveBeenCalledTimes(1)
       expect(host.querySelector('.ai-uniwork-composer-note')).toBeNull()
 
       // Switching provider away and back re-shows the note if condition still holds
@@ -212,7 +204,7 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
           active: false,
           provider: 'openai',
           note: null,
-          onChooseProvider,
+          onSignIn,
         },
       })
       renderComposer({
@@ -221,7 +213,7 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
           active: true,
           provider: 'uniwork',
           note,
-          onChooseProvider,
+          onSignIn,
         },
       })
       expect(host.querySelector('.ai-uniwork-composer-note')).not.toBeNull()
@@ -231,11 +223,7 @@ describe('AiComposer — UniWork AI composer note (S7) and view-only coexistence
   })
 
   it('renders view-only sub-line under the composer and co-exists with a composer note above it (S11)', () => {
-    const note: ComposerNote = {
-      kind: 'credits-exhausted',
-      key: 'credits_exhausted',
-      action: 'choose-provider',
-    }
+    const note: ComposerNote = { kind: 'credits-exhausted', key: 'credits_exhausted', action: null }
     renderComposer({
       lang: 'vi',
       viewOnly: true,

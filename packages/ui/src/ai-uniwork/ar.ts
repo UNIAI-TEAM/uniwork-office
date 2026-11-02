@@ -5,8 +5,8 @@ export const ar = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'الأرصدة المتبقية: {remaining} من {limit}',
   aiUniworkFooterSignIn: 'سجّل الدخول إلى UniWork لاستخدام UniWork AI',
-  aiUniworkSignedOut: 'لقد سجّلت الخروج من UniWork. اختر مزودًا آخر أو سجّل الدخول مجددًا.',
-  aiUniworkOff: 'UniWork AI متوقف لهذا المستند. اختر مزودًا آخر.',
+  aiUniworkSignedOut: 'لقد سجّلت الخروج من UniWork. سجّل الدخول مجددًا.',
+  aiUniworkOff: 'UniWork AI متوقف لهذا المستند.',
   aiUniworkViewOnly: 'عرض فقط: يمكن للذكاء الاصطناعي الإجابة لكنه لا يستطيع تحرير المستند أو حفظه.',
 
   // S8 disclosure
@@ -35,7 +35,6 @@ export const ar = {
   aiRunStopped: 'تم الإيقاف. تبقى أي تغييرات مطبّقة بالفعل في المستند ويمكن التراجع عنها.',
   aiRunRetry: 'إعادة المحاولة',
   aiRunAskAgain: 'السؤال مجددًا',
-  aiRunChooseOther: 'اختيار مزود آخر',
   aiRunOpenInApp: 'الفتح في التطبيق',
   aiConversationRestarted:
     'انتهت صلاحية المحادثة السابقة، لذا بدأ UniWork AI محادثة جديدة ولم يعد يتذكر الأدوار السابقة. أرسل سؤالك مرة أخرى للمتابعة.',
@@ -74,7 +73,7 @@ export const ar = {
   cloudCreditsLeft: 'متبقٍ {remaining} / {limit}',
   cloudCreditsUnlimited: 'غير محدود',
   cloudInactiveBody:
-    'اشتراك UniWork الخاص بمؤسستك غير نشط، لذا تم إيقاف الذكاء الاصطناعي السحابي مؤقتًا. اطلب من المسؤول تجديده؛ ستستمر مزوّداتك الخاصة أدناه في العمل.',
+    'اشتراك UniWork الخاص بمؤسستك غير نشط، لذا تم إيقاف الذكاء الاصطناعي السحابي مؤقتًا. اطلب من المسؤول تجديده.',
   acctSignIn: 'تسجيل الدخول',
   acctSignInAgain: 'تسجيل الدخول مرة أخرى',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -87,8 +86,7 @@ export const ar = {
   aiErrWorkbookTooLarge:
     'هذا المصنف كبير جدًا على الذكاء الاصطناعي على الويب. افتحه في تطبيق UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
-  not_entitled:
-    'خطة مؤسستك لا تتضمن UniWork AI. اسأل مسؤول المؤسسة عن الخطة، أو أضف مفتاح الذكاء الاصطناعي الخاص بك في الإعدادات > نموذج الذكاء الاصطناعي.',
+  not_entitled: 'خطة مؤسستك لا تتضمن UniWork AI. اسأل مسؤول المؤسسة عن الخطة.',
   credits_exhausted:
-    'استنفدت مؤسستك جميع أرصدة الذكاء الاصطناعي لهذه الفترة. اطلب من مسؤول المؤسسة إضافة أرصدة، أو أضف مفتاح الذكاء الاصطناعي الخاص بك في الإعدادات > نموذج الذكاء الاصطناعي.',
+    'استنفدت مؤسستك جميع أرصدة الذكاء الاصطناعي لهذه الفترة. اطلب من مسؤول المؤسسة إضافة أرصدة.',
 } satisfies Record<keyof typeof zh, string>

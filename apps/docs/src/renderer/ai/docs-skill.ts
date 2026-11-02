@@ -178,6 +178,19 @@ function refuseViewOnly(tool: string): ToolExecution {
 const IMAGE_GEN_OFF_NOTE =
   '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
 
+/** the one-shot writer behind write_document runs only where the host reaches the UniWork AI writer route */
+const WRITER_OFF_NOTE =
+  '\n\nNote: write_document is not available here. Edit the open document with the editing tools; do not offer to write a new document in one go.'
+
+function refuseWriter(): ToolExecution {
+  return {
+    output: 'document writing is not available here',
+    isError: true,
+    mutated: false,
+    summary: 'write document',
+  }
+}
+
 const MEDIA_ANALYSIS_OFF_NOTE =
   '\n\nNote: analyze_media is currently unavailable (no media analysis model is configured under Settings → AI media). You cannot see what a picture inside the document shows — tell the user that instead of guessing at its content.'
 
@@ -212,6 +225,11 @@ export function createDocsSkill(
   getProtection?: () => AiDocProtection,
   /** image URLs this run may insert (reset at every run); refuses unregistered ones while its enforce predicate holds */
   imageUrls?: ImageUrlRegistry,
+  /**
+   * live predicate: the host reaches the UniWork AI writer route (the web frame). The desktop has
+   * none: false hides and refuses write_document and says so in the prompt. Unset reads as true.
+   */
+  uniworkWriterRoute?: () => boolean,
 ): AgentSkill {
   // Selection frozen per run: tools act on the range the prompt described,
   // not on wherever the user's live selection has wandered mid-run. The doc
@@ -228,6 +246,7 @@ export function createDocsSkill(
     [...mediaToolsOff()]
       .map((name) => (name === 'generate_image' ? IMAGE_GEN_OFF_NOTE : MEDIA_ANALYSIS_OFF_NOTE))
       .join('')
+  const writerRoute = (): boolean => uniworkWriterRoute?.() ?? true
   const protectionKind = (): AiDocProtection => getProtection?.() ?? 'none'
   const protectionNote = (): string => {
     const kind = protectionKind()
@@ -248,6 +267,7 @@ export function createDocsSkill(
       return (
         AGENT_SYSTEM_PROMPT +
         mediaOffNote() +
+        (writerRoute() ? '' : WRITER_OFF_NOTE) +
         (isReadOnly?.() ? VIEW_ONLY_NOTE : '') +
         protectionNote() +
         redact
@@ -257,6 +277,7 @@ export function createDocsSkill(
       const hidden = mediaToolsOff()
       for (const [tool, c] of CAPABILITY_TOOLS) if (!cap(c)) hidden.add(tool)
       if (isBound?.() === true) for (const tool of BOUND_HIDDEN_TOOLS) hidden.add(tool)
+      if (!writerRoute()) hidden.add('write_document')
       if (!getAsk?.()) hidden.add('ask_clarification')
       const readOnly = isReadOnly?.() === true
       const protection = protectionKind()
@@ -288,6 +309,7 @@ export function createDocsSkill(
       if (protection !== 'none' && protectionBlocks(protection, call.name))
         return refuseProtected(call.name, protection)
       if (isBound?.() && BOUND_HIDDEN_TOOLS.has(call.name)) return refuseBound(call.name)
+      if (call.name === 'write_document' && !writerRoute()) return refuseWriter()
       return executeTool(
         getEditor(),
         call,

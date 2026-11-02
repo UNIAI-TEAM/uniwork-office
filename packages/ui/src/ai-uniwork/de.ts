@@ -5,10 +5,8 @@ export const de = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'Verbleibende Credits: {remaining} von {limit}',
   aiUniworkFooterSignIn: 'Melden Sie sich bei UniWork an, um UniWork AI zu nutzen',
-  aiUniworkSignedOut:
-    'Sie sind von UniWork abgemeldet. Wählen Sie einen anderen Anbieter oder melden Sie sich erneut an.',
-  aiUniworkOff:
-    'UniWork AI ist für dieses Dokument deaktiviert. Wählen Sie einen anderen Anbieter.',
+  aiUniworkSignedOut: 'Sie sind von UniWork abgemeldet. Melden Sie sich erneut an.',
+  aiUniworkOff: 'UniWork AI ist für dieses Dokument deaktiviert.',
   aiUniworkViewOnly:
     'Nur Ansicht: Die KI kann antworten, aber das Dokument weder bearbeiten noch speichern.',
 
@@ -41,7 +39,6 @@ export const de = {
     'Gestoppt. Bereits angewendete Änderungen bleiben im Dokument und lassen sich rückgängig machen.',
   aiRunRetry: 'Erneut versuchen',
   aiRunAskAgain: 'Erneut fragen',
-  aiRunChooseOther: 'Anderen Anbieter wählen',
   aiRunOpenInApp: 'In der App öffnen',
   aiConversationRestarted:
     'Die vorherige Unterhaltung ist abgelaufen, daher hat UniWork AI eine neue begonnen und erinnert sich nicht mehr an frühere Beiträge. Senden Sie Ihre Frage erneut, um fortzufahren.',
@@ -90,7 +87,7 @@ export const de = {
   cloudCreditsLeft: '{remaining} / {limit} übrig',
   cloudCreditsUnlimited: 'Unbegrenzt',
   cloudInactiveBody:
-    'Das UniWork-Abonnement Ihrer Organisation ist nicht aktiv, daher ist die Cloud-KI pausiert. Bitten Sie einen Administrator um die Verlängerung; Ihre eigenen Anbieter unten funktionieren weiter.',
+    'Das UniWork-Abonnement Ihrer Organisation ist nicht aktiv, daher ist die Cloud-KI pausiert. Bitten Sie einen Administrator um die Verlängerung.',
   acctSignIn: 'Anmelden',
   acctSignInAgain: 'Erneut anmelden',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -104,7 +101,7 @@ export const de = {
     'Diese Arbeitsmappe ist für die KI im Web zu groß. Öffnen Sie sie in der UniWork Office-App.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    'Der Tarif Ihrer Organisation umfasst UniWork AI nicht. Wenden Sie sich wegen des Tarifs an einen Organisationsadministrator oder fügen Sie unter Einstellungen > KI-Modell Ihren eigenen KI-Schlüssel hinzu.',
+    'Der Tarif Ihrer Organisation umfasst UniWork AI nicht. Wenden Sie sich wegen des Tarifs an einen Organisationsadministrator.',
   credits_exhausted:
-    'Ihre Organisation hat ihr gesamtes KI-Guthaben für diesen Zeitraum verbraucht. Bitten Sie einen Organisationsadministrator, Guthaben nachzuladen, oder fügen Sie unter Einstellungen > KI-Modell Ihren eigenen KI-Schlüssel hinzu.',
+    'Ihre Organisation hat ihr gesamtes KI-Guthaben für diesen Zeitraum verbraucht. Bitten Sie einen Organisationsadministrator, Guthaben nachzuladen.',
 } satisfies Record<keyof typeof zh, string>

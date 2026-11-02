@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { aiUniworkText } from '@genoffice/ui'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import type { AgentStreamNotice } from '@genoffice/agent-core'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
@@ -60,6 +61,7 @@ describe('UniWork AI notices (markdown panel)', () => {
     editor = null
     delete (window as any).projectApi
     vi.unstubAllGlobals()
+    resetUniworkAi()
   })
 
   function mount(history: 'none' | 'deferred' = 'none') {
@@ -134,6 +136,7 @@ describe('UniWork AI notices (markdown panel)', () => {
   /** mount, let the preset start its turn, return once the loop has handed over its events */
   async function started() {
     harness.events = null
+    readyUniworkAi('/docs/a.md')
     const m = mount()
     m.render('/docs/a.md')
     await flush()

@@ -1,4 +1,4 @@
-// Slides (web frames): a stored key without a known model keeps Send off and says why, instead of
+// Slides: UniWork AI not on for this format or organization keeps Send off and says why, instead of
 // letting the turn end in a setup sentence drawn as an error (N-01, post-A9 sweep). The chip
 // (AiModelPicker) publishes the hint; the bespoke slides composer has to honor it like AiComposer.
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -28,11 +28,12 @@ vi.mock('react-konva', () => {
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 import { setAiModelNeedHint } from '@genoffice/ui'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
-const HINT = 'Choose a model to send'
+const HINT = 'UniWork AI isn’t on for this format or organization'
 
 const settings: AiSettings = {
-  provider: 'anthropic',
+  provider: 'uniwork',
   providers: Object.fromEntries(
     AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
   ) as AiSettings['providers'],
@@ -41,6 +42,8 @@ const settings: AiSettings = {
 let mounted: { root: Root; container: HTMLElement } | null = null
 
 function mount(): HTMLElement {
+  // the disclosure is acknowledged: the hint alone decides Send here
+  readyUniworkAi()
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -80,6 +83,7 @@ beforeAll(() => {
 
 afterEach(() => {
   act(() => setAiModelNeedHint(null))
+  resetUniworkAi()
   if (mounted) {
     act(() => mounted!.root.unmount())
     mounted.container.remove()

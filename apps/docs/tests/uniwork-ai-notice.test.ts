@@ -7,14 +7,15 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { AI_RUN_IDLE_GRACE_MS } from '@genoffice/agent-core'
-import { aiUniworkText } from '@genoffice/ui'
+import { aiUniworkText, clearUniworkAcks } from '@genoffice/ui'
+import { ackUniworkDisclosure } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 import { getLang, LocaleProvider, setModuleLang, t } from '../src/renderer/i18n/locale'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
 const settings: AiSettings = {
-  provider: 'anthropic',
+  provider: 'uniwork',
   providers: Object.fromEntries(
     AI_PROVIDERS.map((p) => [p.id, { apiKey: 'k', model: p.defaultModel }]),
   ) as AiSettings['providers'],
@@ -80,6 +81,8 @@ describe('UniWork AI notices (docs panel)', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
+    // every turn runs on UniWork AI: its disclosure is acknowledged for the document first
+    ackUniworkDisclosure('/docs/a.docx')
     act(() =>
       root!.render(
         createElement(LocaleProvider, {
@@ -112,6 +115,7 @@ describe('UniWork AI notices (docs panel)', () => {
     delete (window as any).desktop
     delete (window as any).uniworkAiRun
     setModuleLang('zh')
+    clearUniworkAcks()
   })
 
   const notices = () => [...container!.querySelectorAll('.ai-msg-notice')].map((n) => n.textContent)
@@ -141,8 +145,9 @@ describe('UniWork AI notices (docs panel)', () => {
     expect(reports.map((r) => r.state)).toEqual(['running', 'idle'])
   })
 
+  // UniWork AI is the one provider: a failed turn's Retry is the labelled action under its error line
   const regenerateButton = () =>
-    container!.querySelector<HTMLButtonElement>(`button[aria-label="${t('aiRegenerateTitle')}"]`)
+    container!.querySelector<HTMLButtonElement>('.ai-error-action button[data-action="retry"]')
 
   it('a wait that gives up ends as an error with one idle, and Retry IS offered', async () => {
     await emit({ type: 'notice', notice: { kind: 'rate-limit-wait', seconds: 5, attempt: 1 } })
@@ -247,12 +252,10 @@ describe('UniWork AI notices (docs panel)', () => {
     await pastGrace()
   })
 
-  it('another failure still offers regenerate and leaves the composer alone (control)', async () => {
+  it('another failure still offers Retry and leaves the composer alone (control)', async () => {
     await emit({ type: 'error', uniworkCode: 'unavailable', error: 'ignored' })
     expect(container!.querySelector('.ai-msg-error')).not.toBeNull()
-    expect(
-      container!.querySelector(`button[aria-label="${t('aiRegenerateTitle')}"]`),
-    ).not.toBeNull()
+    expect(regenerateButton()).not.toBeNull()
     expect(container!.querySelector('textarea')?.value).toBe('')
   })
 

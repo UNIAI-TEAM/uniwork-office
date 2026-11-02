@@ -4,6 +4,7 @@
 import { act, createElement, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
+import { clearUniworkAcks } from '@genoffice/ui'
 import { editorExtensions } from '../../src/renderer/editor/extensions'
 import { AiPanel } from '../../src/renderer/ai/AiPanel'
 import type { Lang } from '@genoffice/i18n'
@@ -13,7 +14,7 @@ import { AI_PROVIDERS, type AiSettings } from '../../src/shared/ipc'
 type AiPanelProps = Parameters<typeof AiPanel>[0]
 
 export const harnessSettings: AiSettings = {
-  provider: 'anthropic',
+  provider: 'uniwork',
   providers: Object.fromEntries(
     AI_PROVIDERS.map((p) => [p.id, { apiKey: 'k', model: p.defaultModel }]),
   ) as AiSettings['providers'],
@@ -112,6 +113,10 @@ export async function mountDocsAiPanel(
   }
   act(() => root.render(element()))
   await settle()
+  // every turn runs on UniWork AI: acknowledge its disclosure once, as a person does before sending
+  const ackDisclosure = container.querySelector<HTMLButtonElement>('[role="region"] button')
+  if (ackDisclosure) await act(async () => ackDisclosure.click())
+  await settle()
   const emit = async (chunk: Record<string, unknown>) => {
     const requestId = requests.at(-1)
     await act(async () => {
@@ -168,6 +173,7 @@ export async function mountDocsAiPanel(
       container.remove()
       editor.destroy()
       delete win.desktop
+      clearUniworkAcks()
     },
   }
 }

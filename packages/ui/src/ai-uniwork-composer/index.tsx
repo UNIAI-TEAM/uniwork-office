@@ -34,10 +34,6 @@ export interface UniworkComposerNoteProps {
   readonly provider?: string | undefined
   /** Invoked when the user clicks the note's action button (also clears the note) */
   readonly onAction?: ((action: ComposerNoteAction, note: ComposerNote) => void) | undefined
-  /** Invoked when the user clicks "Chọn nhà cung cấp khác" (`aiRunChooseOther`) */
-  readonly onChooseProvider?: (() => void) | undefined
-  /** Alias for `onChooseProvider` */
-  readonly onChooseOtherProvider?: (() => void) | undefined
   /** Invoked when the user clicks "Đăng nhập" (`acctSignIn`) on a `signed-out` note */
   readonly onSignIn?: (() => void) | undefined
   /** Optional callback to write the note text once into an external polite live region */
@@ -46,15 +42,15 @@ export interface UniworkComposerNoteProps {
 
 /**
  * S7–S9 Composer note above the composer (one at a time, no auto-hide, clears on action or
- * provider change, announced once through a persistent polite live region).
+ * provider change, announced once through a persistent polite live region). Only the signed-out
+ * note has an action (sign in); a plan or availability note informs, with no button: UniWork AI
+ * is the one provider, so there is nothing to switch to.
  */
 export function UniworkComposerNote({
   note,
   lang = 'vi',
   provider = 'uniwork',
   onAction,
-  onChooseProvider,
-  onChooseOtherProvider,
   onSignIn,
   onAnnounce,
 }: UniworkComposerNoteProps): React.JSX.Element | null {
@@ -96,20 +92,12 @@ export function UniworkComposerNote({
     )
   }
 
-  const actionLabel =
-    visibleNote.action === 'sign-in'
-      ? aiUniworkText(lang, 'acctSignIn')
-      : aiUniworkText(lang, 'aiRunChooseOther')
-
+  const action = visibleNote.action
   const handleActionClick = () => {
+    if (!action) return
     setDismissed({ provider, kind: visibleNote.kind })
-    onAction?.(visibleNote.action, visibleNote)
-    if (visibleNote.action === 'sign-in') {
-      onSignIn?.()
-    } else {
-      onChooseProvider?.()
-      onChooseOtherProvider?.()
-    }
+    onAction?.(action, visibleNote)
+    onSignIn?.()
   }
 
   return (
@@ -121,13 +109,15 @@ export function UniworkComposerNote({
       )}
       <div className="ai-uniwork-composer-note" data-note-kind={visibleNote.kind}>
         <span className="ai-uniwork-composer-note-text">{bodyText}</span>
-        <button
-          type="button"
-          className="ai-uniwork-composer-note-action"
-          onClick={handleActionClick}
-        >
-          {actionLabel}
-        </button>
+        {action === 'sign-in' && (
+          <button
+            type="button"
+            className="ai-uniwork-composer-note-action"
+            onClick={handleActionClick}
+          >
+            {aiUniworkText(lang, 'acctSignIn')}
+          </button>
+        )}
       </div>
     </>
   )
@@ -324,10 +314,6 @@ export interface AiComposerUniworkProps {
   readonly note?: ComposerNote | null | undefined
   /** Invoked when the user clicks the composer note's action button */
   readonly onNoteAction?: ((action: ComposerNoteAction, note: ComposerNote) => void) | undefined
-  /** Invoked when the user clicks "Chọn nhà cung cấp khác" on a composer note */
-  readonly onChooseProvider?: (() => void) | undefined
-  /** Alias for `onChooseProvider` */
-  readonly onChooseOtherProvider?: (() => void) | undefined
   /** Invoked when the user clicks "Đăng nhập" on a `signed-out` composer note */
   readonly onSignIn?: (() => void) | undefined
   /** S8/S10 disclosure configuration and state */

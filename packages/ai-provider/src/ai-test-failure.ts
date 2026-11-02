@@ -13,7 +13,7 @@ import { isAiNetworkError } from './network-error'
  * address, an account id): it is known before any request is sent.
  */
 export type AiTestFailureKind =
-  | Exclude<AiNoticeKind, 'no_model'>
+  | AiNoticeKind
   | 'invalid_key'
   | 'network'
   | 'limit'

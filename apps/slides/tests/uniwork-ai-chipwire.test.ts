@@ -4,7 +4,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { aiUniworkText, clearUniworkAcks } from '@genoffice/ui'
+import { aiUniworkText } from '@genoffice/ui'
 
 const harness = vi.hoisted(() => ({
   events: null as null | {
@@ -61,9 +61,10 @@ vi.mock('react-konva', () => {
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 import { getLang, LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const settings: AiSettings = {
-  provider: 'anthropic',
+  provider: 'uniwork',
   providers: Object.fromEntries(
     AI_PROVIDERS.map((p) => [p.id, { apiKey: 'k', model: p.defaultModel }]),
   ) as AiSettings['providers'],
@@ -79,7 +80,7 @@ const flush = () =>
 const ui = (key: Parameters<typeof aiUniworkText>[1], params?: Record<string, string | number>) =>
   aiUniworkText(getLang(), key, params)
 
-async function startRun(provider: AiSettings['provider'] = 'anthropic'): Promise<HTMLElement> {
+async function startRun(): Promise<HTMLElement> {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -96,7 +97,7 @@ async function startRun(provider: AiSettings['provider'] = 'anthropic'): Promise
             applySlide: () => {},
             applyDeck: () => {},
             fitWidthPx: 960,
-            settings: { ...settings, provider },
+            settings,
             open: true,
             onExpand: () => {},
             onCollapse: () => {},
@@ -107,16 +108,8 @@ async function startRun(provider: AiSettings['provider'] = 'anthropic'): Promise
     )
   const preset = { text: 'tighten it', nonce: 1, autoRun: true }
   mounted.push({ root, container })
-  if (provider === 'uniwork') {
-    // a preset is refused until the UniWork disclosure is acknowledged (S8): mount, acknowledge
-    // the way a user does, then fire the preset
-    render()
-    await flush()
-    act(() => {
-      container.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
-    })
-    await flush()
-  }
+  // every turn runs on UniWork AI: a preset is refused until its disclosure is acknowledged (S8)
+  readyUniworkAi()
   render(preset)
   await flush()
   expect(harness.run).toHaveBeenCalled()
@@ -152,7 +145,7 @@ beforeEach(() => {
 afterEach(() => {
   setModuleLang('zh')
   // the in-memory empty-account ack must not leak into the next test
-  clearUniworkAcks()
+  resetUniworkAi()
   for (const { root, container } of mounted.splice(0)) {
     act(() => root.unmount())
     container.remove()
@@ -164,7 +157,7 @@ describe('UniWork AI chip wiring (slides panel)', () => {
   const root_ = () => current!
   const MODULE = 'Slides'
   const uniworkTurn = async (): Promise<void> => {
-    current = await startRun('uniwork')
+    current = await startRun()
   }
   const failWith = async (_code: string, errKey: string): Promise<void> => {
     await act(async () =>
@@ -190,7 +183,6 @@ describe('UniWork AI chip wiring (slides panel)', () => {
   }
 
   it.each([
-    ['credits_exhausted', 'aiErrCredits', 'aiRunChooseOther'],
     ['session_expired', 'aiErrSession', 'acctSignInAgain'],
     ['cloud_unavailable', 'aiErrUnavailable', 'aiRunRetry'],
     ['run_limit_reached', 'aiErrRunLimit', 'aiRunAskAgain'],
@@ -208,6 +200,13 @@ describe('UniWork AI chip wiring (slides panel)', () => {
       expect(visibleErrorText()).toBe(ui(errKey))
     },
   )
+
+  it('F1: a plan error (credits_exhausted) names itself and offers no action: UniWork AI is the one provider', async () => {
+    await uniworkTurn()
+    await failWith('credits_exhausted', 'aiErrCredits')
+    expect(visibleErrorText()).toBe(ui('aiErrCredits'))
+    expect(root_().querySelector('.ai-error-action')).toBeNull()
+  })
 
   it('F1: a generic error offers no action and a rate-limit wait offers no Retry', async () => {
     await uniworkTurn()

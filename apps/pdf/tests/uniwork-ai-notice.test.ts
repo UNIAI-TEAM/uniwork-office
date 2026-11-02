@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { aiUniworkText } from '@genoffice/ui'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import type { AgentStreamNotice } from '@genoffice/agent-core'
 import { createRoot, type Root } from 'react-dom/client'
 // the stylesheet is only loaded as text so jsdom can compute the rendered style (vitest stubs css imports)
@@ -55,6 +56,7 @@ describe('UniWork AI notices (pdf panel)', () => {
     container = null
     delete (window as any).projectApi
     delete (window as any).pdfApi
+    resetUniworkAi()
   })
 
   const api = new Proxy(
@@ -108,6 +110,7 @@ describe('UniWork AI notices (pdf panel)', () => {
   /** mount, let the preset start its turn, return once the loop has handed over its events */
   async function started() {
     harness.events = null
+    readyUniworkAi('/docs/a.pdf')
     const m = mount()
     m.render('/docs/a.pdf')
     await flush()

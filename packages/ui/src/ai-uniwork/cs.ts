@@ -5,9 +5,8 @@ export const cs = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'Zbývající kredity: {remaining} z {limit}',
   aiUniworkFooterSignIn: 'Pro UniWork AI se přihlaste do UniWork',
-  aiUniworkSignedOut:
-    'Jste odhlášeni z UniWork. Vyberte jiného poskytovatele nebo se znovu přihlaste.',
-  aiUniworkOff: 'UniWork AI je pro tento dokument vypnuto. Vyberte jiného poskytovatele.',
+  aiUniworkSignedOut: 'Jste odhlášeni z UniWork. Znovu se přihlaste.',
+  aiUniworkOff: 'UniWork AI je pro tento dokument vypnuto.',
   aiUniworkViewOnly: 'Jen zobrazení: AI může odpovídat, ale nemůže dokument upravovat ani ukládat.',
 
   // S8 disclosure
@@ -37,7 +36,6 @@ export const cs = {
   aiRunStopped: 'Zastaveno. Již použité změny zůstávají v dokumentu a lze je vrátit zpět.',
   aiRunRetry: 'Zkusit znovu',
   aiRunAskAgain: 'Zeptat se znovu',
-  aiRunChooseOther: 'Vybrat jiného poskytovatele',
   aiRunOpenInApp: 'Otevřít v aplikaci',
   aiConversationRestarted:
     'Předchozí konverzace vypršela, takže UniWork AI začalo novou a dřívější kroky si nepamatuje. Chcete-li pokračovat, pošlete dotaz znovu.',
@@ -79,7 +77,7 @@ export const cs = {
   cloudCreditsLeft: 'Zbývá {remaining} / {limit}',
   cloudCreditsUnlimited: 'Neomezeně',
   cloudInactiveBody:
-    'Předplatné UniWork vaší organizace není aktivní, proto je cloudová AI pozastavena. Požádejte správce o obnovení; vaši vlastní poskytovatelé níže fungují dál.',
+    'Předplatné UniWork vaší organizace není aktivní, proto je cloudová AI pozastavena. Požádejte správce o obnovení.',
   acctSignIn: 'Přihlásit se',
   acctSignInAgain: 'Přihlásit se znovu',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -93,7 +91,7 @@ export const cs = {
     'Tento sešit je pro AI na webu příliš velký. Otevřete ho v aplikaci UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    'Tarif vaší organizace nezahrnuje UniWork AI. Informujte se u správce organizace ohledně tarifu, nebo přidejte vlastní klíč AI v Nastavení > Model AI.',
+    'Tarif vaší organizace nezahrnuje UniWork AI. Informujte se u správce organizace ohledně tarifu.',
   credits_exhausted:
-    'Vaše organizace vyčerpala všechny své kredity AI pro toto období. Požádejte správce organizace o doplnění kreditů, nebo přidejte vlastní klíč AI v Nastavení > Model AI.',
+    'Vaše organizace vyčerpala všechny své kredity AI pro toto období. Požádejte správce organizace o doplnění kreditů.',
 } satisfies Record<keyof typeof zh, string>

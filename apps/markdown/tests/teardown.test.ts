@@ -18,6 +18,7 @@ vi.mock('@tiptap/react', async () => {
 
 import { AiPanel, type MarkdownAiDeps } from '../src/renderer/ai/AiPanel'
 import { CodeBlockView } from '../src/renderer/editor/CodeBlockView'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const mountedRoots: Array<{ root: Root; container: HTMLElement }> = []
 
@@ -56,6 +57,7 @@ afterEach(() => {
   }
   vi.useRealTimers()
   vi.restoreAllMocks()
+  resetUniworkAi()
 })
 
 describe('CodeBlockView teardown', () => {
@@ -106,6 +108,7 @@ describe('AiPanel teardown', () => {
       restoreSnapshot: () => {},
       onRunDone: () => {},
     }
+    readyUniworkAi(null)
     const { root, container } = mount(
       createElement(AiPanel, { deps, filePath: null, onCollapse: () => {} }),
     )

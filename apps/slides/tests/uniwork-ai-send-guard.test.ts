@@ -1,12 +1,14 @@
-// A picked UniWork AI that is not offered keeps every send entry closed (spec S7 / RF1-4 / RF3-3):
-// the composer already has Send off; a preset or queued message goes through runWith() and must
-// neither start a turn nor drop the queued item while the model-need hint is on.
+// UniWork AI not offered keeps every send entry closed (spec S7 / RF1-4 / RF3-3): the composer
+// already has Send off; a preset or queued message goes through runWith() and must neither start a
+// turn nor drop the queued item while the model-need hint is on. UniWork AI is the one provider
+// (UNI-2309), so its disclosure and composer note gate every send entry too.
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { ack, aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import { ackUniworkDisclosure } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const harness = vi.hoisted(() => ({
   runs: [] as string[],
@@ -72,15 +74,12 @@ vi.mock('react-konva', () => {
 
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 
-const settingsFor = (provider: AiSettings['provider']): AiSettings => ({
-  provider,
+const settings: AiSettings = {
+  provider: 'uniwork',
   providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [
-      p.id,
-      { apiKey: p.id === 'anthropic' ? 'test-key' : '', model: p.defaultModel },
-    ]),
+    AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
   ) as AiSettings['providers'],
-})
+}
 
 const flush = async (): Promise<void> => {
   await act(async () => {
@@ -100,7 +99,7 @@ function enqueueInComposer(container: HTMLElement, text: string): void {
   })
 }
 
-describe('slides panel send entry with an unavailable UniWork AI pick', () => {
+describe('slides panel send entry while UniWork AI cannot send', () => {
   let root: Root | null = null
   let container: HTMLElement | null = null
 
@@ -124,8 +123,11 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     delete (window as any).uniworkCloudStatus
   })
 
-  async function mountThenPreset(provider: AiSettings['provider']) {
-    const settings = settingsFor(provider)
+  /** mount with UniWork AI offered or not and its disclosure acknowledged or not (an ack of an
+   * account goes through `ack` before the mount), then fire a preset */
+  async function mountThenPreset(opts: { offered: boolean; acked: boolean }) {
+    setUniworkAiAvailable(opts.offered)
+    if (opts.acked) ackUniworkDisclosure('local')
     ;(window as any).slidesApi = {
       getAiSettings: vi.fn(async () => settings),
       aiGskStatus: vi.fn(async () => ({ loggedIn: false })),
@@ -140,7 +142,7 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    const view = { open: true, expand: vi.fn() }
+    const view = { open: true, expand: vi.fn(), path: null as string | null }
     const render = (nonce: number | null) =>
       act(() =>
         root!.render(
@@ -153,6 +155,7 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
             applyDeck: () => {},
             fitWidthPx: 960,
             settings,
+            currentFilePath: view.path,
             open: view.open,
             onExpand: view.expand,
             onCollapse: () => {},
@@ -168,76 +171,41 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     await flush()
     return {
       expand: view.expand,
-      /** the user picks `next` in the model picker: the panel gets new settings */
-      pick: async (next: AiSettings['provider']) => {
-        const picked = settingsFor(next)
-        act(() =>
-          root!.render(
-            createElement(AiPanel, {
-              slides: [],
-              current: 0,
-              selectedIds: [],
-              images: new Map(),
-              applySlide: () => {},
-              applyDeck: () => {},
-              fitWidthPx: 960,
-              settings: picked,
-              open: view.open,
-              onExpand: view.expand,
-              onCollapse: () => {},
-              preset: { text: 'rewrite it', autoRun: true, nonce: 1 },
-            }),
-          ),
-        )
+      /** another deck opens in the panel: its disclosure is not acknowledged yet */
+      openDocument: async (path: string) => {
+        view.path = path
+        render(1)
         await flush()
       },
-      /** a fresh preset (a new nonce) with UniWork AI still picked */
+      /** a fresh preset (a new nonce); `nextOpen` false fires it while the panel is collapsed */
       firePreset: async (nonce: number, nextOpen = true) => {
         view.open = nextOpen
-        const picked = settingsFor('uniwork')
-        act(() =>
-          root!.render(
-            createElement(AiPanel, {
-              slides: [],
-              current: 0,
-              selectedIds: [],
-              images: new Map(),
-              applySlide: () => {},
-              applyDeck: () => {},
-              fitWidthPx: 960,
-              settings: picked,
-              open: view.open,
-              onExpand: view.expand,
-              onCollapse: () => {},
-              preset: { text: 'rewrite it', autoRun: true, nonce },
-            }),
-          ),
-        )
+        render(nonce)
         await flush()
         await flush()
       },
     }
   }
 
-  it('uniwork picked and not offered: a preset starts no turn and leaves no bubble', async () => {
-    await mountThenPreset('uniwork')
+  it('not offered: a preset starts no turn and leaves no bubble', async () => {
+    await mountThenPreset({ offered: false, acked: true })
     expect(harness.runs).toEqual([])
     expect(container!.querySelector('.ai-msg-user')).toBeNull()
   })
 
-  it('a usable provider still runs the same preset (the guard is the hint, nothing else)', async () => {
-    await mountThenPreset('anthropic')
+  it('offered and acknowledged: the same preset runs (the guard is the hint, nothing else)', async () => {
+    await mountThenPreset({ offered: true, acked: true })
     expect(harness.runs).toHaveLength(1)
     expect(container!.querySelector('.ai-msg-user')).not.toBeNull()
   })
 
   it('a queued item stays queued and sends no request when the model-need hint turns on before settle (RF3-3)', async () => {
-    await mountThenPreset('anthropic')
+    await mountThenPreset({ offered: true, acked: true })
     expect(harness.runs).toEqual(['rewrite it'])
     enqueueInComposer(container!, 'queued follow-up')
     expect(container!.querySelector('.ai-queue-strip')).not.toBeNull()
 
-    act(() => setAiModelNeedHint('Choose a model to send'))
+    act(() => setAiModelNeedHint('UniWork AI is not on here'))
     act(() => harness.finishRun?.())
     await flush()
     await flush()
@@ -247,17 +215,17 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     expect(container!.querySelector('.ai-queue-strip')).not.toBeNull()
   })
 
-  it('a queued item stays queued while UniWork AI is picked with an unacknowledged disclosure, and sends after the ack (RF4-1)', async () => {
-    const panel = await mountThenPreset('anthropic')
+  it('a queued item stays queued while the disclosure is unacknowledged, and sends after the ack (RF4-1)', async () => {
+    const panel = await mountThenPreset({ offered: true, acked: true })
     expect(harness.runs).toEqual(['rewrite it'])
     enqueueInComposer(container!, 'queued follow-up')
 
-    // the hint holds the item while the run settles, then the user picks UniWork AI
-    act(() => setAiModelNeedHint('Choose a model to send'))
+    // the hint holds the item while the run settles, then a deck the user has not acknowledged
+    // opens in the panel
+    act(() => setAiModelNeedHint('UniWork AI is not on here'))
     act(() => harness.finishRun?.())
     await flush()
-    setUniworkAiAvailable(true)
-    await panel.pick('uniwork')
+    await panel.openDocument('/tmp/other.pptx')
     act(() => setAiModelNeedHint(null))
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 900))
@@ -276,39 +244,33 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     expect(harness.runs).toEqual(['rewrite it', 'queued follow-up'])
   })
 
-  it('a preset with UniWork AI picked and the disclosure unacknowledged sends nothing, moves focus to the disclosure, and runs after the ack (core4b)', async () => {
-    const panel = await mountThenPreset('anthropic')
-    expect(harness.runs).toEqual(['rewrite it'])
-    act(() => harness.finishRun?.())
-    await flush()
-    setUniworkAiAvailable(true)
-    await panel.pick('uniwork')
+  it('a preset with the disclosure unacknowledged sends nothing, moves focus to the disclosure, and runs after the ack (core4b)', async () => {
+    const panel = await mountThenPreset({ offered: true, acked: false })
     act(() => setAiModelNeedHint(null))
 
     await panel.firePreset(2)
     const region = container!.querySelector<HTMLElement>('[role="region"]')
     expect(region).not.toBeNull()
-    expect(harness.runs).toEqual(['rewrite it'])
+    expect(harness.runs).toEqual([])
     expect(document.activeElement).toBe(region)
 
     act(() => {
       region!.querySelector<HTMLButtonElement>('button')!.click()
     })
     await panel.firePreset(3)
-    expect(harness.runs).toEqual(['rewrite it', 'rewrite it'])
+    expect(harness.runs).toEqual(['rewrite it'])
   })
 
   it('a preset that fires while collapsed expands the panel, then announces the needs-ack line and focuses the disclosure; nothing is sent (RF5-1)', async () => {
-    const panel = await mountThenPreset('anthropic')
-    act(() => harness.finishRun?.())
-    await flush()
-    setUniworkAiAvailable(true)
-    await panel.pick('uniwork')
+    const panel = await mountThenPreset({ offered: true, acked: false })
     act(() => setAiModelNeedHint(null))
+    // mounted open, the first preset was refused there: collapse before the next one
+    await panel.firePreset(1, false)
+    panel.expand.mockClear()
 
     await panel.firePreset(2, false)
     expect(panel.expand).toHaveBeenCalledTimes(1)
-    expect(harness.runs).toEqual(['rewrite it'])
+    expect(harness.runs).toEqual([])
 
     // the host expands the panel in response: the reason is spoken and the disclosure is focused
     await panel.firePreset(2, true)
@@ -321,7 +283,7 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     // no LocaleProvider here: the panel speaks the default zh
     expect(spoken).toContain(aiUniworkText('zh', 'aiUniworkSendNeedsAck'))
     expect(panel.expand).toHaveBeenCalledTimes(1)
-    expect(harness.runs).toEqual(['rewrite it'])
+    expect(harness.runs).toEqual([])
   })
 
   it('a queued item also waits for a UniWork composer note, as Send does, and sends once it clears (core4b)', async () => {
@@ -334,7 +296,7 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     })
     let push: ((snap: unknown) => void) | null = null
     ;(window as any).uniworkCloudStatus = {
-      get: vi.fn(async () => snapshot('signed-out')),
+      get: vi.fn(async () => snapshot('ready')),
       onChange: (handler: (snap: unknown) => void) => {
         push = handler
         return () => {}
@@ -344,16 +306,13 @@ describe('slides panel send entry with an unavailable UniWork AI pick', () => {
     // the disclosure is acknowledged: only the composer note stands in the way
     ack({ account: 'acc-1', org: 'org-1', document: 'local' })
 
-    const panel = await mountThenPreset('anthropic')
+    await mountThenPreset({ offered: true, acked: false })
     expect(harness.runs).toEqual(['rewrite it'])
     enqueueInComposer(container!, 'queued follow-up')
 
-    act(() => setAiModelNeedHint('Choose a model to send'))
+    // the account signs out while the run settles: the note holds the item
+    act(() => push?.(snapshot('signed-out')))
     act(() => harness.finishRun?.())
-    await flush()
-    setUniworkAiAvailable(true)
-    await panel.pick('uniwork')
-    act(() => setAiModelNeedHint(null))
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 900))
     })

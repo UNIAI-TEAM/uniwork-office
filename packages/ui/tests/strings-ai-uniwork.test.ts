@@ -45,8 +45,8 @@ describe('ai-uniwork string shards', () => {
   })
 
   it('uses one key per counted string: no plural-form keys and no ICU plural', () => {
-    // aiRunChooseOther is a catalogue name, not a plural form: only a One/Few/Many key or an Other
-    // key with a One sibling counts as a plural family
+    // a catalogue name may end in Other without being a plural form: only a One/Few/Many key or an
+    // Other key with a One sibling counts as a plural family
     const pluralForm = (k: string) =>
       /(One|Few|Many)$/.test(k) ||
       (k.endsWith('Other') && referenceKeys.includes(`${k.slice(0, -5)}One`))
@@ -117,8 +117,8 @@ describe('ai-uniwork string shards', () => {
       [
         'aiUniworkOff',
         undefined,
-        'UniWork AI is off for this document. Choose another provider.',
-        'UniWork AI đang tắt cho tài liệu này. Chọn nhà cung cấp khác.',
+        'UniWork AI is off for this document.',
+        'UniWork AI đang tắt cho tài liệu này.',
       ],
       [
         'aiErrRunLimit',
@@ -245,6 +245,39 @@ describe('ai-uniwork string shards', () => {
           table('en').credits_exhausted,
         )
       }
+    }
+  })
+
+  it('UniWork AI is the one provider: no locale offers another provider, an own key or AI Model settings (UNI-2309)', () => {
+    const notes = [
+      'aiUniworkSignedOut',
+      'aiUniworkOff',
+      'cloudInactiveBody',
+      'not_entitled',
+      'credits_exhausted',
+    ] as const
+    for (const lang of LANGS) {
+      const t = table(lang) as Record<string, string>
+      // each note drops the clause and still says something
+      for (const key of notes) expect(t[key]?.trim().length, `${lang} ${key}`).toBeGreaterThan(0)
+    }
+    // no English line offers another provider, an own key or the AI Model settings
+    expect(
+      Object.entries(table('en')).filter(([, v]) =>
+        /another provider|other provider|own key|API key|AI Model/i.test(v),
+      ),
+    ).toEqual([])
+    expect(aiUniworkText('en', 'aiUniworkSignedOut')).toBe(
+      'You’re signed out of UniWork. Sign in again.',
+    )
+    expect(aiUniworkText('vi', 'aiUniworkSignedOut')).toBe(
+      'Phiên UniWork đã đăng xuất. Hãy đăng nhập lại.',
+    )
+    for (const lang of ['en', 'vi'] as const) {
+      for (const key of notes)
+        expect(aiUniworkText(lang, key as never), `${lang} ${key}`).not.toMatch(
+          /provider|nhà cung cấp|key|khóa|AI Model|Mô hình AI/i,
+        )
     }
   })
 })

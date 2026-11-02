@@ -8,6 +8,7 @@ import { AI_SKILLS_LABELS, clearUniworkAcks, setAiModelNeedHint } from '@genoffi
 import { buildExtensions } from '../src/renderer/editor/extensions'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { usableAiSettings } from './helpers/ai-settings'
+import { readyUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const harness = vi.hoisted(() => ({
   runs: [] as string[],
@@ -132,7 +133,6 @@ describe('markdown AI panel skills attach (X4)', () => {
 
   async function mountPanel(
     opts: {
-      provider?: 'openai' | 'uniwork'
       skills?: Array<{ name: string; description: string; relevant: boolean }>
       bodies?: Record<string, string | Error>
       onOpenSkillsSettings?: () => Promise<void>
@@ -140,8 +140,8 @@ describe('markdown AI panel skills attach (X4)', () => {
   ) {
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
-    const provider = opts.provider ?? 'openai'
-    if (provider === 'uniwork') setUniworkAiAvailable(true)
+    // every turn runs on UniWork AI: offered, and its disclosure acknowledged for the document
+    readyUniworkAi('/docs/a.md')
     const skills = opts.skills ?? [
       { name: 'tables', description: 'Header rows and totals', relevant: true },
       { name: 'tone', description: 'Write plainly', relevant: true },
@@ -168,7 +168,7 @@ describe('markdown AI panel skills attach (X4)', () => {
       skillText,
       getAiSettings: vi.fn(async () => {
         if (harness.settingsFail) throw new Error('settings unavailable')
-        return { ...usableAiSettings(), provider }
+        return usableAiSettings()
       }),
     }
     vi.stubGlobal(
@@ -388,22 +388,17 @@ describe('markdown AI panel skills attach (X4)', () => {
     expect(container!.querySelectorAll('.ai-composer .ai-skill-chip')).toHaveLength(0)
   })
 
-  it('UniWork AI 8,000-rune pre-send check: refuses 2 long skills on uniwork (keeps text & chips, shows notice), sends on BYOK, and sends 1 short skill on uniwork', async () => {
+  it('UniWork AI 8,000-rune pre-send check: refuses 2 long skills (keeps text & chips, shows notice), and sends once one is removed', async () => {
     const longA = 'A'.repeat(4500)
     const longB = 'B'.repeat(4500)
-    // 1. UniWork AI with 2 long skills (> 8,000 runes total)
+    // 2 long skills (> 8,000 runes total)
     await mountPanel({
-      provider: 'uniwork',
       bodies: {
         tables: longA,
         tone: longB,
         citations: 'Short skill body.',
       },
     })
-    // Acknowledge UniWork AI disclosure first
-    const ackBtn = container!.querySelector<HTMLButtonElement>('[role="region"] button')
-    if (ackBtn) click(ackBtn)
-    await flush()
 
     // The panel's one persistent live region announces the notice; it is empty before it appears
     expect(container!.querySelectorAll('[aria-live]').length).toBe(1)
@@ -454,29 +449,6 @@ describe('markdown AI panel skills attach (X4)', () => {
     await flush()
     expect(harness.runs).toHaveLength(1)
     expect(harness.runs[0]).toContain(longA)
-
-    // 2. BYOK with the same 2 long skills sends without refusal
-    act(() => root!.unmount())
-    container!.remove()
-    harness.runs.length = 0
-    await mountPanel({
-      provider: 'openai',
-      bodies: {
-        tables: longA,
-        tone: longB,
-      },
-    })
-    click(container!.querySelector('.ai-plus-btn'))
-    await flush()
-    const byokItems = [...container!.querySelectorAll<HTMLButtonElement>('.ai-plus-skill')]
-    click(byokItems[0])
-    click(byokItems[1])
-    typeInComposer(container!, 'Summarize this')
-    pressEnterInComposer(container!)
-    await flush()
-    await flush()
-    expect(harness.runs).toHaveLength(1)
-    expect(harness.runs[0]).toContain(longA)
-    expect(harness.runs[0]).toContain(longB)
+    expect(harness.runs[0]).not.toContain(longB)
   })
 })

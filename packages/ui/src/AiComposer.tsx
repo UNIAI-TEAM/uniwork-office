@@ -107,7 +107,7 @@ export function AiComposer({
   const autoSentenceId = `ai-uniwork-disclosure-sentence-${autoId}`
   const autoNeedsAckId = `ai-uniwork-send-needs-ack-${autoId}`
 
-  // no key or no known model (web): send stays off and the hint says why
+  // UniWork AI is not on here: send stays off and the hint says why
   const needModelHint = useAiModelNeedHint()
   const needModelAction = useAiModelNeedAction()
   const { spellcheck } = useAiPanelPrefs()
@@ -257,7 +257,7 @@ export function AiComposer({
         }}
       />
       {iconOnly && needModelHint !== null && !busy && (
-        // the icon-only footer has no room for the hint line: it sits above it, and opens the AI settings
+        // the icon-only footer has no room for the hint line: it sits above it, and opens the account settings
         <div className="ai-input-need" role="status">
           {needModelAction ? (
             <button type="button" className="ai-input-need-link" onClick={needModelAction}>
@@ -331,8 +331,6 @@ export function AiComposer({
           lang={resolvedLang}
           provider={uniwork.provider ?? (uniworkActive ? 'uniwork' : 'other')}
           onAction={uniwork.onNoteAction}
-          onChooseProvider={uniwork.onChooseProvider}
-          onChooseOtherProvider={uniwork.onChooseOtherProvider}
           onSignIn={uniwork.onSignIn}
           onAnnounce={announce}
         />

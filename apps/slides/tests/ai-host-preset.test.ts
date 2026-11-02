@@ -8,6 +8,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import { readyUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const harness = vi.hoisted(() => ({ runs: [] as string[] }))
 vi.mock('@genoffice/agent-core', async (orig) => {
@@ -50,15 +51,12 @@ import { AiPanel } from '../src/renderer/ai/AiPanel'
 
 const JOB = 'Draft this deck from the job:  Plan\n- Goals'
 
-const settingsFor = (provider: AiSettings['provider']): AiSettings => ({
-  provider,
+const settings: AiSettings = {
+  provider: 'uniwork',
   providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [
-      p.id,
-      { apiKey: p.id === 'anthropic' ? 'test-key' : '', model: p.defaultModel },
-    ]),
+    AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
   ) as AiSettings['providers'],
-})
+}
 
 const flush = async (): Promise<void> => {
   await act(async () => {
@@ -87,11 +85,9 @@ describe('slides AI panel: a preset from outside', () => {
     delete (window as { desktop?: unknown }).desktop
   })
 
-  /** `live`: what the bridge answers when the panel reads its provider (default: the panel's) */
-  function mount(provider: AiSettings['provider'], live?: () => AiSettings) {
-    const settings = settingsFor(provider)
+  function mount() {
     ;(window as { slidesApi?: unknown }).slidesApi = {
-      getAiSettings: vi.fn(async () => (live ? live() : settings)),
+      getAiSettings: vi.fn(async () => settings),
       aiGskStatus: vi.fn(async () => ({ loggedIn: false })),
       beginHistoryBatch: vi.fn(async () => false),
       endHistoryBatch: vi.fn(async () => null),
@@ -138,7 +134,8 @@ describe('slides AI panel: a preset from outside', () => {
   }
 
   it('runs the text word for word and shows the display words', async () => {
-    const render = mount('anthropic')
+    readyUniworkAi()
+    const render = mount()
     render(null)
     await flush()
     await flush()
@@ -151,7 +148,7 @@ describe('slides AI panel: a preset from outside', () => {
 
   it('UniWork AI not acknowledged: the text waits in the composer and nothing is sent', async () => {
     setUniworkAiAvailable(true)
-    const render = mount('uniwork')
+    const render = mount()
     render(null)
     await flush()
     await flush()
@@ -166,7 +163,8 @@ describe('slides AI panel: a preset from outside', () => {
   })
 
   it('a panel remounted for another deck key does not run the preset it already took', async () => {
-    const render = mount('anthropic')
+    readyUniworkAi()
+    const render = mount()
     render({ text: JOB, nonce: 7, autoRun: true })
     await flush()
     await flush()
@@ -177,31 +175,22 @@ describe('slides AI panel: a preset from outside', () => {
     expect(harness.runs).toEqual([JOB])
   })
 
-  it('a host job runs only while the panel is on UniWork AI when it would run; held, it waits in the focused composer', async () => {
-    let live = settingsFor('anthropic')
-    const render = mount('anthropic', () => live)
+  it('a host job runs on UniWork AI; a preset refused while that run is going waits in the focused composer', async () => {
+    readyUniworkAi()
+    const render = mount()
     const box = () =>
       container!.querySelector<HTMLTextAreaElement>('textarea[data-slides-ai-input]')!
     render(null)
     await flush()
     await flush()
-    // the person is on another provider when the job would run: nothing goes to it
     render({ text: JOB, nonce: 1, autoRun: true, uniworkOnly: true })
-    await flush()
-    await flush()
-    expect(harness.runs).toEqual([])
-    expect(box().value).toBe(JOB)
-    expect(document.activeElement).toBe(box())
-
-    live = settingsFor('uniwork')
-    render({ text: JOB, nonce: 2, autoRun: true, uniworkOnly: true })
     await flush()
     await flush()
     expect(harness.runs).toEqual([JOB])
 
     // an auto-run preset refused while that run is going waits in the composer, which takes focus
     act(() => box().blur())
-    render({ text: 'Tidy the deck', nonce: 3, autoRun: true })
+    render({ text: 'Tidy the deck', nonce: 2, autoRun: true })
     await flush()
     await flush()
     expect(harness.runs).toEqual([JOB])

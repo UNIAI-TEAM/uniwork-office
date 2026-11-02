@@ -8,6 +8,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { buildParseMap } from '../src/renderer/document/parse-map'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { usableAiSettings } from './helpers/ai-settings'
+import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 interface FakeEvents {
   onToolExecuted?: (e: { call: unknown; execution: unknown; snapshotBefore?: unknown }) => void
@@ -64,9 +65,11 @@ describe('html AI panel: ask before saving an untitled page', () => {
     container = null
     harness.mutate = true
     vi.unstubAllGlobals()
+    resetUniworkAi()
   })
 
   async function mount(offer: string | null) {
+    readyUniworkAi()
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
     const save = vi.fn(async () => ({ ok: true }))
@@ -79,7 +82,7 @@ describe('html AI panel: ask before saving an untitled page', () => {
               prop === 'save'
                 ? save
                 : prop === 'getAiSettings'
-                  ? vi.fn(async () => ({ ...usableAiSettings(), provider: 'openai' }))
+                  ? vi.fn(async () => usableAiSettings())
                   : /^on[A-Z]/.test(prop)
                     ? vi.fn(() => () => {})
                     : vi.fn(async () => undefined)

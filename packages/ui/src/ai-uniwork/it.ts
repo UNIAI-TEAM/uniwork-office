@@ -5,8 +5,8 @@ export const it = {
   aiUniworkProvider: 'UniWork AI',
   aiUniworkCreditsAria: 'Crediti rimasti: {remaining} di {limit}',
   aiUniworkFooterSignIn: 'Accedi a UniWork per usare UniWork AI',
-  aiUniworkSignedOut: 'Sei disconnesso da UniWork. Scegli un altro provider o accedi di nuovo.',
-  aiUniworkOff: 'UniWork AI è disattivato per questo documento. Scegli un altro provider.',
+  aiUniworkSignedOut: 'Sei disconnesso da UniWork. Accedi di nuovo.',
+  aiUniworkOff: 'UniWork AI è disattivato per questo documento.',
   aiUniworkViewOnly:
     'Sola visualizzazione: l’IA può rispondere ma non può modificare né salvare il documento.',
 
@@ -38,7 +38,6 @@ export const it = {
     'Interrotto. Le modifiche già applicate restano nel documento e possono essere annullate.',
   aiRunRetry: 'Riprova',
   aiRunAskAgain: 'Chiedi di nuovo',
-  aiRunChooseOther: 'Scegli un altro provider',
   aiRunOpenInApp: 'Apri nell’app',
   aiConversationRestarted:
     'La conversazione precedente è scaduta, quindi UniWork AI ne ha iniziata una nuova e non ricorda più i turni precedenti. Invia di nuovo la domanda per continuare.',
@@ -85,7 +84,7 @@ export const it = {
   cloudCreditsLeft: '{remaining} / {limit} rimasti',
   cloudCreditsUnlimited: 'Illimitato',
   cloudInactiveBody:
-    'L’abbonamento UniWork della tua organizzazione non è attivo, quindi l’IA cloud è in pausa. Chiedi a un amministratore di rinnovarlo; i tuoi provider qui sotto continuano a funzionare.',
+    'L’abbonamento UniWork della tua organizzazione non è attivo, quindi l’IA cloud è in pausa. Chiedi a un amministratore di rinnovarlo.',
   acctSignIn: 'Accedi',
   acctSignInAgain: 'Accedi di nuovo',
   // S8/S10 local-file conversation restart notice (G05BE-6)
@@ -99,7 +98,7 @@ export const it = {
     'Questa cartella di lavoro è troppo grande per l’IA sul web. Aprila nell’app UniWork Office.',
   // S7 composer notice keys (not_entitled, credits_exhausted)
   not_entitled:
-    'Il piano della tua organizzazione non include UniWork AI. Chiedi informazioni sul piano a un amministratore dell’organizzazione o aggiungi la tua chiave IA in Impostazioni > Modello IA.',
+    'Il piano della tua organizzazione non include UniWork AI. Chiedi informazioni sul piano a un amministratore dell’organizzazione.',
   credits_exhausted:
-    'La tua organizzazione ha esaurito tutti i crediti IA per questo periodo. Chiedi a un amministratore dell’organizzazione di aggiungere crediti o aggiungi la tua chiave IA in Impostazioni > Modello IA.',
+    'La tua organizzazione ha esaurito tutti i crediti IA per questo periodo. Chiedi a un amministratore dell’organizzazione di aggiungere crediti.',
 } satisfies Record<keyof typeof zh, string>
