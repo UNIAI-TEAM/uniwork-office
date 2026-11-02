@@ -48,7 +48,7 @@ export const DEEPSEEK_V41_FLASH = 'deep-seek-v4.1-flash'
 export const AI_PROVIDERS: AiProviderMeta[] = [
   {
     id: 'genspark',
-    label: 'Genspark',
+    label: 'UniWork',
     // must stay within the proxy's served set (GET /api/llm_proxy/v1/models);
     // bare gpt-5.6 and the gemini family dropped off it (verified 2026-08-31).
     // DeepSeek goes by the proxy's hyphenated pool id; V4.1 Flash takes images
@@ -67,7 +67,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
       DEEPSEEK_V41_FLASH,
     ],
     defaultModel: 'claude-opus-5-5',
-    keyPlaceholder: 'Not required - sign in to Genspark',
+    keyPlaceholder: 'Not required - sign in to UniWork',
   },
   {
     id: 'codex',

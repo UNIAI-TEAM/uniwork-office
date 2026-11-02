@@ -1189,7 +1189,7 @@ export const strings = {
     aiOverloadedError: 'AI hizmeti şu anda yoğun — lütfen biraz sonra yeniden deneyin',
     aiNetworkError:
       'Ağ sorunu: AI hizmetine ulaşılamadı. Bağlantınızı kontrol edip yeniden deneyin',
-    aiCreditsExhausted: 'Krediniz bitti — genspark.ai adresinden yükleyin',
+    aiCreditsExhausted: 'Krediniz bitti — uniworkos.com adresinden yükleyin',
     aiOpenAssistant: 'AI asistanını aç',
     aiNameFile: 'AI ile adlandır',
     aiSummarizeBtn: 'AI Özet',

@@ -1,6 +1,6 @@
 # Connecting a coding agent
 
-GenOffice speaks the Model Context Protocol, so a coding agent can read, write and render your documents through the same engines the app uses. The agent is not guessing at a file format: it gets the typed op schemas from the same definitions the executor validates against.
+UniWork Office speaks the Model Context Protocol, so a coding agent can read, write and render your documents through the same engines the app uses. The agent is not guessing at a file format: it gets the typed op schemas from the same definitions the executor validates against.
 
 ## Registering it from the app
 
@@ -70,7 +70,7 @@ An agent that does not know the op vocabulary will guess. The skill carries the 
 
 ## What it can reach in the app
 
-The server is not limited to files on disk. While GenOffice is running, the agent can also work through the window:
+The server is not limited to files on disk. While UniWork Office is running, the agent can also work through the window:
 
 - **`open_in_genoffice`** opens a file in a tab and focuses it.
 - **`open_documents`** lists every document you have open — id, type, path, and whether it has unsaved changes — then reads one's live content, saves it in place, or closes it, saving first unless you ask it to discard.

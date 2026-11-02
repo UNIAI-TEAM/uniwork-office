@@ -575,7 +575,7 @@ const LABELS: Record<string, Labels> = {
     zoomOut: 'Uzaklaştır',
     fullscreen: 'Tam Ekran',
     help: 'Yardım',
-    about: 'GenOffice Hakkında',
+    about: 'UniWork Office Hakkında',
     checkUpdates: 'Güncellemeleri Denetle…',
     version: 'Sürüm',
     nameWithAi: 'AI ile adlandır…',
@@ -835,7 +835,7 @@ export function appMenuTemplate(
 <<<<<<< ours
     appLabel = 'UniWork Office',
 =======
-    appLabel = 'GenOffice',
+    appLabel = 'UniWork Office',
 >>>>>>> theirs
   }: { extra?: MenuItemConstructorOptions[]; appLabel?: string } = {},
 ): MenuItemConstructorOptions | undefined {

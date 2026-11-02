@@ -280,13 +280,13 @@ const tMain = createI18n({
     filterWord: 'Word 文档',
     odtImportMsg: '转换 .{ext} 文档？',
     odtImportDetail:
-      'GenOffice 只编辑 .docx，不编辑 ODF。正文、标题、列表、表格和图片会转换过来；脚注、批注和文本框不会完整保留。原文件不会被修改，转换出的 .docx 是一份独立副本，之后的保存都写入它。', // public-hygiene: allow
+      'UniWork Office 只编辑 .docx，不编辑 ODF。正文、标题、列表、表格和图片会转换过来；脚注、批注和文本框不会完整保留。原文件不会被修改，转换出的 .docx 是一份独立副本，之后的保存都写入它。', // public-hygiene: allow
     hwpImportDetail:
-      'GenOffice 只编辑 .docx，不编辑 HWP。正文、表格、图片、页眉和页脚会转换过来；公式、脚注和嵌入对象不会转换，自动编号会变成普通文本。原文件不会被修改，转换出的 .docx 是一份独立副本，之后的保存都写入它。', // public-hygiene: allow
+      'UniWork Office 只编辑 .docx，不编辑 HWP。正文、表格、图片、页眉和页脚会转换过来；公式、脚注和嵌入对象不会转换，自动编号会变成普通文本。原文件不会被修改，转换出的 .docx 是一份独立副本，之后的保存都写入它。', // public-hygiene: allow
     odtImportConvertBtn: '转换并打开',
     docImportMsg: '转换 .{ext} 文档？',
     docImportDetail:
-      'GenOffice 只编辑 .docx，不编辑 Word 97-2003 旧版 .doc。正文、标题、列表、表格和图片会转换过来；脚注、批注和文本框不会完整保留。原文件不会被修改，转换出的 .docx 是一份独立副本，之后的保存都写入它。', // public-hygiene: allow
+      'UniWork Office 只编辑 .docx，不编辑 Word 97-2003 旧版 .doc。正文、标题、列表、表格和图片会转换过来；脚注、批注和文本框不会完整保留。原文件不会被修改，转换出的 .docx 是一份独立副本，之后的保存都写入它。', // public-hygiene: allow
     docImportConvertBtn: '转换并打开',
     dlgSaveAs: '另存为',
     closeUnsavedMsg: '此文档有未保存的更改。',
@@ -326,7 +326,7 @@ const tMain = createI18n({
     errNotImage: '不是支持的图片类型',
 <<<<<<< ours
 =======
-    errGskNotLoggedIn: '未登录 Genspark:请点击下方「登录 Genspark」完成登录后重试',
+    errGskNotLoggedIn: '未登录 UniWork:请点击下方「登录 UniWork」完成登录后重试',
     errNoApiKey: '未配置 {provider} 的 API Key',
     errAiRegion: '该模型的厂商不向当前地区提供服务，请换一个模型或切换网络',
     errAiBusy: 'AI 服务当前繁忙，请稍后重试',
@@ -435,13 +435,13 @@ const tMain = createI18n({
     filterWord: 'Word Documents',
     odtImportMsg: 'Convert this .{ext} document?',
     odtImportDetail:
-      'GenOffice edits .docx, not ODF. Body text, headings, lists, tables and images carry over; footnotes, comments and text boxes are not fully preserved. The original file is never changed; the converted .docx is a separate copy that later saves write to.',
+      'UniWork Office edits .docx, not ODF. Body text, headings, lists, tables and images carry over; footnotes, comments and text boxes are not fully preserved. The original file is never changed; the converted .docx is a separate copy that later saves write to.',
     hwpImportDetail:
-      'GenOffice edits .docx, not HWP. Body text, tables, images, headers and footers carry over; equations, footnotes and embedded objects are not converted, and automatic numbering becomes plain text. The original file is never changed; the converted .docx is a separate copy that later saves write to.',
+      'UniWork Office edits .docx, not HWP. Body text, tables, images, headers and footers carry over; equations, footnotes and embedded objects are not converted, and automatic numbering becomes plain text. The original file is never changed; the converted .docx is a separate copy that later saves write to.',
     odtImportConvertBtn: 'Convert and open',
     docImportMsg: 'Convert this .{ext} document?',
     docImportDetail:
-      'GenOffice edits .docx, not Word 97-2003 documents. Body text, headings, lists, tables and images carry over; footnotes, comments and text boxes are not fully preserved. The original file is never changed; the converted .docx is a separate copy that later saves write to.',
+      'UniWork Office edits .docx, not Word 97-2003 documents. Body text, headings, lists, tables and images carry over; footnotes, comments and text boxes are not fully preserved. The original file is never changed; the converted .docx is a separate copy that later saves write to.',
     docImportConvertBtn: 'Convert and open',
     dlgSaveAs: 'Save As',
     closeUnsavedMsg: 'This document has unsaved changes.',
@@ -484,7 +484,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Not signed in to Genspark: click “Sign in to Genspark” below, sign in, then retry',
+      'Not signed in to UniWork: click “Sign in to UniWork” below, sign in, then retry',
     errNoApiKey: 'No API key configured for {provider}',
     errAiRegion:
       "This model's provider does not serve your current region — pick another model or change your network",
@@ -594,13 +594,13 @@ const tMain = createI18n({
     filterWord: 'Tài liệu Word',
     odtImportMsg: 'Chuyển đổi tài liệu .{ext} này?',
     odtImportDetail:
-      'GenOffice chỉnh sửa .docx chứ không chỉnh sửa ODF. Nội dung, tiêu đề, danh sách, bảng và hình ảnh được chuyển đổi; chú thích cuối trang, bình luận và hộp văn bản không được giữ đầy đủ. Tệp gốc không bao giờ bị sửa; bản .docx sau chuyển đổi là một bản sao độc lập để tiếp tục chỉnh sửa và lưu.',
+      'UniWork Office chỉnh sửa .docx chứ không chỉnh sửa ODF. Nội dung, tiêu đề, danh sách, bảng và hình ảnh được chuyển đổi; chú thích cuối trang, bình luận và hộp văn bản không được giữ đầy đủ. Tệp gốc không bao giờ bị sửa; bản .docx sau chuyển đổi là một bản sao độc lập để tiếp tục chỉnh sửa và lưu.',
     hwpImportDetail:
-      'GenOffice chỉnh sửa .docx chứ không chỉnh sửa HWP. Nội dung, bảng, hình ảnh, đầu trang và chân trang được chuyển đổi; công thức, chú thích cuối trang và đối tượng nhúng không được chuyển đổi, còn đánh số tự động trở thành văn bản thường. Tệp gốc không bao giờ bị sửa; bản .docx sau chuyển đổi là một bản sao độc lập để tiếp tục chỉnh sửa và lưu.',
+      'UniWork Office chỉnh sửa .docx chứ không chỉnh sửa HWP. Nội dung, bảng, hình ảnh, đầu trang và chân trang được chuyển đổi; công thức, chú thích cuối trang và đối tượng nhúng không được chuyển đổi, còn đánh số tự động trở thành văn bản thường. Tệp gốc không bao giờ bị sửa; bản .docx sau chuyển đổi là một bản sao độc lập để tiếp tục chỉnh sửa và lưu.',
     odtImportConvertBtn: 'Chuyển đổi và mở',
     docImportMsg: 'Chuyển đổi tài liệu .{ext} này?',
     docImportDetail:
-      'GenOffice chỉnh sửa .docx chứ không chỉnh sửa tài liệu Word 97-2003 (.doc). Nội dung, tiêu đề, danh sách, bảng và hình ảnh được chuyển đổi; chú thích cuối trang, bình luận và hộp văn bản không được giữ đầy đủ. Tệp gốc không bao giờ bị sửa; bản .docx sau chuyển đổi là một bản sao độc lập để tiếp tục chỉnh sửa và lưu.',
+      'UniWork Office chỉnh sửa .docx chứ không chỉnh sửa tài liệu Word 97-2003 (.doc). Nội dung, tiêu đề, danh sách, bảng và hình ảnh được chuyển đổi; chú thích cuối trang, bình luận và hộp văn bản không được giữ đầy đủ. Tệp gốc không bao giờ bị sửa; bản .docx sau chuyển đổi là một bản sao độc lập để tiếp tục chỉnh sửa và lưu.',
     docImportConvertBtn: 'Chuyển đổi và mở',
     dlgSaveAs: 'Lưu dưới dạng',
     closeUnsavedMsg: 'Tài liệu này có những thay đổi chưa được lưu.',
@@ -644,7 +644,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Chưa đăng nhập vào Genspark: nhấp vào “Đăng nhập vào Genspark” bên dưới, đăng nhập, sau đó thử lại',
+      'Chưa đăng nhập vào UniWork: nhấp vào “Đăng nhập vào UniWork” bên dưới, đăng nhập, sau đó thử lại',
     errNoApiKey: 'Chưa cấu hình khóa API cho {provider}',
     errAiRegion:
       'Nhà cung cấp của mô hình này không phục vụ khu vực hiện tại của bạn — hãy chọn mô hình khác hoặc đổi mạng',
@@ -753,13 +753,13 @@ const tMain = createI18n({
     filterWord: 'Word Belgeleri',
     odtImportMsg: 'Bu .{ext} belgesi dönüştürülsün mü?',
     odtImportDetail:
-      'GenOffice ODF değil .docx düzenler. Gövde metni, başlıklar, listeler, tablolar ve resimler aktarılır; dipnotlar, açıklamalar ve metin kutuları tam olarak korunmaz. Özgün dosya hiçbir zaman değiştirilmez; dönüştürülen .docx, sonraki kaydetmelerin yazıldığı ayrı bir kopyadır.',
+      'UniWork Office ODF değil .docx düzenler. Gövde metni, başlıklar, listeler, tablolar ve resimler aktarılır; dipnotlar, açıklamalar ve metin kutuları tam olarak korunmaz. Özgün dosya hiçbir zaman değiştirilmez; dönüştürülen .docx, sonraki kaydetmelerin yazıldığı ayrı bir kopyadır.',
     hwpImportDetail:
-      'GenOffice HWP değil .docx düzenler. Gövde metni, tablolar, resimler, üst bilgiler ve alt bilgiler aktarılır; denklemler, dipnotlar ve gömülü nesneler dönüştürülmez, otomatik numaralandırma düz metne dönüşür. Özgün dosya hiçbir zaman değiştirilmez; dönüştürülen .docx, sonraki kaydetmelerin yazıldığı ayrı bir kopyadır.',
+      'UniWork Office HWP değil .docx düzenler. Gövde metni, tablolar, resimler, üst bilgiler ve alt bilgiler aktarılır; denklemler, dipnotlar ve gömülü nesneler dönüştürülmez, otomatik numaralandırma düz metne dönüşür. Özgün dosya hiçbir zaman değiştirilmez; dönüştürülen .docx, sonraki kaydetmelerin yazıldığı ayrı bir kopyadır.',
     odtImportConvertBtn: 'Dönüştür ve aç',
     docImportMsg: 'Bu .{ext} belgesi dönüştürülsün mü?',
     docImportDetail:
-      'GenOffice Word 97-2003 (.doc) belgelerini değil .docx düzenler. Gövde metni, başlıklar, listeler, tablolar ve resimler aktarılır; dipnotlar, açıklamalar ve metin kutuları tam olarak korunmaz. Özgün dosya hiçbir zaman değiştirilmez; dönüştürülen .docx, sonraki kaydetmelerin yazıldığı ayrı bir kopyadır.',
+      'UniWork Office Word 97-2003 (.doc) belgelerini değil .docx düzenler. Gövde metni, başlıklar, listeler, tablolar ve resimler aktarılır; dipnotlar, açıklamalar ve metin kutuları tam olarak korunmaz. Özgün dosya hiçbir zaman değiştirilmez; dönüştürülen .docx, sonraki kaydetmelerin yazıldığı ayrı bir kopyadır.',
     docImportConvertBtn: 'Dönüştür ve aç',
     dlgSaveAs: 'Farklı Kaydet',
     closeUnsavedMsg: 'Bu belgede kaydedilmemiş değişiklikler var.',
@@ -800,7 +800,7 @@ const tMain = createI18n({
     errImageNoText: 'Resim eklerinde metin yok; resim kullanıcı iletisiyle birlikte gönderilir',
     errNotImage: 'desteklenen bir resim türü değil',
     errGskNotLoggedIn:
-      "Genspark'a giriş yapılmadı: aşağıdaki “Genspark'a giriş yap” düğmesine tıklayın, giriş yapın ve yeniden deneyin",
+      "UniWork'a giriş yapılmadı: aşağıdaki “UniWork'a giriş yap” düğmesine tıklayın, giriş yapın ve yeniden deneyin",
     errNoApiKey: '{provider} için API anahtarı yapılandırılmamış',
     errAiRegion:
       'Bu modelin sağlayıcısı bulunduğunuz bölgeye hizmet vermiyor — başka bir model seçin veya ağınızı değiştirin',
@@ -904,13 +904,13 @@ const tMain = createI18n({
     filterWord: 'Word 文書',
     odtImportMsg: 'この .{ext} 文書を変換しますか？',
     odtImportDetail:
-      'GenOffice は ODF ではなく .docx を編集します。本文・見出し・リスト・表・画像は変換されますが、脚注・コメント・テキストボックスは完全には保持されません。元のファイルは変更されず、変換後の .docx は独立したコピーとして以後の保存先になります。',
+      'UniWork Office は ODF ではなく .docx を編集します。本文・見出し・リスト・表・画像は変換されますが、脚注・コメント・テキストボックスは完全には保持されません。元のファイルは変更されず、変換後の .docx は独立したコピーとして以後の保存先になります。',
     hwpImportDetail:
-      'GenOffice は HWP ではなく .docx を編集します。本文・表・画像・ヘッダー・フッターは変換されますが、数式・脚注・埋め込みオブジェクトは変換されず、自動番号は通常のテキストになります。元のファイルは変更されず、変換後の .docx は独立したコピーとして以後の保存先になります。',
+      'UniWork Office は HWP ではなく .docx を編集します。本文・表・画像・ヘッダー・フッターは変換されますが、数式・脚注・埋め込みオブジェクトは変換されず、自動番号は通常のテキストになります。元のファイルは変更されず、変換後の .docx は独立したコピーとして以後の保存先になります。',
     odtImportConvertBtn: '変換して開く',
     docImportMsg: 'この .{ext} 文書を変換しますか？',
     docImportDetail:
-      'GenOffice は Word 97-2003 形式（.doc）ではなく .docx を編集します。本文・見出し・リスト・表・画像は変換されますが、脚注・コメント・テキストボックスは完全には保持されません。元のファイルは変更されず、変換後の .docx は独立したコピーとして以後の保存先になります。',
+      'UniWork Office は Word 97-2003 形式（.doc）ではなく .docx を編集します。本文・見出し・リスト・表・画像は変換されますが、脚注・コメント・テキストボックスは完全には保持されません。元のファイルは変更されず、変換後の .docx は独立したコピーとして以後の保存先になります。',
     docImportConvertBtn: '変換して開く',
     dlgSaveAs: '名前を付けて保存',
     closeUnsavedMsg: 'このドキュメントに未保存の変更があります。',
@@ -953,7 +953,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Genspark にサインインしていません。下の「Genspark にサインイン」からサインインして再試行してください',
+      'UniWork にサインインしていません。下の「UniWork にサインイン」からサインインして再試行してください',
     errNoApiKey: '{provider} の API キーが設定されていません',
     errAiRegion:
       'このモデルの提供元は現在の地域ではサービスを提供していません。別のモデルを選ぶか、ネットワークを切り替えてください',
@@ -1063,13 +1063,13 @@ const tMain = createI18n({
     filterWord: 'Word 문서',
     odtImportMsg: '이 .{ext} 문서를 변환할까요?',
     odtImportDetail:
-      'GenOffice은 ODF가 아니라 .docx를 편집합니다. 본문, 제목, 목록, 표, 이미지는 변환되지만 각주, 메모, 텍스트 상자는 완전히 유지되지 않습니다. 원본 파일은 변경되지 않으며, 변환된 .docx는 이후 저장이 기록되는 독립적인 사본입니다.',
+      'UniWork Office은 ODF가 아니라 .docx를 편집합니다. 본문, 제목, 목록, 표, 이미지는 변환되지만 각주, 메모, 텍스트 상자는 완전히 유지되지 않습니다. 원본 파일은 변경되지 않으며, 변환된 .docx는 이후 저장이 기록되는 독립적인 사본입니다.',
     hwpImportDetail:
-      'GenOffice은 HWP가 아니라 .docx를 편집합니다. 본문, 표, 그림, 머리말, 꼬리말은 변환되지만 수식, 각주, 삽입 개체는 변환되지 않으며 자동 번호는 일반 텍스트로 바뀝니다. 원본 파일은 변경되지 않으며, 변환된 .docx는 이후 저장이 기록되는 독립적인 사본입니다.',
+      'UniWork Office은 HWP가 아니라 .docx를 편집합니다. 본문, 표, 그림, 머리말, 꼬리말은 변환되지만 수식, 각주, 삽입 개체는 변환되지 않으며 자동 번호는 일반 텍스트로 바뀝니다. 원본 파일은 변경되지 않으며, 변환된 .docx는 이후 저장이 기록되는 독립적인 사본입니다.',
     odtImportConvertBtn: '변환 후 열기',
     docImportMsg: '이 .{ext} 문서를 변환할까요?',
     docImportDetail:
-      'GenOffice은 Word 97-2003(.doc) 문서가 아니라 .docx를 편집합니다. 본문, 제목, 목록, 표, 이미지는 변환되지만 각주, 메모, 텍스트 상자는 완전히 유지되지 않습니다. 원본 파일은 변경되지 않으며, 변환된 .docx는 이후 저장이 기록되는 독립적인 사본입니다.',
+      'UniWork Office은 Word 97-2003(.doc) 문서가 아니라 .docx를 편집합니다. 본문, 제목, 목록, 표, 이미지는 변환되지만 각주, 메모, 텍스트 상자는 완전히 유지되지 않습니다. 원본 파일은 변경되지 않으며, 변환된 .docx는 이후 저장이 기록되는 독립적인 사본입니다.',
     docImportConvertBtn: '변환 후 열기',
     dlgSaveAs: '다른 이름으로 저장',
     closeUnsavedMsg: '이 문서에 저장하지 않은 변경 사항이 있습니다.',
@@ -1113,7 +1113,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Genspark에 로그인되어 있지 않습니다. 아래 "Genspark 로그인"을 눌러 로그인한 뒤 다시 시도하세요',
+      'UniWork에 로그인되어 있지 않습니다. 아래 "UniWork 로그인"을 눌러 로그인한 뒤 다시 시도하세요',
     errNoApiKey: '{provider}의 API 키가 설정되지 않았습니다',
     errAiRegion:
       '이 모델의 제공업체는 현재 지역에서 서비스를 제공하지 않습니다. 다른 모델을 선택하거나 네트워크를 변경하세요',
@@ -1223,13 +1223,13 @@ const tMain = createI18n({
     filterWord: 'Documents Word',
     odtImportMsg: 'Convertir ce document .{ext} ?',
     odtImportDetail:
-      'GenOffice modifie des .docx, pas de l’ODF. Le texte, les titres, les listes, les tableaux et les images sont convertis ; les notes de bas de page, les commentaires et les zones de texte ne sont pas entièrement conservés. Le fichier d’origine n’est jamais modifié ; le .docx converti est une copie distincte où s’effectuent les enregistrements suivants.',
+      'UniWork Office modifie des .docx, pas de l’ODF. Le texte, les titres, les listes, les tableaux et les images sont convertis ; les notes de bas de page, les commentaires et les zones de texte ne sont pas entièrement conservés. Le fichier d’origine n’est jamais modifié ; le .docx converti est une copie distincte où s’effectuent les enregistrements suivants.',
     hwpImportDetail:
-      'GenOffice modifie des .docx, pas des fichiers HWP. Le texte, les tableaux, les images, les en-têtes et les pieds de page sont convertis ; les équations, les notes de bas de page et les objets incorporés ne le sont pas, et la numérotation automatique devient du texte simple. Le fichier d’origine n’est jamais modifié ; le .docx converti est une copie distincte où s’effectuent les enregistrements suivants.',
+      'UniWork Office modifie des .docx, pas des fichiers HWP. Le texte, les tableaux, les images, les en-têtes et les pieds de page sont convertis ; les équations, les notes de bas de page et les objets incorporés ne le sont pas, et la numérotation automatique devient du texte simple. Le fichier d’origine n’est jamais modifié ; le .docx converti est une copie distincte où s’effectuent les enregistrements suivants.',
     odtImportConvertBtn: 'Convertir et ouvrir',
     docImportMsg: 'Convertir ce document .{ext} ?',
     docImportDetail:
-      'GenOffice modifie des .docx, pas de documents Word 97-2003 (.doc). Le texte, les titres, les listes, les tableaux et les images sont convertis ; les notes de bas de page, les commentaires et les zones de texte ne sont pas entièrement conservés. Le fichier d’origine n’est jamais modifié ; le .docx converti est une copie distincte où s’effectuent les enregistrements suivants.',
+      'UniWork Office modifie des .docx, pas de documents Word 97-2003 (.doc). Le texte, les titres, les listes, les tableaux et les images sont convertis ; les notes de bas de page, les commentaires et les zones de texte ne sont pas entièrement conservés. Le fichier d’origine n’est jamais modifié ; le .docx converti est une copie distincte où s’effectuent les enregistrements suivants.',
     docImportConvertBtn: 'Convertir et ouvrir',
     dlgSaveAs: 'Enregistrer sous',
     closeUnsavedMsg: 'Ce document contient des modifications non enregistrées.',
@@ -1274,7 +1274,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Non connecté à Genspark : cliquez sur « Se connecter à Genspark » ci-dessous, connectez-vous puis réessayez',
+      'Non connecté à UniWork : cliquez sur « Se connecter à UniWork » ci-dessous, connectez-vous puis réessayez',
     errNoApiKey: 'Aucune clé API configurée pour {provider}',
     errAiRegion:
       'Le fournisseur de ce modèle ne dessert pas votre région actuelle — choisissez un autre modèle ou changez de réseau',
@@ -1384,13 +1384,13 @@ const tMain = createI18n({
     filterWord: 'Word-Dokumente',
     odtImportMsg: 'Dieses .{ext}-Dokument konvertieren?',
     odtImportDetail:
-      'GenOffice bearbeitet .docx, nicht ODF. Text, Überschriften, Listen, Tabellen und Bilder werden übernommen; Fußnoten, Kommentare und Textfelder werden nicht vollständig bewahrt. Die Originaldatei bleibt unverändert; die konvertierte .docx-Kopie ist eigenständig, und spätere Speicherungen landen in ihr.',
+      'UniWork Office bearbeitet .docx, nicht ODF. Text, Überschriften, Listen, Tabellen und Bilder werden übernommen; Fußnoten, Kommentare und Textfelder werden nicht vollständig bewahrt. Die Originaldatei bleibt unverändert; die konvertierte .docx-Kopie ist eigenständig, und spätere Speicherungen landen in ihr.',
     hwpImportDetail:
-      'GenOffice bearbeitet .docx, nicht HWP. Text, Tabellen, Bilder sowie Kopf- und Fußzeilen werden übernommen; Formeln, Fußnoten und eingebettete Objekte werden nicht konvertiert, und automatische Nummerierung wird zu normalem Text. Die Originaldatei bleibt unverändert; die konvertierte .docx-Kopie ist eigenständig, und spätere Speicherungen landen in ihr.',
+      'UniWork Office bearbeitet .docx, nicht HWP. Text, Tabellen, Bilder sowie Kopf- und Fußzeilen werden übernommen; Formeln, Fußnoten und eingebettete Objekte werden nicht konvertiert, und automatische Nummerierung wird zu normalem Text. Die Originaldatei bleibt unverändert; die konvertierte .docx-Kopie ist eigenständig, und spätere Speicherungen landen in ihr.',
     odtImportConvertBtn: 'Konvertieren und öffnen',
     docImportMsg: 'Dieses .{ext}-Dokument konvertieren?',
     docImportDetail:
-      'GenOffice bearbeitet .docx, nicht Word 97-2003-Dokumente (.doc). Text, Überschriften, Listen, Tabellen und Bilder werden übernommen; Fußnoten, Kommentare und Textfelder werden nicht vollständig bewahrt. Die Originaldatei bleibt unverändert; die konvertierte .docx-Kopie ist eigenständig, und spätere Speicherungen landen in ihr.',
+      'UniWork Office bearbeitet .docx, nicht Word 97-2003-Dokumente (.doc). Text, Überschriften, Listen, Tabellen und Bilder werden übernommen; Fußnoten, Kommentare und Textfelder werden nicht vollständig bewahrt. Die Originaldatei bleibt unverändert; die konvertierte .docx-Kopie ist eigenständig, und spätere Speicherungen landen in ihr.',
     docImportConvertBtn: 'Konvertieren und öffnen',
     dlgSaveAs: 'Speichern unter',
     closeUnsavedMsg: 'Dieses Dokument enthält ungespeicherte Änderungen.',
@@ -1435,7 +1435,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Nicht bei Genspark angemeldet: Klicken Sie unten auf „Bei Genspark anmelden“, melden Sie sich an und versuchen Sie es erneut',
+      'Nicht bei UniWork angemeldet: Klicken Sie unten auf „Bei UniWork anmelden“, melden Sie sich an und versuchen Sie es erneut',
     errNoApiKey: 'Kein API-Schlüssel für {provider} konfiguriert',
     errAiRegion:
       'Der Anbieter dieses Modells bedient Ihre aktuelle Region nicht — wählen Sie ein anderes Modell oder wechseln Sie das Netzwerk',
@@ -1545,13 +1545,13 @@ const tMain = createI18n({
     filterWord: 'Documentos de Word',
     odtImportMsg: '¿Convertir este documento .{ext}?',
     odtImportDetail:
-      'GenOffice edita .docx, no ODF. El texto, los títulos, las listas, las tablas y las imágenes se convierten; las notas al pie, los comentarios y los cuadros de texto no se conservan por completo. El archivo original nunca se modifica; el .docx convertido es una copia independiente en la que se guardan los cambios posteriores.',
+      'UniWork Office edita .docx, no ODF. El texto, los títulos, las listas, las tablas y las imágenes se convierten; las notas al pie, los comentarios y los cuadros de texto no se conservan por completo. El archivo original nunca se modifica; el .docx convertido es una copia independiente en la que se guardan los cambios posteriores.',
     hwpImportDetail:
-      'GenOffice edita .docx, no HWP. El texto, las tablas, las imágenes, los encabezados y los pies de página se convierten; las ecuaciones, las notas al pie y los objetos incrustados no, y la numeración automática pasa a ser texto normal. El archivo original nunca se modifica; el .docx convertido es una copia independiente en la que se guardan los cambios posteriores.',
+      'UniWork Office edita .docx, no HWP. El texto, las tablas, las imágenes, los encabezados y los pies de página se convierten; las ecuaciones, las notas al pie y los objetos incrustados no, y la numeración automática pasa a ser texto normal. El archivo original nunca se modifica; el .docx convertido es una copia independiente en la que se guardan los cambios posteriores.',
     odtImportConvertBtn: 'Convertir y abrir',
     docImportMsg: '¿Convertir este documento .{ext}?',
     docImportDetail:
-      'GenOffice edita .docx, no documentos de Word 97-2003 (.doc). El texto, los títulos, las listas, las tablas y las imágenes se convierten; las notas al pie, los comentarios y los cuadros de texto no se conservan por completo. El archivo original nunca se modifica; el .docx convertido es una copia independiente en la que se guardan los cambios posteriores.',
+      'UniWork Office edita .docx, no documentos de Word 97-2003 (.doc). El texto, los títulos, las listas, las tablas y las imágenes se convierten; las notas al pie, los comentarios y los cuadros de texto no se conservan por completo. El archivo original nunca se modifica; el .docx convertido es una copia independiente en la que se guardan los cambios posteriores.',
     docImportConvertBtn: 'Convertir y abrir',
     dlgSaveAs: 'Guardar como',
     closeUnsavedMsg: 'Este documento tiene cambios sin guardar.',
@@ -1595,7 +1595,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'No has iniciado sesión en Genspark: pulsa «Iniciar sesión en Genspark» abajo, inicia sesión y vuelve a intentarlo',
+      'No has iniciado sesión en UniWork: pulsa «Iniciar sesión en UniWork» abajo, inicia sesión y vuelve a intentarlo',
     errNoApiKey: 'No hay clave de API configurada para {provider}',
     errAiRegion:
       'El proveedor de este modelo no da servicio en tu región actual — elige otro modelo o cambia de red',
@@ -1706,13 +1706,13 @@ const tMain = createI18n({
     filterWord: 'เอกสาร Word',
     odtImportMsg: 'แปลงเอกสาร .{ext} นี้ไหม?',
     odtImportDetail:
-      'GenOffice แก้ไข .docx ไม่ใช่ ODF ข้อความ หัวข้อ รายการ ตาราง และรูปภาพจะถูกแปลง ส่วนเชิงอรรถ ความคิดเห็น และกล่องข้อความจะไม่ถูกเก็บไว้ทั้งหมด ไฟล์ต้นทางจะไม่ถูกแก้ไข และไฟล์ .docx ที่แปลงแล้วเป็นสำเนาแยกต่างหากที่การบันทึกครั้งต่อไปจะเขียนลง',
+      'UniWork Office แก้ไข .docx ไม่ใช่ ODF ข้อความ หัวข้อ รายการ ตาราง และรูปภาพจะถูกแปลง ส่วนเชิงอรรถ ความคิดเห็น และกล่องข้อความจะไม่ถูกเก็บไว้ทั้งหมด ไฟล์ต้นทางจะไม่ถูกแก้ไข และไฟล์ .docx ที่แปลงแล้วเป็นสำเนาแยกต่างหากที่การบันทึกครั้งต่อไปจะเขียนลง',
     hwpImportDetail:
-      'GenOffice แก้ไข .docx ไม่ใช่ HWP ข้อความ ตาราง รูปภาพ หัวกระดาษ และท้ายกระดาษจะถูกแปลง ส่วนสมการ เชิงอรรถ และวัตถุที่ฝังไว้จะไม่ถูกแปลง และลำดับเลขอัตโนมัติจะกลายเป็นข้อความธรรมดา ไฟล์ต้นทางจะไม่ถูกแก้ไข และไฟล์ .docx ที่แปลงแล้วเป็นสำเนาแยกต่างหากที่การบันทึกครั้งต่อไปจะเขียนลง',
+      'UniWork Office แก้ไข .docx ไม่ใช่ HWP ข้อความ ตาราง รูปภาพ หัวกระดาษ และท้ายกระดาษจะถูกแปลง ส่วนสมการ เชิงอรรถ และวัตถุที่ฝังไว้จะไม่ถูกแปลง และลำดับเลขอัตโนมัติจะกลายเป็นข้อความธรรมดา ไฟล์ต้นทางจะไม่ถูกแก้ไข และไฟล์ .docx ที่แปลงแล้วเป็นสำเนาแยกต่างหากที่การบันทึกครั้งต่อไปจะเขียนลง',
     odtImportConvertBtn: 'แปลงแล้วเปิด',
     docImportMsg: 'แปลงเอกสาร .{ext} นี้ไหม?',
     docImportDetail:
-      'GenOffice แก้ไข .docx ไม่ใช่เอกสาร Word 97-2003 (.doc) ข้อความ หัวข้อ รายการ ตาราง และรูปภาพจะถูกแปลง ส่วนเชิงอรรถ ความคิดเห็น และกล่องข้อความจะไม่ถูกเก็บไว้ทั้งหมด ไฟล์ต้นทางจะไม่ถูกแก้ไข และไฟล์ .docx ที่แปลงแล้วเป็นสำเนาแยกต่างหากที่การบันทึกครั้งต่อไปจะเขียนลง',
+      'UniWork Office แก้ไข .docx ไม่ใช่เอกสาร Word 97-2003 (.doc) ข้อความ หัวข้อ รายการ ตาราง และรูปภาพจะถูกแปลง ส่วนเชิงอรรถ ความคิดเห็น และกล่องข้อความจะไม่ถูกเก็บไว้ทั้งหมด ไฟล์ต้นทางจะไม่ถูกแก้ไข และไฟล์ .docx ที่แปลงแล้วเป็นสำเนาแยกต่างหากที่การบันทึกครั้งต่อไปจะเขียนลง',
     docImportConvertBtn: 'แปลงแล้วเปิด',
     dlgSaveAs: 'บันทึกเป็น',
     closeUnsavedMsg: 'เอกสารนี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก',
@@ -1755,7 +1755,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'ยังไม่ได้ลงชื่อเข้าใช้ Genspark: แตะ “ลงชื่อเข้าใช้ Genspark” ด้านล่าง แล้วลองอีกครั้ง',
+      'ยังไม่ได้ลงชื่อเข้าใช้ UniWork: แตะ “ลงชื่อเข้าใช้ UniWork” ด้านล่าง แล้วลองอีกครั้ง',
     errNoApiKey: 'ยังไม่ได้ตั้งค่า API Key ของ {provider}',
     errAiRegion:
       'ผู้ให้บริการของโมเดลนี้ไม่ให้บริการในภูมิภาคปัจจุบันของคุณ — โปรดเลือกโมเดลอื่นหรือเปลี่ยนเครือข่าย',
@@ -1865,13 +1865,13 @@ const tMain = createI18n({
     filterWord: 'Dokumen Word',
     odtImportMsg: 'Konversi dokumen .{ext} ini?',
     odtImportDetail:
-      'GenOffice mengedit .docx, bukan ODF. Teks isi, judul, daftar, tabel, dan gambar ikut dikonversi; catatan kaki, komentar, dan kotak teks tidak sepenuhnya dipertahankan. File asli tidak pernah diubah; salinan .docx hasil konversi berdiri sendiri dan penyimpanan berikutnya ditulis ke sana.',
+      'UniWork Office mengedit .docx, bukan ODF. Teks isi, judul, daftar, tabel, dan gambar ikut dikonversi; catatan kaki, komentar, dan kotak teks tidak sepenuhnya dipertahankan. File asli tidak pernah diubah; salinan .docx hasil konversi berdiri sendiri dan penyimpanan berikutnya ditulis ke sana.',
     hwpImportDetail:
-      'GenOffice mengedit .docx, bukan HWP. Teks isi, tabel, gambar, header, dan footer ikut dikonversi; persamaan, catatan kaki, dan objek tersemat tidak dikonversi, dan penomoran otomatis menjadi teks biasa. File asli tidak pernah diubah; salinan .docx hasil konversi berdiri sendiri dan penyimpanan berikutnya ditulis ke sana.',
+      'UniWork Office mengedit .docx, bukan HWP. Teks isi, tabel, gambar, header, dan footer ikut dikonversi; persamaan, catatan kaki, dan objek tersemat tidak dikonversi, dan penomoran otomatis menjadi teks biasa. File asli tidak pernah diubah; salinan .docx hasil konversi berdiri sendiri dan penyimpanan berikutnya ditulis ke sana.',
     odtImportConvertBtn: 'Konversi dan buka',
     docImportMsg: 'Konversi dokumen .{ext} ini?',
     docImportDetail:
-      'GenOffice mengedit .docx, bukan dokumen Word 97-2003 (.doc). Teks isi, judul, daftar, tabel, dan gambar ikut dikonversi; catatan kaki, komentar, dan kotak teks tidak sepenuhnya dipertahankan. File asli tidak pernah diubah; salinan .docx hasil konversi berdiri sendiri dan penyimpanan berikutnya ditulis ke sana.',
+      'UniWork Office mengedit .docx, bukan dokumen Word 97-2003 (.doc). Teks isi, judul, daftar, tabel, dan gambar ikut dikonversi; catatan kaki, komentar, dan kotak teks tidak sepenuhnya dipertahankan. File asli tidak pernah diubah; salinan .docx hasil konversi berdiri sendiri dan penyimpanan berikutnya ditulis ke sana.',
     docImportConvertBtn: 'Konversi dan buka',
     dlgSaveAs: 'Simpan Sebagai',
     closeUnsavedMsg: 'Dokumen ini memiliki perubahan yang belum disimpan.',
@@ -1914,7 +1914,7 @@ const tMain = createI18n({
     errNotImage: 'bukan jenis gambar yang didukung',
 <<<<<<< ours
 =======
-    errGskNotLoggedIn: 'Belum masuk ke Genspark: klik “Masuk ke Genspark” di bawah, lalu coba lagi',
+    errGskNotLoggedIn: 'Belum masuk ke UniWork: klik “Masuk ke UniWork” di bawah, lalu coba lagi',
     errNoApiKey: 'API Key untuk {provider} belum dikonfigurasi',
     errAiRegion:
       'Penyedia model ini tidak melayani wilayah Anda saat ini — pilih model lain atau ganti jaringan',
@@ -2024,13 +2024,13 @@ const tMain = createI18n({
     filterWord: 'Документы Word',
     odtImportMsg: 'Преобразовать этот документ .{ext}?',
     odtImportDetail:
-      'GenOffice редактирует .docx, а не ODF. Текст, заголовки, списки, таблицы и изображения переносятся; сноски, примечания и надписи сохраняются не полностью. Исходный файл никогда не изменяется; преобразованный .docx — отдельная копия, в которую записывается дальнейшее сохранение.',
+      'UniWork Office редактирует .docx, а не ODF. Текст, заголовки, списки, таблицы и изображения переносятся; сноски, примечания и надписи сохраняются не полностью. Исходный файл никогда не изменяется; преобразованный .docx — отдельная копия, в которую записывается дальнейшее сохранение.',
     hwpImportDetail:
-      'GenOffice редактирует .docx, а не HWP. Текст, таблицы, изображения и колонтитулы переносятся; формулы, сноски и внедрённые объекты не преобразуются, а автоматическая нумерация становится обычным текстом. Исходный файл никогда не изменяется; преобразованный .docx — отдельная копия, в которую записывается дальнейшее сохранение.',
+      'UniWork Office редактирует .docx, а не HWP. Текст, таблицы, изображения и колонтитулы переносятся; формулы, сноски и внедрённые объекты не преобразуются, а автоматическая нумерация становится обычным текстом. Исходный файл никогда не изменяется; преобразованный .docx — отдельная копия, в которую записывается дальнейшее сохранение.',
     odtImportConvertBtn: 'Преобразовать и открыть',
     docImportMsg: 'Преобразовать этот документ .{ext}?',
     docImportDetail:
-      'GenOffice редактирует .docx, а не документы Word 97-2003 (.doc). Текст, заголовки, списки, таблицы и изображения переносятся; сноски, примечания и надписи сохраняются не полностью. Исходный файл никогда не изменяется; преобразованный .docx — отдельная копия, в которую записывается дальнейшее сохранение.',
+      'UniWork Office редактирует .docx, а не документы Word 97-2003 (.doc). Текст, заголовки, списки, таблицы и изображения переносятся; сноски, примечания и надписи сохраняются не полностью. Исходный файл никогда не изменяется; преобразованный .docx — отдельная копия, в которую записывается дальнейшее сохранение.',
     docImportConvertBtn: 'Преобразовать и открыть',
     dlgSaveAs: 'Сохранить как',
     closeUnsavedMsg: 'В этом документе есть несохранённые изменения.',
@@ -2074,7 +2074,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Вы не вошли в Genspark: нажмите «Войти в Genspark» ниже, войдите и повторите попытку',
+      'Вы не вошли в UniWork: нажмите «Войти в UniWork» ниже, войдите и повторите попытку',
     errNoApiKey: 'API-ключ для {provider} не настроен',
     errAiRegion:
       'Поставщик этой модели не обслуживает ваш текущий регион — выберите другую модель или смените сеть',
@@ -2184,13 +2184,13 @@ const tMain = createI18n({
     filterWord: 'مستندات Word',
     odtImportMsg: 'تحويل مستند .{ext} هذا؟',
     odtImportDetail:
-      'يحرّر GenOffice ملفات ‎.docx ولا يحرّر ODF. يُحوَّل النص والعناوين والقوائم والجداول والصور؛ أما الحواشي السفلية والتعليقات ومربعات النص فلا تُحفظ بالكامل. لا يتغيّر الملف الأصلي أبدًا؛ والملف ‎.docx المحوَّل نسخة مستقلة تُكتب فيها عمليات الحفظ اللاحقة.',
+      'يحرّر UniWork Office ملفات ‎.docx ولا يحرّر ODF. يُحوَّل النص والعناوين والقوائم والجداول والصور؛ أما الحواشي السفلية والتعليقات ومربعات النص فلا تُحفظ بالكامل. لا يتغيّر الملف الأصلي أبدًا؛ والملف ‎.docx المحوَّل نسخة مستقلة تُكتب فيها عمليات الحفظ اللاحقة.',
     hwpImportDetail:
-      'يحرّر GenOffice ملفات ‎.docx ولا يحرّر HWP. يُحوَّل النص والجداول والصور والرؤوس والتذييلات؛ أما المعادلات والحواشي السفلية والكائنات المضمّنة فلا تُحوَّل، ويصبح الترقيم التلقائي نصًا عاديًا. لا يتغيّر الملف الأصلي أبدًا؛ والملف ‎.docx المحوَّل نسخة مستقلة تُكتب فيها عمليات الحفظ اللاحقة.',
+      'يحرّر UniWork Office ملفات ‎.docx ولا يحرّر HWP. يُحوَّل النص والجداول والصور والرؤوس والتذييلات؛ أما المعادلات والحواشي السفلية والكائنات المضمّنة فلا تُحوَّل، ويصبح الترقيم التلقائي نصًا عاديًا. لا يتغيّر الملف الأصلي أبدًا؛ والملف ‎.docx المحوَّل نسخة مستقلة تُكتب فيها عمليات الحفظ اللاحقة.',
     odtImportConvertBtn: 'تحويل وفتح',
     docImportMsg: 'تحويل مستند .{ext} هذا؟',
     docImportDetail:
-      'يحرّر GenOffice ملفات ‎.docx ولا يحرّر مستندات Word 97-2003 (‎.doc). يُحوَّل النص والعناوين والقوائم والجداول والصور؛ أما الحواشي السفلية والتعليقات ومربعات النص فلا تُحفظ بالكامل. لا يتغيّر الملف الأصلي أبدًا؛ والملف ‎.docx المحوَّل نسخة مستقلة تُكتب فيها عمليات الحفظ اللاحقة.',
+      'يحرّر UniWork Office ملفات ‎.docx ولا يحرّر مستندات Word 97-2003 (‎.doc). يُحوَّل النص والعناوين والقوائم والجداول والصور؛ أما الحواشي السفلية والتعليقات ومربعات النص فلا تُحفظ بالكامل. لا يتغيّر الملف الأصلي أبدًا؛ والملف ‎.docx المحوَّل نسخة مستقلة تُكتب فيها عمليات الحفظ اللاحقة.',
     docImportConvertBtn: 'تحويل وفتح',
     dlgSaveAs: 'حفظ باسم',
     closeUnsavedMsg: 'يحتوي هذا المستند على تغييرات غير محفوظة.',
@@ -2234,7 +2234,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'لم تسجّل الدخول إلى Genspark: انقر على «تسجيل الدخول إلى Genspark» أدناه ثم أعد المحاولة',
+      'لم تسجّل الدخول إلى UniWork: انقر على «تسجيل الدخول إلى UniWork» أدناه ثم أعد المحاولة',
     errNoApiKey: 'لم يتم تكوين مفتاح API لـ {provider}',
     errAiRegion:
       'مزوّد هذا النموذج لا يقدم الخدمة في منطقتك الحالية — اختر نموذجًا آخر أو غيّر الشبكة',
@@ -2343,13 +2343,13 @@ const tMain = createI18n({
     filterWord: 'Documentos do Word',
     odtImportMsg: 'Converter este documento .{ext}?',
     odtImportDetail:
-      'O GenOffice edita .docx, não ODF. Texto, títulos, listas, tabelas e imagens são convertidos; notas de rodapé, comentários e caixas de texto não são preservados por completo. O arquivo original nunca é alterado; o .docx convertido é uma cópia independente em que os salvamentos seguintes são gravados.',
+      'O UniWork Office edita .docx, não ODF. Texto, títulos, listas, tabelas e imagens são convertidos; notas de rodapé, comentários e caixas de texto não são preservados por completo. O arquivo original nunca é alterado; o .docx convertido é uma cópia independente em que os salvamentos seguintes são gravados.',
     hwpImportDetail:
-      'O GenOffice edita .docx, não HWP. Texto, tabelas, imagens, cabeçalhos e rodapés são convertidos; equações, notas de rodapé e objetos incorporados não são, e a numeração automática vira texto comum. O arquivo original nunca é alterado; o .docx convertido é uma cópia independente em que os salvamentos seguintes são gravados.',
+      'O UniWork Office edita .docx, não HWP. Texto, tabelas, imagens, cabeçalhos e rodapés são convertidos; equações, notas de rodapé e objetos incorporados não são, e a numeração automática vira texto comum. O arquivo original nunca é alterado; o .docx convertido é uma cópia independente em que os salvamentos seguintes são gravados.',
     odtImportConvertBtn: 'Converter e abrir',
     docImportMsg: 'Converter este documento .{ext}?',
     docImportDetail:
-      'O GenOffice edita .docx, não documentos do Word 97-2003 (.doc). Texto, títulos, listas, tabelas e imagens são convertidos; notas de rodapé, comentários e caixas de texto não são preservados por completo. O arquivo original nunca é alterado; o .docx convertido é uma cópia independente em que os salvamentos seguintes são gravados.',
+      'O UniWork Office edita .docx, não documentos do Word 97-2003 (.doc). Texto, títulos, listas, tabelas e imagens são convertidos; notas de rodapé, comentários e caixas de texto não são preservados por completo. O arquivo original nunca é alterado; o .docx convertido é uma cópia independente em que os salvamentos seguintes são gravados.',
     docImportConvertBtn: 'Converter e abrir',
     dlgSaveAs: 'Salvar Como',
     closeUnsavedMsg: 'Este documento tem alterações não salvas.',
@@ -2393,7 +2393,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Não conectado ao Genspark: clique em “Entrar no Genspark” abaixo, entre e tente novamente',
+      'Não conectado ao UniWork: clique em “Entrar no UniWork” abaixo, entre e tente novamente',
     errNoApiKey: 'Nenhuma chave de API configurada para {provider}',
     errAiRegion:
       'O fornecedor deste modelo não atende à sua região atual — escolha outro modelo ou mude de rede',
@@ -2503,13 +2503,13 @@ const tMain = createI18n({
     filterWord: 'Documenti Word',
     odtImportMsg: 'Convertire questo documento .{ext}?',
     odtImportDetail:
-      'GenOffice modifica .docx, non ODF. Testo, titoli, elenchi, tabelle e immagini vengono convertiti; note a piè di pagina, commenti e caselle di testo non sono conservati completamente. Il file originale non viene mai modificato; il .docx convertito è una copia indipendente su cui vengono salvate le modifiche successive.',
+      'UniWork Office modifica .docx, non ODF. Testo, titoli, elenchi, tabelle e immagini vengono convertiti; note a piè di pagina, commenti e caselle di testo non sono conservati completamente. Il file originale non viene mai modificato; il .docx convertito è una copia indipendente su cui vengono salvate le modifiche successive.',
     hwpImportDetail:
-      'GenOffice modifica .docx, non HWP. Testo, tabelle, immagini, intestazioni e piè di pagina vengono convertiti; equazioni, note a piè di pagina e oggetti incorporati no, e la numerazione automatica diventa testo semplice. Il file originale non viene mai modificato; il .docx convertito è una copia indipendente su cui vengono salvate le modifiche successive.',
+      'UniWork Office modifica .docx, non HWP. Testo, tabelle, immagini, intestazioni e piè di pagina vengono convertiti; equazioni, note a piè di pagina e oggetti incorporati no, e la numerazione automatica diventa testo semplice. Il file originale non viene mai modificato; il .docx convertito è una copia indipendente su cui vengono salvate le modifiche successive.',
     odtImportConvertBtn: 'Converti e apri',
     docImportMsg: 'Convertire questo documento .{ext}?',
     docImportDetail:
-      'GenOffice modifica .docx, non documenti Word 97-2003 (.doc). Testo, titoli, elenchi, tabelle e immagini vengono convertiti; note a piè di pagina, commenti e caselle di testo non sono conservati completamente. Il file originale non viene mai modificato; il .docx convertito è una copia indipendente su cui vengono salvate le modifiche successive.',
+      'UniWork Office modifica .docx, non documenti Word 97-2003 (.doc). Testo, titoli, elenchi, tabelle e immagini vengono convertiti; note a piè di pagina, commenti e caselle di testo non sono conservati completamente. Il file originale non viene mai modificato; il .docx convertito è una copia indipendente su cui vengono salvate le modifiche successive.',
     docImportConvertBtn: 'Converti e apri',
     dlgSaveAs: 'Salva con nome',
     closeUnsavedMsg: 'Questo documento contiene modifiche non salvate.',
@@ -2553,7 +2553,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Accesso a Genspark non effettuato: fai clic su “Accedi a Genspark” qui sotto, accedi e riprova',
+      'Accesso a UniWork non effettuato: fai clic su “Accedi a UniWork” qui sotto, accedi e riprova',
     errNoApiKey: 'Nessuna chiave API configurata per {provider}',
     errAiRegion:
       'Il fornitore di questo modello non serve la tua regione attuale — scegli un altro modello o cambia rete',
@@ -2663,13 +2663,13 @@ const tMain = createI18n({
     filterWord: 'Dokumenty programu Word',
     odtImportMsg: 'Skonwertować ten dokument .{ext}?',
     odtImportDetail:
-      'GenOffice edytuje .docx, a nie ODF. Tekst, nagłówki, listy, tabele i obrazy są konwertowane; przypisy, komentarze i pola tekstowe nie są zachowywane w całości. Plik oryginalny nigdy nie jest zmieniany; skonwertowany .docx to niezależna kopia, do której trafiają kolejne zapisy.',
+      'UniWork Office edytuje .docx, a nie ODF. Tekst, nagłówki, listy, tabele i obrazy są konwertowane; przypisy, komentarze i pola tekstowe nie są zachowywane w całości. Plik oryginalny nigdy nie jest zmieniany; skonwertowany .docx to niezależna kopia, do której trafiają kolejne zapisy.',
     hwpImportDetail:
-      'GenOffice edytuje .docx, a nie HWP. Tekst, tabele, obrazy, nagłówki i stopki są konwertowane; równania, przypisy i obiekty osadzone nie są, a automatyczna numeracja staje się zwykłym tekstem. Plik oryginalny nigdy nie jest zmieniany; skonwertowany .docx to niezależna kopia, do której trafiają kolejne zapisy.',
+      'UniWork Office edytuje .docx, a nie HWP. Tekst, tabele, obrazy, nagłówki i stopki są konwertowane; równania, przypisy i obiekty osadzone nie są, a automatyczna numeracja staje się zwykłym tekstem. Plik oryginalny nigdy nie jest zmieniany; skonwertowany .docx to niezależna kopia, do której trafiają kolejne zapisy.',
     odtImportConvertBtn: 'Konwertuj i otwórz',
     docImportMsg: 'Skonwertować ten dokument .{ext}?',
     docImportDetail:
-      'GenOffice edytuje .docx, a nie dokumenty Word 97-2003 (.doc). Tekst, nagłówki, listy, tabele i obrazy są konwertowane; przypisy, komentarze i pola tekstowe nie są zachowywane w całości. Plik oryginalny nigdy nie jest zmieniany; skonwertowany .docx to niezależna kopia, do której trafiają kolejne zapisy.',
+      'UniWork Office edytuje .docx, a nie dokumenty Word 97-2003 (.doc). Tekst, nagłówki, listy, tabele i obrazy są konwertowane; przypisy, komentarze i pola tekstowe nie są zachowywane w całości. Plik oryginalny nigdy nie jest zmieniany; skonwertowany .docx to niezależna kopia, do której trafiają kolejne zapisy.',
     docImportConvertBtn: 'Konwertuj i otwórz',
     dlgSaveAs: 'Zapisz jako',
     closeUnsavedMsg: 'Ten dokument zawiera niezapisane zmiany.',
@@ -2713,7 +2713,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Nie zalogowano do Genspark: kliknij „Zaloguj się do Genspark” poniżej, zaloguj się i spróbuj ponownie',
+      'Nie zalogowano do UniWork: kliknij „Zaloguj się do UniWork” poniżej, zaloguj się i spróbuj ponownie',
     errNoApiKey: 'Nie skonfigurowano klucza API dla {provider}',
     errAiRegion:
       'Dostawca tego modelu nie obsługuje Twojego obecnego regionu — wybierz inny model lub zmień sieć',
@@ -2823,13 +2823,13 @@ const tMain = createI18n({
     filterWord: 'Dokumenty Wordu',
     odtImportMsg: 'Převést tento dokument .{ext}?',
     odtImportDetail:
-      'GenOffice upravuje .docx, nikoli ODF. Text, nadpisy, seznamy, tabulky a obrázky se převedou; poznámky pod čarou, komentáře a textová pole se nepřevezmou úplně. Původní soubor se nikdy nemění; převedený .docx je samostatná kopie, do níž se dalším ukládáním zapisuje.',
+      'UniWork Office upravuje .docx, nikoli ODF. Text, nadpisy, seznamy, tabulky a obrázky se převedou; poznámky pod čarou, komentáře a textová pole se nepřevezmou úplně. Původní soubor se nikdy nemění; převedený .docx je samostatná kopie, do níž se dalším ukládáním zapisuje.',
     hwpImportDetail:
-      'GenOffice upravuje .docx, nikoli HWP. Text, tabulky, obrázky, záhlaví a zápatí se převedou; rovnice, poznámky pod čarou a vložené objekty se nepřevedou a automatické číslování se změní na prostý text. Původní soubor se nikdy nemění; převedený .docx je samostatná kopie, do níž se dalším ukládáním zapisuje.',
+      'UniWork Office upravuje .docx, nikoli HWP. Text, tabulky, obrázky, záhlaví a zápatí se převedou; rovnice, poznámky pod čarou a vložené objekty se nepřevedou a automatické číslování se změní na prostý text. Původní soubor se nikdy nemění; převedený .docx je samostatná kopie, do níž se dalším ukládáním zapisuje.',
     odtImportConvertBtn: 'Převést a otevřít',
     docImportMsg: 'Převést tento dokument .{ext}?',
     docImportDetail:
-      'GenOffice upravuje .docx, nikoli dokumenty Word 97-2003 (.doc). Text, nadpisy, seznamy, tabulky a obrázky se převedou; poznámky pod čarou, komentáře a textová pole se nepřevezmou úplně. Původní soubor se nikdy nemění; převedený .docx je samostatná kopie, do níž se dalším ukládáním zapisuje.',
+      'UniWork Office upravuje .docx, nikoli dokumenty Word 97-2003 (.doc). Text, nadpisy, seznamy, tabulky a obrázky se převedou; poznámky pod čarou, komentáře a textová pole se nepřevezmou úplně. Původní soubor se nikdy nemění; převedený .docx je samostatná kopie, do níž se dalším ukládáním zapisuje.',
     docImportConvertBtn: 'Převést a otevřít',
     dlgSaveAs: 'Uložit jako',
     closeUnsavedMsg: 'Tento dokument obsahuje neuložené změny.',
@@ -2873,7 +2873,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Nejste přihlášeni do Genspark: klikněte níže na „Přihlásit se do Genspark“, přihlaste se a zkuste to znovu',
+      'Nejste přihlášeni do UniWork: klikněte níže na „Přihlásit se do UniWork“, přihlaste se a zkuste to znovu',
     errNoApiKey: 'Pro {provider} není nakonfigurován žádný klíč API',
     errAiRegion:
       'Poskytovatel tohoto modelu neposkytuje služby ve vaší aktuální oblasti — vyberte jiný model nebo změňte síť',
@@ -2983,13 +2983,13 @@ const tMain = createI18n({
     filterWord: 'Word-documenten',
     odtImportMsg: 'Dit .{ext}-document converteren?',
     odtImportDetail:
-      'GenOffice bewerkt .docx, niet ODF. Tekst, koppen, lijsten, tabellen en afbeeldingen worden omgezet; voetnoten, opmerkingen en tekstvakken niet volledig. Het oorspronkelijke bestand wordt nooit gewijzigd; de omgezette .docx is een zelfstandige kopie waarin volgende opslaan-acties terechtkomen.',
+      'UniWork Office bewerkt .docx, niet ODF. Tekst, koppen, lijsten, tabellen en afbeeldingen worden omgezet; voetnoten, opmerkingen en tekstvakken niet volledig. Het oorspronkelijke bestand wordt nooit gewijzigd; de omgezette .docx is een zelfstandige kopie waarin volgende opslaan-acties terechtkomen.',
     hwpImportDetail:
-      'GenOffice bewerkt .docx, niet HWP. Tekst, tabellen, afbeeldingen, kop- en voetteksten worden omgezet; vergelijkingen, voetnoten en ingesloten objecten niet, en automatische nummering wordt gewone tekst. Het oorspronkelijke bestand wordt nooit gewijzigd; de omgezette .docx is een zelfstandige kopie waarin volgende opslaan-acties terechtkomen.',
+      'UniWork Office bewerkt .docx, niet HWP. Tekst, tabellen, afbeeldingen, kop- en voetteksten worden omgezet; vergelijkingen, voetnoten en ingesloten objecten niet, en automatische nummering wordt gewone tekst. Het oorspronkelijke bestand wordt nooit gewijzigd; de omgezette .docx is een zelfstandige kopie waarin volgende opslaan-acties terechtkomen.',
     odtImportConvertBtn: 'Converteren en openen',
     docImportMsg: 'Dit .{ext}-document converteren?',
     docImportDetail:
-      'GenOffice bewerkt .docx, geen Word 97-2003-documenten (.doc). Tekst, koppen, lijsten, tabellen en afbeeldingen worden omgezet; voetnoten, opmerkingen en tekstvakken niet volledig. Het oorspronkelijke bestand wordt nooit gewijzigd; de omgezette .docx is een zelfstandige kopie waarin volgende opslaan-acties terechtkomen.',
+      'UniWork Office bewerkt .docx, geen Word 97-2003-documenten (.doc). Tekst, koppen, lijsten, tabellen en afbeeldingen worden omgezet; voetnoten, opmerkingen en tekstvakken niet volledig. Het oorspronkelijke bestand wordt nooit gewijzigd; de omgezette .docx is een zelfstandige kopie waarin volgende opslaan-acties terechtkomen.',
     docImportConvertBtn: 'Converteren en openen',
     dlgSaveAs: 'Opslaan als',
     closeUnsavedMsg: 'Dit document bevat niet-opgeslagen wijzigingen.',
@@ -3033,7 +3033,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Niet aangemeld bij Genspark: klik hieronder op “Aanmelden bij Genspark”, meld u aan en probeer het opnieuw',
+      'Niet aangemeld bij UniWork: klik hieronder op “Aanmelden bij UniWork”, meld u aan en probeer het opnieuw',
     errNoApiKey: 'Geen API-sleutel geconfigureerd voor {provider}',
     errAiRegion:
       'De aanbieder van dit model bedient uw huidige regio niet — kies een ander model of wissel van netwerk',
@@ -3143,13 +3143,13 @@ const tMain = createI18n({
     filterWord: 'Dokumen Word',
     odtImportMsg: 'Tukar dokumen .{ext} ini?',
     odtImportDetail:
-      'GenOffice menyunting .docx, bukan ODF. Teks kandungan, tajuk, senarai, jadual dan imej ditukar; nota kaki, komen dan kotak teks tidak dikekalkan sepenuhnya. Fail asal tidak pernah diubah; salinan .docx yang ditukar ialah salinan berasingan tempat simpanan seterusnya ditulis.',
+      'UniWork Office menyunting .docx, bukan ODF. Teks kandungan, tajuk, senarai, jadual dan imej ditukar; nota kaki, komen dan kotak teks tidak dikekalkan sepenuhnya. Fail asal tidak pernah diubah; salinan .docx yang ditukar ialah salinan berasingan tempat simpanan seterusnya ditulis.',
     hwpImportDetail:
-      'GenOffice menyunting .docx, bukan HWP. Teks kandungan, jadual, imej, pengepala dan pengaki ditukar; persamaan, nota kaki dan objek terbenam tidak ditukar, dan penomboran automatik menjadi teks biasa. Fail asal tidak pernah diubah; salinan .docx yang ditukar ialah salinan berasingan tempat simpanan seterusnya ditulis.',
+      'UniWork Office menyunting .docx, bukan HWP. Teks kandungan, jadual, imej, pengepala dan pengaki ditukar; persamaan, nota kaki dan objek terbenam tidak ditukar, dan penomboran automatik menjadi teks biasa. Fail asal tidak pernah diubah; salinan .docx yang ditukar ialah salinan berasingan tempat simpanan seterusnya ditulis.',
     odtImportConvertBtn: 'Tukar dan buka',
     docImportMsg: 'Tukar dokumen .{ext} ini?',
     docImportDetail:
-      'GenOffice menyunting .docx, bukan dokumen Word 97-2003 (.doc). Teks kandungan, tajuk, senarai, jadual dan imej ditukar; nota kaki, komen dan kotak teks tidak dikekalkan sepenuhnya. Fail asal tidak pernah diubah; salinan .docx yang ditukar ialah salinan berasingan tempat simpanan seterusnya ditulis.',
+      'UniWork Office menyunting .docx, bukan dokumen Word 97-2003 (.doc). Teks kandungan, tajuk, senarai, jadual dan imej ditukar; nota kaki, komen dan kotak teks tidak dikekalkan sepenuhnya. Fail asal tidak pernah diubah; salinan .docx yang ditukar ialah salinan berasingan tempat simpanan seterusnya ditulis.',
     docImportConvertBtn: 'Tukar dan buka',
     dlgSaveAs: 'Simpan Sebagai',
     closeUnsavedMsg: 'Dokumen ini mempunyai perubahan yang belum disimpan.',
@@ -3193,7 +3193,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Belum log masuk ke Genspark: klik “Log masuk ke Genspark” di bawah, kemudian cuba lagi',
+      'Belum log masuk ke UniWork: klik “Log masuk ke UniWork” di bawah, kemudian cuba lagi',
     errNoApiKey: 'Kunci API untuk {provider} belum dikonfigurasikan',
     errAiRegion:
       'Penyedia model ini tidak memberi perkhidmatan di rantau semasa anda — pilih model lain atau tukar rangkaian',
@@ -3303,13 +3303,13 @@ const tMain = createI18n({
     filterWord: 'מסמכי Word',
     odtImportMsg: 'להמיר את מסמך ה‑.{ext} הזה?',
     odtImportDetail:
-      'GenOffice עורך קבצי ‎.docx ולא ODF. טקסט, כותרות, רשימות, טבלאות ותמונות מומרים; הערות שוליים, תגובות ותיבות טקסט לא נשמרים במלואם. קובץ המקור לעולם אינו משתנה; קובץ ה‑.docx שהומר הוא עותק נפרד שאליו נכתבות השמירות הבאות.',
+      'UniWork Office עורך קבצי ‎.docx ולא ODF. טקסט, כותרות, רשימות, טבלאות ותמונות מומרים; הערות שוליים, תגובות ותיבות טקסט לא נשמרים במלואם. קובץ המקור לעולם אינו משתנה; קובץ ה‑.docx שהומר הוא עותק נפרד שאליו נכתבות השמירות הבאות.',
     hwpImportDetail:
-      'GenOffice עורך קבצי ‎.docx ולא HWP. טקסט, טבלאות, תמונות, כותרות עליונות ותחתונות מומרים; משוואות, הערות שוליים ואובייקטים מוטמעים אינם מומרים, ומספור אוטומטי הופך לטקסט רגיל. קובץ המקור לעולם אינו משתנה; קובץ ה‑.docx שהומר הוא עותק נפרד שאליו נכתבות השמירות הבאות.',
+      'UniWork Office עורך קבצי ‎.docx ולא HWP. טקסט, טבלאות, תמונות, כותרות עליונות ותחתונות מומרים; משוואות, הערות שוליים ואובייקטים מוטמעים אינם מומרים, ומספור אוטומטי הופך לטקסט רגיל. קובץ המקור לעולם אינו משתנה; קובץ ה‑.docx שהומר הוא עותק נפרד שאליו נכתבות השמירות הבאות.',
     odtImportConvertBtn: 'המר ופתח',
     docImportMsg: 'להמיר את מסמך ה‑.{ext} הזה?',
     docImportDetail:
-      'GenOffice עורך קבצי ‎.docx ולא מסמכי Word 97-2003 (‎.doc). טקסט, כותרות, רשימות, טבלאות ותמונות מומרים; הערות שוליים, תגובות ותיבות טקסט לא נשמרים במלואם. קובץ המקור לעולם אינו משתנה; קובץ ה‑.docx שהומר הוא עותק נפרד שאליו נכתבות השמירות הבאות.',
+      'UniWork Office עורך קבצי ‎.docx ולא מסמכי Word 97-2003 (‎.doc). טקסט, כותרות, רשימות, טבלאות ותמונות מומרים; הערות שוליים, תגובות ותיבות טקסט לא נשמרים במלואם. קובץ המקור לעולם אינו משתנה; קובץ ה‑.docx שהומר הוא עותק נפרד שאליו נכתבות השמירות הבאות.',
     docImportConvertBtn: 'המר ופתח',
     dlgSaveAs: 'שמירה בשם',
     closeUnsavedMsg: 'במסמך זה יש שינויים שלא נשמרו.',
@@ -3351,7 +3351,7 @@ const tMain = createI18n({
     errNotImage: 'סוג תמונה שאינו נתמך',
 <<<<<<< ours
 =======
-    errGskNotLoggedIn: 'לא מחובר ל-Genspark: לחץ על "התחבר ל-Genspark" למטה, התחבר ונסה שוב',
+    errGskNotLoggedIn: 'לא מחובר ל-UniWork: לחץ על "התחבר ל-UniWork" למטה, התחבר ונסה שוב',
     errNoApiKey: 'לא הוגדר מפתח API עבור {provider}',
     errAiRegion: 'ספק המודל הזה אינו פועל באזור הנוכחי שלך — בחרו מודל אחר או החליפו רשת',
     errAiBusy: 'שירות ה-AI עמוס כרגע — נסו שוב בעוד רגע',
@@ -3459,13 +3459,13 @@ const tMain = createI18n({
     filterWord: 'Word दस्तावेज़',
     odtImportMsg: 'इस .{ext} दस्तावेज़ को बदलें?',
     odtImportDetail:
-      'GenOffice .docx संपादित करता है, ODF नहीं। मुख्य पाठ, शीर्षक, सूचियाँ, तालिकाएँ और चित्र बदल दिए जाते हैं; फुटनोट, टिप्पणियाँ और टेक्स्ट बॉक्स पूरी तरह नहीं रखे जाते। मूल फ़ाइल कभी नहीं बदलती; बदली हुई .docx एक स्वतंत्र प्रति है जिसमें आगे के सेव लिखे जाते हैं।',
+      'UniWork Office .docx संपादित करता है, ODF नहीं। मुख्य पाठ, शीर्षक, सूचियाँ, तालिकाएँ और चित्र बदल दिए जाते हैं; फुटनोट, टिप्पणियाँ और टेक्स्ट बॉक्स पूरी तरह नहीं रखे जाते। मूल फ़ाइल कभी नहीं बदलती; बदली हुई .docx एक स्वतंत्र प्रति है जिसमें आगे के सेव लिखे जाते हैं।',
     hwpImportDetail:
-      'GenOffice .docx संपादित करता है, HWP नहीं। मुख्य पाठ, तालिकाएँ, चित्र, हेडर और फुटर बदल दिए जाते हैं; समीकरण, फुटनोट और एम्बेड किए गए ऑब्जेक्ट नहीं बदले जाते, और स्वचालित क्रमांकन सामान्य पाठ बन जाता है। मूल फ़ाइल कभी नहीं बदलती; बदली हुई .docx एक स्वतंत्र प्रति है जिसमें आगे के सेव लिखे जाते हैं।',
+      'UniWork Office .docx संपादित करता है, HWP नहीं। मुख्य पाठ, तालिकाएँ, चित्र, हेडर और फुटर बदल दिए जाते हैं; समीकरण, फुटनोट और एम्बेड किए गए ऑब्जेक्ट नहीं बदले जाते, और स्वचालित क्रमांकन सामान्य पाठ बन जाता है। मूल फ़ाइल कभी नहीं बदलती; बदली हुई .docx एक स्वतंत्र प्रति है जिसमें आगे के सेव लिखे जाते हैं।',
     odtImportConvertBtn: 'बदलकर खोलें',
     docImportMsg: 'इस .{ext} दस्तावेज़ को बदलें?',
     docImportDetail:
-      'GenOffice Word 97-2003 (.doc) दस्तावेज़ नहीं, .docx संपादित करता है। मुख्य पाठ, शीर्षक, सूचियाँ, तालिकाएँ और चित्र बदल दिए जाते हैं; फुटनोट, टिप्पणियाँ और टेक्स्ट बॉक्स पूरी तरह नहीं रखे जाते। मूल फ़ाइल कभी नहीं बदलती; बदली हुई .docx एक स्वतंत्र प्रति है जिसमें आगे के सेव लिखे जाते हैं।',
+      'UniWork Office Word 97-2003 (.doc) दस्तावेज़ नहीं, .docx संपादित करता है। मुख्य पाठ, शीर्षक, सूचियाँ, तालिकाएँ और चित्र बदल दिए जाते हैं; फुटनोट, टिप्पणियाँ और टेक्स्ट बॉक्स पूरी तरह नहीं रखे जाते। मूल फ़ाइल कभी नहीं बदलती; बदली हुई .docx एक स्वतंत्र प्रति है जिसमें आगे के सेव लिखे जाते हैं।',
     docImportConvertBtn: 'बदलकर खोलें',
     dlgSaveAs: 'इस रूप में सहेजें',
     closeUnsavedMsg: 'इस दस्तावेज़ में सहेजे नहीं गए परिवर्तन हैं।',
@@ -3509,7 +3509,7 @@ const tMain = createI18n({
 <<<<<<< ours
 =======
     errGskNotLoggedIn:
-      'Genspark में साइन इन नहीं है: नीचे “Genspark में साइन इन करें” पर क्लिक करें, साइन इन करें और फिर से कोशिश करें',
+      'UniWork में साइन इन नहीं है: नीचे “UniWork में साइन इन करें” पर क्लिक करें, साइन इन करें और फिर से कोशिश करें',
     errNoApiKey: '{provider} के लिए कोई API कुंजी कॉन्फ़िगर नहीं है',
     errAiRegion:
       'इस मॉडल का प्रदाता आपके वर्तमान क्षेत्र में सेवा नहीं देता — कोई दूसरा मॉडल चुनें या नेटवर्क बदलें',
@@ -3619,13 +3619,13 @@ const tMain = createI18n({
     filterWord: 'Word 文件',
     odtImportMsg: '轉換這個 .{ext} 文件？',
     odtImportDetail:
-      'GenOffice 只編輯 .docx，不編輯 ODF。內文、標題、清單、表格與圖片會轉換過來；註腳、註解與文字方塊不會完整保留。原始檔案不會被修改，轉換後的 .docx 是獨立副本，之後的儲存都寫入它。', // public-hygiene: allow
+      'UniWork Office 只編輯 .docx，不編輯 ODF。內文、標題、清單、表格與圖片會轉換過來；註腳、註解與文字方塊不會完整保留。原始檔案不會被修改，轉換後的 .docx 是獨立副本，之後的儲存都寫入它。', // public-hygiene: allow
     hwpImportDetail:
-      'GenOffice 只編輯 .docx，不編輯 HWP。內文、表格、圖片、頁首與頁尾會轉換過來；方程式、註腳與內嵌物件不會轉換，自動編號會變成一般文字。原始檔案不會被修改，轉換後的 .docx 是獨立副本，之後的儲存都寫入它。', // public-hygiene: allow
+      'UniWork Office 只編輯 .docx，不編輯 HWP。內文、表格、圖片、頁首與頁尾會轉換過來；方程式、註腳與內嵌物件不會轉換，自動編號會變成一般文字。原始檔案不會被修改，轉換後的 .docx 是獨立副本，之後的儲存都寫入它。', // public-hygiene: allow
     odtImportConvertBtn: '轉換並開啟',
     docImportMsg: '轉換這個 .{ext} 文件？',
     docImportDetail:
-      'GenOffice 只編輯 .docx，不編輯 Word 97-2003 舊版 .doc。內文、標題、清單、表格與圖片會轉換過來；註腳、註解與文字方塊不會完整保留。原始檔案不會被修改，轉換後的 .docx 是獨立副本，之後的儲存都寫入它。', // public-hygiene: allow
+      'UniWork Office 只編輯 .docx，不編輯 Word 97-2003 舊版 .doc。內文、標題、清單、表格與圖片會轉換過來；註腳、註解與文字方塊不會完整保留。原始檔案不會被修改，轉換後的 .docx 是獨立副本，之後的儲存都寫入它。', // public-hygiene: allow
     docImportConvertBtn: '轉換並開啟',
     dlgSaveAs: '另存新檔',
     closeUnsavedMsg: '此文件有未儲存的變更。',
@@ -3665,7 +3665,7 @@ const tMain = createI18n({
     errNotImage: '不是支援的圖片類型',
 <<<<<<< ours
 =======
-    errGskNotLoggedIn: '未登入 Genspark:請點擊下方「登入 Genspark」完成登入後重試',
+    errGskNotLoggedIn: '未登入 UniWork:請點擊下方「登入 UniWork」完成登入後重試',
     errNoApiKey: '未設定 {provider} 的 API Key',
     errAiRegion: '該模型的廠商不向目前地區提供服務，請換一個模型或切換網路',
     errAiBusy: 'AI 服務目前繁忙，請稍後重試',
@@ -7590,8 +7590,8 @@ export function startDocsStandalone(): void {
     // "GenOffice Docs Dev" carried a space, against the XDG one-token
     // convention (genoffice#1817); move the old profile once, as the shell does.
     const appData = app.getPath('appData')
-    const devDir = join(appData, 'GenOffice-Docs-Dev')
-    const oldDevDir = join(appData, 'GenOffice Docs Dev')
+    const devDir = join(appData, 'UniWork Office-Docs-Dev')
+    const oldDevDir = join(appData, 'UniWork Docs Dev')
     let userData = devDir
 >>>>>>> theirs
     if (existsSync(oldDevDir) && !existsSync(devDir)) {

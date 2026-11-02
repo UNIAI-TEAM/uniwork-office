@@ -1,3 +1,5 @@
+> **UniWork Office fork.** The canonical product README is [`README.md`](../../README.md). This file is the upstream GenOffice translation, kept for attribution. It is not a UniWork localized product guide.
+
 <p align="center">
   <a href="https://genoffice.ai/">
     <picture>

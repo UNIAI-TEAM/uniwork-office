@@ -1,4 +1,4 @@
-# GenOffice 설치
+# UniWork Office 설치
 
 모든 빌드는 [Releases 페이지](https://github.com/genspark-ai/genoffice/releases/latest)에 올라 있습니다. 모두 `main`에서 나오며, macOS와 Windows 설치 프로그램은 서명되어 있습니다.
 
@@ -18,11 +18,11 @@
 
 ## macOS에서
 
-`.dmg`을 열고 **GenOffice**를 Applications로 끌어다 놓습니다. Intel 빌드에서는 첫 실행 때 열기 확인을 요구합니다. Applications에서 앱을 오른쪽 클릭하고 ▸ 열기 하세요. 이건 손상된 다운로드가 아니라, 서명되지 않은 것처럼 보이는 디스크 이미지를 만난 Gatekeeper의 동작입니다.
+`.dmg`을 열고 **UniWork Office**를 Applications로 끌어다 놓습니다. Intel 빌드에서는 첫 실행 때 열기 확인을 요구합니다. Applications에서 앱을 오른쪽 클릭하고 ▸ 열기 하세요. 이건 손상된 다운로드가 아니라, 서명되지 않은 것처럼 보이는 디스크 이미지를 만난 Gatekeeper의 동작입니다.
 
 ## Windows에서
 
-`.exe` 설치 프로그램을 실행합니다. GenOffice를 시작 메뉴에 넣고 `.docx`, `.xlsx`, `.pptx`, `.pdf` 등을 등록해서, 파일을 두 번 클릭하면 열립니다.
+`.exe` 설치 프로그램을 실행합니다. UniWork Office를 시작 메뉴에 넣고 `.docx`, `.xlsx`, `.pptx`, `.pdf` 등을 등록해서, 파일을 두 번 클릭하면 열립니다.
 
 ## Linux에서
 

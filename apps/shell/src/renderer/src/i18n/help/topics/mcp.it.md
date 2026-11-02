@@ -1,6 +1,6 @@
 # Collegare un agente di programmazione
 
-GenOffice parla il Model Context Protocol, così un agente di programmazione può leggere, scrivere e renderizzare i tuoi documenti attraverso gli stessi motori che usa l'app. L'agente non sta indovinando un formato di file: ottiene gli schemi tipizzati delle op dalle stesse definizioni contro cui l'executor valida.
+UniWork Office parla il Model Context Protocol, così un agente di programmazione può leggere, scrivere e renderizzare i tuoi documenti attraverso gli stessi motori che usa l'app. L'agente non sta indovinando un formato di file: ottiene gli schemi tipizzati delle op dalle stesse definizioni contro cui l'executor valida.
 
 ## Registrarlo dall'app
 
@@ -70,7 +70,7 @@ Un agente che non conosce il vocabolario delle op indovinerà. La skill porta co
 
 ## Che cosa raggiunge nell'app
 
-Il server non è limitato ai file su disco. Finché GenOffice è in esecuzione, l'agente può lavorare anche attraverso la finestra:
+Il server non è limitato ai file su disco. Finché UniWork Office è in esecuzione, l'agente può lavorare anche attraverso la finestra:
 
 - **`open_in_genoffice`** apre un file in una scheda e la porta in primo piano.
 - **`open_documents`** elenca ogni documento che hai aperto — id, tipo, percorso e se ha modifiche non salvate — e poi legge il contenuto attuale di uno, lo salva sul posto o lo chiude, salvando prima a meno che tu non gli chieda di scartare.

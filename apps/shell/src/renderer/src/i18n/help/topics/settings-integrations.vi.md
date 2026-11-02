@@ -23,7 +23,7 @@ Sáng / Tối / Theo hệ thống. Khi chọn Theo hệ thống, giao diện bá
 - **Vị trí thanh bên AI** (trái hoặc phải), **Cỡ chữ bảng điều khiển AI** và **Kiểm tra chính tả trong trò chuyện AI**.
 - **Mở bảng AI trong tài liệu mới** — tắt, tài liệu mới sẽ bắt đầu với bảng AI đã thu gọn, chỉ một cú nhấp là mở ra.
 - **Tự động lưu tất cả tài liệu** bật AutoSave theo mặc định trong mọi trình soạn thảo; bạn vẫn có thể tắt nó cho một cửa sổ.
-- **Vị trí lữu** kèm nút **Thay đổi**, và **Ứng dụng mặc định cho tài liệu Office** để nhận .docx / .xlsx / .pptx về cho GenOffice.
+- **Vị trí lữu** kèm nút **Thay đổi**, và **Ứng dụng mặc định cho tài liệu Office** để nhận .docx / .xlsx / .pptx về cho UniWork Office.
 
 ## Phương tiện AI & Tìm kiếm
 
@@ -39,17 +39,17 @@ Sáng / Tối / Theo hệ thống. Khi chọn Theo hệ thống, giao diện bá
 
 ## Đăng ký ứng dụng mặc định
 
-Cài đặt có thể đăng ký GenOffice làm ứng dụng xử lý .docx / .xlsx / .pptx / .pdf và các định dạng liên quan (đăng ký ứng dụng mặc định ở cấp nền tảng; xác nhận khi được hỏi).
+Cài đặt có thể đăng ký UniWork Office làm ứng dụng xử lý .docx / .xlsx / .pptx / .pdf và các định dạng liên quan (đăng ký ứng dụng mặc định ở cấp nền tảng; xác nhận khi được hỏi).
 
 ## Thông báo bên thứ ba và cập nhật
 
 - Trợ giúp ▸ Thông báo của bên thứ ba: danh mục giấy phép nguồn mở đầy đủ đi kèm ứng dụng.
 - Trợ giúp ▸ Kiểm tra bản cập nhật: kích hoạt một lần kiểm tra thủ công; nếu có bản mới sẽ nhắc cài đặt.
 
-## Đăng nhập Genspark
+## Đăng nhập UniWork
 
-- Lối đăng nhập (trong cài đặt hoặc danh sách dự án đám mây) dùng luồng **mã thiết bị**: GenOffice hiển thị một mã và mở trang đăng nhập trong trình duyệt; xong thì nó tự tiếp tục.
-- Đăng nhập chỉ dùng cho: danh sách dự án đám mây và các mô hình đám mây của Genspark. Không đăng nhập thì mọi tính năng cục bộ và mô hình tùy chỉnh vẫn hoạt động bình thường.
+- Lối đăng nhập (trong cài đặt hoặc danh sách dự án đám mây) dùng luồng **mã thiết bị**: UniWork Office hiển thị một mã và mở trang đăng nhập trong trình duyệt; xong thì nó tự tiếp tục.
+- Đăng nhập chỉ dùng cho: danh sách dự án đám mây và các mô hình đám mây của UniWork. Không đăng nhập thì mọi tính năng cục bộ và mô hình tùy chỉnh vẫn hoạt động bình thường.
 - Đăng xuất chỉ cần một cú nhấp trong cài đặt.
 
 ## Tích hợp MCP (dành cho người dùng nâng cao / ứng dụng AI)

@@ -4,7 +4,7 @@ export const tr = {
   aiCollapsePanel: 'Paneli daralt',
   aiComposerPlaceholder: "AI'dan belgeyi yazmasını veya düzenlemesini isteyin…",
   aiCopyReplyTitle: 'Yanıtı kopyala',
-  aiCreditsExhausted: 'Krediniz bitti — genspark.ai adresinden yükleyin',
+  aiCreditsExhausted: 'Krediniz bitti — uniworkos.com adresinden yükleyin',
   aiEmptyTitle: 'AI ile bir sayfa tasarlayın',
   aiEmptyBody:
     'Açılış sayfası, rapor, afiş — ne için ve kimin için olduğunu söyleyin; AI önce bir brief önerir, sonra sayfayı oluşturur',

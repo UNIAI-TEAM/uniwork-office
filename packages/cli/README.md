@@ -46,7 +46,7 @@ genoffice capabilities --json                        # whether the UniWork Offic
 genoffice docs read report.docx [--range 0-9] [--html] [--full] [--comments] [--revisions] [--header-footer] [--properties] --json   # blocks (--full: whole text), comment threads, tracked changes, header/footer text, document properties
 genoffice docs apply report.docx --ops ops.json [--dry-run]           # apply_ops entries + insert_content / replace_blocks / insert_image / insert_chart / edit_chart / set_header_footer / reply_comment / resolve_comment / set_properties (document metadata) / wrap_content_control / unwrap_content_control
 =======
-genoffice capabilities --json                        # which cloud features GenOffice has configured (no network call)
+genoffice capabilities --json                        # which cloud features UniWork Office has configured (no network call)
 genoffice search "electron headless export" [--images] [--max 6] --json
 genoffice image "isometric office, soft light" --aspect 16:9 --out hero.png
 genoffice media photo.jpg --ask "What text is in this picture?" --json

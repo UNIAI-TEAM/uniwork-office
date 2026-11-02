@@ -734,7 +734,7 @@ function addDrawing(
 <<<<<<< ours
     annot.set(PDFName.of('T'), PDFHexString.fromText('UniWork Office'))
 =======
-    annot.set(PDFName.of('T'), PDFHexString.fromText('GenOffice'))
+    annot.set(PDFName.of('T'), PDFHexString.fromText('UniWork Office'))
 >>>>>>> theirs
     appendAnnot(pdfDoc, page, pdfDoc.context.register(annot))
     return
@@ -770,7 +770,7 @@ function addDrawing(
 <<<<<<< ours
     annot.set(PDFName.of('T'), PDFHexString.fromText('UniWork Office'))
 =======
-    annot.set(PDFName.of('T'), PDFHexString.fromText('GenOffice'))
+    annot.set(PDFName.of('T'), PDFHexString.fromText('UniWork Office'))
 >>>>>>> theirs
     appendAnnot(pdfDoc, page, pdfDoc.context.register(annot))
     return
@@ -907,7 +907,7 @@ function addDrawing(
 <<<<<<< ours
   annot.set(PDFName.of('T'), PDFHexString.fromText('UniWork Office'))
 =======
-  annot.set(PDFName.of('T'), PDFHexString.fromText('GenOffice'))
+  annot.set(PDFName.of('T'), PDFHexString.fromText('UniWork Office'))
 >>>>>>> theirs
   if (d.kind === 'ink') setVisualSignatureMetadata(annot, d.formFieldName)
   appendAnnot(pdfDoc, page, pdfDoc.context.register(annot))
