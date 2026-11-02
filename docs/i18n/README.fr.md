@@ -186,7 +186,7 @@ fenêtre.
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="GenOffice, page Réglages → Intégrations : le skill genoffice installé dans Claude Code, avec des boutons Installer à côté de Codex et Cursor"></td>
 </tr>
 <tr>
-<td><b>Un seul prompt à votre agent</b> — « Construis un deck de huit diapositives sur le Système solaire. » L'agent lit le skill, écrit une feuille de style, un plan et une spécification de page par diapositive, génère les deux photos avec <code>genoffice image</code>, et laisse <code>genoffice slides check</code> rejeter tout ce qui déborde ou se chevauche avant que <code>genoffice create</code> n'assemble le <code>.pptx</code> et que <code>slides render</code> ne renvoie un PNG par diapositive à examiner.</td>
+<td><b>Un seul prompt à votre agent</b> — « Construis un deck de huit diapositives sur le Système solaire. » L'agent lit le skill, écrit une feuille de style, un plan et une spécification de page par diapositive, et laisse <code>genoffice slides check</code> rejeter tout ce qui déborde ou se chevauche avant que <code>genoffice create</code> n'assemble le <code>.pptx</code> et que <code>slides render</code> ne renvoie un PNG par diapositive à examiner.</td>
 <td><b>Installez une fois, depuis Réglages → Intégrations</b> — GenOffice liste les agents de codage qu'il trouve sur cet ordinateur et écrit le skill dans chacun de ceux que vous choisissez. Ou téléchargez le skill en zip, ou lancez <code>npx skills add genspark-ai/genoffice</code>. Les commandes et le flux de travail complet sont dans <a href="#command-line-and-agent-skill">Ligne de commande et skill d'agent</a>.</td>
 </tr>
 </table>
@@ -245,16 +245,6 @@ document Word dans un onglet d'éditeur visible pendant que vous regardez.
 aux modèles passent par le proxy Genspark (familles Claude, GPT et Gemini) et
 les agents ont accès à la recherche web et d'images, à la génération
 d'images, et à l'analyse d'images, d'audio et de vidéo.
-
-**Ou utilisez votre propre clé.** Paramètres → IA propose Claude, OpenAI,
-Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty
-et OpenCode Zen/Go, ainsi qu'un emplacement personnalisé pour tout point de
-terminaison compatible OpenAI (URL de base + clé), y compris les serveurs de
-modèles locaux. La recherche et les médias disposent de leurs propres
-fournisseurs par fonctionnalité sous **IA Médias et Recherche** : Serper ou
-Tavily pour la recherche web, et OpenAI, Gemini, Doubao/Seedream, GLM, Grok,
-Qwen, MiniMax ou tout point de terminaison d'images compatible OpenAI pour la
-génération d'images et l'analyse d'images/vidéos.
 
 Toute la suite propose les thèmes clair, sombre et système. Les thèmes ne
 changent que ce qui est affiché à l'écran : les exports, les impressions et

@@ -181,7 +181,7 @@ přes stejné enginy jako aplikace, aniž by otevřely jediné okno.
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="Nastavení GenOffice, stránka Integrace: skill genoffice nainstalovaný do Claude Code, s tlačítky Instalovat u položek Codex a Cursor"></td>
 </tr>
 <tr>
-<td><b>Jeden prompt vašemu agentovi</b> — „Vytvoř osmisnímkovou prezentaci o sluneční soustavě.“ Agent si přečte skill, napíše stylový list, osnovu a jednu specifikaci stránky na snímek, vygeneruje obě fotografie pomocí <code>genoffice image</code> a nechá <code>genoffice slides check</code> odmítnout vše, co přetéká nebo se překrývá, než <code>genoffice create</code> sestaví soubor <code>.pptx</code> a <code>slides render</code> vrátí ke kontrole jeden PNG na snímek.</td>
+<td><b>Jeden prompt vašemu agentovi</b> — „Vytvoř osmisnímkovou prezentaci o sluneční soustavě.“ Agent si přečte skill, napíše stylový list, osnovu a jednu specifikaci stránky na snímek a nechá <code>genoffice slides check</code> odmítnout vše, co přetéká nebo se překrývá, než <code>genoffice create</code> sestaví soubor <code>.pptx</code> a <code>slides render</code> vrátí ke kontrole jeden PNG na snímek.</td>
 <td><b>Nainstalujte jednou, v Nastavení → Integrace</b> — GenOffice vypíše kódovací agenty, které na tomto počítači najde, a zapíše skill do každého, který vyberete. Nebo si skill stáhněte jako zip, případně spusťte <code>npx skills add genspark-ai/genoffice</code>. Příkazy a celý pracovní postup najdete v sekci <a href="#command-line-and-agent-skill">Příkazový řádek a agentní skill</a>.</td>
 </tr>
 </table>
@@ -237,15 +237,6 @@ ve viditelné záložce editoru, zatímco se díváte.
 prochází přes proxy Genspark (rodiny Claude, GPT a Gemini) a agenti získávají
 webové a obrázkové vyhledávání, generování obrázků a analýzu
 obrázků/zvuku/videa.
-
-**Nebo použijte vlastní klíč.** Nastavení → AI nabízí Claude, OpenAI, Gemini,
-DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty
-a OpenCode Zen/Go, plus vlastní slot pro jakýkoli OpenAI kompatibilní
-endpoint (base URL + klíč), včetně lokálních serverů s modely. Vyhledávání
-a média mají vlastní poskytovatele pro každou schopnost pod **AI Media
-& Search**: Serper nebo Tavily pro webové vyhledávání a OpenAI, Gemini,
-Doubao/Seedream, GLM, Grok, Qwen, MiniMax nebo jakýkoli OpenAI kompatibilní
-endpoint pro obrázky, generování obrázků a analýzu obrázků/videa.
 
 Celý balík nabízí světlý, tmavý a systémový vzhled. Vzhledy mění pouze to,
 co je vidět na obrazovce: exporty, tisky a uložené soubory si vždy zachovávají

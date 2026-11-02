@@ -2,6 +2,7 @@ import { mkdtempSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { storeGeneratedImage } from '@genoffice/electron-utils/generated-images'
 import {
   UNIWORK_CLOUD_SIGNED_OUT,
   setUniworkCloudStatus,
@@ -66,6 +67,21 @@ describe('loadMediaReferences budget', () => {
     )
     expect(reads.readFile).toBe(0)
     expect(reads.readSync.reduce((n, len) => n + len, 0)).toBeLessThanOrEqual(25 * 1024 * 1024 + 1)
+  })
+
+  it('refuses a generated-image file over the item cap before reading it', async () => {
+    const url = storeGeneratedImage(new Uint8Array(2048).fill(1), 'image/png')
+    reads.readFile = 0
+    await expect(
+      loadMediaReferences([url], { ...TINY, maxItemBytes: 1024, maxTotalBytes: 4096 }),
+    ).rejects.toBeInstanceOf(MediaTooLargeError)
+    expect(reads.readFile).toBe(0)
+    const [blob] = await loadMediaReferences([url], {
+      ...TINY,
+      maxItemBytes: 4096,
+      maxTotalBytes: 4096,
+    })
+    expect(blob?.bytes.byteLength).toBe(2048)
   })
 
   it('reads a local file that fits', async () => {

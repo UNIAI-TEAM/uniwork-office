@@ -183,7 +183,7 @@ venster te openen.
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="GenOffice-instellingen, pagina Integraties: de genoffice-skill geïnstalleerd in Claude Code, met Installeren-knoppen naast Codex en Cursor"></td>
 </tr>
 <tr>
-<td><b>Eén prompt aan je agent</b> — "Bouw een deck van acht slides over het zonnestelsel." De agent leest de skill, schrijft een stylesheet, een outline en één paginaspecificatie per slide, genereert de twee foto's met <code>genoffice image</code> en laat <code>genoffice slides check</code> alles afwijzen wat overloopt of overlapt, voordat <code>genoffice create</code> de <code>.pptx</code> samenstelt en <code>slides render</code> per slide een PNG teruggeeft om te bekijken.</td>
+<td><b>Eén prompt aan je agent</b> — "Bouw een deck van acht slides over het zonnestelsel." De agent leest de skill, schrijft een stylesheet, een outline en één paginaspecificatie per slide en laat <code>genoffice slides check</code> alles afwijzen wat overloopt of overlapt, voordat <code>genoffice create</code> de <code>.pptx</code> samenstelt en <code>slides render</code> per slide een PNG teruggeeft om te bekijken.</td>
 <td><b>Eén keer installeren, via Instellingen → Integraties</b> — GenOffice toont de coding agents die het op deze computer vindt en schrijft de skill naar elke agent die je kiest. Of download de skill als zip, of voer <code>npx skills add genspark-ai/genoffice</code> uit. Commando's en de volledige workflow staan in <a href="#command-line-and-agent-skill">Opdrachtregel en agent-skill</a>.</td>
 </tr>
 </table>
@@ -240,15 +240,6 @@ editortabblad terwijl je toekijkt.
 via de Genspark-proxy (de Claude-, GPT- en Gemini-families) en de agents
 krijgen toegang tot web- en beeldzoeken, beeldgeneratie en analyse van beeld,
 audio en video.
-
-**Of gebruik je eigen key.** Onder Settings → AI vind je Claude, OpenAI,
-Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty
-en OpenCode Zen/Go, plus een aangepast slot voor elk OpenAI-compatibel
-endpoint (base URL + key), inclusief lokale modelservers. Zoeken en media
-hebben elk hun eigen providers per capability onder **AI Media & Search**:
-Serper of Tavily voor webzoeken, en OpenAI, Gemini, Doubao/Seedream, GLM,
-Grok, Qwen, MiniMax of elk OpenAI-compatibel images-endpoint voor
-beeldgeneratie en analyse van beeld en video.
 
 De hele suite wordt geleverd met een licht, donker en systeemthema. Thema's
 veranderen alleen wat er op je scherm te zien is: exports, afdrukken en

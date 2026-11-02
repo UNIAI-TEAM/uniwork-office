@@ -207,8 +207,7 @@ Claude Code、Codex、Cursor、Gemini CLI、GitHub Copilot、OpenCode 或 Windsu
 </tr>
 <tr>
 <td><b>對代理下一句提示詞</b>——「做一份關於太陽系的八頁簡報。」代理讀取 skill，
-寫出一份樣式表、一份大綱與每張投影片各一份的頁面規格，用
-<code>genoffice image</code> 生成兩張照片，再讓 <code>genoffice slides check</code>
+寫出一份樣式表、一份大綱與每張投影片各一份的頁面規格，再讓 <code>genoffice slides check</code>
 擋下所有溢出或重疊的內容，最後由 <code>genoffice create</code> 組裝出
 <code>.pptx</code>，並以 <code>slides render</code> 交回每張投影片各一張 PNG
 供你檢視。</td>
@@ -264,14 +263,6 @@ Cursor 及任何其他 MCP 用戶端都能自行啟動 `genoffice mcp`，不必�
 **用 Genspark 登入**就完全不用設定：模型呼叫會透過 Genspark 代理路由
 （涵蓋 Claude、GPT 與 Gemini 家族），代理也能使用網頁與圖片搜尋、
 圖片生成，以及圖片／音訊／影片分析。
-
-**或自帶金鑰。**「設定 → AI」列出了 Claude、OpenAI、Gemini、DeepSeek、
-Kimi、GLM、Qwen、Doubao、MiniMax、Grok、Mistral、OpenRouter、Requesty 與
-OpenCode Zen/Go，另外還有一個自訂欄位可填入任何相容 OpenAI 的服務端點
-（base URL + 金鑰），也包括本機模型伺服器。搜尋與媒體功能則各自在
-**AI 媒體與搜尋**下設定獨立的服務商：網頁搜尋可選 Serper 或 Tavily，
-圖片生成與圖片／影片分析可選 OpenAI、Gemini、Doubao/Seedream、GLM、
-Grok、Qwen、MiniMax，或任何相容 OpenAI 的圖片服務端點。
 
 整套軟體支援亮色、深色與跟隨系統三種主題。主題只會改變畫面顯示：
 匯出、列印與儲存的檔案永遠保留文件本身的原始色彩。

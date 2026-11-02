@@ -76,7 +76,11 @@ export function storeGeneratedImage(bytes: Uint8Array, mime: string): string {
  * inside GENERATED_IMAGE_DIR, uuid-named, image extension. Returns null for
  * every other URL so a prompt-injected file:///etc/passwd never gets read.
  */
-export function readGeneratedImage(rawUrl: string): { bytes: Buffer; mime: string } | null {
+export function readGeneratedImage(
+  rawUrl: string,
+  /** throws a RangeError, before anything is read, for a file larger than this */
+  maxBytes = Infinity,
+): { bytes: Buffer; mime: string } | null {
   let path: string
   try {
     const url = new URL(rawUrl)
@@ -90,9 +94,11 @@ export function readGeneratedImage(rawUrl: string): { bytes: Buffer; mime: strin
   const name = basename(path)
   if (!FILE_NAME_RE.test(name) || path !== join(dir, name)) return null
   try {
+    if (statSync(path).size > maxBytes) throw new RangeError('generated image is too large')
     const bytes = readFileSync(path)
     return { bytes, mime: MIME_BY_EXT[name.slice(name.lastIndexOf('.') + 1)] ?? 'image/png' }
-  } catch {
+  } catch (err) {
+    if (err instanceof RangeError) throw err
     return null
   }
 }

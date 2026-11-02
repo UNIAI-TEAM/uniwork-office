@@ -178,7 +178,7 @@ GenOffice מגיעה עם שורת פקודה `genoffice` ועם skill לסוכ�
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="הגדרות GenOffice, עמוד Integrations: ה-skill של genoffice מותקן ב-Claude Code, עם כפתורי Install ליד Codex ו-Cursor"></td>
 </tr>
 <tr>
-<td dir="rtl"><b>פרומפט אחד לסוכן שלכם</b> — ״בנו מצגת בת שמונה שקופיות על מערכת השמש.״ הסוכן קורא את ה-skill, כותב גיליון סטייל, מתווה ומפרט עמוד אחד לכל שקופית, מייצר את שתי התמונות עם <code>genoffice image</code>, ונותן ל-<code>genoffice slides check</code> לדחות כל דבר שגולש או חופף לפני ש-<code>genoffice create</code> מרכיב את ה-<code>.pptx</code> ו-<code>slides render</code> מחזיר PNG לכל שקופית להתרשמות.</td>
+<td dir="rtl"><b>פרומפט אחד לסוכן שלכם</b> — ״בנו מצגת בת שמונה שקופיות על מערכת השמש.״ הסוכן קורא את ה-skill, כותב גיליון סטייל, מתווה ומפרט עמוד אחד לכל שקופית, ונותן ל-<code>genoffice slides check</code> לדחות כל דבר שגולש או חופף לפני ש-<code>genoffice create</code> מרכיב את ה-<code>.pptx</code> ו-<code>slides render</code> מחזיר PNG לכל שקופית להתרשמות.</td>
 <td dir="rtl"><b>התקינו פעם אחת, מתוך הגדרות → שילובים</b> — GenOffice מציגה את סוכני הקוד שהיא מוצאת על המחשב הזה וכותבת את ה-skill לכל אחד שתבחרו. או הורידו את ה-skill כ-zip, או הריצו <code>npx skills add genspark-ai/genoffice</code>. הפקודות ותהליך העבודה המלא נמצאים ב<a href="#command-line-and-agent-skill">שורת הפקודה וה-skill לסוכנים</a>.</td>
 </tr>
 </table>
@@ -230,14 +230,6 @@ skill ובלי לפתוח חלון, ולקבל 29 כלים בתוספת מדרי
 **התחברות עם Genspark** לא מצריכה שום הגדרה: קריאות המודל עוברות דרך
 ה-proxy של Genspark (משפחות Claude,‏ GPT ו-Gemini), והסוכנים מקבלים חיפוש
 רשת ותמונות, יצירת תמונות, וניתוח תמונה/אודיו/וידאו.
-
-**או הביאו מפתח משלכם.** בתפריט Settings → AI מופיעים Claude,‏ OpenAI,‏
-Gemini,‏ DeepSeek,‏ Kimi,‏ GLM,‏ Qwen,‏ Doubao,‏ MiniMax,‏ Grok,‏ Mistral,‏
-OpenRouter,‏ Requesty ו-OpenCode Zen/Go, ובנוסף שדה מותאם אישית לכל endpoint
-תואם-OpenAI (כתובת בסיס + מפתח), כולל שרתי מודלים מקומיים. לחיפוש ולמדיה יש
-ספקים נפרדים לפי יכולת תחת **AI Media & Search**: Serper או Tavily לחיפוש
-ברשת, ו-OpenAI,‏ Gemini,‏ Doubao/Seedream,‏ GLM,‏ Grok,‏ Qwen,‏ MiniMax או
-כל endpoint תואם-OpenAI ליצירת תמונות ולניתוח תמונה/וידאו.
 
 כל החבילה מגיעה עם ערכות עיצוב בהיר, כהה ומצב מערכת. ערכות העיצוב משנות רק
 את מה שמוצג על המסך: קבצים מיוצאים, מודפסים ונשמרים תמיד שומרים על הצבעים

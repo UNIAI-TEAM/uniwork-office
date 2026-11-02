@@ -183,7 +183,7 @@ lewat engine yang sama dengan aplikasinya, tanpa membuka satu jendela pun.
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="GenOffice Settings, halaman Integrations: skill genoffice terpasang di Claude Code, dengan tombol Install di samping Codex dan Cursor"></td>
 </tr>
 <tr>
-<td><b>Satu prompt ke agen Anda</b> — "Buat deck delapan slide tentang Tata Surya." Agen membaca skill, menulis style sheet, outline, dan satu spesifikasi halaman per slide, menghasilkan dua foto dengan <code>genoffice image</code>, dan membiarkan <code>genoffice slides check</code> menolak apa pun yang meluap atau tumpang tindih sebelum <code>genoffice create</code> merakit <code>.pptx</code> dan <code>slides render</code> mengembalikan satu PNG per slide untuk dilihat.</td>
+<td><b>Satu prompt ke agen Anda</b> — "Buat deck delapan slide tentang Tata Surya." Agen membaca skill, menulis style sheet, outline, dan satu spesifikasi halaman per slide, dan membiarkan <code>genoffice slides check</code> menolak apa pun yang meluap atau tumpang tindih sebelum <code>genoffice create</code> merakit <code>.pptx</code> dan <code>slides render</code> mengembalikan satu PNG per slide untuk dilihat.</td>
 <td><b>Pasang sekali, dari Pengaturan → Integrasi</b> — GenOffice menampilkan coding agent yang ditemukannya di komputer ini dan menulis skill ke setiap agen yang Anda pilih. Atau unduh skill sebagai zip, atau jalankan <code>npx skills add genspark-ai/genoffice</code>. Perintah dan alur kerja lengkapnya ada di <a href="#command-line-and-agent-skill">Baris perintah dan skill agen</a>.</td>
 </tr>
 </table>
@@ -240,15 +240,6 @@ terlihat sambil Anda menyaksikannya.
 model diarahkan lewat proxy Genspark (keluarga Claude, GPT, dan Gemini) dan
 agen mendapatkan akses pencarian web dan gambar, generasi gambar, serta
 analisis gambar/audio/video.
-
-**Atau bawa kunci Anda sendiri.** Settings → AI menampilkan Claude, OpenAI,
-Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty,
-dan OpenCode Zen/Go, plus slot khusus untuk endpoint apa pun yang kompatibel
-dengan OpenAI (base URL + kunci), termasuk server model lokal. Pencarian dan
-media memiliki penyedia tersendiri per kemampuan di bawah **AI Media &
-Search**: Serper atau Tavily untuk pencarian web, dan OpenAI, Gemini,
-Doubao/Seedream, GLM, Grok, Qwen, MiniMax, atau endpoint apa pun yang
-kompatibel dengan OpenAI untuk generasi gambar serta analisis gambar/video.
 
 Seluruh suite mendukung tema terang, gelap, dan sistem. Tema hanya mengubah
 tampilan di layar: ekspor, cetakan, dan file yang disimpan selalu

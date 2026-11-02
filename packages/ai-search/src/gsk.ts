@@ -1,5 +1,6 @@
 /**
- * UniWork cloud tools (web/image search, image generation, media analysis), paid with the organization's UniWork AI credits. The calls
+ * UniWork cloud tools (web/image search, image generation, media analysis),
+ * paid with the organization's UniWork AI credits. The calls
  * go through the transport the shell main process installs in
  * `@genoffice/ai-provider` (uniwork-cloud.ts), which adds the bearer token
  * itself; this file never sees a token. Media is read here, client-side

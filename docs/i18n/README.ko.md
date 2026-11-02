@@ -181,7 +181,7 @@ Windsurf가 앱과 동일한 엔진을 통해 창을 열지 않고도 실제 Off
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="GenOffice 설정의 연동 페이지: genoffice 스킬이 Claude Code에 설치되어 있고, Codex와 Cursor 옆에는 설치 버튼이 표시된 화면"></td>
 </tr>
 <tr>
-<td><b>에이전트에게 프롬프트 하나</b> — "태양계에 관한 8장짜리 덱을 만들어줘." 에이전트는 스킬을 읽고 스타일 시트, 개요, 슬라이드마다 하나씩의 페이지 스펙을 작성하고, <code>genoffice image</code>로 사진 두 장을 생성하고, <code>genoffice slides check</code>가 넘치거나 겹치는 요소를 걸러낸 뒤, <code>genoffice create</code>로 <code>.pptx</code>를 조립하고 <code>slides render</code>로 슬라이드마다 PNG 한 장을 받아 확인합니다.</td>
+<td><b>에이전트에게 프롬프트 하나</b> — "태양계에 관한 8장짜리 덱을 만들어줘." 에이전트는 스킬을 읽고 스타일 시트, 개요, 슬라이드마다 하나씩의 페이지 스펙을 작성하고, <code>genoffice slides check</code>가 넘치거나 겹치는 요소를 걸러낸 뒤, <code>genoffice create</code>로 <code>.pptx</code>를 조립하고 <code>slides render</code>로 슬라이드마다 PNG 한 장을 받아 확인합니다.</td>
 <td><b>설정 → 연동에서 한 번만 설치</b> — GenOffice가 이 컴퓨터에서 찾은 코딩 에이전트를 나열하고, 선택한 각 에이전트에 스킬을 기록합니다. 스킬을 zip으로 내려받거나 <code>npx skills add genspark-ai/genoffice</code>를 실행해도 됩니다. 명령과 전체 워크플로는 <a href="#command-line-and-agent-skill">명령줄과 에이전트 스킬</a>에 있습니다.</td>
 </tr>
 </table>
@@ -235,15 +235,6 @@ Cursor 및 다른 모든 MCP 클라이언트는 스킬을 설치하거나 창을
 Genspark 프록시(Claude, GPT, Gemini 계열)를 거치고, 에이전트는 웹 및
 이미지 검색, 이미지 생성, 이미지/오디오/비디오 분석 기능까지 사용할 수
 있습니다.
-
-**직접 키를 가져올 수도 있습니다.** 설정 → AI에는 Claude, OpenAI, Gemini,
-DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty,
-OpenCode Zen/Go가 있으며, 로컬 모델 서버를 포함한 모든 OpenAI 호환
-엔드포인트(기본 URL + 키)를 위한 사용자 지정 슬롯도 제공됩니다. 검색과
-미디어는 **AI 미디어 및 검색**에서 기능별로 별도 공급자를 설정할 수
-있습니다: 웹 검색은 Serper 또는 Tavily, 이미지 생성과 이미지/비디오
-분석은 OpenAI, Gemini, Doubao/Seedream, GLM, Grok, Qwen, MiniMax 또는
-OpenAI 호환 이미지 엔드포인트 중에서 선택합니다.
 
 전체 제품군은 라이트, 다크, 시스템 테마를 지원합니다. 테마는 화면에
 보이는 모습만 바꿀 뿐입니다: 내보내기, 인쇄, 저장된 파일은 항상 문서

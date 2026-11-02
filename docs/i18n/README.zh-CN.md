@@ -173,7 +173,7 @@ Claude Code、Codex、Cursor、Gemini CLI、GitHub Copilot、OpenCode 或 Windsu
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="GenOffice 设置的「集成」页面：genoffice skill 已安装到 Claude Code，Codex 和 Cursor 旁边显示着「安装」按钮"></td>
 </tr>
 <tr>
-<td><b>给智能体一句提示词</b> —— “制作一份关于太阳系的八页演示文稿。”智能体读取 skill，依次写出样式表、大纲和每页一份的页面规格，用 <code>genoffice image</code> 生成两张图片，再由 <code>genoffice slides check</code> 拦下所有溢出或重叠的内容，最后由 <code>genoffice create</code> 组装出 <code>.pptx</code>，并用 <code>slides render</code> 为每一页交回一张 PNG 供查看。</td>
+<td><b>给智能体一句提示词</b> —— “制作一份关于太阳系的八页演示文稿。”智能体读取 skill，依次写出样式表、大纲和每页一份的页面规格，再由 <code>genoffice slides check</code> 拦下所有溢出或重叠的内容，最后由 <code>genoffice create</code> 组装出 <code>.pptx</code>，并用 <code>slides render</code> 为每一页交回一张 PNG 供查看。</td>
 <td><b>在设置 → 集成中一次安装</b> —— GenOffice 会列出在这台电脑上找到的编程智能体，并把 skill 写入你选中的每一个。也可以把 skill 下载为 zip 压缩包，或运行 <code>npx skills add genspark-ai/genoffice</code>。命令和完整工作流见<a href="#command-line-and-agent-skill">命令行与 agent skill</a>。</td>
 </tr>
 </table>
@@ -223,13 +223,6 @@ Word 文档，供你实时查看。
 **登录 Genspark**，无需任何配置：模型调用通过 Genspark 代理路由（Claude、GPT
 和 Gemini 系列），智能体同时获得网页与图片搜索、图片生成，以及图片/音频/视频
 解析能力。
-
-**或者自带密钥。** 设置 → AI 中列出了 Claude、OpenAI、Gemini、DeepSeek、Kimi、
-GLM、Qwen、Doubao、MiniMax、Grok、Mistral、OpenRouter、Requesty 和 OpenCode Zen/Go，另有
-一个自定义槽位可接入任何 OpenAI 兼容端点（Base URL + 密钥），包括本地模型服务。
-搜索和媒体能力在 **AI 媒体与搜索** 下按能力分别配置服务商：网页搜索可选 Serper
-或 Tavily；图片生成和图片/视频解析可选 OpenAI、Gemini、Doubao/Seedream、GLM、
-Grok、Qwen、MiniMax 或任何 OpenAI 兼容的图片端点。
 
 整个套件提供浅色、深色和跟随系统三种主题。主题只改变屏幕上的显示：导出、打印
 和保存的文件始终保留文档自身的颜色。

@@ -155,7 +155,7 @@ GenOffice には `genoffice` コマンドラインとエージェントスキル
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="GenOffice の設定、連携ページ：genoffice スキルが Claude Code にインストール済みで、Codex と Cursor の横にはインストールボタンが表示されている"></td>
 </tr>
 <tr>
-<td><b>エージェントへのプロンプトは 1 つ</b> — 「太陽系についての 8 枚構成のデッキを作って」。エージェントはスキルを読み、スタイルシート、アウトライン、スライドごとのページ仕様を書き、<code>genoffice image</code> で 2 枚の写真を生成し、<code>genoffice slides check</code> にはみ出しや重なりのある要素を弾かせてから、<code>genoffice create</code> で <code>.pptx</code> を組み立て、<code>slides render</code> でスライドごとの PNG を受け取って確認します。</td>
+<td><b>エージェントへのプロンプトは 1 つ</b> — 「太陽系についての 8 枚構成のデッキを作って」。エージェントはスキルを読み、スタイルシート、アウトライン、スライドごとのページ仕様を書き、<code>genoffice slides check</code> にはみ出しや重なりのある要素を弾かせてから、<code>genoffice create</code> で <code>.pptx</code> を組み立て、<code>slides render</code> でスライドごとの PNG を受け取って確認します。</td>
 <td><b>インストールは設定 → 連携から 1 回だけ</b> — GenOffice がこのコンピューター上で見つかったコーディングエージェントを一覧し、選んだそれぞれにスキルを書き込みます。スキルを zip としてダウンロードするか、<code>npx skills add genspark-ai/genoffice</code> を実行しても構いません。コマンドとワークフローの全体は <a href="#command-line-and-agent-skill">コマンドラインとエージェントスキル</a> にあります。</td>
 </tr>
 </table>
@@ -209,14 +209,6 @@ Word ドキュメントを組み立てる様子を見守ることもできます
 **Genspark でサインイン**すれば、設定は一切不要です。モデル呼び出しは Genspark のプロキシ
 （Claude、GPT、Gemini 系列）を経由し、エージェントは Web・画像検索、画像生成、画像／音声／
 動画の解析機能も利用できます。
-
-**あるいは自分のキーを持ち込む。** 設定 → AI には Claude、OpenAI、Gemini、DeepSeek、Kimi、
-GLM、Qwen、Doubao、MiniMax、Grok、Mistral、OpenRouter、Requesty、OpenCode Zen/Go が並び、さらに任意
-の OpenAI 互換エンドポイント（ベース URL + キー、ローカルモデルサーバーを含む）を登録できる
-カスタム枠も用意されています。検索とメディア関連は **AI メディア＆検索** の下で機能ごとに個
-別のプロバイダーを設定できます：Web 検索には Serper か Tavily、画像生成と画像／動画解析には
-OpenAI、Gemini、Doubao/Seedream、GLM、Grok、Qwen、MiniMax、または任意の OpenAI 互換の画像
-エンドポイントが使えます。
 
 スイート全体でライト・ダーク・システムのテーマに対応しています。テーマが変わるのは画面表示
 だけで、書き出し・印刷・保存されたファイルは常にドキュメント本来の色を保持します。

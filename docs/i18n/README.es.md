@@ -182,7 +182,7 @@ reales con los mismos motores que las apps, sin abrir una ventana.
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="Ajustes de GenOffice, página Integraciones: el skill genoffice instalado en Claude Code, con botones Instalar junto a Codex y Cursor"></td>
 </tr>
 <tr>
-<td><b>Un solo prompt a tu agente</b> — «Crea una presentación de ocho diapositivas sobre el Sistema Solar». El agente lee el skill, escribe una hoja de estilos, un esquema y una especificación de página por diapositiva, genera las dos fotos con <code>genoffice image</code> y deja que <code>genoffice slides check</code> rechace todo lo que desborde o se superponga antes de que <code>genoffice create</code> ensamble el <code>.pptx</code> y <code>slides render</code> devuelva un PNG por diapositiva para revisarlo.</td>
+<td><b>Un solo prompt a tu agente</b> — «Crea una presentación de ocho diapositivas sobre el Sistema Solar». El agente lee el skill, escribe una hoja de estilos, un esquema y una especificación de página por diapositiva y deja que <code>genoffice slides check</code> rechace todo lo que desborde o se superponga antes de que <code>genoffice create</code> ensamble el <code>.pptx</code> y <code>slides render</code> devuelva un PNG por diapositiva para revisarlo.</td>
 <td><b>Instálalo una vez, desde Ajustes → Integraciones</b> — GenOffice muestra los agentes de programación que encuentra en este equipo y escribe el skill en cada uno de los que elijas. O descarga el skill como zip, o ejecuta <code>npx skills add genspark-ai/genoffice</code>. Los comandos y el flujo de trabajo completo están en <a href="#command-line-and-agent-skill">Línea de comandos y skill de agente</a>.</td>
 </tr>
 </table>
@@ -242,16 +242,6 @@ mientras lo observas.
 modelo se enrutan a través del proxy de Genspark (familias Claude, GPT y
 Gemini) y los agentes obtienen búsqueda web y de imágenes, generación de
 imágenes, y análisis de imagen/audio/video.
-
-**O usa tu propia clave.** Settings → AI incluye Claude, OpenAI, Gemini,
-DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty y
-OpenCode Zen/Go, además de una ranura personalizada para cualquier endpoint
-compatible con OpenAI (URL base + clave), incluidos servidores de modelos
-locales. La búsqueda y los medios tienen sus propios proveedores por
-capacidad en **AI Media & Search**: Serper o Tavily para búsqueda web, y
-OpenAI, Gemini, Doubao/Seedream, GLM, Grok, Qwen, MiniMax o cualquier
-endpoint de imágenes compatible con OpenAI para generación de imágenes y
-análisis de imagen/video.
 
 Toda la suite incluye temas claro, oscuro y del sistema. Los temas solo
 cambian lo que se ve en pantalla: las exportaciones, las impresiones y los

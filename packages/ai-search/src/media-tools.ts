@@ -219,7 +219,13 @@ export async function loadMediaReference(
     return { bytes, mime: mime.toLowerCase() }
   }
   if (ref.startsWith('file:')) {
-    const local = readGeneratedImage(ref)
+    let local: ReturnType<typeof readGeneratedImage>
+    try {
+      local = readGeneratedImage(ref, maxBytes)
+    } catch (err) {
+      if (err instanceof RangeError) throw new MediaTooLargeError(`${ref} is too large to analyze`)
+      throw err
+    }
     if (!local) throw new Error(`Not an accessible image: ${ref}`)
     return { bytes: new Uint8Array(local.bytes), mime: local.mime }
   }

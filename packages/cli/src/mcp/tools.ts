@@ -48,8 +48,6 @@ export interface ToolSpec {
   /** the text content is the result's summary, not the JSON envelope (guides) */
   plainText?: boolean
   readOnly?: boolean
-  /** the call reaches the configured cloud provider (search, image, media) */
-  openWorld?: boolean
   /** needs the GenOffice window in front of the client, so not registered in http mode */
   localOnly?: boolean
 }

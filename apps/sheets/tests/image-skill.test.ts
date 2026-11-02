@@ -33,7 +33,7 @@ describe('image skill: image_search', () => {
 
   it('lists numbered direct URLs with pixel sizes', async () => {
     const imageSearch = vi.fn().mockResolvedValue({
-      method: 'serper',
+      method: 'gsk',
       images: [
         {
           title: 'Golden retriever',

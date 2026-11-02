@@ -155,7 +155,7 @@ GenOffice के साथ एक `genoffice` कमांड लाइन औ�
 <td width="50%"><img src="../assets/readme/cli-integrations.webp" alt="GenOffice Settings का Integrations पेज: genoffice skill Claude Code में इंस्टॉल है, और Codex व Cursor के बगल में Install बटन हैं"></td>
 </tr>
 <tr>
-<td><b>अपने एजेंट को एक प्रॉम्प्ट</b> — "सोलर सिस्टम पर आठ स्लाइड का डेक बनाएँ।" एजेंट skill पढ़ता है, एक स्टाइल शीट, एक आउटलाइन और हर स्लाइड के लिए एक पेज स्पेक लिखता है, <code>genoffice image</code> से दो फ़ोटो जनरेट करता है, और <code>genoffice slides check</code> को ओवरफ़्लो या ओवरलैप करने वाली हर चीज़ रिजेक्ट करने देता है; इसके बाद <code>genoffice create</code> <code>.pptx</code> असेंबल करता है और <code>slides render</code> देखने के लिए हर स्लाइड का एक PNG वापस देता है।</td>
+<td><b>अपने एजेंट को एक प्रॉम्प्ट</b> — "सोलर सिस्टम पर आठ स्लाइड का डेक बनाएँ।" एजेंट skill पढ़ता है, एक स्टाइल शीट, एक आउटलाइन और हर स्लाइड के लिए एक पेज स्पेक लिखता है, और <code>genoffice slides check</code> को ओवरफ़्लो या ओवरलैप करने वाली हर चीज़ रिजेक्ट करने देता है; इसके बाद <code>genoffice create</code> <code>.pptx</code> असेंबल करता है और <code>slides render</code> देखने के लिए हर स्लाइड का एक PNG वापस देता है।</td>
 <td><b>एक बार इंस्टॉल करें, सेटिंग्स → इंटीग्रेशन से</b> — GenOffice इस कंप्यूटर पर मिले कोडिंग एजेंट्स की सूची दिखाता है और आपके चुने हुए हर एजेंट में skill लिख देता है। या skill को zip के रूप में डाउनलोड करें, या <code>npx skills add genspark-ai/genoffice</code> चलाएँ। कमांड और पूरा वर्कफ़्लो <a href="#command-line-and-agent-skill">कमांड लाइन और एजेंट skill</a> में हैं।</td>
 </tr>
 </table>
@@ -207,8 +207,6 @@ skill इंस्टॉल करने की ज़रूरत, न को�
 ## AI बैकएंड
 
 **Genspark से साइन इन करें** और कुछ भी कॉन्फ़िगर करने की ज़रूरत नहीं: मॉडल कॉल्स Genspark प्रॉक्सी (Claude, GPT और Gemini फ़ैमिली) के ज़रिए रूट होती हैं, और एजेंट्स को वेब व इमेज सर्च, इमेज जनरेशन, और इमेज/ऑडियो/वीडियो एनालिसिस मिलता है।
-
-**या अपनी खुद की key लाएँ।** Settings → AI में Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty और OpenCode Zen/Go लिस्ट किए गए हैं, साथ ही किसी भी OpenAI-compatible endpoint (base URL + key) के लिए एक कस्टम स्लॉट है, जिसमें लोकल मॉडल सर्वर भी शामिल हैं। सर्च और मीडिया के अपने अलग, हर-कैपेबिलिटी प्रोवाइडर **AI Media & Search** के तहत हैं: वेब सर्च के लिए Serper या Tavily, और इमेज जनरेशन व इमेज/वीडियो एनालिसिस के लिए OpenAI, Gemini, Doubao/Seedream, GLM, Grok, Qwen, MiniMax या कोई भी OpenAI-compatible images endpoint।
 
 पूरा सूट लाइट, डार्क और सिस्टम थीम के साथ आता है। थीम सिर्फ़ स्क्रीन पर दिखने वाली चीज़ बदलती है: एक्सपोर्ट, प्रिंट और सेव की गई फ़ाइलें हमेशा डॉक्यूमेंट के अपने असली रंग बरकरार रखती हैं।
 

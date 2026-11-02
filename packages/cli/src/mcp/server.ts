@@ -107,10 +107,7 @@ export async function createMcpServer(
       {
         description: tool.description,
         inputSchema: toolShape(tool, ctx.mode, typed),
-        annotations: {
-          readOnlyHint: tool.readOnly === true,
-          openWorldHint: tool.openWorld === true,
-        },
+        annotations: { readOnlyHint: tool.readOnly === true, openWorldHint: false },
       },
       async (args) => {
         const outcome = await runTool(tool, { ...(args as Record<string, unknown>) }, ctx)
