@@ -1,41 +1,7 @@
 /** Browser-safe settings surface. Keep Node-backed transports out of renderer bundles. */
-export type {
-  AiProviderConfig,
-  AiProviderId,
-  AiProviderMeta,
-  AiModelPick,
-  AiModelSource,
-  AiSettingsSaveOptions,
-  AiSettings,
-  CodexModelCatalog,
-} from './types'
-export {
-  AI_PROVIDERS,
-  UNIWORK_PROVIDER_META,
-  cloudToolsEnabled,
-  DEFAULT_MAX_OUTPUT_TOKENS,
-  MAX_MAX_OUTPUT_TOKENS,
-  MIN_MAX_OUTPUT_TOKENS,
-  clampMaxOutputTokens,
-  aiEffectiveModel,
-  defaultAiSettings,
-  isProviderUsable,
-  providerNeed,
-  selectedProvider,
-  uniAiOpenRouterKey,
-  type ProviderNeed,
-} from './providers'
-export { getProviderAdapter, modelLacksVision } from './registry'
-export {
-  AI_MEDIA_PROVIDERS,
-  imageGenerationAvailable,
-  mediaAnalysisAvailable,
-  offeredMediaProviders,
-  setMediaProviderChoice,
-  shownMediaProvider,
-  updateMediaProviderConfig,
-  visibleMediaProviders,
-} from './media'
+export type { AiProviderId, AiSettings } from './types'
+export { UNIWORK_PROVIDER_META, cloudToolsEnabled, defaultAiSettings } from './providers'
+export { imageGenerationAvailable, mediaAnalysisAvailable } from './media'
 export { aiChatFailureText } from './ai-chat-error-text'
 export {
   UNIWORK_CLOUD_SIGNED_OUT,
@@ -91,4 +57,3 @@ export type {
 } from './ai-notice'
 export { normalizeAiTestFailureKind } from './ai-test-failure'
 export type { AiTestFailureKind } from './ai-test-failure'
-export { AI_SEARCH_PROVIDERS } from './search-settings'

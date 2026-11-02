@@ -280,6 +280,13 @@ export interface UniworkCloudMedia {
   dataBase64: string
 }
 
+/** media bytes as the tools hand them around (a generated image, a file to analyze) */
+export interface MediaBlob {
+  bytes: Uint8Array
+  mime: string
+  name?: string
+}
+
 export interface UniworkCloudSearchResult {
   title: string
   url: string

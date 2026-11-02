@@ -1,14 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { aiStreamErrorFields } from '../src/ai-chat-error'
 import { isAiOverloadedError } from '../src/overload-error'
-import {
-  AI_PROVIDERS,
-  defaultAiSettings,
-  providerNeed,
-  selectedProvider,
-  setUniworkAiAvailable,
-  uniworkAiAvailable,
-} from '../src/providers'
+import { setUniworkAiAvailable, uniworkAiAvailable } from '../src/providers'
 import { UNIWORK_CLOUD_TOOLS, normalizeUniworkCloudStatus } from '../src/uniwork-cloud'
 import { UniworkError, uniworkErrorFromResponse, uniworkErrorKey } from '../src/uniwork/errors'
 
@@ -117,34 +110,12 @@ describe('UniWork AI errors branch on the code', () => {
 })
 
 describe('uniwork provider entry (Q-4)', () => {
-  it('stays out of AI_PROVIDERS until UniWork AI is available', () => {
+  it('is unavailable until the host says so, and follows the flag', () => {
     expect(uniworkAiAvailable()).toBe(false)
-    expect(AI_PROVIDERS.some((m) => m.id === 'uniwork')).toBe(false)
     setUniworkAiAvailable(true)
-    expect(AI_PROVIDERS.filter((m) => m.id === 'uniwork')).toHaveLength(1)
-    setUniworkAiAvailable(true)
-    expect(AI_PROVIDERS.filter((m) => m.id === 'uniwork')).toHaveLength(1)
+    expect(uniworkAiAvailable()).toBe(true)
     setUniworkAiAvailable(false)
-    expect(AI_PROVIDERS.some((m) => m.id === 'uniwork')).toBe(false)
-  })
-
-  it('sits right after UniAI, which leads the list, and leaves the other entries in order', () => {
-    const before = AI_PROVIDERS.map((m) => m.id)
-    expect(AI_PROVIDERS[0]!.label).toBe('UniAI')
-    setUniworkAiAvailable(true)
-    expect(AI_PROVIDERS[1]!.id).toBe('uniwork')
-    expect(AI_PROVIDERS.filter((m) => m.id !== 'uniwork').map((m) => m.id)).toEqual(before)
-    setUniworkAiAvailable(false)
-    expect(AI_PROVIDERS.map((m) => m.id)).toEqual(before)
-  })
-
-  it('needs no key and stays the selection whether or not it is offered (no silent switch to UniAI)', () => {
-    const settings = { ...defaultAiSettings(), provider: 'uniwork' as const }
-    expect(providerNeed(settings, 'uniwork')).toBeNull()
-    expect(selectedProvider(settings)).toBe('uniwork')
-    setUniworkAiAvailable(true)
-    expect(providerNeed(settings, 'uniwork')).toBeNull()
-    expect(selectedProvider(settings)).toBe('uniwork')
+    expect(uniworkAiAvailable()).toBe(false)
   })
 
   it('chat is a cloud flag read from the status', () => {

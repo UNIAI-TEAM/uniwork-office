@@ -9,7 +9,7 @@
  *   ./hide     HIDE class no-ops (Zotero, doc passwords, recovery copy,
  *              tabs/menu, window chrome) + the capability source.
  *   ./ai       aiStream / webSearch / imageSearch / aiGenerateImage /
- *              getAiSettings / aiChat / fetchImage stubs (AI hidden).
+ *              getAiSettings / fetchImage stubs (AI hidden).
  * The merged object then gets the web AI bridge (web/modules/shared/ai,
  * CONTRACT C16): while the host grants `uniworkAi` its members replace the stubs
  * (frame-token AI routes); without the grant the stubs answer as before.

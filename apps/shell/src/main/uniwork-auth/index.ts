@@ -426,9 +426,8 @@ export function startUniworkAiChat(deps: {
     toolPolicy: () => uniworkToolPolicy(join(app.getPath('userData'), 'ai-settings.json')),
   })
   aiStreams = streams
-  // the provider entry (picker, Settings, selectedProvider) shows only while the
-  // selected org offers UniWork AI for some format; re-read on account and cloud
-  // changes and once per capability TTL
+  // UniWork AI is available only while the selected org offers it for some
+  // format; re-read on account and cloud changes and once per capability TTL
   let generation = 0
   const publishAvailability = () => {
     const run = ++generation

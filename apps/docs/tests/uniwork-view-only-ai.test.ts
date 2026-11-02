@@ -10,13 +10,11 @@ import { READ_ONLY_TOOLS, createDocsSkill } from '../src/renderer/ai/docs-skill'
 import { AGENT_TOOLS } from '../src/renderer/ai/tools'
 import { autoSaveToggleVisible } from '../src/renderer/uniwork-doc-state'
 import { strings } from '../src/renderer/i18n/strings'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 
 const settings: AiSettings = {
   provider: 'uniwork',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  providers: {},
 }
 
 function createEditor(): Editor {

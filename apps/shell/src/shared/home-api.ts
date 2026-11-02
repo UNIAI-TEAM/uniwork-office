@@ -1,8 +1,4 @@
-import type {
-  AiSettings,
-  AiSettingsSaveOptions,
-  UniworkCloudStatus,
-} from '@genoffice/ai-provider'
+import type { AiSettings, UniworkCloudStatus } from '@genoffice/ai-provider'
 import type {
   AskUniContext,
   AskUniOpenRequest,
@@ -1463,10 +1459,7 @@ export interface HomeApi {
   /** AI settings (userData/ai-settings.json, shared by every editor) */
   getAiSettings(options?: AiSettingsPickOptions): Promise<AiSettings>
   /** persist AI settings; every renderer gets ai:settings-changed and re-reads */
-  setAiSettings(
-    settings: AiSettings,
-    options?: AiSettingsPickOptions & AiSettingsSaveOptions,
-  ): Promise<void>
+  setAiSettings(settings: AiSettings, options?: AiSettingsPickOptions): Promise<void>
   /** ai-settings.json was rewritten by any renderer (composer model chip, another window) */
   onAiSettingsChanged(handler: () => void): () => void
   /** file picker for the workbench module panes (files stay on device) */

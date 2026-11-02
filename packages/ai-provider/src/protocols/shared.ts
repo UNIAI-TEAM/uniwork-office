@@ -1,27 +1,6 @@
 import type { AgentStreamNotice, AgentToolCall } from '@genoffice/agent-core'
 import type { AiTokenUsage } from '../types'
 
-// ---- endpoint URL composition ----
-
-/**
- * Append a provider endpoint path to a base URL without string concatenation.
- *
- * A custom base URL may carry a query string (Azure-style `?api-version=…`,
- * gateways that pin a version) and a fragment. Concatenating would push the
- * path into the query component, so the request 404s or lands on the wrong
- * route. Setting `pathname` keeps the query in place and the fragment is
- * dropped — it is never sent to the server anyway.
- */
-export function endpointUrl(baseUrl: string, path: string, search?: string): string {
-  const url = new URL(baseUrl)
-  const base = url.pathname.replace(/\/+$/, '')
-  const suffix = path.replace(/^\/+/, '')
-  url.pathname = suffix ? `${base}/${suffix}` : base
-  url.hash = ''
-  if (search !== undefined) url.search = search
-  return url.toString()
-}
-
 // ---- streaming (SSE line splitting shared by all providers) ----
 
 /** Max buffered SSE line: a gateway sending GB without newline would OOM main. */
@@ -349,52 +328,6 @@ export async function jsonBodyInsteadOfSse(
     : null
 }
 
-/**
- * A non-SSE JSON reply whose text is the gateway's credits-exhausted notice
- * (Genspark: "Your Genspark credits have been exhausted…") surfaces as a typed
- * error so the apps show a localized "top up" message (errorCode 'credits')
- * instead of the English notice as a normal assistant reply.
- */
-export class AiCreditsError extends Error {
-  constructor(notice: string) {
-    super(notice)
-    this.name = 'AiCreditsError'
-  }
-}
-
-function creditsNoticeText(value: unknown): string | null {
-  if (typeof value === 'string') {
-    const t = value.toLowerCase()
-    const credits =
-      t.includes('uniworkos.com/pricing') ||
-      t.includes('uniwork.app/pricing') ||
-      t.includes('openrouter.ai') ||
-      t.includes('openrouter_credits') ||
-      t.includes('openrouter_key_limit') ||
-      (t.includes('credit') &&
-        (t.includes('exhausted') || t.includes('insufficient') || t.includes('balance')))
-    return credits ? value : null
-  }
-  if (Array.isArray(value) || (value && typeof value === 'object')) {
-    for (const v of Object.values(value)) {
-      const hit = creditsNoticeText(v)
-      if (hit) return hit
-    }
-  }
-  return null
-}
-
-export function throwIfCreditsNotice(bodyText: string): void {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(bodyText)
-  } catch {
-    return // unparseable bodies are the emit helpers' problem
-  }
-  const notice = creditsNoticeText(parsed)
-  if (notice) throw new AiCreditsError(notice)
-}
-
 /** Don't throw on parse failure (it would kill the whole stream); return error so the loop feeds it back for retry */
 export function parseToolInput(json: string): { input: Record<string, unknown>; error?: string } {
   if (!json.trim()) return { input: {} }
@@ -415,6 +348,6 @@ export function parseToolInput(json: string): { input: Record<string, unknown>; 
   return { input: parsed }
 }
 
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
+function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

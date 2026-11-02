@@ -399,11 +399,11 @@ describe('members (off = as today, on = UniWork routes)', () => {
     const api = withWebAi({ ...stubs }, ai)
     const settings = (await (api.getAiSettings as () => Promise<Record<string, unknown>>)()) as {
       provider: string
-      providers: Record<string, { apiKey: string }>
+      providers: Record<string, never>
       gskToolsEnabled: boolean
     }
     expect(settings.provider).toBe('uniwork')
-    expect(Object.keys(settings.providers)).toEqual(['uniwork'])
+    expect(settings.providers).toEqual({})
     expect(settings.gskToolsEnabled).toBe(true)
     // GET cloud says image_search is not available: its capability goes off
     expect(capabilities.imageSearch).toBe(false)
@@ -673,7 +673,7 @@ describe('UniWork AI on the web (G6-05)', () => {
     s.aiStream({
       requestId: id,
       sessionId: 'sess-1',
-      settings: { provider: 'uniwork', providers: { uniwork: { apiKey: '…', model: '' } } },
+      settings: { provider: 'uniwork', providers: {} },
       system: 'sys',
       messages: [{ role: 'user', content: 'hi' }],
       tools: [{ name: 'edit_doc', description: 'd', parameters: { type: 'object' } }],
@@ -975,21 +975,6 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(r.chunks.at(-1)).toEqual({ requestId: 'v1', type: 'done' })
     })
 
-    it('aiChat (one-shot) has no UniWork AI route: its failure text, nothing sent', async () => {
-      const r = rig(async () => {})
-      for (const provider of ['uniwork', 'openai']) {
-        expect(
-          await r.s.aiChat({
-            settings: { provider, providers: {} } as never,
-            system: 's',
-            user: 'u',
-          }),
-        ).toEqual({ ok: false, error: 'uniwork:ai_disabled' })
-      }
-      expect(r.calls).toEqual([])
-      expect(r.stream).not.toHaveBeenCalled()
-    })
-
     describe('uniwork turn: one idle per ending path', () => {
       const paths: Array<[string, FakeStream]> = [
         ['done', async () => {}],
@@ -1107,7 +1092,7 @@ describe('UniWork AI on the web (G6-05)', () => {
   describe('createWebAi with uniworkAi', () => {
     const uniworkPort = (caps: Record<string, boolean>, module?: string) => port(caps, true, module)
 
-    it('settings name UniWork AI only: one provider, an unlocked slot, the model the server names', async () => {
+    it('settings name UniWork AI only: no provider slot, the model the server names', async () => {
       const { fetch } = recorder(() =>
         jsonResponse(200, { ...CLOUD, uniwork_model: 'claude-opus-5' }),
       )
@@ -1120,12 +1105,9 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(await ai.active()).toBe(true)
       const s = await ai.settings()
       expect(s.provider).toBe('uniwork')
-      expect(Object.keys(s.providers)).toEqual(['uniwork'])
-      // not locked: the picker sees a non-empty slot; the server's policy picks the model
-      expect(s.providers.uniwork).toEqual({ apiKey: '…', model: '' })
+      expect(s.providers).toEqual({})
+      // the server's policy picks the model
       expect(s.uniworkModel).toBe('claude-opus-5')
-      expect(s.uniAiAvailable).toBe(false)
-      expect(s.modelSources).toBeUndefined()
     })
 
     it('publishes the cloud status (credits included) on window.uniworkCloudStatus for the model chip, also without a cloud tool', async () => {
@@ -1273,7 +1255,7 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(calls).toEqual([])
     })
 
-    it('the grant sets the availability flag (the entry in AI_PROVIDERS); off clears it', async () => {
+    it('the grant sets the availability flag; off clears it', async () => {
       const capabilities: Record<string, unknown> = { ai: true, uniworkAi: true }
       const ai = createWebAi({
         port: uniworkPort({ uniworkAi: true }),
@@ -1324,7 +1306,7 @@ describe('UniWork AI on the web (G6-05)', () => {
       })
       const s = await ai.settings()
       expect(s.provider).toBe('uniwork')
-      expect(Object.keys(s.providers)).toEqual(['uniwork'])
+      expect(s.providers).toEqual({})
       expect(changed).not.toHaveBeenCalled()
       // nothing is saved anywhere: only the cloud status is read
       expect(calls.every((c) => c.url === `${BASE}/cloud` && !c.init.method)).toBe(true)
@@ -1381,10 +1363,11 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(capabilities.ai).toBe(false)
       expect(changed).toHaveBeenCalled()
       expect(document.querySelector('.ow-ai-state')).toBeNull()
-      // the one provider stays, unavailable (an empty slot: Send blocked), never another provider
+      // the one provider stays, unavailable (Send blocked), never another provider
       const s = await ai.settings()
       expect(s.provider).toBe('uniwork')
-      expect(s.providers).toEqual({ uniwork: { apiKey: '', model: '' } })
+      expect(s.providers).toEqual({})
+      expect(uniworkAiAvailable()).toBe(false)
       expect(chunks.at(-1)!.type).toBe('done')
       expect(chunks.some((c) => c.type === 'error')).toBe(false)
     })

@@ -9,10 +9,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-const { handlers, dirs, streamForProvider } = vi.hoisted(() => ({
+const { handlers, dirs, fetchSpy } = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
   dirs: { userData: '' },
-  streamForProvider: vi.fn(async () => undefined),
+  fetchSpy: vi.fn(),
 }))
 
 vi.mock('electron', () => ({
@@ -27,7 +27,7 @@ vi.mock('electron', () => ({
     ),
     on: vi.fn(),
   },
-  net: { fetch: vi.fn() },
+  net: { fetch: fetchSpy },
   webContents: { fromId: vi.fn(), getAllWebContents: () => [] },
 }))
 vi.mock('@genoffice/ai-search', () => ({
@@ -53,11 +53,6 @@ vi.mock('../src/main/session-state', () => ({
   scheduleHistoryNotify: () => {},
   sessions: new Map(),
 }))
-vi.mock('@genoffice/ai-provider', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@genoffice/ai-provider')>()),
-  streamForProvider,
-}))
-
 import { setUniworkAiAvailable, type AiSettings } from '@genoffice/ai-provider'
 import { registerAiIpc } from '../src/main/ai-ipc'
 
@@ -69,13 +64,17 @@ const getSettings = () =>
 describe('slides ai:get-settings is UniWork AI only', () => {
   beforeAll(() => {
     dirs.userData = mkdtempSync(join(tmpdir(), 'slides-uniwork-choice-'))
+    vi.stubGlobal('fetch', fetchSpy)
     registerAiIpc()
   })
   afterEach(() => {
     setUniworkAiAvailable(false)
-    streamForProvider.mockClear()
+    fetchSpy.mockClear()
   })
-  afterAll(() => rmSync(dirs.userData, { recursive: true, force: true }))
+  afterAll(() => {
+    vi.unstubAllGlobals()
+    rmSync(dirs.userData, { recursive: true, force: true })
+  })
 
   it('answers uniwork whatever provider the file holds, offered or not', async () => {
     storeFile({ provider: 'anthropic', providers: { anthropic: { apiKey: 'sk-own' } } })
@@ -145,6 +144,6 @@ describe('slides ai:get-settings is UniWork AI only', () => {
       messages: [{ role: 'user', content: 'hi' }],
     })
     expect(chunks.map((c) => [c.type, c.uniworkCode])).toEqual([['error', 'ai_disabled']])
-    expect(streamForProvider).not.toHaveBeenCalled()
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })

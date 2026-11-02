@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AiSettings } from '@genoffice/ai-provider/browser'
+import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
 
 /** the shell's `ai:gsk-status` answer: signed in to UniWork and the plan includes cloud AI */
 type CloudStatusRead = () => Promise<{ loggedIn?: boolean } | null | undefined> | undefined
@@ -7,8 +7,8 @@ type CloudStatusRead = () => Promise<{ loggedIn?: boolean } | null | undefined> 
 /**
  * Whether the visible image-generation entries (the "AI image" buttons, the "Regenerate with AI"
  * chip) are offered: the host grant (`cap('imageGeneration')`) AND the UniWork cloud, which is the
- * only way to generate (signed in, with the cloud tools on). It is the same rule the AI skills use
- * for the generate_image tool, so a button never offers what the agent would refuse. Unlike
+ * only way to generate (signed in, with the cloud tools on). It is the same predicate the AI skills
+ * use for the generate_image tool, so a button never offers what the agent would refuse. Unlike
  * `useCloudSignedIn` (a ref read at tool-call time) this is state: a button has to render, or
  * vanish, when the answer changes. The cloud state is re-read on mount, on window focus and when
  * the settings change; with the grant off nothing is read at all.
@@ -40,5 +40,5 @@ export function useImageGenerationOffered(
       window.removeEventListener('focus', refresh)
     }
   }, [granted, settings])
-  return granted && loggedIn && settings?.gskToolsEnabled !== false
+  return granted && imageGenerationAvailable(settings, loggedIn)
 }

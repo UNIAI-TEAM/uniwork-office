@@ -14,26 +14,19 @@
  *
  * | method                      | answer                                              |
  * |-----------------------------|-----------------------------------------------------|
- * | aiChat                      | { ok: false, error }                                |
  * | aiStream                    | one terminal { type: 'error', error } chunk         |
  * | webSearch / imageSearch     | { method: 'error', error, results|images: [] }      |
  * | aiGenerateImage             | { error }                                           |
  * | fetchImage                  | null (cross-origin fetch is not possible in a page) |
  * | aiGskStatus                 | { loggedIn: false }                                 |
- * | getAiSettings               | empty provider config, Genspark tools off           |
+ * | getAiSettings               | UniWork AI, cloud tools off                         |
  * | setAiSettings               | accepted and dropped (nothing is persisted)         |
  *
  * `error` is always `ai-unavailable: <feature> is not available in the web build`
  * (see `aiUnavailableMessage`), so a caller can match on the `ai-unavailable`
  * prefix; `isAiUnavailable` does that.
  */
-import { AI_PROVIDERS } from '../../../apps/docs/src/shared/ipc'
-import type {
-  AiChatResponse,
-  AiSettings,
-  AiStreamChunk,
-  DesktopApi,
-} from '../../../apps/docs/src/shared/ipc'
+import type { AiSettings, AiStreamChunk, DesktopApi } from '../../../apps/docs/src/shared/ipc'
 
 /** machine-readable prefix of every "unavailable" error string */
 export const AI_UNAVAILABLE_CODE = 'ai-unavailable'
@@ -59,18 +52,9 @@ function emit(chunk: AiStreamChunk): void {
   }
 }
 
-/** a valid, empty settings object: the renderer reads it at startup even with the AI UI hidden */
+/** a valid settings object: the renderer reads it at startup even with the AI UI hidden */
 function emptySettings(): AiSettings {
-  const providers = {} as AiSettings['providers']
-  for (const meta of AI_PROVIDERS) {
-    providers[meta.id] = {
-      apiKey: '',
-      model: meta.defaultModel,
-      baseUrl: meta.needsBaseUrl ? '' : undefined,
-      cliPath: meta.needsCliPath ? '' : undefined,
-    }
-  }
-  return { provider: 'genspark', providers, gskToolsEnabled: false }
+  return { provider: 'uniwork', providers: {}, gskToolsEnabled: false }
 }
 
 export default {
@@ -84,11 +68,6 @@ export default {
     openInNewDocs: true,
     // the web frame has no AI sidebar to hide; keep the shipped default
     showAiSidebar: true,
-  }),
-
-  aiChat: async (): Promise<AiChatResponse> => ({
-    ok: false,
-    error: aiUnavailableMessage('AI chat'),
   }),
 
   // resolves after the one terminal chunk, like a real turn that failed to start

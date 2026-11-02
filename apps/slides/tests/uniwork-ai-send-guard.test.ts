@@ -7,7 +7,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { ack, aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const harness = vi.hoisted(() => ({
@@ -76,9 +76,7 @@ import { AiPanel } from '../src/renderer/ai/AiPanel'
 
 const settings: AiSettings = {
   provider: 'uniwork',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  providers: {},
 }
 
 const flush = async (): Promise<void> => {

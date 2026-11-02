@@ -31,7 +31,7 @@
  * |                                             | The boot document's draft is offered (shared prompt) before it opens;     |
  * |                                             | Restore opens the draft bytes `restoredFromRecovery`, dirty until saved   |
  * | onRecoveryPrompt / replyRecoveryPrompt      | no-ops: the shared draft prompt is the only recovery UI on the web        |
- * | AI (aiStream, aiChat, getAiSettings,        | the stubs below answer while AI is off; installModuleBridge swaps in the  |
+ * | AI (aiStream, getAiSettings,                | the stubs below answer while AI is off; installModuleBridge swaps in the  |
  * | webSearch, imageSearch, generateImage, ...) | shared web AI bridge (modules/shared/ai withWebAi) while the host grants  |
  * |                                             | `uniworkAi` (CONTRACT C16): UniWork AI routes, streamed in the frame      |
  * | fetchImage                                  | data: URLs decoded locally; else image.fetch (host proxy, SSRF-guarded)   |

@@ -4,8 +4,8 @@
  *
  * A turn sends only the new question or the trailing tool results (./slice),
  * with the conversation and run ids the server handed out (./conversation).
- * The answer (a real stream or the v1 one-chunk SSE, or JSON) is read by the
- * same code as the BYOK openai-compatible path. A 429, before the headers or
+ * The answer (a real stream or the v1 one-chunk SSE, or JSON) is read by
+ * ../protocols/openai-sse. A 429, before the headers or
  * as the reserved `x_uniwork.terminal` frame, is waited out here under the
  * one Retry-After rule (./retry-after), so the turn stays one stream: the
  * run indicator never drops to idle and the host watchdog keeps getting
@@ -13,7 +13,7 @@
  */
 import type { AgentDroppedToolCall, AgentMessage, AgentToolDef } from '@genoffice/agent-core'
 import { isAiNetworkError } from '../network-error'
-import { consumeOpenAiCompatibleResponse } from '../protocols/openai-compatible'
+import { consumeOpenAiCompatibleResponse } from '../protocols/openai-sse'
 import type { StreamCallbacks } from '../protocols/shared'
 import { AiTimeoutError, createStreamWatchdog } from '../watchdog'
 import { uniworkConversations, type UniworkConversations } from './conversation'
@@ -160,7 +160,7 @@ function requestBody(slice: UniworkTurnSlice, tools: AgentToolDef[], scope: Uniw
           })),
         }
       : {}),
-    // always a stream: never the JSON path's credits-notice scan; a JSON answer is still read
+    // always a stream; a JSON answer is still read
     stream: true,
     // the organization route keys the conversation by module, so every turn carries it
     module: scope.format,
@@ -196,13 +196,13 @@ export async function streamUniwork(
   const tools = uniworkAllowedTools(request.tools, request.toolPolicy)
   const body = requestBody(slice, tools, request.scope)
   // a question after tool calls nobody answered (Stop while tools ran, a dropped answer) cannot go
-  // onto that transcript: it starts a new conversation, said like a provider boundary
+  // onto that transcript: it starts a new conversation, and the panel says so
   const dangling = slice.kind === 'question' && conversations.hasOpenToolCalls(session)
-  if (dangling) conversations.dropConversation(session)
-  const start = conversations.begin(session, request.scope, slice.continuesRun && !dangling)
-  if (start.boundary || dangling) {
+  if (dangling) {
+    conversations.dropConversation(session)
     cb.onNotice?.({ kind: 'conversation-boundary', provider: 'uniwork' })
   }
+  const start = conversations.begin(session, request.scope, slice.continuesRun && !dangling)
   if (slice.imagesDropped) cb.onNotice?.({ kind: 'images-not-sent' })
   // a tool-result turn without the run header is a 400 (API §3.7): the run is already gone
   if (slice.kind === 'tool-result' && !start.ids.runId) throw new UniworkError('run_expired')
@@ -329,7 +329,6 @@ async function attempt(
       try {
         await consumeOpenAiCompatibleResponse(response, cb, onBytes, {
           onExtension: (ext) => readExtension(ext, cb),
-          creditsNotice: false,
         })
         return { kind: 'done' }
       } catch (cause) {

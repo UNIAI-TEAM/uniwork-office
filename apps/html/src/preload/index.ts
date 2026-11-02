@@ -119,8 +119,7 @@ const api: HtmlApi = {
     return () => ipcRenderer.removeListener('app:chrome-pressed', listener)
   },
   getAiSettings: () => ipcRenderer.invoke(AI_CHANNELS.getSettings),
-  setAiSettings: (settings, options) =>
-    ipcRenderer.invoke(AI_CHANNELS.setSettings, settings, options),
+  setAiSettings: (settings) => ipcRenderer.invoke(AI_CHANNELS.setSettings, settings),
   onAiSettingsChanged: (handler) => {
     const listener = () => handler()
     ipcRenderer.on(AI_CHANNELS.settingsChanged, listener)

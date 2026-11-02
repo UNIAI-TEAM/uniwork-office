@@ -1086,15 +1086,10 @@ const homeApi: HomeApi = {
     )) as AiSettings
   },
   async setAiSettings(settings, options) {
-    const sent = {
-      ...(options?.includeUniworkPick ? { includeUniworkPick: true } : {}),
-      ...(options?.modelPick ? { modelPick: options.modelPick } : {}),
-      ...(options?.modelPicks?.length ? { modelPicks: options.modelPicks } : {}),
-    }
     await ipcRenderer.invoke(
       'ai:set-settings',
       settings,
-      Object.keys(sent).length > 0 ? sent : undefined,
+      options?.includeUniworkPick ? { includeUniworkPick: true } : undefined,
     )
   },
   pickAttachments() {

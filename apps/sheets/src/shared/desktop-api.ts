@@ -28,10 +28,7 @@ import {
   workbookVisualEditSchema,
 } from '@genoffice/xlsx-gateway/shared/edit-schemas'
 import type {
-  AiChatRequest,
-  AiChatResponse,
   AiSettings,
-  AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
   GenSparkAccountStatus,
@@ -2654,11 +2651,10 @@ export type WorkbookPivotAdd = z.infer<typeof workbookPivotAddSchema>
 export type WorkbookCellStyle = z.infer<typeof cellStyleSchema>
 export type WorkbookConditionalRule = z.infer<typeof conditionalRuleSchema>
 
-// ---- AI settings + chat/stream: canonical types live in @genoffice/ai-provider,
+// ---- AI settings + stream: canonical types live in @genoffice/ai-provider,
 // shared with apps/docs. Validated here like every other renderer→main request in
-// this file; the validated shape is cast to AiSettings at the main-process call
-// site, which has every known provider key once merged through
-// resolveAiSettings/defaultAiSettings. ----
+// this file. The schema still accepts the fields an older renderer sent; main reads
+// none of them (UniWork AI is the only provider). ----
 
 const aiProviderConfigSchema = z
   .object({
@@ -2710,9 +2706,8 @@ export const aiSettingsInputSchema = z
       })
       .strict()
       .optional(),
-    // bounds are enforced by clampMaxOutputTokens on read; the schema only
-    // rejects nonsense (this object is .strict(), so an omitted key here would
-    // make the whole settings save fail)
+    // the schema only rejects nonsense (this object is .strict(), so an omitted
+    // key here would make the whole request fail)
     maxOutputTokens: z.number().int().positive().optional(),
   })
   .strict()
@@ -2774,14 +2769,6 @@ const agentToolDefSchema = z
 const MAX_AI_MESSAGES = 500
 const MAX_AI_TOOLS = 50
 
-export const aiChatRequestSchema = z
-  .object({
-    settings: aiSettingsInputSchema,
-    system: z.string(),
-    user: z.string(),
-  })
-  .strict()
-
 export const aiStreamRequestSchema = z
   .object({
     requestId: z.string().min(1),
@@ -2795,7 +2782,6 @@ export const aiStreamRequestSchema = z
   .strict()
 
 export type AiSettingsInput = z.infer<typeof aiSettingsInputSchema>
-export type AiChatRequestInput = z.infer<typeof aiChatRequestSchema>
 export type AiStreamRequestInput = z.infer<typeof aiStreamRequestSchema>
 
 const pdfPageVariantSchema = z
@@ -3199,12 +3185,11 @@ export interface DesktopApi {
   /// EL-1(b) fix6: explicit Save on a read-only bound workbook asks main to explain
   uniworkReadOnlySave?(path?: string): Promise<void>
   getAiSettings(): Promise<AiSettings>
-  setAiSettings(settings: AiSettings, options?: AiSettingsSaveOptions): Promise<void>
+  setAiSettings(settings: AiSettings): Promise<void>
   /// ai-settings.json was rewritten by any renderer; re-read it
   onAiSettingsChanged(handler: () => void): () => void
   /// shell only: switch to Home and open Settings › AI Model (rejects in standalone)
   openAiModelSettings(): Promise<void>
-  aiChat(request: AiChatRequest): Promise<AiChatResponse>
   /// start a streaming AI call; deltas arrive via onAiStream with the same requestId
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>

@@ -33,16 +33,14 @@ vi.mock('react-konva', () => {
   return { Stage: stub, Layer: stub, Rect: stub, Group: stub, Line: stub, Text: stub, Image: stub }
 })
 
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 import { resetForTest } from '../src/renderer/capabilities'
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 import { LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 
 const settings: AiSettings = {
-  provider: 'anthropic',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  provider: 'uniwork',
+  providers: {},
 }
 
 const props = (extra: Record<string, unknown>) => ({

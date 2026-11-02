@@ -3,7 +3,6 @@ import type { IpcRendererEvent } from 'electron'
 import { VIEW_IMAGE_CHANNEL } from '../shared/ipc'
 import type { AiPanelPrefs } from '@genoffice/ui'
 import type {
-  AiChatRequest,
   AiStreamChunk,
   AiStreamRequest,
   DesktopApi,
@@ -212,14 +211,13 @@ const api: DesktopApi = {
     return () => ipcRenderer.removeListener(VIEW_IMAGE_CHANNEL, listener)
   },
   getAiSettings: () => ipcRenderer.invoke('ai:get-settings'),
-  setAiSettings: (settings, options) => ipcRenderer.invoke('ai:set-settings', settings, options),
+  setAiSettings: (settings) => ipcRenderer.invoke('ai:set-settings', settings),
   onAiSettingsChanged: (handler) => {
     const listener = () => handler()
     ipcRenderer.on('ai:settings-changed', listener)
     return () => ipcRenderer.removeListener('ai:settings-changed', listener)
   },
   openAiModelSettings: () => ipcRenderer.invoke('ai:open-model-settings'),
-  aiChat: (request: AiChatRequest) => ipcRenderer.invoke('ai:chat', request),
   aiStream: (request: AiStreamRequest) => ipcRenderer.invoke('ai:stream', request),
   aiStreamCancel: (requestId: string) => ipcRenderer.invoke('ai:stream-cancel', requestId),
   aiGskStatus: (withEmail?: boolean) => ipcRenderer.invoke('ai:gsk-status', withEmail),

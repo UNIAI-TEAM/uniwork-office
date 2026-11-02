@@ -204,38 +204,6 @@ describe('UniWork AI conversation and run ids', () => {
     )
   })
 
-  it('a BYOK turn between two UniWork turns starts a new conversation with a boundary notice', async () => {
-    const conversations = new UniworkConversations()
-    const fake = createUniworkFake()
-    fake.enqueue(oneChunk('a1', { ids: { conversation: 'conv-1', run: 'run-1' } }))
-    fake.enqueue(oneChunk('a3', { ids: { conversation: 'conv-2', run: 'run-3' } }))
-    const first = recorder()
-    await streamUniwork(fake, turn(question('q1')), first.cb, { conversations })
-    expect(first.state.notices).not.toContainEqual(
-      expect.objectContaining({ kind: 'conversation-boundary' }),
-    )
-
-    conversations.observe('panel-1', 'openai')
-
-    const third = recorder()
-    await streamUniwork(fake, turn(question('q3')), third.cb, { conversations })
-    expect(fake.requests[1]!.headers['X-UniWork-AI-Conversation']).toBeUndefined()
-    expect(third.state.notices).toContainEqual({
-      kind: 'conversation-boundary',
-      provider: 'uniwork',
-    })
-  })
-
-  it('a first UniWork turn after a BYOK turn is a boundary too', async () => {
-    const conversations = new UniworkConversations()
-    conversations.observe('panel-1', 'anthropic')
-    const fake = createUniworkFake()
-    fake.enqueue(oneChunk('a1'))
-    const rec = recorder()
-    await streamUniwork(fake, turn(question('q1')), rec.cb, { conversations })
-    expect(rec.state.notices).toContainEqual({ kind: 'conversation-boundary', provider: 'uniwork' })
-  })
-
   it('another scope (document) starts its own conversation', async () => {
     const conversations = new UniworkConversations()
     const fake = createUniworkFake()

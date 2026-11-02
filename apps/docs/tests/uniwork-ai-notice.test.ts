@@ -12,13 +12,11 @@ import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/u
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 import { getLang, LocaleProvider, setModuleLang, t } from '../src/renderer/i18n/locale'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 
 const settings: AiSettings = {
   provider: 'uniwork',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: 'k', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  providers: {},
 }
 
 const flush = async (): Promise<void> => {

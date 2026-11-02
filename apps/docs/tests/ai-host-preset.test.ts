@@ -12,7 +12,7 @@ import { aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
 import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { editorExtensions } from '../src/renderer/editor/extensions'
-import { AI_PROVIDERS, type AiPresetPayload, type AiSettings } from '../src/shared/ipc'
+import { type AiPresetPayload, type AiSettings } from '../src/shared/ipc'
 import { resetCapabilitiesForTest } from '../src/renderer/capabilities'
 import { LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 
@@ -40,9 +40,7 @@ const JOB = 'Draft this document from the job:  Plan\r\n- Goals'
 
 const settingsFor = (provider: AiSettings['provider']): AiSettings => ({
   provider,
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: 'test-key', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  providers: {},
 })
 
 const tick = async (): Promise<void> => {

@@ -7,34 +7,8 @@ import type {
   WriterCall,
 } from '@genoffice/agent-core'
 
-export type AiProviderId =
-  | 'genspark'
-  | 'codex'
-  | 'anthropic'
-  | 'gemini'
-  | 'deepseek'
-  | 'openai'
-  | 'kimi'
-  | 'glm'
-  | 'qwen'
-  | 'doubao'
-  | 'mimo'
-  | 'hunyuan'
-  | 'ling'
-  | 'spark'
-  | 'longcat'
-  | 'minimax'
-  | 'xai'
-  | 'mistral'
-  | 'openrouter'
-  | 'requesty'
-  | 'opper'
-  | 'cheaperinference'
-  | 'opencode-zen'
-  | 'opencode-go'
-  | 'custom'
-  /** UniWork AI: the organization's server-side model through the UniWork façade (no key, never BYOK pass-through) */
-  | 'uniwork'
+/** UniWork AI: the organization's server-side model through the UniWork façade (no key) */
+export type AiProviderId = 'uniwork'
 
 /** UniWork cloud account status (internal name kept): loggedIn = signed in to UniWork + plan includes cloud AI */
 export interface GenSparkAccountStatus {
@@ -42,204 +16,18 @@ export interface GenSparkAccountStatus {
   email?: string
 }
 
-export interface AiProviderConfig {
-  apiKey: string
-  model: string
-  /** required for custom; for other direct providers it overrides the default endpoint (regional mirrors) */
-  baseUrl?: string | undefined
-  /** optional Codex CLI override; empty means auto-detect the current authenticated install */
-  cliPath?: string | undefined
-}
-
-/** Live picker data returned by Codex app-server's model/list method. */
-export interface CodexModelCatalog {
-  models: string[]
-  defaultModel: string
-}
-
-export interface AiProviderMeta {
-  id: AiProviderId
-  label: string
-  models: string[]
-  defaultModel: string
-  keyPlaceholder: string
-  needsBaseUrl?: boolean
-  needsCliPath?: boolean
-}
-
-/** Image generation / media analysis backends (separate from the chat provider) */
-export type AiMediaProviderId =
-  | 'genspark'
-  | 'openai'
-  | 'gemini'
-  | 'doubao'
-  | 'glm'
-  | 'xai'
-  | 'qwen'
-  | 'minimax'
-  | 'deepseek'
-  | 'custom'
-
-/** wire shape of the image endpoint */
-export type AiImageProtocol = 'openai-images' | 'gemini' | 'dashscope' | 'minimax'
-/** wire shape of the understanding endpoint */
-export type AiAnalysisProtocol = 'openai-chat' | 'gemini'
-
-export interface AiMediaProviderConfig {
-  apiKey: string
-  /** required for custom; for the others it overrides the official endpoint (regional mirrors) */
-  baseUrl?: string | undefined
-  /** image generation model (empty = the provider default) */
-  imageModel: string
-  /** image/video understanding model (empty = the provider default) */
-  analysisModel: string
-}
-
-export interface AiMediaProviderMeta {
-  id: AiMediaProviderId
-  label: string
-  /** one-line English blurb shown on the provider card */
-  description: string
-  keyPlaceholder: string
-  needsBaseUrl?: boolean
-  /** '' for genspark (UniWork cloud, kept for stored settings) and custom (user-supplied) */
-  defaultBaseUrl: string
-  /** absent = the provider does not generate images */
-  imageProtocol?: AiImageProtocol
-  imageModels: string[]
-  defaultImageModel: string
-  /** absent = the provider does not analyze media */
-  analysisProtocol?: AiAnalysisProtocol
-  analysisModels: string[]
-  defaultAnalysisModel: string
-  /** the analysis model accepts video input (Gemini natively; OpenAI-compatible vendors via a video_url part) */
-  videoAnalysis: boolean
-}
-
-export interface AiMediaSettings {
-  /** provider behind generate_image */
-  imageProvider: AiMediaProviderId
-  /** provider behind analyze_media for images */
-  analysisProvider: AiMediaProviderId
-  /** provider behind analyze_media when the input has video/audio (only video-capable vendors qualify) */
-  videoAnalysisProvider: AiMediaProviderId
-  providers: Record<AiMediaProviderId, AiMediaProviderConfig>
-  /**
-   * Capabilities where the user picked the UniWork cloud entry themselves. A
-   * stored `genspark` without this mark is only the default and yields to a
-   * BYOK vendor with a usable config.
-   */
-  cloudPicked?: { image?: boolean; analysis?: boolean; video?: boolean } | undefined
-  /** pre-catalog shape (one provider for both); migrated by resolveAiMediaSettings */
-  provider?: AiMediaProviderId | undefined
-}
-
-/** web/image search backends; `auto` is the keyless chain, Parallel supports both a user key and free keyless search */
-export type AiSearchProviderId =
-  'auto' | 'serper' | 'serply' | 'tavily' | 'parallel' | 'exa' | 'firecrawl'
-
-export interface AiSearchProviderMeta {
-  id: AiSearchProviderId
-  label: string
-  keyPlaceholder: string
-  /** the backend also serves image search (otherwise image search falls back to free sources) */
-  imageSearch: boolean
-}
-
-export interface AiSearchSettings {
-  provider: AiSearchProviderId
-  providers: Record<Exclude<AiSearchProviderId, 'auto'>, { apiKey: string }>
-}
-
-/** where one provider's chip rows come from (G6-05m): Settings first, the live list, the catalog as fallback */
-export interface AiModelSource {
-  /** the model chosen for this provider in Settings (server row on web, ai-settings.json on desktop); '' = none */
-  readonly chosen: string
-  /** the provider's live model ids from its own /models; absent = not listed (yet), the catalog is shown */
-  readonly listed?: readonly string[] | undefined
-  /** 'loading' while a first listing runs, 'error' after a failed one (the catalog is shown); absent = ok or not asked */
-  readonly listState?: 'loading' | 'error' | undefined
-}
-
-/** the model the user picked for one provider (chip or Settings), sent beside `ai:set-settings` */
-export interface AiModelPick {
-  readonly provider: AiProviderId
-  readonly model: string
-}
-
-/**
- * What a renderer may say beside the settings it saves (`ai:set-settings` second argument).
- * `modelPick` is the one signal that a model was chosen: a plain echo of the loaded settings
- * carries none.
- */
-export interface AiSettingsSaveOptions {
-  readonly modelPick?: AiModelPick | undefined
-  /** several picks in one save (the Settings pane keeps one per provider) */
-  readonly modelPicks?: readonly AiModelPick[] | undefined
-}
-
 export interface AiSettings {
   provider: AiProviderId
-  providers: Record<AiProviderId, AiProviderConfig>
-  /**
-   * Provider for generate_image / analyze_media. Absent (pre-media settings
-   * files) means the UniWork cloud route, i.e. signed in + entitled + the gskToolsEnabled gate.
-   */
-  media?: AiMediaSettings | undefined
-  /** web/image search backend; absent means `auto` (the keyless free chain) */
-  search?: AiSearchSettings | undefined
+  /** no provider slots: UniWork AI has no key and the server picks the model */
+  providers: Record<string, never>
   /**
    * UniWork cloud tools (web/image search, image generation, media
-   * analysis). Default true; false makes tools skip the cloud backend entirely
-   * (search falls back to free sources, cloud-only tools are unavailable).
-   * Only meaningful while signed in + entitled (see uniwork-cloud.ts).
+   * analysis). Default true; false makes the tools unavailable. Only
+   * meaningful while signed in + entitled (see uniwork-cloud.ts).
    */
   gskToolsEnabled?: boolean
-  /**
-   * false = this host runs only the viewer's own providers, so the UniAI pool (`genspark`) is not
-   * offered in the model picker even while the cloud sign-in is reported (the web frames).
-   * Absent means offered.
-   */
-  uniAiAvailable?: boolean
-  /**
-   * Per provider: the model chosen in Settings and the provider's live model list (G6-05m).
-   * Derived by the host on every read and never saved: a host writing settings back drops it.
-   * A provider without an entry (older host or server) gets the hard-coded catalog.
-   */
-  modelSources?: Partial<Record<AiProviderId, AiModelSource>> | undefined
   /** the model UniWork AI serves (server policy); '' or absent = unknown, the row shows its label. Derived, never saved */
   uniworkModel?: string | undefined
-  /**
-   * Output-token cap for ONE model turn of agent runs (default
-   * DEFAULT_MAX_OUTPUT_TOKENS). Reasoning models bill their thinking against
-   * this same budget, so a heavy edit turn can consume all of it and close with
-   * finish_reason=length and no prose at all — raising it is the user's lever
-   * (absent = the default, so pre-existing settings files keep working).
-   */
-  maxOutputTokens?: number | undefined
-}
-
-/** pre-provider settings shape (single OpenAI-compatible endpoint); migrated into "custom" */
-export interface LegacyAiSettings {
-  baseUrl?: string
-  apiKey?: string
-  model?: string
-}
-
-export interface AiChatRequest {
-  settings: AiSettings
-  system: string
-  user: string
-}
-
-export interface AiChatResponse {
-  ok: boolean
-  content?: string
-  error?: string
-  /** Same codes as stream errors — e.g. OpenRouter HTTP 402 */
-  errorCode?: 'timeout' | 'credits' | 'network' | 'overloaded'
-  /** a UniWork AI refusal/failure carries the server's code (e.g. ai_disabled); errorCode stays unset */
-  uniworkCode?: string
 }
 
 export interface AiStreamRequest {
@@ -256,7 +44,7 @@ export interface AiStreamRequest {
    * except a one-shot that names its `writer`, which the web frame sends to the writer route
    */
   purpose?: AgentRequestPurpose
-  /** the one-shot as a UniWork AI writer (kind + input); BYOK ignores it */
+  /** the one-shot as a UniWork AI writer (kind + input) */
   writer?: WriterCall
 }
 
@@ -280,8 +68,8 @@ export interface AiStreamChunk {
   /** 'notice' only: a non-fatal turn notice (UniWork AI); 'reset' = drop this turn's streamed output, the same turn is resent */
   notice?: AgentStreamNotice
   error?: string
-  /** machine-readable error cause ('timeout', exhausted 'credits', 'network' connectivity failure, 'overloaded' capacity/rate limit); lets the renderer localize the message */
-  errorCode?: 'timeout' | 'credits' | 'network' | 'overloaded'
+  /** machine-readable error cause ('timeout', 'network' connectivity failure, 'overloaded' capacity/rate limit); lets the renderer localize the message */
+  errorCode?: 'timeout' | 'network' | 'overloaded'
   /** a UniWork AI failure: the server's `code` (UniworkWireCode) decides the message, never the text or errorCode */
   uniworkCode?: string
   /** with uniworkCode: seconds the server asked to wait (Retry-After), when it sent one */

@@ -61,14 +61,12 @@ vi.mock('react-konva', () => {
 
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 import { getLang, LocaleProvider, setModuleLang, t } from '../src/renderer/i18n/locale'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const settings: AiSettings = {
   provider: 'uniwork',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: 'k', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  providers: {},
 }
 
 const mounted: Array<{ root: Root; container: HTMLElement }> = []

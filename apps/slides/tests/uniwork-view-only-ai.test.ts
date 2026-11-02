@@ -8,7 +8,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { RenderSlide } from '@genoffice/pptx-render'
 import type { AgentToolCall } from '../src/shared/ipc'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 import { resetForTest } from '../src/renderer/capabilities'
 
 vi.mock('react-konva', () => {
@@ -247,9 +247,7 @@ describe('AI skill of a view-only deck', () => {
 describe('AI panel of a view-only deck', () => {
   const settings: AiSettings = {
     provider: 'uniwork',
-    providers: Object.fromEntries(
-      AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
-    ) as AiSettings['providers'],
+    providers: {},
   }
   const props = (extra: Record<string, unknown>) => ({
     slides: [],

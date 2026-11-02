@@ -16,7 +16,6 @@ import type { CatalogEntry as FontCatalogEntry } from '@genoffice/electron-utils
 import type { LayoutSkeleton } from '../renderer/ai/layout-skeleton'
 import type {
   AiSettings,
-  AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
   GenSparkAccountStatus,
@@ -47,15 +46,12 @@ export type { SlideComment, SectionInfo } from '@genoffice/pptx-engine'
 
 // Canonical definitions of AI-related types live in @genoffice/ai-provider / @genoffice/agent-core (shared with docs)
 export type {
-  AiProviderConfig,
   AiProviderId,
-  AiProviderMeta,
   AiSettings,
   AiStreamChunk,
   AiStreamRequest,
   GenSparkAccountStatus,
 } from '@genoffice/ai-provider'
-export { AI_PROVIDERS } from '@genoffice/ai-provider/browser'
 export type { AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
 
 export type UiTheme = 'light' | 'dark' | 'system'
@@ -1782,7 +1778,7 @@ export interface SlidesApi {
   /** The file was renamed externally (shell Home list rename) — pushes the new path, the renderer updates the title bar */
   onRenamed: (handler: (newPath: string) => void) => () => void
   getAiSettings: () => Promise<AiSettings>
-  setAiSettings: (settings: AiSettings, options?: AiSettingsSaveOptions) => Promise<void>
+  setAiSettings: (settings: AiSettings) => Promise<void>
   /** ai-settings.json was rewritten by any renderer; re-read it */
   onAiSettingsChanged: (handler: () => void) => () => void
   /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */

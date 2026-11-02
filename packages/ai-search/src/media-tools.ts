@@ -13,7 +13,6 @@ import {
   defaultAiSettings,
   resolveAiSettings,
   type AiSettings,
-  type LegacyAiSettings,
   type MediaBlob,
 } from '@genoffice/ai-provider'
 // deep imports: the package root re-exports Electron-bound modules, and this file also runs in the genoffice CLI
@@ -102,7 +101,7 @@ function dataUrlDecodedSize(ref: string): number {
 }
 
 export function readAiSettingsFile(path: string): AiSettings {
-  let stored: Partial<AiSettings> & LegacyAiSettings = {}
+  let stored: unknown = {}
   try {
     if (existsSync(path)) stored = JSON.parse(readFileSync(path, 'utf-8'))
   } catch {

@@ -68,14 +68,12 @@ vi.mock('react-konva', () => {
 })
 
 import { AiPanel } from '../src/renderer/ai/AiPanel'
-import { AI_PROVIDERS, type AiSettings, type AttachmentMeta } from '../src/shared/ipc'
+import { type AiSettings, type AttachmentMeta } from '../src/shared/ipc'
 import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
 const settings: AiSettings = {
   provider: 'uniwork',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((provider) => [provider.id, { apiKey: '', model: provider.defaultModel }]),
-  ) as AiSettings['providers'],
+  providers: {},
 }
 
 const mountedRoots: Array<{ root: Root; container: HTMLElement }> = []

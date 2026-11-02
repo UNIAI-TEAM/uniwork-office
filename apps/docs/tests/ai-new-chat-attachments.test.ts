@@ -6,17 +6,15 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 import { t } from '../src/renderer/i18n/locale'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 
 // New chat must drop staged composer attachments along with the transcript:
 // otherwise unsent files silently join the next chat's file context
 // (availableAttachments merges sent + live composer files).
 
 const settings: AiSettings = {
-  provider: 'anthropic',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  provider: 'uniwork',
+  providers: {},
 }
 
 function createEditor(): Editor {

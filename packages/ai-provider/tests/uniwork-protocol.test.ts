@@ -1,12 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentMessage, AgentToolDef } from '@genoffice/agent-core'
-import { streamForProvider } from '../src/stream'
 import { UniworkConversations } from '../src/uniwork/conversation'
 import { UniworkError, uniworkErrorKey } from '../src/uniwork/errors'
 import { streamUniwork, type UniworkTurnRequest } from '../src/uniwork/protocol'
-import { setUniworkChatTransport } from '../src/uniwork/transport'
 import type { UniworkScope } from '../src/uniwork/types'
-import { okResponse, sseStream } from './test-utils'
 import {
   createUniworkFake,
   error,
@@ -19,8 +16,6 @@ import {
 
 afterEach(() => {
   vi.useRealTimers()
-  vi.unstubAllGlobals()
-  setUniworkChatTransport(null)
 })
 
 const scope: UniworkScope = { kind: 'org', orgId: 'org-1', format: 'docx' }
@@ -463,104 +458,5 @@ describe('streamUniwork: run limits and errors', () => {
       conversations: new UniworkConversations(),
     }).catch((e) => e)
     expect((err as UniworkError).code).toBe('disconnected')
-  })
-
-  it('a 503 leaves no state that breaks the next BYOK turn', async () => {
-    const fake = createUniworkFake()
-    fake.enqueue(error(503, 'ai_disabled', { ids: false }))
-    setUniworkChatTransport(fake)
-    const first = recorder()
-    const err = await streamForProvider(
-      'uniwork',
-      { apiKey: '', model: '' },
-      'system',
-      q('x'),
-      moduleTools,
-      4096,
-      first.cb,
-      {
-        scope,
-        toolPolicy: { cloudTools: false },
-      },
-    ).catch((e) => e)
-    expect((err as UniworkError).code).toBe('ai_disabled')
-    expect(uniworkErrorKey('ai_disabled')).toBe('aiErrUnavailable')
-
-    const fetchMock = vi.fn(async () =>
-      okResponse(
-        sseStream([
-          'data: {"choices":[{"delta":{"content":"BYOK answer"}}]}',
-          'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
-          'data: [DONE]',
-        ]),
-      ),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-    const second = recorder()
-    await streamForProvider(
-      'openai',
-      { apiKey: 'sk-test', model: 'gpt-test' },
-      'system',
-      q('y'),
-      moduleTools,
-      4096,
-      second.cb,
-    )
-    expect(second.state.text).toBe('BYOK answer')
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-  })
-
-  it('streamForProvider routes uniwork to the adapter, never a BYOK endpoint', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
-    const fake = createUniworkFake()
-    fake.enqueue(oneChunk('via adapter'))
-    setUniworkChatTransport(fake)
-    const rec = recorder()
-    await streamForProvider(
-      'uniwork',
-      { apiKey: '', model: '' },
-      'system prompt',
-      q('x'),
-      moduleTools,
-      4096,
-      rec.cb,
-      {
-        scope,
-        toolPolicy: { cloudTools: false },
-      },
-    )
-    expect(rec.state.text).toBe('via adapter')
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(JSON.stringify(fake.requests[0]!.body)).not.toContain('system prompt')
-  })
-
-  it('streamForProvider without a session transport or a scope fails with a UniWork code', async () => {
-    const rec = recorder()
-    const noTransport = await streamForProvider(
-      'uniwork',
-      { apiKey: '', model: '' },
-      's',
-      q('x'),
-      [],
-      4096,
-      rec.cb,
-      {
-        scope,
-        toolPolicy: { cloudTools: false },
-      },
-    ).catch((e) => e)
-    expect((noTransport as UniworkError).code).toBe('session_expired')
-    setUniworkChatTransport(createUniworkFake())
-    const noScope = await streamForProvider(
-      'uniwork',
-      { apiKey: '', model: '' },
-      's',
-      q('x'),
-      [],
-      4096,
-      rec.cb,
-    ).catch((e) => e)
-    expect(noScope).toBeInstanceOf(UniworkError)
   })
 })

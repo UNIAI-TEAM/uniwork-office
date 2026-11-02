@@ -12,10 +12,10 @@ export interface UniworkAiFlagBridge {
 
 /**
  * Mirrors the shell main process's UniWork AI availability flag into THIS realm, so this
- * renderer's AI_PROVIDERS (picker, settings) shows or hides the `uniwork` entry. A renderer has
- * its own module instances, so main's setUniworkAiAvailable never reaches it. Subscribes before
- * the pull: a change pushed while the pull is in flight wins over the older pulled value. With no
- * bridge, or a failing or non-boolean answer, the entry stays hidden. Returns the unsubscribe.
+ * renderer's `uniworkAiAvailable()` (model chip, Send guard) follows it. A renderer has its own
+ * module instances, so main's setUniworkAiAvailable never reaches it. Subscribes before the pull:
+ * a change pushed while the pull is in flight wins over the older pulled value. With no bridge, or
+ * a failing or non-boolean answer, UniWork AI stays unavailable. Returns the unsubscribe.
  */
 export function mirrorUniworkAiFlag(
   bridge: UniworkAiFlagBridge | undefined = (globalThis as { uniworkAiFlag?: UniworkAiFlagBridge })

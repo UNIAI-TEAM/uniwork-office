@@ -1,5 +1,5 @@
 /**
- * aiStream / aiChat in the frame (the desktop runs them in the main process, e.g.
+ * aiStream in the frame (the desktop runs it in the main process, e.g.
  * apps/slides/src/main/ai-ipc.ts `ai:stream`), with the same AiStreamChunk sequence (delta /
  * reasoning / tool-call / ping, then one done or error).
  *
@@ -10,12 +10,7 @@
  * same chunk sequence the panel already reads.
  */
 import type { StreamCallbacks } from '../../../../packages/ai-provider/src/protocols/shared'
-import type {
-  AiChatResponse,
-  AiSettings,
-  AiStreamChunk,
-  AiStreamRequest,
-} from '../../../../packages/ai-provider/src/types'
+import type { AiStreamChunk, AiStreamRequest } from '../../../../packages/ai-provider/src/types'
 import { uniworkConversations } from '../../../../packages/ai-provider/src/uniwork/conversation'
 import { streamUniwork } from '../../../../packages/ai-provider/src/uniwork/protocol'
 import {
@@ -75,7 +70,6 @@ export interface WebAiStreams {
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>
   onAiStream(handler: (chunk: AiStreamChunk) => void): () => void
-  aiChat(request: { settings: AiSettings; system: string; user: string }): Promise<AiChatResponse>
 }
 
 export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
@@ -258,18 +252,6 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     }
   }
 
-  /**
-   * UniWork AI only: no one-shot chat route, so a one-shot answers with the failure text and sends
-   * nothing (no editor panel calls aiChat on the web)
-   */
-  async function aiChat(): Promise<AiChatResponse> {
-    return {
-      ok: false,
-      error:
-        deps.uniwork?.describeFailure({ code: 'ai_disabled' }) ?? 'UniWork AI is not available',
-    }
-  }
-
   return {
     aiStream: uniworkTurn,
     aiStreamCancel: async (requestId) => {
@@ -281,6 +263,5 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
         listeners.delete(handler)
       }
     },
-    aiChat,
   }
 }

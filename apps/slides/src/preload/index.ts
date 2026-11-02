@@ -419,7 +419,7 @@ const api: SlidesApi = {
     return () => ipcRenderer.removeListener('slides:renamed', listener)
   },
   getAiSettings: () => ipcRenderer.invoke('ai:get-settings'),
-  setAiSettings: (settings, options) => ipcRenderer.invoke('ai:set-settings', settings, options),
+  setAiSettings: (settings) => ipcRenderer.invoke('ai:set-settings', settings),
   onAiSettingsChanged: (handler: () => void) => {
     const listener = () => handler()
     ipcRenderer.on('ai:settings-changed', listener)

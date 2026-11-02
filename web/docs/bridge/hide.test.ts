@@ -142,12 +142,6 @@ describe('hide stubs behind the hidden desktop-only entries', () => {
 })
 
 describe('AI / search / image bridge stays stubbed with a typed "unavailable" answer', () => {
-  it('aiChat fails with the ai-unavailable error', async () => {
-    const res = await ai.aiChat()
-    expect(res.ok).toBe(false)
-    expect(isAiUnavailable(res.error)).toBe(true)
-  })
-
   it('aiStream emits exactly one terminal error chunk for its request and resolves', async () => {
     const chunks: Array<{ requestId: string; type: string; error?: string }> = []
     const off = ai.onAiStream((chunk) => chunks.push(chunk))
@@ -192,13 +186,11 @@ describe('AI / search / image bridge stays stubbed with a typed "unavailable" an
     expect(await ai.aiGskStatus(true)).toEqual({ loggedIn: false })
   })
 
-  it('getAiSettings is a valid empty config and setAiSettings persists nothing', async () => {
+  it('getAiSettings is a valid UniWork AI config and setAiSettings persists nothing', async () => {
     const settings = await ai.getAiSettings()
-    expect(settings.provider).toBe('genspark')
-    expect(settings.gskToolsEnabled).toBe(false)
-    expect(Object.values(settings.providers).every((p) => p.apiKey === '')).toBe(true)
-    await ai.setAiSettings({ ...settings, provider: 'custom' } as never)
-    expect((await ai.getAiSettings()).provider).toBe('genspark')
+    expect(settings).toEqual({ provider: 'uniwork', providers: {}, gskToolsEnabled: false })
+    await ai.setAiSettings({ ...settings, gskToolsEnabled: true } as never)
+    expect((await ai.getAiSettings()).gskToolsEnabled).toBe(false)
     expect(localStorage.length).toBe(0)
   })
 

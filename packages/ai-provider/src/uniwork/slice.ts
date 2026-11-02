@@ -100,7 +100,7 @@ export function sliceUniworkTurn(history: AgentMessage[]): UniworkTurnSlice {
     const round = m.results.map((r) => ({
       role: 'tool' as const,
       tool_call_id: r.id,
-      // the same failure marking as the BYOK openai-compatible path
+      // chat completions carry no is_error flag: prefix the output so the model sees the failure
       content: r.isError ? `Error: ${r.output}` : r.output,
     }))
     results.unshift(...round)

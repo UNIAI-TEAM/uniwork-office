@@ -58,15 +58,6 @@ export default defineConfig({
       '@genoffice/electron-utils': local('../../packages/electron-utils/src/index.ts'),
       '@genoffice/ai-provider/askuni': local('../../packages/ai-provider/src/askuni.ts'),
       '@genoffice/ai-provider/browser': local('../../packages/ai-provider/src/browser.ts'),
-      '@genoffice/ai-provider/codex-app-server': local(
-        '../../packages/ai-provider/src/codex-app-server.ts',
-      ),
-      '@genoffice/ai-provider/custom-models': local(
-        '../../packages/ai-provider/src/custom-models.ts',
-      ),
-      '@genoffice/ai-provider/provider-models': local(
-        '../../packages/ai-provider/src/provider-models.ts',
-      ),
       '@genoffice/ai-provider/settings-file': local(
         '../../packages/ai-provider/src/settings-file.ts',
       ),

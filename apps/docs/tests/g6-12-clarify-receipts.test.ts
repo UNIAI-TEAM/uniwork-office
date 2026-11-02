@@ -10,7 +10,7 @@ import { clearUniworkAcks } from '@genoffice/ui'
 import { ackUniworkDisclosureInFile } from '../../../packages/ui/tests/helpers/uniwork-ack'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { t } from '../src/renderer/i18n/locale'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 
 // the loop is replaced by a fake whose run() asks one clarification and then finishes
 vi.mock('@genoffice/agent-core', async (orig) => {
@@ -41,9 +41,7 @@ import { AiPanel } from '../src/renderer/ai/AiPanel'
 
 const settings: AiSettings = {
   provider: 'uniwork',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  providers: {},
 }
 
 const flush = async (): Promise<void> => {

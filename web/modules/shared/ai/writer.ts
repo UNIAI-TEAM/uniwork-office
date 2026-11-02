@@ -10,7 +10,7 @@
  */
 import type { WriterCall } from '@genoffice/agent-core'
 import { isAiNetworkError } from '../../../../packages/ai-provider/src/network-error'
-import { consumeOpenAiCompatibleResponse } from '../../../../packages/ai-provider/src/protocols/openai-compatible'
+import { consumeOpenAiCompatibleResponse } from '../../../../packages/ai-provider/src/protocols/openai-sse'
 import type { AiStreamChunk, AiStreamRequest } from '../../../../packages/ai-provider/src/types'
 import {
   uniworkConversations,
@@ -125,7 +125,6 @@ export async function runUniworkWriter(
             (typeof code === 'string' && code ? code : 'ai_provider_error') as UniworkError['code'],
           )
         },
-        creditsNotice: false,
       },
     )
     emit(

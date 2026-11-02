@@ -1,82 +1,22 @@
-import type { AgentMessage, AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
-import { aiFetch } from '../fetch'
+/**
+ * Reads an OK chat-completions answer (an SSE stream or a complete JSON body) into the stream
+ * callbacks. UniWork AI answers in this wire shape: the turn adapter (../uniwork/protocol.ts) and
+ * the web frame's one-shot writer read it here.
+ */
+import type { AgentToolCall } from '@genoffice/agent-core'
 import { httpBodyDetail } from '../http-error'
-import { opencodeSessionHeaders } from '../providers'
-import { openRouterAttributionHeaders } from '../openrouter'
-import { modelEchoesReasoning } from '../registry'
-import type { AiChatResponse, AiProviderConfig } from '../types'
-import { createStreamWatchdog, type StreamWatchdog } from '../watchdog'
+import type { AiTokenUsage } from '../types'
 import {
-  endpointUrl,
   jsonBodyInsteadOfSse,
   openAiContentText,
   parseToolInput,
-  readCappedResponseText,
   sseErrorText,
   sseDataEvents,
-  AiCreditsError,
-  throwIfCreditsNotice,
   throwIfToolCountOverBudget,
   throwIfToolJsonOverBudget,
   usageCount,
   type StreamCallbacks,
 } from './shared'
-import type { AiTokenUsage } from '../types'
-
-function openAiMessages(
-  system: string,
-  messages: AgentMessage[],
-  echoReasoning: boolean,
-): unknown[] {
-  const out: unknown[] = [{ role: 'system', content: system }]
-  for (const m of messages) {
-    if (m.role === 'user') {
-      if (!m.images?.length) {
-        out.push({ role: 'user', content: m.text })
-      } else {
-        out.push({
-          role: 'user',
-          content: [
-            ...(m.text ? [{ type: 'text', text: m.text }] : []),
-            ...m.images.map((img) => ({
-              type: 'image_url',
-              image_url: { url: `data:${img.mime};base64,${img.base64}` },
-            })),
-          ],
-        })
-      }
-    } else if (m.role === 'assistant') {
-      const hasTools = !!(m.toolCalls && m.toolCalls.length > 0)
-      // content:null with no tool_calls is an empty assistant turn; some OpenAI-
-      // compatible proxies drop or reject the follow-up conversation after that.
-      out.push({
-        role: 'assistant',
-        content: m.text || (hasTools ? null : '(no content)'),
-        ...(echoReasoning && m.reasoning ? { reasoning_content: m.reasoning } : {}),
-        ...(hasTools
-          ? {
-              tool_calls: m.toolCalls!.map((call) => ({
-                id: call.id,
-                type: 'function',
-                function: { name: call.name, arguments: JSON.stringify(call.input) },
-              })),
-            }
-          : {}),
-      })
-    } else {
-      for (const r of m.results) {
-        // OpenAI has no structured is_error flag (Anthropic sends one); prefix the
-        // content so the model can tell a failed call from a successful one and retry.
-        out.push({
-          role: 'tool',
-          tool_call_id: r.id,
-          content: r.isError ? `Error: ${r.output}` : r.output,
-        })
-      }
-    }
-  }
-  return out
-}
 
 /** Emits a complete (non-streamed) chat completion delivered as a plain JSON body. */
 function emitOpenAiJsonMessage(
@@ -152,100 +92,6 @@ function emitOpenAiJsonMessage(
   }
 }
 
-/** Per-endpoint request shaping resolved from the provider registry. */
-export interface OpenAiRequestOptions {
-  omitTemperature?: boolean | undefined
-  /** send the output cap as OpenAI's renamed `max_completion_tokens` (GPT-5.x/o-series 400 on `max_tokens`) */
-  useMaxCompletionTokens?: boolean | undefined
-  /** vendor-specific fields merged into the request body (e.g. DeepSeek's `thinking`) */
-  bodyExtras?: Record<string, unknown> | undefined
-}
-
-export async function streamOpenAiCompatible(
-  baseUrl: string,
-  config: AiProviderConfig,
-  system: string,
-  messages: AgentMessage[],
-  tools: AgentToolDef[],
-  maxTokens: number,
-  cb: StreamCallbacks,
-  options: OpenAiRequestOptions = {},
-): Promise<void> {
-  const wd = createStreamWatchdog(cb.signal)
-  return wd.guard(() =>
-    openAiCompatibleTurn(baseUrl, config, system, messages, tools, maxTokens, cb, wd, {
-      ...options,
-      requestUsage: true,
-    }).catch((e) => {
-      // Some gateways reject the (spec) stream_options field outright; a 400 that
-      // names it is retried once without it — those providers simply never report usage.
-      if (!/HTTP 4\d\d:[\s\S]*stream_options/i.test(e instanceof Error ? e.message : String(e)))
-        throw e
-      return openAiCompatibleTurn(baseUrl, config, system, messages, tools, maxTokens, cb, wd, {
-        ...options,
-        requestUsage: false,
-      })
-    }),
-  )
-}
-
-async function openAiCompatibleTurn(
-  baseUrl: string,
-  config: AiProviderConfig,
-  system: string,
-  messages: AgentMessage[],
-  tools: AgentToolDef[],
-  maxTokens: number,
-  cb: StreamCallbacks,
-  wd: StreamWatchdog,
-  options: OpenAiRequestOptions & { requestUsage?: boolean | undefined },
-): Promise<void> {
-  const onBytes = () => {
-    wd.touch()
-    cb.onActivity?.()
-  }
-  const response = await aiFetch(endpointUrl(baseUrl, 'chat/completions'), {
-    method: 'POST',
-    signal: wd.signal,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
-      ...openRouterAttributionHeaders(baseUrl),
-      ...opencodeSessionHeaders(baseUrl, cb.sessionId),
-    },
-    body: JSON.stringify({
-      model: config.model,
-      ...(options.useMaxCompletionTokens
-        ? { max_completion_tokens: maxTokens }
-        : { max_tokens: maxTokens }),
-      messages: openAiMessages(system, messages, modelEchoesReasoning(config.model)),
-      ...(tools.length > 0
-        ? {
-            tools: tools.map((t) => ({
-              type: 'function',
-              function: { name: t.name, description: t.description, parameters: t.inputSchema },
-            })),
-          }
-        : {}),
-      ...(options.omitTemperature ? {} : { temperature: 0.3 }),
-      ...options.bodyExtras,
-      stream: true,
-      // OpenAI-class providers only report usage in a stream when asked (a final
-      // chunk with empty choices carries it); strict gateways that reject the
-      // field are retried once without it by streamOpenAiCompatible.
-      ...(options.requestUsage ? { stream_options: { include_usage: true } } : {}),
-    }),
-  })
-  // headers arrived: ping the renderer watchdog too, or a slow first chunk could trip it
-  onBytes()
-  if (!response.ok || !response.body) {
-    const detail = httpBodyDetail(await readCappedResponseText(response, onBytes))
-    if (response.status === 402) throw new AiCreditsError(detail)
-    throw new Error(`HTTP ${response.status}: ${detail}`)
-  }
-  return consumeOpenAiCompatibleResponse(response, cb, onBytes)
-}
-
 /** How a successful chat-completions answer is read. */
 export interface ConsumeOpenAiResponseOptions {
   /**
@@ -253,18 +99,11 @@ export interface ConsumeOpenAiResponseOptions {
    * that carries it (before that chunk's choices). Throwing ends the read.
    */
   onExtension?: ((extension: unknown) => void) | undefined
-  /**
-   * Scan a JSON body for a gateway credits-exhausted notice (default true).
-   * UniWork AI reports credits by status and code only, so its answer text
-   * (which may quote such a sentence) is never scanned.
-   */
-  creditsNotice?: boolean | undefined
 }
 
 /**
  * Reads an OK chat-completions response, a JSON body or an SSE stream (one
- * complete chunk or many deltas alike), into the stream callbacks. Shared by
- * the BYOK openai-compatible path and the UniWork AI adapter.
+ * complete chunk or many deltas alike), into the stream callbacks.
  */
 export async function consumeOpenAiCompatibleResponse(
   response: Response,
@@ -273,10 +112,8 @@ export async function consumeOpenAiCompatibleResponse(
   options: ConsumeOpenAiResponseOptions = {},
 ): Promise<void> {
   const jsonBody = await jsonBodyInsteadOfSse(response, onBytes)
-  if (jsonBody !== null) {
-    if (options.creditsNotice !== false) throwIfCreditsNotice(jsonBody)
-    return emitOpenAiJsonMessage(jsonBody, cb, options.onExtension)
-  }
+  // UniWork AI reports credits by status and code only: the answer text is never scanned for them
+  if (jsonBody !== null) return emitOpenAiJsonMessage(jsonBody, cb, options.onExtension)
   // tool call arguments stream in fragments keyed by index
   const pendingTools = new Map<number, { id: string; name: string; json: string }>()
   let stopReason: string | undefined
@@ -424,55 +261,4 @@ export async function consumeOpenAiCompatibleResponse(
   }
   if (stopReason) cb.onStopReason?.(stopReason)
   if (turnUsage) cb.onUsage?.(turnUsage)
-}
-
-export async function chatOpenAiCompatible(
-  wd: StreamWatchdog,
-  baseUrl: string,
-  config: AiProviderConfig,
-  system: string,
-  user: string,
-  options: OpenAiRequestOptions = {},
-): Promise<AiChatResponse> {
-  const response = await aiFetch(endpointUrl(baseUrl, 'chat/completions'), {
-    method: 'POST',
-    signal: wd.signal,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
-      ...openRouterAttributionHeaders(baseUrl),
-      ...opencodeSessionHeaders(baseUrl),
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      ...(options.omitTemperature ? {} : { temperature: 0.3 }),
-      ...options.bodyExtras,
-    }),
-  })
-  wd.touch()
-  if (!response.ok) {
-    const detail = httpBodyDetail(await readCappedResponseText(response, () => wd.touch()))
-    if (response.status === 402) return { ok: false, error: detail, errorCode: 'credits' as const }
-    return { ok: false, error: `HTTP ${response.status}: ${detail}` }
-  }
-  // A 200 with an HTML shell / empty / truncated body (gateway soft-failure)
-  // would make response.json() throw; return ok:false instead of leaking a
-  // raw SyntaxError to the caller.
-  const bodyText = await readCappedResponseText(response, () => wd.touch())
-  let json: { choices?: Array<{ message?: { content?: string } }> }
-  try {
-    json = JSON.parse(bodyText) as { choices?: Array<{ message?: { content?: string } }> }
-  } catch {
-    return {
-      ok: false,
-      error: `AI returned a non-JSON response: ${httpBodyDetail(bodyText)}`,
-    }
-  }
-  const content = json.choices?.[0]?.message?.content
-  if (!content) return { ok: false, error: 'AI returned an empty response' }
-  return { ok: true, content }
 }

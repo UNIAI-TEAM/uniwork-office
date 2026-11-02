@@ -26,7 +26,7 @@ vi.mock('react-konva', () => {
 })
 
 import { AiPanel } from '../src/renderer/ai/AiPanel'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 import { setAiModelNeedHint } from '@genoffice/ui'
 import { readyUniworkAi, resetUniworkAi } from '../../../packages/ui/tests/helpers/uniwork-ack'
 
@@ -34,9 +34,7 @@ const HINT = 'UniWork AI isn’t on for this format or organization'
 
 const settings: AiSettings = {
   provider: 'uniwork',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: '', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  providers: {},
 }
 
 let mounted: { root: Root; container: HTMLElement } | null = null

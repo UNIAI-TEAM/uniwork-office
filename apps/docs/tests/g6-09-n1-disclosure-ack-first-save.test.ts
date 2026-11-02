@@ -8,14 +8,12 @@ import { Editor } from '@tiptap/core'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
 import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { editorExtensions } from '../src/renderer/editor/extensions'
-import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
+import type { AiSettings } from '../src/shared/ipc'
 import { AiPanel } from '../src/renderer/ai/AiPanel'
 
 const settings: AiSettings = {
   provider: 'uniwork',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: 'test-key', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  providers: {},
 }
 
 const flush = async (): Promise<void> => {

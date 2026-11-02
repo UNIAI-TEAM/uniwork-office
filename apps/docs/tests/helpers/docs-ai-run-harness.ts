@@ -9,15 +9,13 @@ import { editorExtensions } from '../../src/renderer/editor/extensions'
 import { AiPanel } from '../../src/renderer/ai/AiPanel'
 import type { Lang } from '@genoffice/i18n'
 import { LocaleProvider } from '../../src/renderer/i18n/locale'
-import { AI_PROVIDERS, type AiSettings } from '../../src/shared/ipc'
+import type { AiSettings } from '../../src/shared/ipc'
 
 type AiPanelProps = Parameters<typeof AiPanel>[0]
 
 export const harnessSettings: AiSettings = {
   provider: 'uniwork',
-  providers: Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p.id, { apiKey: 'k', model: p.defaultModel }]),
-  ) as AiSettings['providers'],
+  providers: {},
 }
 
 export const flush = async (): Promise<void> => {

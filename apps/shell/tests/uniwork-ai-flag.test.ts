@@ -1,8 +1,8 @@
 // The availability flag travels main -> preload bridge -> renderer (G6-05 S2 gap 2): main answers a
 // pull and broadcasts every change to all webContents; each editor preload exposes
-// window.uniworkAiFlag; the renderer mirrors it into its own AI_PROVIDERS.
+// window.uniworkAiFlag; the renderer mirrors it into its own uniworkAiAvailable().
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AI_PROVIDERS, setUniworkAiAvailable } from '@genoffice/ai-provider'
+import { setUniworkAiAvailable, uniworkAiAvailable } from '@genoffice/ai-provider'
 import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
 import {
   UNIWORK_AI_FLAG_BRIDGE_KEY,
@@ -13,7 +13,6 @@ import {
 import { createUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
 import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from '../src/main/uniwork-ai-flag'
 
-const listed = () => AI_PROVIDERS.some((m) => m.id === 'uniwork')
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 /** main + one renderer wired through a fake ipc: the preload bridge on one side, the handlers on the other */
@@ -48,22 +47,22 @@ function wire(initial: boolean) {
 describe('UniWork AI availability flag in the renderer', () => {
   afterEach(() => setUniworkAiAvailable(false))
 
-  it('flag true -> the uniwork entry is in the renderer list', async () => {
+  it('flag true -> UniWork AI is available in the renderer', async () => {
     const { bridge } = wire(true)
     mirrorUniworkAiFlag(bridge)
     await settle()
-    expect(listed()).toBe(true)
+    expect(uniworkAiAvailable()).toBe(true)
   })
 
-  it('flag false -> the entry is absent; a later main-side change adds then removes it', async () => {
+  it('flag false -> unavailable; a later main-side change turns it on then off', async () => {
     const { bridge, change } = wire(false)
     mirrorUniworkAiFlag(bridge)
     await settle()
-    expect(listed()).toBe(false)
+    expect(uniworkAiAvailable()).toBe(false)
     change(true)
-    expect(listed()).toBe(true)
+    expect(uniworkAiAvailable()).toBe(true)
     change(false)
-    expect(listed()).toBe(false)
+    expect(uniworkAiAvailable()).toBe(false)
   })
 
   it('broadcast skips a destroyed webContents and reaches every other one', () => {

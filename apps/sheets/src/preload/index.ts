@@ -1,12 +1,7 @@
 import type { AiPanelPrefs } from '@genoffice/ui'
 import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 
-import type {
-  AiChatResponse,
-  AiSettings,
-  AiStreamChunk,
-  GenSparkAccountStatus,
-} from '@genoffice/ai-provider'
+import type { AiSettings, AiStreamChunk, GenSparkAccountStatus } from '@genoffice/ai-provider'
 import type { ProjectApi } from '@genoffice/project-store'
 import type {
   AttachmentAddResult,
@@ -610,8 +605,8 @@ const desktopApi: DesktopApi = {
     if (!isRecord(result)) throw new Error('Invalid AI settings response.')
     return result as unknown as AiSettings
   },
-  async setAiSettings(settings, options) {
-    await ipcRenderer.invoke(IPC_CHANNELS.aiSetSettings, settings, options)
+  async setAiSettings(settings) {
+    await ipcRenderer.invoke(IPC_CHANNELS.aiSetSettings, settings)
   },
   onAiSettingsChanged(handler) {
     const listener = () => handler()
@@ -620,13 +615,6 @@ const desktopApi: DesktopApi = {
   },
   async openAiModelSettings() {
     await ipcRenderer.invoke(IPC_CHANNELS.aiOpenModelSettings)
-  },
-  async aiChat(request) {
-    const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.aiChat, request)
-    if (!isRecord(result) || typeof result.ok !== 'boolean') {
-      throw new Error('Invalid AI chat response.')
-    }
-    return result as unknown as AiChatResponse
   },
   async aiStream(request) {
     await ipcRenderer.invoke(IPC_CHANNELS.aiStream, request)
