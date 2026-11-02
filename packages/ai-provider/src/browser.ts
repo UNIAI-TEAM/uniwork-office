@@ -55,5 +55,4 @@ export type {
   ComposerNoteKey,
   ComposerNoteKind,
 } from './ai-notice'
-export { normalizeAiTestFailureKind } from './ai-test-failure'
 export type { AiTestFailureKind } from './ai-test-failure'

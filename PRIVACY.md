@@ -13,9 +13,9 @@ turn reporting on or off because nothing is reported.
 
 ## Network requests you trigger
 
-- AI features (assistant panels, web and file search, image tools) require a network
-  connection and send a request only when you use them, to the AI provider you chose or
-  to your UniWork account.
+- AI features (assistant panels, web search, image tools) require a network connection
+  and a UniWork account, and send a request only when you use them, to UniWork AI through
+  UniWork's servers.
 - Sign-in, credit and plan information, and update checks contact the UniWork services
   or the update feed configured for your build.
 - Opening a link from a document opens it in your default browser.

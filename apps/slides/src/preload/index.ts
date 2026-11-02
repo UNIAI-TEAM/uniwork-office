@@ -469,8 +469,6 @@ const api: SlidesApi = {
     ipcRenderer.on('ai:stream-chunk', listener)
     return () => ipcRenderer.removeListener('ai:stream-chunk', listener)
   },
-  saveStyleSidecar: (data: { topic: string; styleSkill: string; createdAt: string }) =>
-    ipcRenderer.invoke('ai:save-sidecar', data),
   saveStyleTemplate: (
     name: string,
     data: { topic: string; styleSkill: string; createdAt: string; layout?: unknown },

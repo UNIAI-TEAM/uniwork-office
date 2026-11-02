@@ -12,7 +12,7 @@
  * | ai               | AI dock + toggle, stage AI bar, AI ribbon buttons, ask-AI popover, AI menu items  |
  * | imageGeneration  | the "AI image" buttons (Home ribbon, stage AI bar), the remove-background chip and  |
  * |                  | the generate_image tool; shown only with the grant AND a live way to generate    |
- * |                  | (see useImageGenerationOffered), so the person's own provider keys still enable it |
+ * |                  | (see useImageGenerationOffered)                                                  |
  * | autoSave         | AutoSave toggle and its 30 s / blur timer (CONTRACT C10: explicit save only)      |
  * | open / recents   | File > Open (Ctrl+O) / recent files (on with the host's `filePick` / `recents`)    |
  * | save / saveAs    | Save (Ctrl+S, QAT) / Save As (on with the host's grants; no `save` = view-only)   |

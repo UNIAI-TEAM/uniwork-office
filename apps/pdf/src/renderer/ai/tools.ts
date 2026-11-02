@@ -181,7 +181,7 @@ export interface PdfAiDeps {
   /** Queue a pending delete of an existing image */
   deleteImage(ref: PageImageRef): void
   searchImages(query: string, maxResults: number): Promise<ImageSearchResponse>
-  /** live predicate (a BYOK media model is configured; the UniWork cloud route while its seam is on); false hides generate_image */
+  /** live predicate (the UniWork cloud route while its seam is on); false hides generate_image */
   imageGenAvailable?(): boolean
   generateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string
@@ -195,7 +195,7 @@ export interface PdfAiDeps {
   setStamps(cfg: StampConfig | null): void
   /** live predicate: the open PDF is a UniWork-bound copy (C-BOUND: no file written outside it); absent = plain local file */
   uniworkBound?(): boolean
-  /** live predicate: the active AI provider is UniWork AI (absent = BYOK); read before every model request */
+  /** live predicate: the turn runs on UniWork AI; read before every model request */
   uniworkAi?(): boolean
   /** image URLs this run may insert (image_search / generate_image results); refuses unregistered ones under UniWork AI; absent = no rule */
   imageUrls?: ImageUrlRegistry
@@ -2967,7 +2967,7 @@ async function insertImageTool(
   const r = resolvePage(deps, input.page)
   if ('bad' in r) return err(r.bad, summary)
   const url = String(input.url ?? '')
-  // file:// = a BYOK-generated image in the local store (the main process only resolves its own files)
+  // file:// = a generated image in the local store (the main process only resolves its own files)
   if (!/^(https?|file):\/\//.test(url))
     return err('invalid url; pass an imageUrl from image_search or generate_image', summary)
   const refusal = deps.imageUrls?.check(url)

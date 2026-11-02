@@ -14,16 +14,7 @@ function expectProductText(text: string): void {
 }
 
 describe('chat failure texts', () => {
-  const kinds: AiTestFailureKind[] = [
-    'not_entitled',
-    'credits_exhausted',
-    'invalid_key',
-    'network',
-    'limit',
-    'unavailable',
-    'misconfigured',
-    'failed',
-  ]
+  const kinds: AiTestFailureKind[] = ['invalid_key', 'network', 'limit', 'unavailable', 'failed']
 
   it('has an en and a vi message for every kind, and other locales read English', () => {
     for (const kind of kinds) {

@@ -49,10 +49,6 @@ provede požadovanou úpravu a přesně vám ukáže, čeho se dotkl.
   i převádějí přímo na vašem počítači. PDF → Word / Excel / PowerPoint
   a Markdown → Word i HTML → Word běží celé na zařízení. Zařízení opouštějí
   jen volání AI, a to k poskytovateli, kterého si sami vyberete.
-- **Vaše klíče, nebo žádné.** Přihlaste se přes Genspark a klíče nepotřebujete,
-  nebo použijte vlastní klíč pro Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM,
-  Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty nebo jakýkoli OpenAI
-  kompatibilní endpoint, včetně lokálních serverů.
 - **Skriptovatelný a připravený pro agenty.** Aplikace obsahuje příkazový
   řádek `genoffice` a skill pro Claude Code, Codex, Cursor, Gemini CLI,
   GitHub Copilot, OpenCode a Windsurf, takže kódovací agent může na vašem
@@ -220,9 +216,6 @@ ve viditelné záložce editoru, zatímco se díváte.
 - **AI, která upravuje dokument přímo.** Sledované změny v Docs, živé vzorce
   a grafy v Sheets, prezentace kreslené přímo na plochu, každý krok AI je
   snapshot, ke kterému se lze vrátit.
-- **Vlastní model, vlastní klíč.** Přihlaste se přes Genspark, nebo použijte
-  klíč pro Claude, OpenAI, Gemini, DeepSeek a další, včetně lokálních serverů
-  a jakéhokoli OpenAI kompatibilního endpointu.
 - **PDF udělané správně.** Upravujte text přímo na stránce a převádějte PDF
   do Word, Excel nebo PowerPoint na zařízení, se systémovým OCR pro skeny.
 - **Také Markdown a HTML**, se stejným panelem AI a místním exportem do Word.
@@ -230,13 +223,6 @@ ve viditelné záložce editoru, zatímco se díváte.
   server dávají každý engine do služeb Claude Code, Claude Desktop, Codex,
   Cursor a dalších agentů, stále na zařízení.
 - **Zdarma**, pro jednotlivce i týmy.
-
-## AI backendy
-
-**Přihlaste se přes Genspark** a nemusíte nic nastavovat: volání modelů
-prochází přes proxy Genspark (rodiny Claude, GPT a Gemini) a agenti získávají
-webové a obrázkové vyhledávání, generování obrázků a analýzu
-obrázků/zvuku/videa.
 
 Celý balík nabízí světlý, tmavý a systémový vzhled. Vzhledy mění pouze to,
 co je vidět na obrazovce: exporty, tisky a uložené soubory si vždy zachovávají
@@ -490,8 +476,7 @@ zpět beze změny, takže dokumenty dál fungují v Microsoft Office.
 
 Úprava dokumentů je zcela lokální — soubory neopustí váš počítač při
 otevírání, úpravách, ukládání ani konverzi. AI funkce (agenti, vyhledávání,
-nástroje pro obrázky) potřebují síťové připojení, buď s přihlášením přes
-Genspark, nebo s vlastním API klíčem k modelu.
+nástroje pro obrázky) potřebují síťové připojení a účet UniWork.
 
 </details>
 
@@ -510,17 +495,6 @@ Ano — zcela na zařízení: extrakce na úrovni znaků přes PDFium plus anal�
 rozvržení na základě geometrie, žádná cloudová služba, žádné nahrávání.
 Skenované stránky jsou také podporovány: na macOS a Windows je čte systémové
 OCR, takže se převedou na editovatelný text, ne na obrázek stránky.
-
-</details>
-
-<details>
-<summary><b>Můžu použít vlastní AI model nebo API klíč?</b></summary>
-
-Ano. Kromě bezklíčového přihlášení Genspark GenOffice podporuje vlastní klíč
-pro Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok,
-Mistral, OpenRouter, Requesty a OpenCode Zen/Go, plus jakýkoli OpenAI kompatibilní
-endpoint — včetně lokálních serverů s modely. Vyhledávání, generování obrázků
-a analýza obrázků/videa mají vlastní klíče pod Nastavení → AI Media & Search.
 
 </details>
 

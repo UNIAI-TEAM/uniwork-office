@@ -1,4 +1,4 @@
-/** UniWork cloud AI copy (Settings → Account / AI model / AI media); zh defines the key set */
+/** UniWork cloud AI copy (Settings → Account); zh defines the key set */
 export const zh = {
   cloudTitle: 'UniWork 云端 AI',
   cloudStateReady: '可用',
@@ -11,6 +11,5 @@ export const zh = {
   cloudCreditsUnlimited: '不限量',
   cloudCreditsRenews: '{date} 重置',
   cloudToolsToggle: '使用 UniWork 云端工具',
-  cloudToolsToggleDesc:
-    '网页搜索、图片生成和媒体分析使用 UniWork 云端（消耗 AI 额度）。',
+  cloudToolsToggleDesc: '网页搜索、图片生成和媒体分析使用 UniWork 云端（消耗 AI 额度）。',
 }

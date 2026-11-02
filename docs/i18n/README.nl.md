@@ -50,10 +50,6 @@ aangepast.
   opgeslagen en geconverteerd. PDF → Word / Excel / PowerPoint, Markdown →
   Word en HTML → Word draaien allemaal on-device. Alleen de AI-aanroepen
   verlaten de machine, naar de provider die jij kiest.
-- **Jouw eigen keys, of geen enkele.** Log in met Genspark en je hoeft niets te
-  regelen, of gebruik je eigen key voor Claude, OpenAI, Gemini, DeepSeek,
-  Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty, of elk
-  OpenAI-compatibel endpoint, inclusief lokale servers.
 - **Scriptbaar en klaar voor agents.** De app levert een
   `genoffice`-opdrachtregel en een skill voor Claude Code, Codex, Cursor,
   Gemini CLI, GitHub Copilot, OpenCode en Windsurf mee, zodat een coding
@@ -222,9 +218,6 @@ editortabblad terwijl je toekijkt.
 - **Een AI die het document zelf bewerkt.** Tracked changes in Docs, live
   formules en grafieken in Sheets, slides die direct op het canvas worden
   getekend, elke AI-beurt een snapshot waarnaar je kunt teruggaan.
-- **Je eigen model, je eigen key.** Log in met Genspark, of gebruik een key
-  voor Claude, OpenAI, Gemini, DeepSeek en meer, inclusief lokale servers en
-  elk OpenAI-compatibel endpoint.
 - **PDF goed gedaan.** Bewerk tekst direct op de pagina en converteer PDF
   naar Word, Excel of PowerPoint on-device, met systeem-OCR voor scans.
 - **Ook Markdown en HTML**, met hetzelfde AI-paneel en lokale export naar
@@ -233,13 +226,6 @@ editortabblad terwijl je toekijkt.
   MCP-server stellen elke engine ter beschikking van Claude Code, Claude
   Desktop, Codex, Cursor en andere agents, nog altijd on-device.
 - **Gratis**, voor individuen en teams.
-
-## AI-backends
-
-**Log in met Genspark** en er is niets te configureren: modelaanroepen lopen
-via de Genspark-proxy (de Claude-, GPT- en Gemini-families) en de agents
-krijgen toegang tot web- en beeldzoeken, beeldgeneratie en analyse van beeld,
-audio en video.
 
 De hele suite wordt geleverd met een licht, donker en systeemthema. Thema's
 veranderen alleen wat er op je scherm te zien is: exports, afdrukken en
@@ -501,8 +487,8 @@ werken in Microsoft Office.
 
 Documenten bewerken is volledig lokaal — bestanden verlaten je machine nooit
 om te worden geopend, bewerkt, opgeslagen of geconverteerd. De AI-functies
-(agents, search, beeldtools) hebben een netwerkverbinding nodig, met ofwel
-een Genspark-login of je eigen model-API-key.
+(agents, search, beeldtools) hebben een netwerkverbinding en een
+UniWork-account nodig.
 
 </details>
 
@@ -523,17 +509,6 @@ geometrie-gebaseerde layout-analyse, geen cloudservice, geen upload. Gescande
 pagina's worden ook ondersteund: op macOS en Windows leest de systeem-OCR ze,
 zodat ze worden omgezet naar bewerkbare tekst in plaats van een
 pagina-afbeelding.
-
-</details>
-
-<details>
-<summary><b>Kan ik mijn eigen AI-model of API-key gebruiken?</b></summary>
-
-Ja. Naast de keyless Genspark-login ondersteunt GenOffice je eigen key voor
-Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok,
-Mistral, OpenRouter, Requesty en OpenCode Zen/Go, plus elk OpenAI-compatibel endpoint —
-inclusief lokale modelservers. Search, beeldgeneratie en analyse van beeld en
-video gebruiken hun eigen keys onder Settings → AI Media & Search.
 
 </details>
 

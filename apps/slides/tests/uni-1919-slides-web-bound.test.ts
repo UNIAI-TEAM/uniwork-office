@@ -1,12 +1,7 @@
 /**
- * UNI-1919 (w2): a deck open in the web frame IS the UniWork document, so the
- * AI must see it as bound even though the web adapter keeps answering
- * `uniworkState.bound: false` (working-copy semantics: web save, autosave and
- * the ribbon Save button are keyed off that answer and must not change). The
- * seam is the shared rule `uniworkBoundForAi(bound, platform())`, applied where
- * AiPanel builds `DeckAccess.uniworkBound`; the `.styleskill.json` sidecar next
- * to the file is the bound-only write it gates (slides-skill.ts).
- * Renders the real AiPanel and reads the access it hands to the real skill.
+ * UNI-1919 (w2) / UNI-2309: the deck tools a UniWork AI turn sees in the web frame
+ * and on the desktop. Renders the real AiPanel and reads the access it hands to the
+ * real skill.
  */
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -128,9 +123,6 @@ afterEach(() => {
   root = null
 })
 
-/** the web adapter's answer for an editable frame — must reach save consumers verbatim */
-const WEB_EDITABLE = { bound: false, readOnly: false }
-
 /** the UniWork AI selection; every turn runs on UniWork AI, whatever a legacy file names (UNI-2309) */
 const uniworkSettings: AiSettings = { ...settings, provider: 'uniwork' }
 
@@ -158,7 +150,6 @@ const deckCall: AgentToolCall = {
 
 /** the wired access with the page-writer seams stubbed, so generate_deck lands pages */
 function deckRun(base: DeckAccess) {
-  const sidecars: unknown[] = []
   let pages = 0
   const run: DeckAccess = {
     ...base,
@@ -174,24 +165,14 @@ function deckRun(base: DeckAccess) {
     isCloudPageGenEnabled: async () => false,
     generatePageLocal: async (args) => ({ ok: true, marker: `localpptx:PAGE${args.pageIndex}` }),
     generateStyleSkill: async (a) => ({ ok: true, styleSkill: 'STYLE_FOR:' + a.topic }),
-    saveSidecar: async (data) => {
-      sidecars.push(data)
-    },
   }
-  return { run, sidecars, getPages: () => pages }
+  return { run, getPages: () => pages }
 }
 
-describe('the web slides frame is UniWork-bound for the AI', () => {
-  it('the skill predicate reads bound with the adapter still answering bound: false', async () => {
-    installSlidesApi({ platform: 'web' })
-    render({ uniworkBound: WEB_EDITABLE.bound })
-    expect(seen.accesses.length).toBeGreaterThan(0)
-    expect(access().uniworkBound?.()).toBe(true)
-  })
-
+describe('the deck tools of a UniWork AI turn, web frame and desktop', () => {
   it('feeds uniworkAi so a UniWork AI turn loses the three hidden tools', async () => {
     installSlidesApi({ platform: 'web' })
-    render({ uniworkBound: WEB_EDITABLE.bound, settings: uniworkSettings })
+    render({ settings: uniworkSettings })
     // RPB-1: the whole shape the skill reads — uniworkAi() must answer true, or the hidden
     // tools are offered to a UniWork AI turn (the G7-08 failure class)
     expect(access().uniworkAi?.()).toBe(true)
@@ -202,7 +183,7 @@ describe('the web slides frame is UniWork-bound for the AI', () => {
     expect(createSlidesSkill(access()).systemPrompt).not.toContain('generate_deck is unavailable')
 
     // a legacy settings file naming another provider still runs on UniWork AI, the one provider
-    render({ uniworkBound: WEB_EDITABLE.bound })
+    render({})
     expect(access().uniworkAi?.()).toBe(true)
     const legacy = createSlidesSkill(access()).tools.map((t) => t.name)
     for (const n of UNIWORK_AI_HIDDEN) expect(legacy, n).not.toContain(n)
@@ -210,7 +191,7 @@ describe('the web slides frame is UniWork-bound for the AI', () => {
 
   it('a desktop UniWork AI turn keeps the deck tools hidden and the "unavailable" sentence', async () => {
     installSlidesApi(undefined)
-    render({ uniworkBound: true, settings: uniworkSettings })
+    render({ settings: uniworkSettings })
     expect(access().uniworkAi?.()).toBe(true)
     const skill = createSlidesSkill(access())
     const names = skill.tools.map((t) => t.name)
@@ -219,36 +200,22 @@ describe('the web slides frame is UniWork-bound for the AI', () => {
     expect(skill.systemPrompt).toContain('generate_deck is unavailable')
   })
 
-  it('a bound-web deck writes no .styleskill.json sidecar even on a forced generate_deck', async () => {
+  it('a web deck runs a forced generate_deck and lands its pages', async () => {
     installSlidesApi({ platform: 'web' })
-    render({ uniworkBound: WEB_EDITABLE.bound })
-    const { run, sidecars } = deckRun(access())
+    render({})
+    const { run, getPages } = deckRun(access())
     const res = (await createSlidesSkill(run).executeTool(deckCall)) as { isError?: boolean }
     expect(res.isError).toBeFalsy()
-    expect(sidecars).toEqual([])
+    expect(getPages()).toBe(2)
   })
 
-  it('a desktop deck has no deck writer (UNI-2309): a forced generate_deck is refused and writes no sidecar, bound or not', async () => {
+  it('a desktop deck has no deck writer (UNI-2309): a forced generate_deck is refused', async () => {
     installSlidesApi(undefined)
-    for (const uniworkBound of [false, true]) {
-      render({ uniworkBound })
-      const { run, sidecars } = deckRun(access())
-      const res = (await createSlidesSkill(run).executeTool(deckCall)) as { isError?: boolean }
-      expect(res.isError, `bound ${uniworkBound}`).toBe(true)
-      expect(sidecars).toEqual([])
-    }
-  })
-})
-
-describe('the web save path is untouched', () => {
-  it('the adapter’s bound answer still reaches its consumers unmodified', async () => {
-    installSlidesApi({ platform: 'web' })
-    render({ uniworkBound: WEB_EDITABLE.bound })
-    // save()/autosave/the ribbon Save button keep seeing the unbound working copy…
-    const api = window.slidesApi as { uniworkState: () => Promise<typeof WEB_EDITABLE> }
-    expect(await api.uniworkState()).toEqual(WEB_EDITABLE)
-    // …while the AI filter reads the same frame as bound
-    expect(access().uniworkBound?.()).toBe(true)
+    render({})
+    const { run, getPages } = deckRun(access())
+    const res = (await createSlidesSkill(run).executeTool(deckCall)) as { isError?: boolean }
+    expect(res.isError).toBe(true)
+    expect(getPages()).toBe(0)
   })
 })
 
@@ -276,7 +243,7 @@ describe('the panel page generator under UniWork AI', () => {
         },
       },
     )
-    render({ uniworkBound: WEB_EDITABLE.bound, settings: uniworkSettings })
+    render({ settings: uniworkSettings })
     const r = await access().generatePageLocal!({
       pageIndex: 3,
       totalPages: 5,

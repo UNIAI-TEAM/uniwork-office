@@ -440,7 +440,7 @@ export function startUniworkAiChat(deps: {
       .then((available) => {
         if (run !== generation) return
         setUniworkAiAvailable(available)
-        // each renderer has its own provider list: tell them when the flag moves
+        // each renderer mirrors the flag: tell them when it moves
         if (available !== lastAiFlag) {
           lastAiFlag = available
           aiFlagListener?.(available)

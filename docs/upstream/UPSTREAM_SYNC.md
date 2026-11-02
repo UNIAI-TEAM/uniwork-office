@@ -72,6 +72,7 @@ authoritative list):
 - `apps/shell/src/main/file-excerpts.ts`, `apps/shell/src/main/file-index/decider.ts`, `rerank.ts`,
   `apps/shell/src/shared/file-excerpt.ts`
 - `e2e/settings-media-search.spec.ts`
+- `apps/slides/src/renderer/ai/prompts/qc-visual.md` (a UniWork AI QC turn takes no screenshot)
 
 What keeps them out:
 

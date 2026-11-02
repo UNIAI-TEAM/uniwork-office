@@ -26,7 +26,7 @@ import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
 import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
 
 installScreenTips()
-// this renderer's own provider list shows the UniWork AI entry only while the shell offers it
+// this renderer's model chip and Send guard follow the shell's UniWork AI availability flag
 mirrorUniworkAiFlag()
 
 // Canvas fillText never triggers @font-face downloads, so the bundled document fonts

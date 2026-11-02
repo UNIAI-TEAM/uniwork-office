@@ -70,7 +70,6 @@ export const tMain = createI18n({
     errParseFailed: '文件解析失败',
     errImageNoText: '图片附件不提供文本,已作为图像随用户消息发送,直接看图即可',
     errNotImage: '不是支持的图片类型',
-    errNoModel: '未配置模型名称',
     errMediaNotConfigured: '云端工具已关闭。请在「设置(账户)」中重新开启',
     errNoDeckAppend:
       '当前没有可追加的文稿（会话不存在）。请先用 mode:"replace" 生成首页，或改用原生工具新增页面。',
@@ -180,7 +179,6 @@ export const tMain = createI18n({
     errParseFailed: 'Failed to parse file',
     errImageNoText: 'Image attachments have no text; the image is sent along with the user message',
     errNotImage: 'not a supported image type',
-    errNoModel: 'No model name configured',
     errMediaNotConfigured: 'Cloud tools are turned off. Turn them on under Settings (Account).',
     errNoDeckAppend:
       'No deck to append to (session missing). Generate the first page with mode:"replace" or add pages with the native tools.',
@@ -291,7 +289,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Tệp đính kèm hình ảnh không có văn bản; hình ảnh được gửi cùng với tin nhắn của người dùng',
     errNotImage: 'loại hình ảnh không được hỗ trợ',
-    errNoModel: 'Chưa cấu hình tên mô hình',
     errMediaNotConfigured: 'Công cụ đám mây đang tắt. Bật lại trong Cài đặt (Tài khoản).',
     errNoDeckAppend:
       'Không có bản trình bày để nối thêm vào (thiếu phiên làm việc). Hãy tạo trang đầu tiên với mode:"replace" hoặc thêm trang bằng các công cụ gốc.',
@@ -404,7 +401,6 @@ export const tMain = createI18n({
     errImageNoText:
       '画像添付はテキストを提供しません。画像としてユーザー メッセージと一緒に送信済みのため、そのまま画像をご覧ください',
     errNotImage: 'サポートされていない画像形式です',
-    errNoModel: 'モデル名が設定されていません',
     errMediaNotConfigured: 'クラウドツールがオフです。設定(アカウント)でオンにしてください。',
     errNoDeckAppend:
       '追加先のプレゼンテーションがありません（セッションが存在しません）。まず mode:"replace" で最初のページを生成するか、ネイティブ ツールでページを追加してください。',
@@ -518,7 +514,6 @@ export const tMain = createI18n({
     errImageNoText:
       '이미지 첨부는 텍스트를 제공하지 않으며, 이미지로 사용자 메시지와 함께 전송되었으니 이미지를 직접 확인하세요',
     errNotImage: '지원되는 이미지 형식이 아님',
-    errNoModel: '모델 이름이 설정되지 않았습니다',
     errMediaNotConfigured: '클라우드 도구가 꺼져 있습니다. 설정(계정)에서 다시 켜 주세요.',
     errNoDeckAppend:
       '추가할 수 있는 문서가 없습니다(세션 없음). 먼저 mode:"replace"로 첫 페이지를 생성하거나 네이티브 도구로 페이지를 추가하세요.',
@@ -629,7 +624,6 @@ export const tMain = createI18n({
     errImageNoText:
       "Les pièces jointes image ne fournissent pas de texte ; l'image a été envoyée avec le message de l'utilisateur, consultez-la directement",
     errNotImage: "n'est pas un type d'image pris en charge",
-    errNoModel: 'Aucun nom de modèle configuré',
     errMediaNotConfigured:
       'Les outils cloud sont désactivés. Réactivez-les dans Paramètres (Compte).',
     errNoDeckAppend:
@@ -746,7 +740,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Bildanlagen liefern keinen Text; das Bild wurde mit der Benutzernachricht gesendet, bitte direkt ansehen',
     errNotImage: 'kein unterstütztes Bildformat',
-    errNoModel: 'Kein Modellname konfiguriert',
     errMediaNotConfigured:
       'Die Cloud-Tools sind ausgeschaltet. Schalten Sie sie unter Einstellungen (Konto) wieder ein.',
     errNoDeckAppend:
@@ -862,7 +855,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Las imágenes adjuntas no proporcionan texto; la imagen se envió junto con el mensaje del usuario, consúltala directamente',
     errNotImage: 'no es un tipo de imagen compatible',
-    errNoModel: 'No hay nombre de modelo configurado',
     errMediaNotConfigured:
       'Las herramientas en la nube están desactivadas. Actívalas en Ajustes (Cuenta).',
     errNoDeckAppend:
@@ -977,7 +969,6 @@ export const tMain = createI18n({
     errImageNoText:
       'สิ่งที่แนบเป็นรูปภาพไม่มีข้อความ รูปถูกส่งไปพร้อมข้อความของผู้ใช้แล้ว โปรดดูรูปโดยตรง',
     errNotImage: 'ไม่ใช่ชนิดรูปภาพที่รองรับ',
-    errNoModel: 'ยังไม่ได้ตั้งค่าชื่อโมเดล',
     errMediaNotConfigured: 'เครื่องมือคลาวด์ปิดอยู่ เปิดใหม่ได้ใน การตั้งค่า (บัญชี)',
     errNoDeckAppend:
       'ไม่มีเอกสารให้เพิ่มต่อท้าย (ไม่มีเซสชัน) โปรดสร้างหน้าแรกด้วย mode:"replace" ก่อน หรือใช้เครื่องมือเนทีฟเพิ่มหน้าแทน',
@@ -1088,7 +1079,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Lampiran gambar tidak menyediakan teks; gambar telah dikirim bersama pesan pengguna, silakan lihat gambarnya langsung',
     errNotImage: 'bukan jenis gambar yang didukung',
-    errNoModel: 'Nama model belum dikonfigurasi',
     errMediaNotConfigured: 'Alat cloud sedang dimatikan. Aktifkan lagi di Pengaturan (Akun).',
     errNoDeckAppend:
       'Tidak ada dokumen yang bisa ditambahi (sesi tidak ada). Buat halaman pertama dengan mode:"replace" dulu, atau tambahkan halaman dengan alat bawaan.',
@@ -1203,7 +1193,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Вложения-изображения не содержат текста; изображение отправлено вместе с сообщением пользователя, просто посмотрите на него',
     errNotImage: 'неподдерживаемый тип изображения',
-    errNoModel: 'Не указано имя модели',
     errMediaNotConfigured:
       'Облачные инструменты выключены. Включите их в разделе «Настройки (Учётная запись)».',
     errNoDeckAppend:
@@ -1318,7 +1307,6 @@ export const tMain = createI18n({
     errImageNoText:
       'المرفقات من نوع الصور لا توفر نصًا؛ وقد أُرسلت الصورة مع رسالة المستخدم، يكفي النظر إليها مباشرة',
     errNotImage: 'ليس نوع صورة مدعومًا',
-    errNoModel: 'لم يتم تكوين اسم النموذج',
     errMediaNotConfigured: 'أدوات السحابة متوقفة. أعد تشغيلها من الإعدادات (الحساب).',
     errNoDeckAppend:
       'لا يوجد مستند يمكن الإلحاق به (الجلسة غير موجودة). أنشئ الصفحة الأولى باستخدام mode:"replace" أولًا، أو أضف صفحات بالأدوات الأصلية.',
@@ -1428,7 +1416,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Anexos de imagem não têm texto; a imagem é enviada junto com a mensagem do usuário',
     errNotImage: 'não é um tipo de imagem suportado',
-    errNoModel: 'Nenhum nome de modelo configurado',
     errMediaNotConfigured:
       'As ferramentas na nuvem estão desativadas. Ative-as em Configurações (Conta).',
     errNoDeckAppend:
@@ -1544,7 +1531,6 @@ export const tMain = createI18n({
     errImageNoText:
       "Gli allegati immagine non hanno testo; l'immagine viene inviata insieme al messaggio dell'utente",
     errNotImage: 'tipo di immagine non supportato',
-    errNoModel: 'Nessun nome di modello configurato',
     errMediaNotConfigured:
       'Gli strumenti cloud sono disattivati. Riattivali in Impostazioni (Account).',
     errNoDeckAppend:
@@ -1661,7 +1647,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Załączniki graficzne nie zawierają tekstu; obraz jest wysyłany razem z wiadomością użytkownika',
     errNotImage: 'nieobsługiwany typ obrazu',
-    errNoModel: 'Nie skonfigurowano nazwy modelu',
     errMediaNotConfigured: 'Narzędzia chmurowe są wyłączone. Włącz je w Ustawienia (Konto).',
     errNoDeckAppend:
       'Brak prezentacji do rozszerzenia (brak sesji). Najpierw wygeneruj pierwszą stronę z mode:"replace" albo dodaj strony narzędziami natywnymi.',
@@ -1775,7 +1760,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Obrázkové přílohy neobsahují text; obrázek je odeslán spolu se zprávou uživatele',
     errNotImage: 'nepodporovaný typ obrázku',
-    errNoModel: 'Není nakonfigurován název modelu',
     errMediaNotConfigured: 'Cloudové nástroje jsou vypnuté. Zapněte je v Nastavení (Účet).',
     errNoDeckAppend:
       'Není k čemu přidávat (chybí relace). Vygenerujte první stránku s mode:"replace" nebo přidejte stránky nativními nástroji.',
@@ -1888,7 +1872,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Afbeeldingsbijlagen bevatten geen tekst; de afbeelding wordt samen met het gebruikersbericht verzonden',
     errNotImage: 'geen ondersteund afbeeldingstype',
-    errNoModel: 'Geen modelnaam geconfigureerd',
     errMediaNotConfigured: 'Cloudtools staan uit. Zet ze weer aan via Instellingen (Account).',
     errNoDeckAppend:
       'Geen presentatie om aan toe te voegen (sessie ontbreekt). Genereer eerst de eerste pagina met mode:"replace" of voeg pagina\'s toe met de native tools.',
@@ -2001,7 +1984,6 @@ export const tMain = createI18n({
     errParseFailed: 'Gagal menghurai fail',
     errImageNoText: 'Lampiran imej tiada teks; imej dihantar bersama mesej pengguna',
     errNotImage: 'bukan jenis imej yang disokong',
-    errNoModel: 'Nama model belum dikonfigurasikan',
     errMediaNotConfigured: 'Alat awan dimatikan. Hidupkan semula di Tetapan (Akaun).',
     errNoDeckAppend:
       'Tiada persembahan untuk ditambah (sesi tidak wujud). Jana halaman pertama dengan mode:"replace" dahulu, atau tambah halaman dengan alat asli.',
@@ -2113,7 +2095,6 @@ export const tMain = createI18n({
     errParseFailed: 'ניתוח הקובץ נכשל',
     errImageNoText: 'קבצים מצורפים מסוג תמונה אינם מכילים טקסט; התמונה נשלחת יחד עם הודעת המשתמש',
     errNotImage: 'סוג תמונה שאינו נתמך',
-    errNoModel: 'לא הוגדר שם מודל',
     errMediaNotConfigured: 'כלי הענן כבויים. הפעל אותם מחדש בהגדרות (חשבון).',
     errNoDeckAppend:
       'אין מצגת להוסיף אליה (הפעלה חסרה). צור תחילה את העמוד הראשון עם mode:"replace" או הוסף עמודים בכלים המקוריים.',
@@ -2222,7 +2203,6 @@ export const tMain = createI18n({
     errParseFailed: 'फ़ाइल पार्स करने में विफल',
     errImageNoText: 'छवि अनुलग्नक में टेक्स्ट नहीं होता; छवि उपयोगकर्ता संदेश के साथ भेजी जाती है',
     errNotImage: 'समर्थित छवि प्रकार नहीं है',
-    errNoModel: 'कोई मॉडल नाम कॉन्फ़िगर नहीं है',
     errMediaNotConfigured: 'क्लाउड टूल बंद हैं। उन्हें सेटिंग्स (खाता) में फिर से चालू करें।',
     errNoDeckAppend:
       'जोड़ने के लिए कोई प्रस्तुति नहीं है (सत्र मौजूद नहीं)। पहले mode:"replace" से पहला पृष्ठ बनाएँ, या नेटिव टूल से पृष्ठ जोड़ें।',
@@ -2334,7 +2314,6 @@ export const tMain = createI18n({
     errParseFailed: '檔案解析失敗',
     errImageNoText: '圖片附件不提供文字,已作為影像隨使用者訊息傳送,直接看圖即可',
     errNotImage: '不是支援的圖片類型',
-    errNoModel: '未設定模型名稱',
     errMediaNotConfigured: '雲端工具已關閉。請在「設定(帳戶)」中重新開啟',
     errNoDeckAppend:
       '目前沒有可附加的簡報（工作階段不存在）。請先用 mode:"replace" 產生首頁，或改用原生工具新增頁面。',

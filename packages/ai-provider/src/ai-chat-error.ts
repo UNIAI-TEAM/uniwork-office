@@ -30,8 +30,8 @@ function rawText(err: unknown): string {
 /**
  * The fields of a failed stream's `error` chunk. Timeouts, connectivity and
  * capacity failures keep the machine-readable code the renderers localize;
- * every other provider failure (a rejected key, a 4xx/5xx
- * dump) carries a finished product message instead of the raw text. A plain
+ * every other service failure (a 4xx/5xx dump) carries a finished product
+ * message instead of the raw text. A plain
  * message that is not a provider dump (our own "no content" notes) is kept.
  */
 export function aiStreamErrorFields(err: unknown, lang: string): AiStreamErrorFields {

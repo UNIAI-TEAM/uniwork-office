@@ -52,13 +52,13 @@ function emit(chunk: AiStreamChunk): void {
   }
 }
 
-/** a valid settings object: the renderer reads it at startup even with the AI UI hidden */
-function emptySettings(): AiSettings {
+/** UniWork AI with the cloud tools off: the renderer reads settings at startup even with the AI UI hidden */
+function uniworkSettingsToolsOff(): AiSettings {
   return { provider: 'uniwork', providers: {}, gskToolsEnabled: false }
 }
 
 export default {
-  getAiSettings: async () => emptySettings(),
+  getAiSettings: async () => uniworkSettingsToolsOff(),
   setAiSettings: async () => {},
   getAiPanelPrefs: async () => ({
     side: 'left',

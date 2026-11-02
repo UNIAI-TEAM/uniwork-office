@@ -1331,7 +1331,7 @@ export function registerSlidesIpc(): void {
     },
   )
 
-  // ── Local single-page generation (no cloud needed, e.g. BYOK): a JSON slide spec written by
+  // ── Local single-page generation (no cloud page generation needed): a JSON slide spec written by
   // the renderer's LLM call is built directly into a one-slide pptx with pptx-engine
   // primitives — no HTML intermediate. Returns the same marker kind as the cloud path, so
   // landing (slides:land-generated-pages) is shared.

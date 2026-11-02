@@ -49,10 +49,6 @@ hace el cambio y te muestra exactamente qué tocó.
   en tu equipo. PDF → Word / Excel / PowerPoint, Markdown → Word y HTML →
   Word se ejecutan todos en el dispositivo. Solo las llamadas de IA salen de
   tu equipo, hacia el proveedor que elijas.
-- **Tus claves o ninguna.** Inicia sesión con Genspark y olvídate de las
-  claves, o usa tu propia clave para Claude, OpenAI, Gemini, DeepSeek, Kimi,
-  GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty, o cualquier endpoint
-  compatible con OpenAI, servidores locales incluidos.
 - **Automatizable y listo para agentes.** La app incluye una línea de comandos
   `genoffice` y un skill para Claude Code, Codex, Cursor, Gemini CLI, GitHub
   Copilot, OpenCode y Windsurf, de modo que un agente de programación puede
@@ -223,9 +219,6 @@ mientras lo observas.
   fórmulas y gráficos en vivo en Sheets, diapositivas dibujadas directamente
   en el lienzo, y cada turno de la IA deja una instantánea a la que puedes
   volver.
-- **Tu modelo, tu clave.** Inicia sesión con Genspark, o usa tu propia clave
-  para Claude, OpenAI, Gemini, DeepSeek y más; también incluye servidores
-  locales y cualquier endpoint compatible con OpenAI.
 - **PDF hecho como debe ser.** Edita el texto directamente en la página y
   convierte PDF a Word, Excel o PowerPoint en el dispositivo, con OCR del
   sistema para escaneos.
@@ -235,13 +228,6 @@ mientras lo observas.
   un servidor MCP ponen todos los motores al servicio de Claude Code, Claude
   Desktop, Codex, Cursor y otros agentes, siempre en el dispositivo.
 - **Gratis**, tanto para personas individuales como para equipos.
-
-## Backends de IA
-
-**Inicia sesión con Genspark** y no hay nada que configurar: las llamadas al
-modelo se enrutan a través del proxy de Genspark (familias Claude, GPT y
-Gemini) y los agentes obtienen búsqueda web y de imágenes, generación de
-imágenes, y análisis de imagen/audio/video.
 
 Toda la suite incluye temas claro, oscuro y del sistema. Los temas solo
 cambian lo que se ve en pantalla: las exportaciones, las impresiones y los
@@ -502,11 +488,10 @@ en Microsoft Office.
 <details>
 <summary><b>¿Funciona GenOffice sin conexión?</b></summary>
 
-La edición de documentos es completamente local: los archivos nunca salen
-de tu equipo para abrirse, editarse, guardarse o convertirse. Las funciones
-de IA (agentes, búsqueda, herramientas de imagen) necesitan conexión a la
-red, ya sea con un inicio de sesión de Genspark o con tu propia clave de API
-de modelo.
+La edición de documentos es completamente local: los archivos nunca salen de
+tu equipo para abrirse, editarse, guardarse o convertirse. Las funciones de
+IA (agentes, búsqueda, herramientas de imagen) necesitan conexión a la red y
+una cuenta de UniWork.
 
 </details>
 
@@ -527,18 +512,6 @@ PDFium más análisis de diseño basado en geometría, sin servicios en la nube
 ni subidas. Las páginas escaneadas también quedan cubiertas: en macOS y
 Windows el OCR del sistema las lee, así que se convierten en texto editable
 en lugar de una imagen de página.
-
-</details>
-
-<details>
-<summary><b>¿Puedo usar mi propio modelo de IA o clave de API?</b></summary>
-
-Sí. Además del inicio de sesión sin clave con Genspark, GenOffice admite tu
-propia clave para Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao,
-MiniMax, Grok, Mistral, OpenRouter, Requesty y OpenCode Zen/Go, además de cualquier
-endpoint compatible con OpenAI, incluidos servidores de modelos locales. La
-búsqueda, la generación de imágenes y el análisis de imagen/video usan sus
-propias claves en Settings → AI Media & Search.
 
 </details>
 

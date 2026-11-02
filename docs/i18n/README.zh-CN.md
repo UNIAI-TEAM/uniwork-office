@@ -45,9 +45,6 @@ PDF、Markdown 和 HTML，并在每份文档旁边配备一个 AI 智能体 —�
 - **本地优先的设计。** 文件的打开、编辑、保存和转换都在你的电脑上完成。
   PDF → Word / Excel / PowerPoint、Markdown → Word、HTML → Word 全部在本机运行。
   只有 AI 调用会发送到你选择的服务商。
-- **用自己的密钥，或者不用密钥。** 登录 Genspark 即可免配置使用；也可以自带
-  Claude、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、Doubao、MiniMax、Grok、
-  Mistral、OpenRouter、Requesty 的密钥，或任何 OpenAI 兼容端点，包括本地模型服务。
 - **可脚本化，随时可供智能体调用。** 应用自带 `genoffice` 命令行和一份面向
   Claude Code、Codex、Cursor、Gemini CLI、GitHub Copilot、OpenCode 和 Windsurf
   的 agent skill，让编程智能体无需打开任何窗口，就能在你的电脑上创建、转换、
@@ -208,8 +205,6 @@ Word 文档，供你实时查看。
   的部分原样复制。
 - **直接编辑文档的 AI。** Docs 中的修订痕迹、Sheets 中实时生效的公式和图表、直接
   在画布上生成的幻灯片，每一次 AI 操作都会留下可回滚的快照。
-- **自带模型，自带密钥。** 使用 Genspark 登录，或带上 Claude、OpenAI、Gemini、
-  DeepSeek 等的密钥，同样支持本地服务器和任意 OpenAI 兼容端点。
 - **认真做好 PDF。** 在页面内直接编辑文字，本机将 PDF 转换为 Word、Excel 或
   PowerPoint，扫描件支持系统 OCR。
 - **同样支持 Markdown 和 HTML**，共用同一个 AI 面板，并可本机导出为 Word。
@@ -217,12 +212,6 @@ Word 文档，供你实时查看。
   为 Claude Code、Claude Desktop、Codex、Cursor 及其他智能体所用，且仍然在本机
   运行。
 - **免费**，个人和团队皆可使用。
-
-## AI 后端
-
-**登录 Genspark**，无需任何配置：模型调用通过 Genspark 代理路由（Claude、GPT
-和 Gemini 系列），智能体同时获得网页与图片搜索、图片生成，以及图片/音频/视频
-解析能力。
 
 整个套件提供浅色、深色和跟随系统三种主题。主题只改变屏幕上的显示：导出、打印
 和保存的文件始终保留文档自身的颜色。
@@ -455,8 +444,7 @@ GenOffice 正在积极开发中，你的反馈决定它的走向。
 <summary><b>GenOffice 可以离线使用吗？</b></summary>
 
 文档编辑完全在本地进行 —— 打开、编辑、保存和转换文件都不需要把文件发送到任何
-地方。AI 功能（智能体、搜索、图片工具）需要网络连接，并且需要登录 Genspark 或
-提供你自己的模型 API 密钥。
+地方。AI 功能（智能体、搜索、图片工具）需要网络连接和 UniWork 账户。
 
 </details>
 
@@ -474,16 +462,6 @@ GenOffice 正在积极开发中，你的反馈决定它的走向。
 可以 —— 完全在本机完成：PDFium 字符级提取加上基于几何的版面分析，不依赖云
 服务，不上传。扫描页同样支持：在 macOS 和 Windows 上由系统 OCR 识别，转换结果
 是可编辑的文字，而不是一张页面图片。
-
-</details>
-
-<details>
-<summary><b>我可以使用自己的 AI 模型或 API 密钥吗？</b></summary>
-
-可以。除了免密钥的 Genspark 登录，GenOffice 还支持自带 Claude、OpenAI、Gemini、
-DeepSeek、Kimi、GLM、Qwen、Doubao、MiniMax、Grok、Mistral、OpenRouter、Requesty 和
-OpenCode Zen/Go 的密钥，以及任何 OpenAI 兼容端点 —— 包括本地模型服务。搜索、
-图片生成和图片/视频解析在 设置 → AI 媒体与搜索 下使用各自的密钥。
 
 </details>
 

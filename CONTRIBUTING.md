@@ -59,9 +59,10 @@ All pure TypeScript, no Electron dependency, unit-tested (except the UI kit):
   text formats).
 - `packages/agent-core` — the AI agent loop and skill composition shared by
   every app.
-- `packages/ai-provider` — provider abstraction and streaming for the model
-  backends.
-- `packages/ai-search` — web/image search tools.
+- `packages/ai-provider` — the UniWork AI client and streaming (UniWork AI is
+  the only model backend).
+- `packages/ai-search` — UniWork cloud tools (web/image search, image
+  generation, media analysis).
 - `packages/i18n`, `packages/ui`, `packages/project-store`,
   `packages/electron-utils` — shared i18n core, React UI kit, recent-files
   store, and Electron main-process helpers.

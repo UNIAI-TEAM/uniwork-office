@@ -46,10 +46,6 @@ Windows 與 Linux。它能開啟並儲存原生的 `.docx`、`.xlsx` 與 `.pptx`
 - **本機優先的設計。** 檔案的開啟、編輯、儲存與轉換都在你的裝置上完成。
   PDF → Word / Excel / PowerPoint、Markdown → Word、HTML → Word 全部
   在本機執行。只有 AI 呼叫會離開這台裝置，且僅送往你選擇的服務商。
-- **用你自己的金鑰，或完全不用。** 用 Genspark 登入即可省去金鑰設定，
-  或自行帶入 Claude、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、
-  Doubao、MiniMax、Grok、Mistral、OpenRouter、Requesty，或任何相容 OpenAI 介面
-  的服務端點，也支援本機伺服器。
 - **可寫成腳本，也隨時能交給代理。** 應用程式內建 `genoffice` 命令列，
   並附上一份給 Claude Code、Codex、Cursor、Gemini CLI、GitHub Copilot、
   OpenCode 與 Windsurf 使用的 agent skill，讓程式開發代理不必開啟任何
@@ -248,8 +244,6 @@ Cursor 及任何其他 MCP 用戶端都能自行啟動 `genoffice mcp`，不必�
   的部分會原樣複製。
 - **AI 直接編輯文件本身。** Docs 中的追蹤修訂、Sheets 中即時運算的公式與圖表、
   直接在畫布上生成的投影片，每一次 AI 操作都會留下可回復的快照。
-- **自帶模型，自帶金鑰。** 使用 Genspark 登入，或帶上 Claude、OpenAI、Gemini、
-  DeepSeek 等服務的金鑰，同時支援本機伺服器與任何相容 OpenAI 的服務端點。
 - **認真做好 PDF。** 直接在頁面內編輯文字，並在本機將 PDF 轉換為 Word、Excel 或
   PowerPoint，掃描檔案支援系統 OCR。
 - **同樣支援 Markdown 與 HTML**，共用同一套 AI 面板，並可在本機匯出為 Word。
@@ -257,12 +251,6 @@ Cursor 及任何其他 MCP 用戶端都能自行啟動 `genoffice mcp`，不必�
   都能供 Claude Code、Claude Desktop、Codex、Cursor 及其他代理使用，而且依然
   在本機執行。
 - **免費**，個人與團隊皆可使用。
-
-## AI 後端
-
-**用 Genspark 登入**就完全不用設定：模型呼叫會透過 Genspark 代理路由
-（涵蓋 Claude、GPT 與 Gemini 家族），代理也能使用網頁與圖片搜尋、
-圖片生成，以及圖片／音訊／影片分析。
 
 整套軟體支援亮色、深色與跟隨系統三種主題。主題只會改變畫面顯示：
 匯出、列印與儲存的檔案永遠保留文件本身的原始色彩。
@@ -502,8 +490,7 @@ Office 中依然能正常使用。
 <summary><b>GenOffice 能離線使用嗎？</b></summary>
 
 文件編輯完全在本機執行——檔案在開啟、編輯、儲存或轉換的過程中
-都不會離開你的裝置。AI 功能（代理、搜尋、圖片工具）需要網路連線，
-可透過 Genspark 登入或使用你自己的模型 API 金鑰。
+都不會離開你的裝置。AI 功能（代理、搜尋、圖片工具）需要網路連線和 UniWork 帳戶。
 
 </details>
 
@@ -522,17 +509,6 @@ Office 中依然能正常使用。
 資訊為基礎的版面分析，不經雲端服務，也不需要上傳檔案。掃描頁面
 同樣支援：在 macOS 與 Windows 上會由系統 OCR 讀取內容，因此轉出的
 是可編輯文字，而不是頁面圖片。
-
-</details>
-
-<details>
-<summary><b>我可以使用自己的 AI 模型或 API 金鑰嗎？</b></summary>
-
-可以。除了免金鑰的 Genspark 登入之外，GenOffice 也支援自帶金鑰，
-涵蓋 Claude、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、Doubao、
-MiniMax、Grok、Mistral、OpenRouter、Requesty 與 OpenCode Zen/Go，以及任何相容
-OpenAI 的服務端點——包括本機模型伺服器。搜尋、圖片生成與圖片／影片
-分析則在「設定 → AI 媒體與搜尋」下使用各自獨立的金鑰。
 
 </details>
 

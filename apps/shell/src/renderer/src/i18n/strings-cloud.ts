@@ -21,7 +21,7 @@ import { hi } from './cloud/hi'
 import { zhTW } from './cloud/zh-TW'
 import { vi } from './cloud/vi'
 
-/** UniWork cloud AI: Settings → Account / AI model / AI media (sharded per locale; zh defines the key set) */
+/** UniWork cloud AI: Settings → Account (sharded per locale; zh defines the key set) */
 export const cloudStrings = defineStrings({
   zh,
   en,

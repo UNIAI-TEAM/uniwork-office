@@ -10,8 +10,8 @@
  *
  * Matching is exact on the trimmed string: no prefix, substring, host or case folding, so a
  * registered URL never vouches for a sibling. A generated `data:` URL is kept by identity.
- * Enforcement is live-gated by `enforce` (UniWork AI turns only; BYOK keeps today's rules but the
- * registry still records).
+ * Enforcement is live-gated by `enforce` (UniWork AI turns); with it off the registry still
+ * records.
  */
 
 export type ImageUrlSource = 'image_search' | 'generate_image' | 'attachment'

@@ -348,7 +348,7 @@ function fenceVerify(editor: Editor): OpsContext['verify'] {
   return (before, after) => fenceViolation(before, after, spans)
 }
 
-// ── image URL rule for text that lands as markdown (UniWork AI only; BYOK registry never refuses) ──
+// ── image URL rule for text that lands as markdown (UniWork AI turns) ──
 
 /** a remote or inline image source; local md-asset / relative paths are not subject to the rule */
 const REMOTE_IMAGE_SRC = /^(?:https?:|data:|\/\/)/i

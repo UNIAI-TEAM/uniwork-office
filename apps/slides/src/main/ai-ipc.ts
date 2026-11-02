@@ -12,7 +12,6 @@ import {
   readFileSync,
   renameSync,
   statSync,
-  writeFileSync,
 } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -394,26 +393,6 @@ export function registerSlidesOnlyAiIpc(): void {
         return rebuildSlide(session, op.slideIndex)
       } catch {
         return null
-      }
-    },
-  )
-
-  // ── Style Skill sidecar persistence: write a same-named .styleskill.json next to the draft (fail-open)
-  ipcMain.handle(
-    'ai:save-sidecar',
-    async (
-      event,
-      data: { topic: string; styleSkill: string; createdAt: string },
-    ): Promise<{ ok: boolean }> => {
-      try {
-        const session = sessions.get(event.sender.id)
-        const draftPath = session?.path
-        if (!draftPath || !draftPath.endsWith('.pptx')) return { ok: false }
-        const sidecarPath = draftPath.replace(/\.pptx$/i, '.styleskill.json')
-        writeFileSync(sidecarPath, JSON.stringify(data, null, 2))
-        return { ok: true }
-      } catch {
-        return { ok: false }
       }
     },
   )

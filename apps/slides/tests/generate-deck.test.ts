@@ -39,7 +39,6 @@ function makeAccess(opts?: {
   const landOrder: string[] = [] // records the landing order
   const imageSearchCalls: string[] = [] // records the queries searchImages was called with
   const imagesSeen: string[][] = [] // records the images each generatePageCloud call received
-  const sidecarSaves: Array<{ topic: string; styleSkill: string; createdAt: string }> = []
   const savedTemplates: Record<
     string,
     { name: string; topic: string; styleSkill: string; createdAt: string }
@@ -150,9 +149,6 @@ function makeAccess(opts?: {
       }
       return [`https://mock.img/${encodeURIComponent(query)}.jpg`]
     },
-    saveSidecar: async (data) => {
-      sidecarSaves.push(data)
-    },
     saveStyleTemplate: async (name, data) => {
       savedTemplates[name] = { name, ...data }
       return { ok: true }
@@ -177,7 +173,6 @@ function makeAccess(opts?: {
     landOrder,
     imageSearchCalls,
     imagesSeen,
-    sidecarSaves,
     savedTemplates,
     getPages: () => pages,
   }
@@ -703,18 +698,8 @@ describe('generate_deck Style Skill template persistence', () => {
     },
   })
 
-  it('saveSidecar is called after generate_deck completes, with styleSkill and topic', async () => {
-    const { access, sidecarSaves } = makeAccess()
-    const skill = createSlidesSkill(access)
-    await skill.executeTool(topicCall('Beijing Travel'))
-    expect(sidecarSaves.length).toBe(1)
-    expect(sidecarSaves[0]!.styleSkill).toBe('STYLE_SKILL_FOR:Beijing Travel')
-    expect(sidecarSaves[0]!.topic).toBe('Beijing Travel')
-    expect(sidecarSaves[0]!.createdAt).toBeTruthy()
-  })
-
-  it('saveSidecar is not called when all pages fail to generate', async () => {
-    const { access, sidecarSaves } = makeAccess({ failPages: [1, 2] })
+  it('all pages failing ends the run with a failed progress event', async () => {
+    const { access } = makeAccess({ failPages: [1, 2] })
     const doneEvents: Array<{ total: number; outcome?: string }> = []
     access.onProgress = (e) => {
       if (e.stage === 'done') doneEvents.push({ total: e.total, outcome: e.outcome })
@@ -722,8 +707,6 @@ describe('generate_deck Style Skill template persistence', () => {
     const skill = createSlidesSkill(access)
     const res = (await skill.executeTool(topicCall('Shanghai Travel'))) as { isError?: boolean }
     expect(res.isError).toBe(true)
-    // landedPages=0 -> no sidecar written
-    expect(sidecarSaves.length).toBe(0)
     // the terminal progress event says failed; the card must not read it as "done, 0 slides"
     expect(doneEvents).toEqual([{ total: 0, outcome: 'failed' }])
   })

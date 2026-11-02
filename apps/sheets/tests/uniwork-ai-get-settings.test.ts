@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { aiSettingsFileOf, defaultAiSettings } from '@genoffice/ai-provider'
+import { aiSettingsInputSchema } from '../src/shared/desktop-api'
 
 const source = readFileSync(join(__dirname, '..', 'src', 'main', 'sheets-main.ts'), 'utf8')
 
@@ -39,6 +40,18 @@ describe('sheets AI settings are UniWork AI only', () => {
     const body = handlerBody('IPC_CHANNELS.aiSetSettings')
     expect(body).toMatch(/saveAiSettingsFile\(\s*SETTINGS_PATH\(\)/)
     expect(body).not.toContain('writeJsonAtomic')
+  })
+
+  it('the renderer request schema takes the UniWork settings and refuses a key-shaped field', () => {
+    const settings = { provider: 'uniwork', providers: {}, gskToolsEnabled: false }
+    expect(aiSettingsInputSchema.safeParse(settings).success).toBe(true)
+    for (const bad of [
+      { ...settings, providers: { openrouter: { apiKey: 'sk-or-1', model: 'm' } } },
+      { ...settings, search: { provider: 'tavily', providers: { tavily: { apiKey: 'tv' } } } },
+      { ...settings, maxOutputTokens: 4096 },
+    ]) {
+      expect(aiSettingsInputSchema.safeParse(bad).success).toBe(false)
+    }
   })
 
   it('a send ends in ai_disabled with no provider request', () => {

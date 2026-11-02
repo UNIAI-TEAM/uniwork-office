@@ -100,7 +100,7 @@ const IMAGE_FETCH_OFF_NOTE =
   '\n\nNote: insert_image and generate_image are unavailable here (images cannot be downloaded into this document). Do not call or promise them; image_search results can be shared as links.'
 
 const IMAGE_GEN_OFF_NOTE =
-  '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
+  '\n\nNote: generate_image is currently unavailable (signed out of UniWork, or the UniWork cloud tools are off). Do not call or promise it; use image_search for imagery.'
 
 /** the one-shot writer behind write_document runs only where the host reaches the UniWork AI writer route */
 const WRITER_OFF_NOTE =
@@ -109,7 +109,7 @@ const WRITER_OFF_NOTE =
 export function createMarkdownSkill(
   getEditor: () => Editor | null,
   fm?: FrontmatterAccess,
-  /** live predicate (a BYOK media model is configured; the UniWork cloud route while its seam is on); false hides generate_image */
+  /** live predicate (the UniWork cloud route while its seam is on); false hides generate_image */
   imageGenAvailable?: () => boolean,
   /** streaming long-form writer behind write_document (panel-owned: progress chip, partial keep/discard) */
   getWriter?: () => AiDocWriter | undefined,

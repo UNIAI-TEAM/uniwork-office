@@ -77,7 +77,7 @@ In-app auto-update reads the feed `UNIWORK_UPDATE_URL` names at packaging time: 
 
 ## Scope notes
 
-- The app is a desktop editor suite; opening and saving files needs no account. AI features use a UniWork account or your own provider key
+- The app is a desktop editor suite; opening and saving files needs no account. AI features run on UniWork AI and need a UniWork account
 - Collaboration, cloud sync and a PWA / browser conversion are not part of the desktop app
 - The `genoffice` CLI command, the MCP server names and `@genoffice/*` package names are retained for upstream mergeability
 - The icon artwork lives in `tools/rebrand/assets/` (see `tools/rebrand/README.md` for the asset-to-target list)

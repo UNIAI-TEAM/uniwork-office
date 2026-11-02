@@ -51,11 +51,6 @@ kepada anda dengan tepat apa yang disentuhnya.
   ditukar terus pada mesin anda. PDF → Word / Excel / PowerPoint, Markdown →
   Word dan HTML → Word semuanya berjalan di peranti sendiri. Hanya panggilan
   AI yang keluar dari mesin, kepada pembekal pilihan anda.
-- **Kunci anda sendiri atau tiada langsung.** Log masuk dengan Genspark dan
-  anda tidak perlu sebarang kunci, atau bawa kunci anda sendiri untuk Claude,
-  OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral,
-  OpenRouter, Requesty, atau mana-mana titik akhir yang serasi dengan OpenAI, termasuk
-  pelayan setempat.
 - **Boleh dijalankan melalui skrip dan sedia untuk agen.** Aplikasi ini
   disertakan dengan baris arahan `genoffice` dan skill untuk Claude Code,
   Codex, Cursor, Gemini CLI, GitHub Copilot, OpenCode dan Windsurf, jadi agen
@@ -223,9 +218,6 @@ tab editor yang kelihatan sementara anda memerhati.
 - **AI yang menyunting dokumen itu sendiri.** Perubahan dijejak dalam Docs,
   formula dan carta langsung dalam Sheets, slaid dilukis terus pada kanvas,
   setiap pusingan AI adalah snapshot yang boleh anda kembalikan.
-- **Model anda, kunci anda.** Log masuk dengan Genspark, atau bawa kunci
-  untuk Claude, OpenAI, Gemini, DeepSeek dan lain-lain, termasuk pelayan
-  setempat dan mana-mana endpoint serasi OpenAI.
 - **PDF yang diuruskan dengan betul.** Sunting teks terus dalam halaman, dan
   tukar PDF kepada Word, Excel atau PowerPoint di peranti sendiri, dengan OCR
   sistem untuk hasil imbasan.
@@ -235,13 +227,6 @@ tab editor yang kelihatan sementara anda memerhati.
   dan pelayan MCP meletakkan setiap enjin di bawah khidmat Claude Code,
   Claude Desktop, Codex, Cursor dan agen lain, masih di peranti sendiri.
 - **Percuma**, untuk individu dan pasukan.
-
-## Bahagian belakang AI
-
-**Log masuk dengan Genspark** dan tidak ada apa-apa yang perlu ditetapkan:
-panggilan model disalurkan melalui proksi Genspark (keluarga Claude, GPT dan
-Gemini) dan agen mendapat carian web serta imej, penjanaan imej, dan analisis
-imej/audio/video.
 
 Keseluruhan rangkaian ini disertakan dengan tema terang, gelap dan sistem.
 Tema hanya mengubah apa yang dipaparkan pada skrin: eksport, cetakan dan fail
@@ -500,8 +485,7 @@ ditulis semula seadanya, jadi dokumen kekal berfungsi dalam Microsoft Office.
 
 Penyuntingan dokumen sepenuhnya setempat — fail tidak pernah keluar daripada
 mesin anda untuk dibuka, disunting, disimpan atau ditukar. Ciri-ciri AI
-(agen, carian, alat imej) memerlukan sambungan rangkaian, sama ada dengan log
-masuk Genspark atau kunci API model anda sendiri.
+(agen, carian, alat imej) memerlukan sambungan rangkaian dan akaun UniWork.
 
 </details>
 
@@ -522,18 +506,6 @@ analisis susun atur berasaskan geometri, tanpa perkhidmatan awan, tanpa muat
 naik. Halaman yang diimbas turut disokong: pada macOS dan Windows, OCR sistem
 membacanya, jadi ia ditukar kepada teks yang boleh disunting bukan imej
 halaman.
-
-</details>
-
-<details>
-<summary><b>Bolehkah saya menggunakan model AI atau kunci API saya sendiri?</b></summary>
-
-Ya. Selain log masuk Genspark tanpa kunci, GenOffice menyokong bawa kunci
-anda sendiri untuk Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao,
-MiniMax, Grok, Mistral, OpenRouter, Requesty dan OpenCode Zen/Go, ditambah mana-mana
-titik akhir serasi OpenAI — termasuk pelayan model setempat. Carian,
-penjanaan imej dan analisis imej/video memerlukan kunci tersendiri di bawah
-Settings → AI Media & Search.
 
 </details>
 

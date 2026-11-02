@@ -50,7 +50,6 @@ import {
   mediaAnalysisAvailable,
 } from '@genoffice/ai-provider/browser'
 import { platform } from '../capabilities'
-import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import {
@@ -368,8 +367,6 @@ interface AiPanelProps {
   onQueueConsume?: (keys: string[]) => void
   /** view-only UniWork deck: the agent only gets read-only tools, edit-only composer affordances are gone */
   readOnly?: boolean
-  /** UniWork-bound deck: AI generation writes nothing outside the document (no draft, no sidecar) */
-  uniworkBound?: boolean
 }
 
 /** Some locales already end the label with an ellipsis — normalize to exactly one. */
@@ -469,7 +466,6 @@ export function AiPanel({
   onQueueFocus,
   onQueueConsume,
   readOnly = false,
-  uniworkBound = false,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   const askUni = useAskUniMode(lang, currentFilePath)
@@ -618,8 +614,6 @@ export function AiPanel({
   slidesRef.current = slides
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
-  const uniworkBoundRef = useRef(uniworkBound)
-  uniworkBoundRef.current = uniworkBound
   const currentRef = useRef(current)
   currentRef.current = current
   const selectedRef = useRef(selectedIds)
@@ -1005,8 +999,6 @@ export function AiPanel({
 
     const access: DeckAccess = {
       readOnly: () => readOnlyRef.current,
-      // the adapter bound feeds the AI through the shared rule: a web frame reads as bound
-      uniworkBound: () => uniworkBoundForAi(uniworkBoundRef.current ?? false, platform()),
       // every turn runs on UniWork AI
       uniworkAi: () => true,
       // only the web frame reaches the UniWork AI writer route; the desktop refuses writer calls
@@ -1424,13 +1416,6 @@ export function AiPanel({
           return r.images.map((im) => im.imageUrl).filter(Boolean)
         } catch {
           return []
-        }
-      },
-      saveSidecar: async (data) => {
-        try {
-          await window.slidesApi.saveStyleSidecar(data)
-        } catch {
-          /* fail-open */
         }
       },
       saveStyleTemplate: async (name, data) => {
@@ -2030,7 +2015,6 @@ export function AiPanel({
           access,
           transport,
           pageIndex: page,
-          screenshot: null,
           systemSuffix: aiLangDirective,
           signal: controller.signal,
         })

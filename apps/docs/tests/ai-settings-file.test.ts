@@ -140,9 +140,7 @@ describe('ai-settings.json holds the cloud-tools opt-out only', () => {
   it('ai:get-settings answers uniwork to every sender, with the stored opt-out', async () => {
     register(OLD_FILE)
     for (const sender of [11, 22]) {
-      const settings = (await handlers.get('ai:get-settings')!(from(sender), {
-        includeUniworkPick: true,
-      })) as AiSettings
+      const settings = (await handlers.get('ai:get-settings')!(from(sender))) as AiSettings
       expect(settings.provider).toBe('uniwork')
       expect(settings.gskToolsEnabled).toBe(false)
     }

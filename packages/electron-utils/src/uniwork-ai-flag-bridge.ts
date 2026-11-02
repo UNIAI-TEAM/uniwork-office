@@ -1,6 +1,6 @@
 /// Preload half of the UniWork AI availability flag (see ./uniwork-ai-flag): exposes
 /// window.uniworkAiFlag { get, onChange } to the renderer. Called once from every editor preload
-/// and the shell preload; the renderer mirrors the value into its own provider list.
+/// and the shell preload; the renderer mirrors the value (its model chip and Send guard read it).
 import { contextBridge, ipcRenderer } from 'electron'
 import {
   UNIWORK_AI_FLAG_BRIDGE_KEY,

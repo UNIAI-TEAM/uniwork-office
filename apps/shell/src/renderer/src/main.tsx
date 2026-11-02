@@ -16,7 +16,7 @@ import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
 import { UniworkLiveHost, ensureLiveHost } from './uniwork-live'
 
 installScreenTips()
-// this renderer's own provider list shows the UniWork AI entry only while the shell offers it
+// this renderer's model chip and Send guard follow the shell's UniWork AI availability flag
 mirrorUniworkAiFlag()
 // the window's two live regions (polite + assertive) exist from the start, as body-level nodes
 ensureLiveHost()

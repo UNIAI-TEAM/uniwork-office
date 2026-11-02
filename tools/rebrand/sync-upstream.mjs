@@ -146,6 +146,8 @@ export const DROPPED_UPSTREAM_PATHS = [
   'apps/shell/tests/file-index-decision.test.ts',
   'apps/shell/tests/settings-custom-models.test.ts',
   'e2e/settings-media-search.spec.ts',
+  // slides: the screenshot QC prompt (a UniWork AI QC turn takes no screenshot)
+  'apps/slides/src/renderer/ai/prompts/qc-visual.md',
 ]
 
 /**

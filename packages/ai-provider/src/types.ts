@@ -32,7 +32,7 @@ export interface AiSettings {
 
 export interface AiStreamRequest {
   requestId: string
-  /** Stable renderer transport id used to retain native provider sessions. */
+  /** Stable renderer transport id: keys the UniWork AI conversation and run ids (uniwork/conversation.ts). */
   sessionId?: string
   settings: AiSettings
   system: string

@@ -6020,7 +6020,6 @@ function registerHomeIpc(): void {
     ensureFolderWatchers()
     return picked
   })
-
 }
 
 function stringPaths(value: unknown): string[] {
@@ -7347,7 +7346,7 @@ registerDroppedFilesIpc()
 registerUserSkillsIpc(guardedIpc)
 // editors report a running AI turn per webContents (TabManager.editorDirtyStates reads it)
 registerAiRunIpc(guardedIpc)
-// the renderers' own provider lists learn whether UniWork AI is offered (pull + push)
+// the renderers learn whether UniWork AI is offered (pull + push)
 registerUniworkAiFlagIpc(guardedIpc)
 setUniworkAiFlagListener((available) =>
   broadcastUniworkAiFlag(available, webContents.getAllWebContents()),

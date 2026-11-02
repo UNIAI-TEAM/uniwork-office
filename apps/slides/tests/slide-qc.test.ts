@@ -83,8 +83,8 @@ describe('createSlideFixSkill', () => {
     expect(r.output).toContain('Canvas 1280×720px')
   })
 
-  it('uses a geometry-only prompt when no screenshot can be sent', () => {
-    const skill = createSlideFixSkill(access, false)
+  it('uses the geometry-only prompt: no screenshot is ever sent', () => {
+    const skill = createSlideFixSkill(access)
     expect(skill.systemPrompt).toContain('NO rendered screenshot is attached')
     expect(skill.systemPrompt).toContain('DO NOT judge or change contrast')
   })
@@ -124,7 +124,6 @@ describe('geometry-only QC (UniWork AI takes no screenshot in a QC turn)', () =>
       access: one,
       transport,
       pageIndex: 0,
-      screenshot: null,
     })
     expect(result).toMatchObject({ ok: true, edited: false, reply: 'OK' })
     expect(streamed).toBe(false)
@@ -163,7 +162,6 @@ describe('geometry-only QC (UniWork AI takes no screenshot in a QC turn)', () =>
       access: one,
       transport,
       pageIndex: 0,
-      screenshot: null,
     })
     expect(result.error).toBeUndefined()
     const message = request?.messages[0]

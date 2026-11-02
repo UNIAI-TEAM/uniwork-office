@@ -50,11 +50,6 @@ perubahan, dan menunjukkan dengan tepat bagian mana yang diubah.
   perangkat Anda sendiri. Konversi PDF → Word / Excel / PowerPoint, Markdown →
   Word, dan HTML → Word semuanya berjalan on-device. Hanya panggilan AI yang
   meninggalkan perangkat, menuju penyedia yang Anda pilih.
-- **Kunci API Anda sendiri, atau tanpa kunci sama sekali.** Masuk dengan
-  Genspark dan lewati urusan kunci API, atau gunakan kunci Anda sendiri untuk
-  Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok,
-  Mistral, OpenRouter, Requesty, atau endpoint apa pun yang kompatibel dengan OpenAI,
-  termasuk server lokal.
 - **Dapat dijalankan lewat skrip dan siap untuk agen.** Aplikasi ini
   menyertakan baris perintah `genoffice` dan sebuah skill untuk Claude Code,
   Codex, Cursor, Gemini CLI, GitHub Copilot, OpenCode, dan Windsurf, sehingga
@@ -221,9 +216,6 @@ terlihat sambil Anda menyaksikannya.
 - **AI yang mengedit dokumen itu sendiri.** Tracked changes di Docs, rumus dan
   grafik langsung di Sheets, slide yang digambar langsung di kanvas, setiap
   giliran AI adalah snapshot yang bisa Anda kembalikan.
-- **Model Anda, kunci Anda.** Masuk dengan Genspark, atau bawa kunci untuk
-  Claude, OpenAI, Gemini, DeepSeek dan lainnya, termasuk server lokal dan
-  endpoint apa pun yang kompatibel dengan OpenAI.
 - **PDF yang ditangani dengan benar.** Edit teks langsung di halaman, dan
   konversi PDF ke Word, Excel, atau PowerPoint secara on-device, dengan OCR
   sistem untuk hasil pindaian.
@@ -233,13 +225,6 @@ terlihat sambil Anda menyaksikannya.
   dan server MCP menempatkan setiap engine untuk melayani Claude Code,
   Claude Desktop, Codex, Cursor, dan agen lainnya, tetap on-device.
 - **Gratis**, untuk individu maupun tim.
-
-## Backend AI
-
-**Masuk dengan Genspark** dan tidak ada yang perlu dikonfigurasi: panggilan
-model diarahkan lewat proxy Genspark (keluarga Claude, GPT, dan Gemini) dan
-agen mendapatkan akses pencarian web dan gambar, generasi gambar, serta
-analisis gambar/audio/video.
 
 Seluruh suite mendukung tema terang, gelap, dan sistem. Tema hanya mengubah
 tampilan di layar: ekspor, cetakan, dan file yang disimpan selalu
@@ -499,8 +484,8 @@ Microsoft Office.
 
 Pengeditan dokumen sepenuhnya lokal — file tidak pernah meninggalkan
 perangkat Anda untuk dibuka, diedit, disimpan, atau dikonversi. Fitur AI
-(agen, pencarian, alat gambar) membutuhkan koneksi jaringan, baik dengan
-masuk lewat Genspark atau dengan kunci API model Anda sendiri.
+(agen, pencarian, alat gambar) membutuhkan koneksi jaringan dan akun
+UniWork.
 
 </details>
 
@@ -521,18 +506,6 @@ ditambah analisis layout berbasis geometri, tanpa layanan cloud, tanpa
 unggah. Halaman hasil pindai (scan) juga didukung: di macOS dan Windows, OCR
 sistem membacanya, sehingga hasilnya berupa teks yang bisa diedit, bukan
 gambar halaman.
-
-</details>
-
-<details>
-<summary><b>Bisakah saya menggunakan model AI atau kunci API saya sendiri?</b></summary>
-
-Ya. Selain masuk lewat Genspark tanpa kunci API, GenOffice mendukung
-penggunaan kunci Anda sendiri untuk Claude, OpenAI, Gemini, DeepSeek, Kimi,
-GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty, dan OpenCode Zen/Go,
-plus endpoint apa pun yang kompatibel dengan OpenAI — termasuk server model
-lokal. Pencarian, generasi gambar, dan analisis gambar/video menggunakan
-kunci tersendiri di Settings → AI Media & Search.
 
 </details>
 

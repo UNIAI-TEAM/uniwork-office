@@ -6,7 +6,7 @@ import { DEFAULT_DECK_STYLE, type DeckAccess } from './slides-skill'
  * The request behind the panel's own generators (per-page, style skill, planning). They are not
  * conversation turns, so they carry `purpose: 'one-shot'`. UniWork AI refuses such a request
  * unless it names its `writer`: then the web frame runs it on the writer route, inside the run of
- * the chat session (`sessionId`) that called the generator; BYOK keeps reading system/user.
+ * the chat session (`sessionId`) that called the generator.
  */
 export function oneShotStreamRequest(
   args: {
@@ -57,7 +57,7 @@ export function deckOutlineWriter(a: OutlineArgs): WriterCall {
       count: a.count,
       context: a.context?.slice(0, 8000),
       style_skill: a.styleSkill?.slice(0, 8000),
-      // the start page only matters to a continuation, as in the BYOK prompt
+      // the start page only matters to a continuation
       start_page: a.continueFrom ? a.startPage : undefined,
       continue_core_hook: a.continueFrom?.coreHook.slice(0, 1000),
     }),
@@ -67,7 +67,7 @@ export function deckOutlineWriter(a: OutlineArgs): WriterCall {
 /**
  * previousError: the validation error of the attempt before (the repair round). The server
  * requires a style and a title: a page redone outside generate_deck may have neither, so it gets
- * the deck's default style and "Slide N" (the BYOK prompt is built from the args unchanged).
+ * the deck's default style and "Slide N".
  */
 export function slidePageWriter(a: PageArgs, previousError?: string): WriterCall {
   return {

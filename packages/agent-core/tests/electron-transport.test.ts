@@ -12,7 +12,6 @@ interface FakeSettings {
 
 function setup(
   startImpl?: (request: IpcStreamStart<FakeSettings>) => void | Promise<unknown>,
-  creditsErrorText?: () => string,
   networkErrorText?: () => string,
   overloadedErrorText?: () => string,
 ) {
@@ -35,7 +34,6 @@ function setup(
     getSettings: () => ({ provider: 'genspark' }),
     unknownErrorText: () => 'unknown error',
     timeoutErrorText: () => 'timed out',
-    ...(creditsErrorText ? { creditsErrorText } : {}),
     ...(networkErrorText ? { networkErrorText } : {}),
     ...(overloadedErrorText ? { overloadedErrorText } : {}),
   })
@@ -129,18 +127,8 @@ describe('createIpcTransport', () => {
     expect(cb.onError).toHaveBeenCalledWith('timed out', undefined)
   })
 
-  it('maps a credits error code to the localized credits message', () => {
-    const { cb, emit } = setup(undefined, () => 'credits used up')
-    emit({
-      type: 'error',
-      error: 'Your credits have been exhausted.',
-      errorCode: 'credits',
-    })
-    expect(cb.onError).toHaveBeenCalledWith('credits used up', undefined)
-  })
-
   it('maps a network error code to the localized network message', () => {
-    const { cb, emit } = setup(undefined, undefined, () => 'network problem')
+    const { cb, emit } = setup(undefined, () => 'network problem')
     emit({
       type: 'error',
       error: 'Claude fetch failed: fetch failed cause=ECONNRESET',
@@ -162,18 +150,8 @@ describe('createIpcTransport', () => {
     )
   })
 
-  it('a credits error code without creditsErrorText falls back to the carried text', () => {
-    const { cb, emit } = setup()
-    emit({
-      type: 'error',
-      error: 'Your credits have been exhausted.',
-      errorCode: 'credits',
-    })
-    expect(cb.onError).toHaveBeenCalledWith('Your credits have been exhausted.', undefined)
-  })
-
   it('maps an overloaded error code to the localized busy message', () => {
-    const { cb, emit } = setup(undefined, undefined, undefined, () => 'service busy')
+    const { cb, emit } = setup(undefined, undefined, () => 'service busy')
     emit({
       type: 'error',
       error: 'HTTP 429: {"error":{"type":"engine_overloaded_error"}}',

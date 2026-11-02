@@ -144,7 +144,7 @@ export type WriterKind =
 
 /**
  * A one-shot writer as UniWork AI takes it: the kind and its structured input (the server's
- * field names), never prompt text. A BYOK provider ignores it and reads `system` / the user text.
+ * field names), never prompt text.
  */
 export type WriterCall = { kind: WriterKind; input: Record<string, unknown> }
 

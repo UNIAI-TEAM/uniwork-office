@@ -51,11 +51,6 @@ er verändert hat.
   bearbeitet, gespeichert und konvertiert. PDF → Word / Excel / PowerPoint,
   Markdown → Word und HTML → Word laufen vollständig auf dem Gerät. Nur die
   KI-Aufrufe verlassen den Rechner – zu dem Anbieter, den du wählst.
-- **Deine Schlüssel oder keine.** Melde dich mit Genspark an und du brauchst
-  keine Schlüssel, oder bring deinen eigenen Schlüssel für Claude, OpenAI,
-  Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral,
-  OpenRouter, Requesty oder jeden OpenAI-kompatiblen Endpunkt mit – auch lokale Server
-  werden unterstützt.
 - **Skriptbar und bereit für Agenten.** Die App bringt eine
   `genoffice`-Befehlszeile und einen Skill für Claude Code, Codex, Cursor,
   Gemini CLI, GitHub Copilot, OpenCode und Windsurf mit, sodass ein
@@ -225,9 +220,6 @@ aufbauen, während du zusiehst.
   Docs, echte Formeln und Diagramme in Sheets, Folien werden direkt auf die
   Arbeitsfläche gezeichnet, und jeder KI-Schritt hinterlässt einen Snapshot,
   den du zurückrollen kannst.
-- **Dein Modell, dein Schlüssel.** Melde dich mit Genspark an oder bring einen
-  eigenen Schlüssel für Claude, OpenAI, Gemini, DeepSeek und mehr mit – lokale
-  Server und jeder OpenAI-kompatible Endpunkt sind ebenfalls möglich.
 - **PDF richtig gemacht.** Text direkt auf der Seite bearbeiten und PDF lokal
   in Word, Excel oder PowerPoint konvertieren, mit System-OCR für Scans.
 - **Auch Markdown und HTML**, mit demselben KI-Panel und lokalem Export nach
@@ -236,13 +228,6 @@ aufbauen, während du zusiehst.
   MCP-Server stellen jede Engine in den Dienst von Claude Code, Claude
   Desktop, Codex, Cursor und anderen Agenten – weiterhin auf dem Gerät.
 - **Kostenlos**, für Einzelpersonen wie für Teams.
-
-## KI-Backends
-
-**Mit Genspark anmelden**, und es gibt nichts zu konfigurieren:
-Modellaufrufe laufen über den Genspark-Proxy (die Modellfamilien Claude, GPT
-und Gemini), und die Agenten erhalten Web- und Bildsuche, Bildgenerierung
-sowie Bild-/Audio-/Videoanalyse.
 
 Die gesamte Suite bringt ein helles, ein dunkles und einen
 Systemdesign-Modus mit. Designs ändern nur, was auf dem Bildschirm zu sehen
@@ -508,8 +493,7 @@ Dokumente in Microsoft Office weiter funktionieren.
 Die Dokumentbearbeitung ist vollständig lokal – Dateien verlassen deinen
 Rechner nie, um geöffnet, bearbeitet, gespeichert oder konvertiert zu
 werden. Die KI-Funktionen (Agenten, Suche, Bildwerkzeuge) benötigen eine
-Netzwerkverbindung, entweder über eine Genspark-Anmeldung oder deinen
-eigenen Modell-API-Schlüssel.
+Netzwerkverbindung und ein UniWork-Konto.
 
 </details>
 
@@ -529,18 +513,6 @@ geometriebasierte Layoutanalyse, kein Cloud-Dienst, kein Upload. Auch
 gescannte Seiten werden abgedeckt: Unter macOS und Windows liest die
 System-OCR sie aus, sodass sie zu bearbeitbarem Text statt zu einem
 Seitenbild konvertiert werden.
-
-</details>
-
-<details>
-<summary><b>Kann ich mein eigenes KI-Modell oder meinen eigenen API-Schlüssel verwenden?</b></summary>
-
-Ja. Neben der schlüssellosen Genspark-Anmeldung unterstützt GenOffice das
-Mitbringen eigener Schlüssel für Claude, OpenAI, Gemini, DeepSeek, Kimi,
-GLM, Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty und OpenCode Zen/Go,
-plus jeden OpenAI-kompatiblen Endpunkt – einschließlich lokaler
-Modell-Server. Suche, Bildgenerierung und Bild-/Videoanalyse benötigen
-eigene Schlüssel unter Einstellungen → KI-Medien & Suche.
 
 </details>
 

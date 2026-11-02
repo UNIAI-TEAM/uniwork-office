@@ -2653,62 +2653,13 @@ export type WorkbookConditionalRule = z.infer<typeof conditionalRuleSchema>
 
 // ---- AI settings + stream: canonical types live in @genoffice/ai-provider,
 // shared with apps/docs. Validated here like every other renderer→main request in
-// this file. The schema still accepts the fields an older renderer sent; main reads
-// none of them (UniWork AI is the only provider). ----
-
-const aiProviderConfigSchema = z
-  .object({
-    apiKey: z.string(),
-    model: z.string(),
-    baseUrl: z.string().optional(),
-    cliPath: z.string().optional(),
-  })
-  .strict()
-
-const aiMediaProviderConfigSchema = z
-  .object({
-    apiKey: z.string(),
-    baseUrl: z.string().optional(),
-    imageModel: z.string(),
-    analysisModel: z.string(),
-  })
-  .strict()
+// this file. UniWork AI is the only provider: no key, no model, no provider slots. ----
 
 export const aiSettingsInputSchema = z
   .object({
     provider: z.string().min(1),
-    providers: z.record(z.string(), aiProviderConfigSchema),
+    providers: z.object({}).strict(),
     gskToolsEnabled: z.boolean().optional(),
-    media: z
-      .object({
-        imageProvider: z.string().min(1).optional(),
-        analysisProvider: z.string().min(1).optional(),
-        videoAnalysisProvider: z.string().min(1).optional(),
-        // capabilities where the user picked the UniWork cloud entry explicitly
-        cloudPicked: z
-          .object({
-            image: z.boolean().optional(),
-            analysis: z.boolean().optional(),
-            video: z.boolean().optional(),
-          })
-          .strict()
-          .optional(),
-        // pre-catalog single choice, still accepted on read
-        provider: z.string().min(1).optional(),
-        providers: z.record(z.string(), aiMediaProviderConfigSchema),
-      })
-      .strict()
-      .optional(),
-    search: z
-      .object({
-        provider: z.string().min(1),
-        providers: z.record(z.string(), z.object({ apiKey: z.string() }).strict()),
-      })
-      .strict()
-      .optional(),
-    // the schema only rejects nonsense (this object is .strict(), so an omitted
-    // key here would make the whole request fail)
-    maxOutputTokens: z.number().int().positive().optional(),
   })
   .strict()
 

@@ -3913,7 +3913,6 @@ export function App() {
                   currentFilePath={path}
                   editQueue={editQueue}
                   readOnly={uniwork.readOnly}
-                  uniworkBound={uniwork.bound}
                   onQueueEditInstruction={(key, instruction) =>
                     setEditQueue((prev) =>
                       prev.map((it) => (it.key === key ? { ...it, instruction } : it)),

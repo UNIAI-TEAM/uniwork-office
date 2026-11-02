@@ -41,11 +41,6 @@ export type {
 } from './uniwork-conflict'
 
 /** Legal files shipped beside the app and opened from Settings > About. */
-/** The Settings window shows and saves the account's UniWork AI pick; My AI, email and one-click never pass this. */
-export interface AiSettingsPickOptions {
-  includeUniworkPick?: boolean
-}
-
 export type LegalDoc = 'license' | 'notice' | 'modifications' | 'thirdParty'
 
 export interface AttachmentMeta {
@@ -1457,9 +1452,9 @@ export interface HomeApi {
   /** document page theme switched anywhere (broadcast from the main process) */
   onDocumentThemeChanged(handler: (theme: DocTheme) => void): () => void
   /** AI settings (userData/ai-settings.json, shared by every editor) */
-  getAiSettings(options?: AiSettingsPickOptions): Promise<AiSettings>
+  getAiSettings(): Promise<AiSettings>
   /** persist AI settings; every renderer gets ai:settings-changed and re-reads */
-  setAiSettings(settings: AiSettings, options?: AiSettingsPickOptions): Promise<void>
+  setAiSettings(settings: AiSettings): Promise<void>
   /** ai-settings.json was rewritten by any renderer (composer model chip, another window) */
   onAiSettingsChanged(handler: () => void): () => void
   /** file picker for the workbench module panes (files stay on device) */

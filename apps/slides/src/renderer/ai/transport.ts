@@ -13,7 +13,6 @@ export function createElectronTransport(getSettings: () => AiSettings): IpcTrans
     getSettings,
     unknownErrorText: () => t('aiErrUnknown'),
     timeoutErrorText: () => t('aiErrStreamTimeout'),
-    creditsErrorText: () => t('aiCreditsExhausted'),
     networkErrorText: () => t('aiErrNetwork'),
     overloadedErrorText: () => t('aiErrOverloaded'),
     // a UniWork AI failure is worded by its code (S9), in the UI language, never by the chunk's text

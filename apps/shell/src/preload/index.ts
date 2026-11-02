@@ -1079,18 +1079,11 @@ const homeApi: HomeApi = {
     ipcRenderer.on('ai:settings-changed', listener)
     return () => ipcRenderer.removeListener('ai:settings-changed', listener)
   },
-  async getAiSettings(options) {
-    return (await ipcRenderer.invoke(
-      'ai:get-settings',
-      options?.includeUniworkPick ? { includeUniworkPick: true } : undefined,
-    )) as AiSettings
+  async getAiSettings() {
+    return (await ipcRenderer.invoke('ai:get-settings')) as AiSettings
   },
-  async setAiSettings(settings, options) {
-    await ipcRenderer.invoke(
-      'ai:set-settings',
-      settings,
-      options?.includeUniworkPick ? { includeUniworkPick: true } : undefined,
-    )
+  async setAiSettings(settings) {
+    await ipcRenderer.invoke('ai:set-settings', settings)
   },
   pickAttachments() {
     return ipcRenderer.invoke('files:pick') as Promise<AttachmentAddResult | null>

@@ -1851,12 +1851,6 @@ export interface SlidesApi {
     requirements: string
   }) => Promise<{ text?: string; error?: string }>
   onAiStream: (handler: (chunk: AiStreamChunk) => void) => () => void
-  /** Style Skill sidecar: write styleSkill to a same-named .styleskill.json next to the draft */
-  saveStyleSidecar: (data: {
-    topic: string
-    styleSkill: string
-    createdAt: string
-  }) => Promise<{ ok: boolean }>
   /** Store styleSkill in userData/style-templates/<name>.json */
   saveStyleTemplate: (
     name: string,

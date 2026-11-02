@@ -21,9 +21,8 @@ const OVERLOADED_PATTERN = new RegExp(
   'i',
 )
 
-// Credits-exhausted notices ("Your Genspark credits have been exhausted…") are
-// a different failure class (errorCode 'credits', "top up" message) — never
-// misreport them as a transient capacity problem.
+// A credits-exhausted notice is a billing failure, not a transient capacity
+// problem — never misreport it as overloaded.
 const CREDITS_PATTERN = /credit|pricing/i
 
 // "credits per minute exceeded" is a rate limit; only the exhausted/insufficient wording is billing.

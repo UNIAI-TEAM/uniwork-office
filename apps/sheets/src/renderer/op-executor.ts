@@ -195,7 +195,7 @@ export async function prefetchOpImages(
     if (op.op !== 'add_image' || imageData.has(op.path)) continue
     let dataUrl: string
     let mediaType: string
-    // file:// = a BYOK-generated image in the local store (fetchImage resolves it); data: = a
+    // file:// = a generated image in the local store (fetchImage resolves it); data: = a
     // cloud-generated image on the web (fetchImage decodes it in place)
     if (/^(https?|file):\/\//i.test(op.path) || /^data:image\//i.test(op.path)) {
       const fetched = await window.desktopApi.fetchImage(op.path)

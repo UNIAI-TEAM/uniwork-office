@@ -24,8 +24,8 @@ const IMAGES_SYSTEM_PROMPT_NO_GEN = `## Images
 ${PLACEMENT_PROMPT}`
 
 /**
- * `imageGen` is a live predicate (a configured BYOK media model, or the
- * UniWork cloud route when it is on); the loop re-reads tools and systemPrompt
+ * `imageGen` is a live predicate (the UniWork cloud route is on); the loop
+ * re-reads tools and systemPrompt
  * before every request, so generate_image appears and disappears without
  * rebuilding the loop.
  */

@@ -4,7 +4,7 @@ import type { UniworkCloudState } from './uniwork-cloud'
  * Product notices for a UniWork AI plan state: the organization's plan has no UniWork AI, or its
  * credits ran out for the period. The text never mentions an account of this app or a purchase
  * inside it: plans belong to the organization, so the way out is an organization admin.
- * en and vi are ours; the failure texts of `ai-chat-error-text.ts` reuse them.
+ * en and vi are ours.
  */
 export type AiNoticeKind = 'not_entitled' | 'credits_exhausted'
 

@@ -49,10 +49,6 @@ GenOffice는 macOS, Windows, Linux에서 사용할 수 있는 무료 오픈소�
   편집되고, 저장되고, 변환됩니다. PDF → Word / Excel / PowerPoint,
   Markdown → Word, HTML → Word 변환 모두 기기 내에서 실행됩니다. 오직
   AI 호출만 사용자가 선택한 공급자로 전송됩니다.
-- **API 키가 있어도, 없어도 됩니다.** Genspark로 로그인하면 키 없이 바로
-  사용할 수 있고, 원한다면 Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM,
-  Qwen, Doubao, MiniMax, Grok, Mistral, OpenRouter, Requesty는 물론 OpenAI
-  호환 엔드포인트(로컬 서버 포함)까지 직접 가져올 수 있습니다.
 - **스크립트로 다룰 수 있고, 에이전트가 바로 쓸 수 있습니다.** 앱에는
   `genoffice` 명령줄과 Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot,
   OpenCode, Windsurf용 스킬이 함께 제공되어, 코딩 에이전트가 창 하나 열지
@@ -217,9 +213,6 @@ Cursor 및 다른 모든 MCP 클라이언트는 스킬을 설치하거나 창을
 - **문서를 직접 편집하는 AI.** Docs에서는 변경 내용 추적, Sheets에서는 실시간으로
   동작하는 수식과 차트, 슬라이드는 캔버스 위에 그려지며, AI가 한 번 작업할 때마다
   되돌릴 수 있는 스냅샷이 남습니다.
-- **내 모델, 내 키.** Genspark로 로그인하거나 Claude, OpenAI, Gemini, DeepSeek
-  등의 키를 사용할 수 있으며, 로컬 서버와 모든 OpenAI 호환 엔드포인트도 지원합니
-  다.
 - **PDF도 제대로.** 페이지 안에서 텍스트를 직접 편집하고, 기기 내에서 PDF를
   Word, Excel, PowerPoint로 변환하며, 스캔 문서는 시스템 OCR을 사용합니다.
 - **Markdown과 HTML도 지원**하며, 동일한 AI 패널과 로컬 Word 내보내기를 사용합
@@ -228,13 +221,6 @@ Cursor 및 다른 모든 MCP 클라이언트는 스킬을 설치하거나 창을
   서버가 모든 엔진을 Claude Code, Claude Desktop, Codex, Cursor 및 다른
   에이전트가 쓸 수 있게 하며, 이 역시 기기 내에서 동작합니다.
 - **무료**로 개인과 팀 모두 사용할 수 있습니다.
-
-## AI 백엔드
-
-**Genspark로 로그인**하면 별도 설정이 전혀 필요 없습니다. 모델 호출은
-Genspark 프록시(Claude, GPT, Gemini 계열)를 거치고, 에이전트는 웹 및
-이미지 검색, 이미지 생성, 이미지/오디오/비디오 분석 기능까지 사용할 수
-있습니다.
 
 전체 제품군은 라이트, 다크, 시스템 테마를 지원합니다. 테마는 화면에
 보이는 모습만 바꿀 뿐입니다: 내보내기, 인쇄, 저장된 파일은 항상 문서
@@ -482,10 +468,8 @@ GenOffice는 활발히 개발되고 있으며, 여러분의 피드백이 그 방
 <details>
 <summary><b>GenOffice는 오프라인에서도 동작하나요?</b></summary>
 
-문서 편집은 완전히 로컬에서 이루어집니다 — 파일을 열고, 편집하고,
-저장하고, 변환하는 과정에서 파일이 기기를 벗어나지 않습니다. AI
-기능(에이전트, 검색, 이미지 도구)은 네트워크 연결이 필요하며, Genspark
-로그인 또는 직접 발급받은 모델 API 키가 있어야 합니다.
+문서 편집은 완전히 로컬에서 이루어집니다 — 파일을 열고, 편집하고, 저장하고, 변환하는 과정에서 파일이 기기를 벗어나지 않습니다. AI
+기능(에이전트, 검색, 이미지 도구)은 네트워크 연결과 UniWork 계정이 필요합니다.
 
 </details>
 
@@ -505,18 +489,6 @@ GenOffice는 활발히 개발되고 있으며, 여러분의 피드백이 그 방
 기하학 기반 레이아웃 분석만 사용하며, 클라우드 서비스나 업로드가 필요
 없습니다. 스캔된 페이지도 지원합니다: macOS와 Windows에서는 시스템 OCR이
 텍스트를 인식해 페이지 이미지가 아니라 편집 가능한 텍스트로 변환됩니다.
-
-</details>
-
-<details>
-<summary><b>제 AI 모델이나 API 키를 직접 사용할 수 있나요?</b></summary>
-
-네. 키가 필요 없는 Genspark 로그인 외에도, GenOffice는 Claude, OpenAI,
-Gemini, DeepSeek, Kimi, GLM, Qwen, Doubao, MiniMax, Grok, Mistral,
-OpenRouter, Requesty, OpenCode Zen/Go를 위한 직접 키 사용을 지원하며, 로컬 모델
-서버를 포함한 모든 OpenAI 호환 엔드포인트도 사용할 수 있습니다. 검색,
-이미지 생성, 이미지/비디오 분석은 설정 → AI 미디어 및 검색에서 별도의
-키를 설정합니다.
 
 </details>
 

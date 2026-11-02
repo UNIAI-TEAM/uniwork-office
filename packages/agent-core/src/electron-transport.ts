@@ -27,8 +27,8 @@ export interface IpcStreamChunk {
   /** 'notice' only: the non-fatal turn notice (UniWork AI) */
   notice?: AgentStreamNotice
   error?: string
-  /** machine-readable error cause; maps to the localized timeout/credits/network/overloaded message */
-  errorCode?: 'timeout' | 'credits' | 'network' | 'overloaded'
+  /** machine-readable error cause; maps to the localized timeout/network/overloaded message */
+  errorCode?: 'timeout' | 'network' | 'overloaded'
   /** a UniWork AI failure: the server's `code` decides the message, never the text or errorCode */
   uniworkCode?: string
   /** with uniworkCode: seconds the server asked to wait (Retry-After), when it sent one */
@@ -44,8 +44,8 @@ export interface IpcStreamChunk {
 /** The request forwarded to the main process to start one streaming turn. */
 export interface IpcStreamStart<S> {
   requestId: string
-  /** Stable for the lifetime of one renderer-side transport. Providers with
-   * native conversations can reuse it across the tool loop and follow-ups. */
+  /** Stable for the lifetime of one renderer-side transport. UniWork AI keys its server
+   * conversation by it across the tool loop and follow-ups. */
   sessionId: string
   settings: S
   system: string
@@ -80,8 +80,6 @@ export interface IpcTransportOptions<S> {
   unknownErrorText(): string
   /** localized message for timeouts (errorCode 'timeout' and the silence watchdog) */
   timeoutErrorText?(): string
-  /** localized message for exhausted credits (errorCode 'credits') */
-  creditsErrorText?(): string
   /** localized message for network connectivity failures (errorCode 'network') */
   networkErrorText?(): string
   /** localized message for capacity/rate-limit failures (errorCode 'overloaded') */
@@ -194,15 +192,11 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): IpcTrans
               ? (uniwork?.text ?? chunk.error ?? options.unknownErrorText())
               : chunk.errorCode === 'timeout'
                 ? timeoutText()
-                : chunk.errorCode === 'credits'
-                  ? (options.creditsErrorText?.() ?? chunk.error ?? options.unknownErrorText())
-                  : chunk.errorCode === 'network'
-                    ? (options.networkErrorText?.() ?? chunk.error ?? options.unknownErrorText())
-                    : chunk.errorCode === 'overloaded'
-                      ? (options.overloadedErrorText?.() ??
-                        chunk.error ??
-                        options.unknownErrorText())
-                      : (chunk.error ?? options.unknownErrorText()),
+                : chunk.errorCode === 'network'
+                  ? (options.networkErrorText?.() ?? chunk.error ?? options.unknownErrorText())
+                  : chunk.errorCode === 'overloaded'
+                    ? (options.overloadedErrorText?.() ?? chunk.error ?? options.unknownErrorText())
+                    : (chunk.error ?? options.unknownErrorText()),
             uniwork?.errorKey,
           )
         } else {
