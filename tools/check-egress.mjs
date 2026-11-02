@@ -1,5 +1,6 @@
 // Egress gate: shipped code must not name a Genspark / GenOffice cloud host,
-// a Google Analytics / ads endpoint or the @genspark/cli package. Comments count
+// a Google Analytics / ads endpoint, the @genspark/cli package, or an AI vendor
+// host: AI runs only on UniWork AI (UniWork ADR 0051, UNI-2309). Comments count
 // too (cheap and simple); the few reasoned exemptions live in ALLOWLIST below.
 // Host patterns also match the escaped forms used in regex literals and RegExp
 // strings (`genspark\.ai`, `genspark\\.ai`). A host split across strings or
@@ -16,6 +17,31 @@ import { fileURLToPath } from 'node:url'
 /** a literal dot, optionally escaped once (regex literal) or twice (RegExp string) */
 const DOT = String.raw`\\{0,2}\.`
 const host = (...labels) => new RegExp(labels.join(DOT), 'i')
+/** an AI vendor host as a whole name: `exa.ai` matches `api.exa.ai`, never `hexa.ai` or `this.exa.aiRun` */
+const vendor = (name) =>
+  new RegExp(String.raw`(?<![\w-])${name.split('.').join(DOT)}(?![\w-])`, 'i')
+
+const AI_VENDOR_HOSTS = [
+  'openrouter.ai',
+  'api.openai.com',
+  'api.anthropic.com',
+  'generativelanguage.googleapis.com',
+  'api.deepseek.com',
+  'dashscope.aliyuncs.com',
+  'api.x.ai',
+  'api.mistral.ai',
+  'open.bigmodel.cn',
+  'volces.com',
+  'api.minimax.io',
+  'duckduckgo.com',
+  'parallel.ai',
+  'serper.dev',
+  'serply.io',
+  'tavily.com',
+  'exa.ai',
+  'firecrawl.dev',
+  'perplexity.ai',
+]
 
 export const PATTERNS = [
   { id: 'genspark.ai', re: host('genspark', 'ai') },
@@ -29,6 +55,7 @@ export const PATTERNS = [
   { id: 'doubleclick.net', re: host('doubleclick', 'net') },
   { id: 'gtag(', re: /\bgtag\s*\(/ },
   { id: '@genspark/cli', re: /@genspark\/cli/i },
+  ...AI_VENDOR_HOSTS.map((id) => ({ id, re: vendor(id) })),
 ]
 
 /**

@@ -70,7 +70,6 @@ export const tMain = createI18n({
     errParseFailed: '文件解析失败',
     errImageNoText: '图片附件不提供文本,已作为图像随用户消息发送,直接看图即可',
     errNotImage: '不是支持的图片类型',
-    errNoApiKey: '未配置 {provider} 的 API Key',
     errNoModel: '未配置模型名称',
     errMediaNotConfigured: '云端工具已关闭。请在「设置(账户)」中重新开启',
     errNoDeckAppend:
@@ -111,8 +110,7 @@ export const tMain = createI18n({
     menuActualSize: '实际大小',
     errSaveOriginalFormat: '请另存为 .{ext} 文件。此应用无法按原文件的格式保存。',
   },
-  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no AI model set up yet); the other locales keep
-  // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
+  // en and vi are ours (UniWork wording); the other locales keep upstream's wording.
   en: {
     dlgInsertImage: 'Insert Image',
     dlgReplacePicture: 'Replace Picture',
@@ -182,8 +180,6 @@ export const tMain = createI18n({
     errParseFailed: 'Failed to parse file',
     errImageNoText: 'Image attachments have no text; the image is sent along with the user message',
     errNotImage: 'not a supported image type',
-    errNoApiKey:
-      'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.',
     errNoModel: 'No model name configured',
     errMediaNotConfigured: 'Cloud tools are turned off. Turn them on under Settings (Account).',
     errNoDeckAppend:
@@ -295,8 +291,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Tệp đính kèm hình ảnh không có văn bản; hình ảnh được gửi cùng với tin nhắn của người dùng',
     errNotImage: 'loại hình ảnh không được hỗ trợ',
-    errNoApiKey:
-      'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.',
     errNoModel: 'Chưa cấu hình tên mô hình',
     errMediaNotConfigured: 'Công cụ đám mây đang tắt. Bật lại trong Cài đặt (Tài khoản).',
     errNoDeckAppend:
@@ -410,7 +404,6 @@ export const tMain = createI18n({
     errImageNoText:
       '画像添付はテキストを提供しません。画像としてユーザー メッセージと一緒に送信済みのため、そのまま画像をご覧ください',
     errNotImage: 'サポートされていない画像形式です',
-    errNoApiKey: '{provider} の API キーが設定されていません',
     errNoModel: 'モデル名が設定されていません',
     errMediaNotConfigured: 'クラウドツールがオフです。設定(アカウント)でオンにしてください。',
     errNoDeckAppend:
@@ -525,7 +518,6 @@ export const tMain = createI18n({
     errImageNoText:
       '이미지 첨부는 텍스트를 제공하지 않으며, 이미지로 사용자 메시지와 함께 전송되었으니 이미지를 직접 확인하세요',
     errNotImage: '지원되는 이미지 형식이 아님',
-    errNoApiKey: '{provider}의 API 키가 설정되지 않았습니다',
     errNoModel: '모델 이름이 설정되지 않았습니다',
     errMediaNotConfigured: '클라우드 도구가 꺼져 있습니다. 설정(계정)에서 다시 켜 주세요.',
     errNoDeckAppend:
@@ -637,7 +629,6 @@ export const tMain = createI18n({
     errImageNoText:
       "Les pièces jointes image ne fournissent pas de texte ; l'image a été envoyée avec le message de l'utilisateur, consultez-la directement",
     errNotImage: "n'est pas un type d'image pris en charge",
-    errNoApiKey: 'Aucune clé API configurée pour {provider}',
     errNoModel: 'Aucun nom de modèle configuré',
     errMediaNotConfigured:
       'Les outils cloud sont désactivés. Réactivez-les dans Paramètres (Compte).',
@@ -755,7 +746,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Bildanlagen liefern keinen Text; das Bild wurde mit der Benutzernachricht gesendet, bitte direkt ansehen',
     errNotImage: 'kein unterstütztes Bildformat',
-    errNoApiKey: 'Kein API-Schlüssel für {provider} konfiguriert',
     errNoModel: 'Kein Modellname konfiguriert',
     errMediaNotConfigured:
       'Die Cloud-Tools sind ausgeschaltet. Schalten Sie sie unter Einstellungen (Konto) wieder ein.',
@@ -872,7 +862,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Las imágenes adjuntas no proporcionan texto; la imagen se envió junto con el mensaje del usuario, consúltala directamente',
     errNotImage: 'no es un tipo de imagen compatible',
-    errNoApiKey: 'No hay clave de API configurada para {provider}',
     errNoModel: 'No hay nombre de modelo configurado',
     errMediaNotConfigured:
       'Las herramientas en la nube están desactivadas. Actívalas en Ajustes (Cuenta).',
@@ -988,7 +977,6 @@ export const tMain = createI18n({
     errImageNoText:
       'สิ่งที่แนบเป็นรูปภาพไม่มีข้อความ รูปถูกส่งไปพร้อมข้อความของผู้ใช้แล้ว โปรดดูรูปโดยตรง',
     errNotImage: 'ไม่ใช่ชนิดรูปภาพที่รองรับ',
-    errNoApiKey: 'ยังไม่ได้ตั้งค่า API Key ของ {provider}',
     errNoModel: 'ยังไม่ได้ตั้งค่าชื่อโมเดล',
     errMediaNotConfigured: 'เครื่องมือคลาวด์ปิดอยู่ เปิดใหม่ได้ใน การตั้งค่า (บัญชี)',
     errNoDeckAppend:
@@ -1100,7 +1088,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Lampiran gambar tidak menyediakan teks; gambar telah dikirim bersama pesan pengguna, silakan lihat gambarnya langsung',
     errNotImage: 'bukan jenis gambar yang didukung',
-    errNoApiKey: 'API Key untuk {provider} belum dikonfigurasi',
     errNoModel: 'Nama model belum dikonfigurasi',
     errMediaNotConfigured: 'Alat cloud sedang dimatikan. Aktifkan lagi di Pengaturan (Akun).',
     errNoDeckAppend:
@@ -1216,7 +1203,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Вложения-изображения не содержат текста; изображение отправлено вместе с сообщением пользователя, просто посмотрите на него',
     errNotImage: 'неподдерживаемый тип изображения',
-    errNoApiKey: 'API-ключ для {provider} не настроен',
     errNoModel: 'Не указано имя модели',
     errMediaNotConfigured:
       'Облачные инструменты выключены. Включите их в разделе «Настройки (Учётная запись)».',
@@ -1332,7 +1318,6 @@ export const tMain = createI18n({
     errImageNoText:
       'المرفقات من نوع الصور لا توفر نصًا؛ وقد أُرسلت الصورة مع رسالة المستخدم، يكفي النظر إليها مباشرة',
     errNotImage: 'ليس نوع صورة مدعومًا',
-    errNoApiKey: 'لم يتم تكوين مفتاح API لـ {provider}',
     errNoModel: 'لم يتم تكوين اسم النموذج',
     errMediaNotConfigured: 'أدوات السحابة متوقفة. أعد تشغيلها من الإعدادات (الحساب).',
     errNoDeckAppend:
@@ -1443,7 +1428,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Anexos de imagem não têm texto; a imagem é enviada junto com a mensagem do usuário',
     errNotImage: 'não é um tipo de imagem suportado',
-    errNoApiKey: 'Nenhuma chave de API configurada para {provider}',
     errNoModel: 'Nenhum nome de modelo configurado',
     errMediaNotConfigured:
       'As ferramentas na nuvem estão desativadas. Ative-as em Configurações (Conta).',
@@ -1560,7 +1544,6 @@ export const tMain = createI18n({
     errImageNoText:
       "Gli allegati immagine non hanno testo; l'immagine viene inviata insieme al messaggio dell'utente",
     errNotImage: 'tipo di immagine non supportato',
-    errNoApiKey: 'Nessuna chiave API configurata per {provider}',
     errNoModel: 'Nessun nome di modello configurato',
     errMediaNotConfigured:
       'Gli strumenti cloud sono disattivati. Riattivali in Impostazioni (Account).',
@@ -1678,7 +1661,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Załączniki graficzne nie zawierają tekstu; obraz jest wysyłany razem z wiadomością użytkownika',
     errNotImage: 'nieobsługiwany typ obrazu',
-    errNoApiKey: 'Nie skonfigurowano klucza API dla {provider}',
     errNoModel: 'Nie skonfigurowano nazwy modelu',
     errMediaNotConfigured: 'Narzędzia chmurowe są wyłączone. Włącz je w Ustawienia (Konto).',
     errNoDeckAppend:
@@ -1793,7 +1775,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Obrázkové přílohy neobsahují text; obrázek je odeslán spolu se zprávou uživatele',
     errNotImage: 'nepodporovaný typ obrázku',
-    errNoApiKey: 'Pro {provider} není nakonfigurován žádný klíč API',
     errNoModel: 'Není nakonfigurován název modelu',
     errMediaNotConfigured: 'Cloudové nástroje jsou vypnuté. Zapněte je v Nastavení (Účet).',
     errNoDeckAppend:
@@ -1907,7 +1888,6 @@ export const tMain = createI18n({
     errImageNoText:
       'Afbeeldingsbijlagen bevatten geen tekst; de afbeelding wordt samen met het gebruikersbericht verzonden',
     errNotImage: 'geen ondersteund afbeeldingstype',
-    errNoApiKey: 'Geen API-sleutel geconfigureerd voor {provider}',
     errNoModel: 'Geen modelnaam geconfigureerd',
     errMediaNotConfigured: 'Cloudtools staan uit. Zet ze weer aan via Instellingen (Account).',
     errNoDeckAppend:
@@ -2021,7 +2001,6 @@ export const tMain = createI18n({
     errParseFailed: 'Gagal menghurai fail',
     errImageNoText: 'Lampiran imej tiada teks; imej dihantar bersama mesej pengguna',
     errNotImage: 'bukan jenis imej yang disokong',
-    errNoApiKey: 'Kunci API untuk {provider} belum dikonfigurasikan',
     errNoModel: 'Nama model belum dikonfigurasikan',
     errMediaNotConfigured: 'Alat awan dimatikan. Hidupkan semula di Tetapan (Akaun).',
     errNoDeckAppend:
@@ -2134,7 +2113,6 @@ export const tMain = createI18n({
     errParseFailed: 'ניתוח הקובץ נכשל',
     errImageNoText: 'קבצים מצורפים מסוג תמונה אינם מכילים טקסט; התמונה נשלחת יחד עם הודעת המשתמש',
     errNotImage: 'סוג תמונה שאינו נתמך',
-    errNoApiKey: 'לא הוגדר מפתח API עבור {provider}',
     errNoModel: 'לא הוגדר שם מודל',
     errMediaNotConfigured: 'כלי הענן כבויים. הפעל אותם מחדש בהגדרות (חשבון).',
     errNoDeckAppend:
@@ -2244,7 +2222,6 @@ export const tMain = createI18n({
     errParseFailed: 'फ़ाइल पार्स करने में विफल',
     errImageNoText: 'छवि अनुलग्नक में टेक्स्ट नहीं होता; छवि उपयोगकर्ता संदेश के साथ भेजी जाती है',
     errNotImage: 'समर्थित छवि प्रकार नहीं है',
-    errNoApiKey: '{provider} के लिए कोई API कुंजी कॉन्फ़िगर नहीं है',
     errNoModel: 'कोई मॉडल नाम कॉन्फ़िगर नहीं है',
     errMediaNotConfigured: 'क्लाउड टूल बंद हैं। उन्हें सेटिंग्स (खाता) में फिर से चालू करें।',
     errNoDeckAppend:
@@ -2357,7 +2334,6 @@ export const tMain = createI18n({
     errParseFailed: '檔案解析失敗',
     errImageNoText: '圖片附件不提供文字,已作為影像隨使用者訊息傳送,直接看圖即可',
     errNotImage: '不是支援的圖片類型',
-    errNoApiKey: '未設定 {provider} 的 API Key',
     errNoModel: '未設定模型名稱',
     errMediaNotConfigured: '雲端工具已關閉。請在「設定(帳戶)」中重新開啟',
     errNoDeckAppend:

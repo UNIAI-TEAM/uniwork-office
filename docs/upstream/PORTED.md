@@ -5,6 +5,11 @@ selective port (UNI-923) took part of the range b08e2ebf..28508de9 commit by com
 bumped. The next full sync starts at `UPSTREAM_BASE` and must skip what this table marks as ported: those patches
 are already in, re-applying them conflicts or duplicates code.
 
+Standing rule (UNI-2309): upstream provider, key, Codex CLI, OpenRouter, media/search key, keyless search and
+decision-model work: skip; UniWork AI only (UniWork ADR 0051, spec 2026-10-27). The files the fork deleted for it are
+in `DROPPED_UPSTREAM_PATHS` (`tools/rebrand/sync-upstream.mjs`), which every sync leaves out; see "Removed in the fork:
+own-key AI (UNI-2309)" in [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
+
 Each ported commit is one fork commit with the subject `port(<scope>): <upstream subject> (genoffice <sha>)`,
 re-branded with `tools/rebrand/rebrand.mjs`. Order below is upstream's (topological).
 

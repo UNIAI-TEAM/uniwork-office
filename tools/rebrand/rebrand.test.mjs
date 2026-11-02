@@ -189,28 +189,13 @@ test('CLI binary paths are fixed in the prettier-wrapped multi-line shape too', 
   }
 })
 
-test('en and vi errNoApiKey keep the UniWork wording after an upstream merge', () => {
-  const upstreamEn = "    errNoApiKey: 'No API key configured for {provider}',\n"
-  for (const file of [
-    'apps/docs/src/main/docs-main.ts',
-    'apps/sheets/src/main/sheets-main.ts',
-    'apps/slides/src/main/i18n-main.ts',
-  ]) {
-    withFiles({ [file]: upstreamEn }, (get) => {
-      assert.equal(
-        get(file),
-        "    errNoApiKey: 'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.',\n",
-      )
-    })
-  }
-})
-
-test('vi errNoApiKey keeps the UniWork wording after an upstream merge', () => {
-  const upstreamVi = "    errNoApiKey: 'Chưa cấu hình khóa API cho {provider}',\n"
-  withFiles({ 'apps/docs/src/main/docs-main.ts': upstreamVi }, (get) => {
+test('the ai-search description names only the UniWork cloud tools after an upstream merge', () => {
+  const upstream =
+    '  "description": "Shared web/image search (Genspark, Serper, Serply, Tavily, Parallel, DuckDuckGo fallback) for docs/sheets/slides AI. No Electron deps; runs in main process (Node fetch).",\n'
+  withFiles({ 'packages/ai-search/package.json': upstream }, (get) => {
     assert.equal(
-      get('apps/docs/src/main/docs-main.ts'),
-      "    errNoApiKey: 'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.',\n",
+      get('packages/ai-search/package.json'),
+      `  "description": "UniWork cloud tools (web/image search, image generation, media analysis) for the editors' AI. No Electron deps; runs in the main process.",\n`,
     )
   })
 })

@@ -7,8 +7,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { after, test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import {
   BASE_FILE,
+  DROPPED_UPSTREAM_PATHS,
   codeSpan,
   defaultChecks,
   parsePorcelainZ,
@@ -348,6 +350,51 @@ test('--exclude leaves paths out of the patch and lists them', () => {
   assert.deepEqual(s.excluded, ['c.txt'])
   assert.equal(existsSync(join(fork, 'c.txt')), false)
 })
+
+/** A fork that deleted `gone` and an upstream that edits it and adds `added` beside it. */
+function setupDropped({ gone, added }) {
+  const upstream = join(TMP, `dropped-upstream-${++counter}`)
+  mkdirSync(upstream, { recursive: true })
+  git(upstream, 'init', '-q')
+  write(upstream, { ...BASE_TREE, [gone]: lines(5) })
+  const base = commitAll(upstream, 'upstream base')
+  write(upstream, { [gone]: lines(5, ' upstream'), [added]: 'export const vendor = 1\n' })
+  commitAll(upstream, 'upstream: provider work')
+  const fork = join(TMP, `fork-${++counter}`)
+  mkdirSync(fork, { recursive: true })
+  git(fork, 'init', '-q')
+  write(fork, { ...BASE_TREE, [BASE_FILE]: `${base}\n` })
+  commitAll(fork, 'fork: the own-key AI is gone')
+  return { fork, upstream }
+}
+
+test('an upstream edit to a file the fork removed with the own-key AI is left out, not failed', () => {
+  const gone = 'packages/ai-provider/src/codex-app-server.ts'
+  const added = 'packages/ai-provider/src/new-vendor.ts'
+  const { fork, upstream } = setupDropped({ gone, added })
+  const s = run(fork, upstream)
+  assert.deepEqual(s.excluded, [gone])
+  assert.deepEqual(s.apply.failed, [])
+  assert.equal(existsSync(join(fork, gone)), false)
+  assert.match(renderReport(s), /Left out by --exclude/)
+  const hit = s.watch.find((w) => w.path === added)
+  assert.ok(hit, 'the new provider file is on the watch list')
+  assert.match(hit.note, /UniWork AI only/)
+})
+
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+
+test(
+  'DROPPED_UPSTREAM_PATHS never names a file the fork still ships',
+  // a sync runs these tests from a copy of tools/ alone, outside the checkout
+  { skip: existsSync(join(REPO, 'packages')) ? false : 'not run from a checkout' },
+  () => {
+    assert.ok(DROPPED_UPSTREAM_PATHS.includes('packages/ai-provider/src/codex-app-server.ts'))
+    for (const glob of DROPPED_UPSTREAM_PATHS) {
+      assert.equal(git(REPO, 'ls-files', '--', `:(glob)${glob}`), '', glob)
+    }
+  },
+)
 
 test('a failing or crashing check makes the run exit 2 instead of aborting', () => {
   const { fork, upstream } = setup({ upstreamChanges: CLEAN_CHANGES })

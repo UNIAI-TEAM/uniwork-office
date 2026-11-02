@@ -51,6 +51,42 @@ Treat these as **expected conflict areas**. Prefer UniWork display strings and i
 - `packages/docx-engine/src/compare.ts` (`DEFAULT_COMPARE_AUTHOR`), `packages/cli/src/commands/docs.ts` (compare `--author` default help), `packages/cli/tests/docs-compare.test.ts` (redline default author `UniWork Office`)
 - `packages/xlsx-gateway/src/gateway/xlsx-redaction.ts` (`REDACTION_REL_TYPE` OPC relationship-type URL stays byte-identical and is allowlisted in `tools/check-egress.mjs` and `tools/rebrand/brand-allowlist.json`; the two version-mismatch error strings name `UniWork Office`)
 
+## Removed in the fork: own-key AI (UNI-2309)
+
+Rule: upstream provider, key, Codex CLI, OpenRouter, media/search key, keyless search and decision-model work: skip;
+UniWork AI only (UniWork ADR 0051, spec 2026-10-27). Every AI call of the desktop app, the web frames and the `genoffice`
+command line goes through UniWork's servers; nothing in the fork talks to an AI vendor directly.
+
+Upstream files the fork deleted (with their tests; `DROPPED_UPSTREAM_PATHS` in `tools/rebrand/sync-upstream.mjs` is the
+authoritative list):
+
+- `packages/ai-provider/src/`: `ai-settings-guard.ts`, `chat.ts`, `codex-app-server.ts`, `custom-models.ts`, `fetch.ts`,
+  `media-protocols.ts`, `openrouter.ts`, `output-cap.ts`, `registry.ts`, `search-settings.ts`, `stream.ts`,
+  `protocols/anthropic.ts`, `protocols/gemini.ts`, `protocols/gemini-schema.ts`, `protocols/openai-compatible.ts` (its SSE
+  reader lives on as `protocols/openai-sse.ts`; port reader fixes by hand)
+- `packages/ai-search/src/parallel-mcp.ts` and the Serper, Serply, Tavily, Parallel and DuckDuckGo search tests
+- `packages/cli/src/cloud.ts`, `packages/cli/src/commands/image.ts`, `media.ts`, `search.ts`
+- `packages/ui/src/ai-model-picker-options.ts`
+- `apps/shell/src/renderer/src/`: `CreditWallet.tsx`, `credit-wallet.ts`, `ai-usage-ledger.ts`, `my-ai-*.ts`,
+  `provider-logos.tsx`
+- `apps/shell/src/main/file-excerpts.ts`, `apps/shell/src/main/file-index/decider.ts`, `rerank.ts`,
+  `apps/shell/src/shared/file-excerpt.ts`
+- `e2e/settings-media-search.spec.ts`
+
+What keeps them out:
+
+- `DROPPED_UPSTREAM_PATHS`: always left out of the patch, on top of `--exclude`. An upstream edit to one of these files is
+  listed under "Left out by --exclude" in the report instead of failing to apply. Add a path only when the fork deletes a
+  file that came from upstream.
+- `WATCH` in the same script flags upstream changes under `packages/ai-provider/src/` and `packages/ai-search/src/`, to
+  `SettingsModal.tsx` / `NewChatPane.tsx` (the AI Model / AI Media panes and My AI), and to the deleted CLI commands and
+  file-search rerank. Take bug fixes for the UniWork provider; skip new providers, keys and keyless search.
+- `DROPPED_SHELL_STRING_KEYS` in `tools/rebrand/table.mjs`: the rebrand drops the removed Settings and My AI strings from
+  `strings.ts` again after every merge.
+- `npm run check:egress` (`tools/check-egress.mjs`) fails when shipped code names an AI vendor host (OpenRouter, OpenAI,
+  Anthropic, Gemini, DeepSeek, Qwen, xAI, Mistral, Zhipu, Volcengine, MiniMax, DuckDuckGo, Parallel, Serper, Serply,
+  Tavily, Exa, Firecrawl, Perplexity).
+
 ## How to avoid overwriting UniWork branding
 
 - Do not `git merge -X theirs upstream/main`

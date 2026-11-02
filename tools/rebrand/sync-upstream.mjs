@@ -15,7 +15,8 @@
 //   --branch <name>       sync branch (default upstream-sync/<target7>)
 //   --report <file.md>    write the markdown report there, plus a .json sibling
 //   --pr-body <file.md>   write the report cut below 60000 characters (a pull request body limit)
-//   --exclude <glob>      leave matching upstream paths out of the patch (repeatable; listed in the report)
+//   --exclude <glob>      leave matching upstream paths out of the patch (repeatable; listed in the report;
+//                         DROPPED_UPSTREAM_PATHS is always left out too)
 //   --prettier <path>     prettier.cjs used to format the files the rebrand touched
 //                         (default: node_modules/prettier of the repo or its main checkout; skipped if absent)
 //   --commit-conflicts    commit conflicted files with their markers and finish the remaining steps
@@ -68,6 +69,86 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 export const REBRAND_TESTS = ['brand-scan.test.mjs', 'rebrand.test.mjs', 'sync-upstream.test.mjs']
 
 /**
+ * Upstream files the fork deleted with the own-key AI (UNI-2309: AI runs only on UniWork AI,
+ * UniWork ADR 0051), and their tests. Always left out of the patch, on top of --exclude, so an
+ * upstream edit to one is listed under "Left out by --exclude" instead of failing to apply.
+ * Only files that came from upstream belong here; see docs/upstream/UPSTREAM_SYNC.md.
+ */
+export const DROPPED_UPSTREAM_PATHS = [
+  // own-key providers, Codex CLI, OpenRouter, the one-shot chat and the media/search keys
+  'packages/ai-provider/src/ai-settings-guard.ts',
+  'packages/ai-provider/src/chat.ts',
+  'packages/ai-provider/src/codex-app-server.ts',
+  'packages/ai-provider/src/custom-models.ts',
+  'packages/ai-provider/src/fetch.ts',
+  'packages/ai-provider/src/media-protocols.ts',
+  'packages/ai-provider/src/openrouter.ts',
+  'packages/ai-provider/src/output-cap.ts',
+  // its SSE reader lives on in protocols/openai-sse.ts: port reader fixes by hand
+  'packages/ai-provider/src/protocols/openai-compatible.ts',
+  'packages/ai-provider/src/protocols/anthropic.ts',
+  'packages/ai-provider/src/protocols/gemini-schema.ts',
+  'packages/ai-provider/src/protocols/gemini.ts',
+  'packages/ai-provider/src/registry.ts',
+  'packages/ai-provider/src/search-settings.ts',
+  'packages/ai-provider/src/stream.ts',
+  'packages/ai-provider/tests/ai-settings-guard.test.ts',
+  'packages/ai-provider/tests/chat.test.ts',
+  'packages/ai-provider/tests/codex-app-server.test.ts',
+  'packages/ai-provider/tests/codex-stdout-lines.test.ts',
+  'packages/ai-provider/tests/custom-models.test.ts',
+  'packages/ai-provider/tests/endpoint-url.test.ts',
+  'packages/ai-provider/tests/fetch.test.ts',
+  'packages/ai-provider/tests/gemini-schema.test.ts',
+  'packages/ai-provider/tests/images.test.ts',
+  'packages/ai-provider/tests/media-conntest.test.ts',
+  'packages/ai-provider/tests/media-json-guard.test.ts',
+  'packages/ai-provider/tests/minimax-capabilities.test.ts',
+  'packages/ai-provider/tests/openrouter.test.ts',
+  'packages/ai-provider/tests/output-cap.test.ts',
+  'packages/ai-provider/tests/registry-baseurl-query.test.ts',
+  'packages/ai-provider/tests/registry.test.ts',
+  'packages/ai-provider/tests/search-settings.test.ts',
+  'packages/ai-provider/tests/stream-anthropic-index.test.ts',
+  'packages/ai-provider/tests/stream-openai-iserror.test.ts',
+  // keyless and key-based web search (Parallel MCP, DuckDuckGo, Serper, Serply, Tavily)
+  'packages/ai-search/src/parallel-mcp.ts',
+  'packages/ai-search/tests/copyright-host.test.ts',
+  'packages/ai-search/tests/parallel-mcp.test.ts',
+  'packages/ai-search/tests/parallel.test.ts',
+  'packages/ai-search/tests/search.test.ts',
+  'packages/ai-search/tests/serply.test.ts',
+  'packages/ai-search/tests/usable-images.test.ts',
+  // the genoffice image, media and search commands
+  'packages/cli/src/cloud.ts',
+  'packages/cli/src/commands/image.ts',
+  'packages/cli/src/commands/media.ts',
+  'packages/cli/src/commands/search.ts',
+  'packages/cli/tests/cloud.test.ts',
+  // the editors' model picker
+  'packages/ui/src/ai-model-picker-options.ts',
+  'packages/ui/tests/ai-model-picker-options.test.ts',
+  // shell: My AI, the OpenRouter credit wallet, the AI usage ledger, provider logos
+  'apps/shell/src/renderer/src/CreditWallet.tsx',
+  'apps/shell/src/renderer/src/credit-wallet.ts',
+  'apps/shell/src/renderer/src/ai-usage-ledger.ts',
+  'apps/shell/src/renderer/src/my-ai-*.ts',
+  'apps/shell/src/renderer/src/provider-logos.tsx',
+  'apps/shell/tests/ai-usage-ledger.test.ts',
+  'apps/shell/tests/credit-wallet.test.ts',
+  'apps/shell/tests/my-ai-*.test.ts',
+  // shell: the decision-model file-search rerank and the AI Model / AI Media settings
+  'apps/shell/src/main/file-excerpts.ts',
+  'apps/shell/src/main/file-index/decider.ts',
+  'apps/shell/src/main/file-index/rerank.ts',
+  'apps/shell/src/shared/file-excerpt.ts',
+  'apps/shell/tests/file-excerpt.test.ts',
+  'apps/shell/tests/file-index-decision.test.ts',
+  'apps/shell/tests/settings-custom-models.test.ts',
+  'e2e/settings-media-search.spec.ts',
+]
+
+/**
  * Upstream paths that bring back things the fork removed or must adjust by hand
  * (see README "Known gaps"); hits are listed in the report's checklist.
  */
@@ -95,6 +176,20 @@ export const WATCH = [
   {
     test: (p) => p.startsWith('.github/'),
     note: 'upstream CI / repo config: compare with ours before taking it',
+  },
+  {
+    test: (p) => /^packages\/ai-(provider|search)\/src\//.test(p),
+    note: 'own-key AI provider or search code: UniWork AI only (UniWork ADR 0051); skip new providers, keys, Codex CLI, keyless search',
+  },
+  {
+    test: (p) => /^apps\/shell\/src\/renderer\/src\/(SettingsModal|NewChatPane)\.tsx$/.test(p),
+    note: 'AI Model/AI Media panes and My AI were removed; keep them out',
+  },
+  {
+    test: (p) =>
+      /^packages\/cli\/src\/commands\/(image|media|search)\.ts$/.test(p) ||
+      /^apps\/shell\/src\/main\/file-index\/(decider|rerank)\.ts$/.test(p),
+    note: 'removed in the fork; remove it again',
   },
 ]
 
@@ -709,7 +804,7 @@ export function syncUpstream(options) {
 }
 
 function runSync({ options, root, git, checks, log, started }) {
-  const exclude = options.exclude ?? []
+  const exclude = [...DROPPED_UPSTREAM_PATHS, ...(options.exclude ?? [])]
   if (options.continue) return continueSync({ git, root, checks, log, started })
 
   const base = options.base ?? readBase(root)

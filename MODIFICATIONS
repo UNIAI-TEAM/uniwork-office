@@ -28,6 +28,12 @@ Privacy and network services
   from the interface. Account, credit top-up and download links point at
   UniWork services, and the update feed is configured at build time.
 
+AI
+  The AI features run only on UniWork AI through UniWork's servers. On-device
+  provider keys, command-line model providers (Codex CLI), the OpenRouter
+  credit wallet, keyless web search, the decision-model file-search rerank
+  and the genoffice image, media and search commands were removed.
+
 Work and practice features
   Practice packs for business roles, the UniWork Office Bridge client and its
   contracts, the UniAI web app, UniWork sign-in and cloud documents, and a

@@ -33,7 +33,7 @@ describe('scanText', () => {
         "const u = 'https://www.google-analytics.com/mp/collect'",
         '<script src="https://www.googletagmanager.com/gtag/js"></script>',
         '"@genspark/cli": "^1.4.2"',
-        'const ok = "https://openrouter.ai/api/v1"',
+        'const ok = "https://openrouter.example/api/v1"',
       ].join('\n'),
     )
     assert.deepEqual(
@@ -71,6 +71,43 @@ describe('scanText', () => {
         [6, 'gtag('],
       ],
     )
+  })
+
+  it('flags every AI vendor host: AI runs only on UniWork AI', () => {
+    const hosts = [
+      'openrouter.ai',
+      'api.openai.com',
+      'api.anthropic.com',
+      'generativelanguage.googleapis.com',
+      'api.deepseek.com',
+      'dashscope.aliyuncs.com',
+      'api.x.ai',
+      'api.mistral.ai',
+      'open.bigmodel.cn',
+      'volces.com',
+      'api.minimax.io',
+      'duckduckgo.com',
+      'parallel.ai',
+      'serper.dev',
+      'serply.io',
+      'tavily.com',
+      'exa.ai',
+      'firecrawl.dev',
+      'perplexity.ai',
+    ]
+    const hits = scanText(hosts.map((h) => `const u = 'https://${h}/v1'`).join('\n'))
+    assert.deepEqual(
+      hits.map((h) => h.pattern),
+      hosts,
+    )
+    assert.deepEqual(
+      scanText("fetch('https://html.duckduckgo.com/html/?q=x')").map((h) => h.pattern),
+      ['duckduckgo.com'],
+    )
+  })
+
+  it('does not take a look-alike word for an AI vendor host', () => {
+    assert.deepEqual(scanText('const hexa = flexa.aiValue; this.parallel.aiRun()'), [])
   })
 
   it('flags the escaped host forms of a regex literal and a RegExp string', () => {
@@ -146,6 +183,20 @@ describe('scanTree', () => {
         ['apps/b/package.json', 1, '@genspark/cli'],
         ['packages/a/src/x.ts', 1, 'genspark.ai'],
       ].sort(),
+    )
+  })
+
+  it('reports an AI vendor host in shipped code', () => {
+    const root = tree({
+      'packages/ai-provider/src/vendor.ts': "const BASE = 'https://openrouter.ai/api/v1'\n",
+      'apps/docs/src/main/search.ts': "fetch('https://html.duckduckgo.com/html/')\n",
+    })
+    assert.deepEqual(
+      scanTree(root, { allowlist: [] }).map((h) => [h.path, h.line, h.pattern]),
+      [
+        ['apps/docs/src/main/search.ts', 1, 'duckduckgo.com'],
+        ['packages/ai-provider/src/vendor.ts', 1, 'openrouter.ai'],
+      ],
     )
   })
 

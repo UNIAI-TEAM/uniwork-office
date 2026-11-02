@@ -227,8 +227,8 @@ in Resources/ of the shell and the standalone Docs package. Upstream names may a
   prompt, analytics tracker) comes back with upstream's files and must be removed again by hand (git conflict resolution).
 - The tracker `apps/shell/src/main/analytics.ts` and every `analytics.track(...)` call were deleted, not guarded; the scan and
   `apps/shell/tests/privacy-doc.test.ts` fail if an analytics endpoint or credential reappears.
-- Main-process `errNoApiKey` in `docs-main.ts`, `sheets-main.ts` and `slides/i18n-main.ts`: `en` and `vi` are ours (UniWork wording),
-  the other locales keep upstream's text; the rules `en-no-api-key` and `vi-no-api-key` re-apply the `en` and `vi` values after a merge.
+- Own-key AI (UNI-2309): the files the fork deleted are in `DROPPED_UPSTREAM_PATHS` and never enter a sync patch; `WATCH` flags new
+  provider, key and search work for a human to skip (UniWork AI only, `docs/upstream/UPSTREAM_SYNC.md`).
 - `skills/genoffice/SKILL.md` is rebranded by `skills-product-name`; after a sync bump its `metadata.version` once more
   (`tools/check-skill-version.mjs` in CI), or the new text never reaches installed copies.
 - `packaging/**` (flatpak, nix, docker) is in the scan scope but still names GenOffice, `com.genoffice.app` and fetches

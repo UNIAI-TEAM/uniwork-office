@@ -434,40 +434,15 @@ export const rules = [
     replace: [[/GenOffice-venster/g, 'UniWork Office-venster']],
   },
   {
-    id: 'vi-no-api-key',
-    why: 'Main-process vi errNoApiKey keeps the UniWork wording (no AI model set up yet; chat runs on the user own key), matching the en entry; the upstream "no API key configured for {provider}" text comes back with every merge of these three dictionaries',
-    files: [
-      'apps/docs/src/main/docs-main.ts',
-      'apps/sheets/src/main/sheets-main.ts',
-      'apps/slides/src/main/i18n-main.ts',
-    ],
-    replace: [
-      [
-        /errNoApiKey: 'Chưa cấu hình khóa API cho \{provider\}'/g,
-        "errNoApiKey: 'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.'",
-      ],
-    ],
-  },
-  {
-    id: 'en-no-api-key',
-    why: 'Main-process en errNoApiKey keeps the UniWork wording (no AI model set up yet; chat runs on the user own key), like vi-no-api-key; the upstream "No API key configured for {provider}" text comes back with every merge of these three dictionaries',
-    files: [
-      'apps/docs/src/main/docs-main.ts',
-      'apps/sheets/src/main/sheets-main.ts',
-      'apps/slides/src/main/i18n-main.ts',
-    ],
-    replace: [
-      [
-        /errNoApiKey: 'No API key configured for \{provider\}'/g,
-        "errNoApiKey: 'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.'",
-      ],
-    ],
-  },
-  {
     id: 'ai-search-description',
-    why: 'ai-search package description lists the search providers; "Genspark" -> "UniWork" like every other vendor mention',
+    why: 'ai-search package description: upstream lists its search providers (Genspark, Serper, ..., DuckDuckGo fallback); the fork keeps only the UniWork cloud tools (UNI-2309)',
     files: ['packages/ai-search/package.json'],
-    replace: [[/\(Genspark, Serper/g, '(UniWork, Serper']],
+    replace: [
+      [
+        /"description": "Shared web\/image search \([^)]*\)[^"]*"/g,
+        '"description": "UniWork cloud tools (web/image search, image generation, media analysis) for the editors\' AI. No Electron deps; runs in the main process."',
+      ],
+    ],
   },
   {
     id: 'pptx-ops-prompt-preview',
