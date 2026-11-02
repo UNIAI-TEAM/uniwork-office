@@ -191,15 +191,11 @@ plus referenční příručky k operacím jako zdroje (resources). Druhý,
 HTTP server uvnitř aplikace umožňuje agentovi sestavit dokument Word přímo
 ve viditelné záložce editoru, zatímco se díváte.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Zrychlený záznam toho, jak Claude Code staví osmislajdovou investorskou prezentaci o obnovitelné energii přes MCP server genoffice: hledá obrázky a fotografie, kontroluje každou kandidátní fotografii pomocí media, deck_start zapíše stylový list a osnovu, deck_page přidává vždy jednu zkontrolovanou stránku, deck_build sestaví .pptx a slides_render vrátí obrázek každého slajdu; hotová prezentace se pak otevře v GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides zobrazuje osmislajdovou prezentaci Renewable Energy 2026, kterou Claude Code postavil přes MCP server genoffice: titulní slajd s fotografií větrné farmy na ploše a osm miniatur vlevo"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="Nastavení GenOffice, stránka Integrations, část MCP: jednořádkový příkaz claude mcp add pro Claude Code, blok JSON pro Cursor, Claude Desktop a další MCP klienty, a níže možnost lokálního HTTP serveru"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="Nastavení GenOffice, stránka Integrations, část MCP: jednořádkový příkaz claude mcp add pro Claude Code, blok JSON pro Cursor, Claude Desktop a další MCP klienty, a níže možnost lokálního HTTP serveru"></td>
 </tr>
 <tr>
-<td><b>Jeden prompt, 38 volání nástrojů, žádný shell</b> — „Vytvoř osmislajdovou investorskou prezentaci o obnovitelné energii v roce 2026, se skutečnou fotografií na titulní straně a všude, kde fotografie pomůže.“ Agent stáhne obrázky a fotografie pomocí <code>search</code>, zeptá se <code>media</code>, zda je každá kandidátní fotografie skutečnou fotografií, zavolá <code>deck_start</code> se stylovým listem a osnovou, poté <code>deck_page</code> pro každý slajd; každá stránka je zkontrolována proti osnově a paletě, než je přijata, <code>deck_build</code> sestaví <code>.pptx</code>, <code>slides_audit</code> hledá přetečení, <code>slides_render</code> vrátí PNG pro každý slajd jako obrazový obsah, na který se model může podívat, a <code>deck_replace</code> opraví tři stránky, které se mu nelíbily.</td>
 <td><b>Připojte se jednou, z Nastavení → Integrace</b> — zkopírujte řádek <code>claude mcp add</code> pro Claude Code, nebo blok JSON do Cursoru, Claude Desktop či jiného MCP klienta. Možnost B zapíná lokální HTTP server pro viditelný editor Word. Obojí je popsáno v sekci <a href="#mcp-server">MCP server</a>.</td>
 </tr>
 </table>

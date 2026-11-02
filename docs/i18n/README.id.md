@@ -192,15 +192,11 @@ mcp`, tanpa perlu memasang skill dan tanpa membuka jendela, lalu mendapatkan
 aplikasi memungkinkan agen membangun dokumen Word di tab editor yang
 terlihat sambil Anda menyaksikannya.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Rekaman time-lapse Claude Code membangun briefing investor delapan slide tentang energi terbarukan lewat MCP server genoffice: mencari figur dan foto, memeriksa setiap foto kandidat dengan media, deck_start menulis style sheet dan outline, deck_page menambahkan satu halaman yang sudah diperiksa setiap kalinya, deck_build merakit .pptx dan slides_render mengembalikan gambar setiap slide; deck yang sudah jadi kemudian terbuka di GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides menampilkan deck Renewable Energy 2026 delapan slide yang dibangun Claude Code lewat MCP server genoffice: slide sampul dengan foto ladang angin di kanvas dan delapan thumbnail di kiri"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice Settings, halaman Integrations, bagian MCP: perintah satu baris claude mcp add untuk Claude Code, blok JSON untuk Cursor, Claude Desktop, dan MCP client lain, serta opsi server HTTP lokal di bawahnya"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice Settings, halaman Integrations, bagian MCP: perintah satu baris claude mcp add untuk Claude Code, blok JSON untuk Cursor, Claude Desktop, dan MCP client lain, serta opsi server HTTP lokal di bawahnya"></td>
 </tr>
 <tr>
-<td><b>Satu prompt, 38 panggilan alat, tanpa shell</b> — "Buat briefing investor delapan slide tentang energi terbarukan di 2026, dengan foto asli di sampul dan di mana pun foto membantu." Agen mengambil figur dan foto dengan <code>search</code>, menanyakan ke <code>media</code> apakah setiap foto kandidat adalah foto asli, memanggil <code>deck_start</code> dengan style sheet dan outline, lalu <code>deck_page</code> untuk setiap slide; setiap halaman diperiksa terhadap outline dan palet sebelum disimpan, <code>deck_build</code> merakit <code>.pptx</code>, <code>slides_audit</code> mencari overflow, <code>slides_render</code> mengembalikan PNG per slide sebagai konten gambar yang bisa dilihat model, dan <code>deck_replace</code> memperbaiki tiga halaman yang kurang disukainya.</td>
 <td><b>Hubungkan sekali, dari Pengaturan → Integrasi</b> — salin baris <code>claude mcp add</code> untuk Claude Code, atau blok JSON ke Cursor, Claude Desktop, atau MCP client lain. Opsi B mengaktifkan server HTTP lokal untuk editor Word yang terlihat. Keduanya dijelaskan di <a href="#mcp-server">Server MCP</a>.</td>
 </tr>
 </table>

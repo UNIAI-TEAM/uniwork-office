@@ -188,15 +188,11 @@ Desktop, Cursor และไคลเอนต์ MCP อื่นใดสา�
 ภายในแอปยังช่วยให้เอเจนต์สร้างเอกสาร Word ในแท็บเอดิเตอร์ที่มองเห็นได้
 ขณะที่คุณเฝ้าดูอยู่ได้ด้วย
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="ภาพไทม์แลปส์ของ Claude Code กำลังสร้างเดคบรีฟให้นักลงทุนเรื่องพลังงานหมุนเวียน 8 สไลด์ผ่านเซิร์ฟเวอร์ genoffice MCP: ค้นหาข้อมูลและภาพถ่ายด้วย search ตรวจสอบภาพถ่ายที่เป็นตัวเลือกแต่ละภาพด้วย media, deck_start เขียนสไตล์ชีตและโครงร่าง, deck_page เพิ่มหน้าที่ผ่านการตรวจสอบทีละหน้า, deck_build ประกอบไฟล์ .pptx และ slides_render ส่งภาพของทุกสไลด์กลับมา; เดคที่เสร็จแล้วจึงเปิดใน GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides แสดงเดคเรื่องพลังงานหมุนเวียน 2026 จำนวน 8 สไลด์ที่ Claude Code สร้างผ่านเซิร์ฟเวอร์ genoffice MCP: สไลด์หน้าปกที่มีภาพถ่ายฟาร์มกังหันลมบนแคนวาสและภาพย่อ 8 ภาพทางซ้าย"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice Settings หน้า Integrations ส่วน MCP: คำสั่ง claude mcp add บรรทัดเดียวสำหรับ Claude Code, บล็อก JSON สำหรับ Cursor, Claude Desktop และไคลเอนต์ MCP อื่นๆ และตัวเลือกเซิร์ฟเวอร์ HTTP ในเครื่องด้านล่าง"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice Settings หน้า Integrations ส่วน MCP: คำสั่ง claude mcp add บรรทัดเดียวสำหรับ Claude Code, บล็อก JSON สำหรับ Cursor, Claude Desktop และไคลเอนต์ MCP อื่นๆ และตัวเลือกเซิร์ฟเวอร์ HTTP ในเครื่องด้านล่าง"></td>
 </tr>
 <tr>
-<td><b>พรอมป์เดียว เรียกเครื่องมือสามสิบแปดครั้ง ไม่ต้องใช้เทอร์มินัล</b> — "สร้างบรีฟให้นักลงทุน 8 สไลด์เกี่ยวกับพลังงานหมุนเวียนในปี 2026 ใส่ภาพถ่ายจริงที่หน้าปกและทุกจุดที่ภาพช่วยได้" เอเจนต์ดึงข้อมูลและภาพถ่ายด้วย <code>search</code> ถาม <code>media</code> ว่าภาพที่เป็นตัวเลือกแต่ละภาพเป็นภาพถ่ายจริงหรือไม่ จากนั้นเรียก <code>deck_start</code> พร้อมสไตล์ชีตและโครงร่าง แล้วเรียก <code>deck_page</code> ทีละสไลด์ ทุกหน้าจะถูกตรวจสอบกับโครงร่างและจานสีก่อนจะถูกเก็บไว้ <code>deck_build</code> ประกอบ <code>.pptx</code>, <code>slides_audit</code> ตรวจหาความล้น, <code>slides_render</code> ส่ง PNG กลับมาทีละสไลด์เป็นเนื้อหาภาพให้โมเดลดู และสุดท้าย <code>deck_replace</code> แก้ไขสามหน้าที่ไม่ถูกใจ</td>
 <td><b>เชื่อมต่อครั้งเดียวจาก การตั้งค่า → การเชื่อมต่อ</b> — คัดลอกคำสั่ง <code>claude mcp add</code> สำหรับ Claude Code หรือบล็อก JSON ไปวางใน Cursor, Claude Desktop หรือไคลเอนต์ MCP อื่นใด ตัวเลือก B เปิดใช้เซิร์ฟเวอร์ HTTP ในเครื่องสำหรับเอดิเตอร์ Word ที่มองเห็นได้ ทั้งสองแบบอธิบายไว้ใน <a href="#mcp-server">เซิร์ฟเวอร์ MCP</a></td>
 </tr>
 </table>

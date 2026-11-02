@@ -193,15 +193,11 @@ tools plus de op-referenties als resources. Een tweede, HTTP-server in de
 app laat een agent een Word-document opbouwen in een zichtbaar
 editortabblad terwijl je toekijkt.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Time-lapse van Claude Code dat via de genoffice MCP-server een investeerderspresentatie van acht slides over hernieuwbare energie bouwt: zoekt naar figuren en foto's, controleert elke kandidaat-afbeelding met media, deck_start schrijft de stylesheet en de outline, deck_page voegt telkens één gecontroleerde pagina toe, deck_build stelt de .pptx samen en slides_render geeft een afbeelding van elke slide terug; het afgeronde deck opent daarna in GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides toont het deck Renewable Energy 2026 van acht slides dat Claude Code via de genoffice MCP-server heeft gebouwd: de openingsslide met een foto van een windmolenpark op het canvas en acht miniaturen links"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice-instellingen, pagina Integraties, MCP-onderdeel: het eenregelige commando claude mcp add voor Claude Code, het JSON-blok voor Cursor, Claude Desktop en andere MCP-clients, en de optie voor de lokale HTTP-server daaronder"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice-instellingen, pagina Integraties, MCP-onderdeel: het eenregelige commando claude mcp add voor Claude Code, het JSON-blok voor Cursor, Claude Desktop en andere MCP-clients, en de optie voor de lokale HTTP-server daaronder"></td>
 </tr>
 <tr>
-<td><b>Eén prompt, 38 tool-aanroepen, geen terminal</b> — "Bouw een investeerderspresentatie van acht slides over hernieuwbare energie in 2026, met een echte foto op de omslag en overal waar een foto helpt." De agent haalt de figuren en de foto's op met <code>search</code>, vraagt <code>media</code> of elke kandidaat-afbeelding een echte foto is, roept <code>deck_start</code> aan met een stylesheet en een outline, daarna <code>deck_page</code> één keer per slide; elke pagina wordt tegen de outline en het kleurenpalet gecontroleerd voordat ze wordt bewaard, <code>deck_build</code> stelt de <code>.pptx</code> samen, <code>slides_audit</code> zoekt naar overloop, <code>slides_render</code> geeft per slide een PNG terug als beeldinhoud die het model kan bekijken, en <code>deck_replace</code> verbetert de drie pagina's die niet bevielen.</td>
 <td><b>Eén keer verbinden, via Instellingen → Integraties</b> — kopieer de <code>claude mcp add</code>-regel voor Claude Code, of het JSON-blok in Cursor, Claude Desktop of een andere MCP-client. Optie B schakelt de lokale HTTP-server in voor de zichtbare Word-editor. Beide worden beschreven in <a href="#mcp-server">MCP-server</a>.</td>
 </tr>
 </table>

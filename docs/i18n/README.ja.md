@@ -168,15 +168,11 @@ Desktop、Cursor、その他任意の MCP クライアントは、スキルの�
 もう 1 つの HTTP サーバーを使えば、エージェントが目に見えるエディタータブで
 Word ドキュメントを組み立てる様子を見守ることもできます。
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Claude Code が genoffice MCP サーバー経由で 8 枚構成の再生可能エネルギー投資家向けブリーフィングデッキを組み立てるタイムラプス：search で図版と写真を探し、media で候補の写真を 1 枚ずつ確認し、deck_start がスタイルシートとアウトラインを書き込み、deck_page が検査済みのページを 1 枚ずつ追加し、deck_build が .pptx を組み立て、slides_render がスライドごとの画像を返す。完成したデッキはその後 GenOffice Slides で開かれる" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides が、Claude Code が genoffice MCP サーバー経由で組み立てた 8 枚構成の再生可能エネルギー 2026 デッキを表示している様子：キャンバスには風力発電所の写真入りの表紙スライド、左側に 8 枚のサムネイル"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice の設定、連携ページ、MCP 部分：Claude Code 用の 1 行の claude mcp add コマンド、Cursor・Claude Desktop・その他の MCP クライアント用の JSON ブロック、その下にあるローカル HTTP サーバーのオプション"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice の設定、連携ページ、MCP 部分：Claude Code 用の 1 行の claude mcp add コマンド、Cursor・Claude Desktop・その他の MCP クライアント用の JSON ブロック、その下にあるローカル HTTP サーバーのオプション"></td>
 </tr>
 <tr>
-<td><b>プロンプト 1 つ、ツール呼び出し 38 回、ターミナルなし</b> — 「2026 年の再生可能エネルギーについての 8 枚構成の投資家向けブリーフィングを、表紙とその他写真が役立つ場所に実写を入れて作って」。エージェントは <code>search</code> で図版と写真を集め、<code>media</code> で候補の写真それぞれが実写かどうかを確認したうえで、スタイルシートとアウトラインを添えて <code>deck_start</code> を呼び出し、続けてスライドごとに <code>deck_page</code> を呼び出します。各ページはアウトラインとパレットに沿っているか検査に通ってから保持され、<code>deck_build</code> が <code>.pptx</code> を組み立て、<code>slides_audit</code> がはみ出しを探し、<code>slides_render</code> がモデルが確認できる画像コンテンツとしてスライドごとの PNG を返し、最後に <code>deck_replace</code> が気に入らなかった 3 ページを修正します。</td>
 <td><b>設定 → 連携から 1 回接続するだけ</b> — Claude Code 用の <code>claude mcp add</code> コマンドをコピーするか、JSON ブロックを Cursor・Claude Desktop・その他の MCP クライアントに貼り付けます。オプション B は、目に見える Word エディターのためのローカル HTTP サーバーを有効にします。どちらも <a href="#mcp-server">MCP サーバー</a> で説明しています。</td>
 </tr>
 </table>

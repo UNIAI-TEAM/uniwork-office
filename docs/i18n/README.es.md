@@ -193,15 +193,11 @@ operaciones como recursos. Un segundo servidor HTTP dentro de la app permite
 que un agente construya un documento Word en una pestaña de editor visible
 mientras lo observas.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Lapso de tiempo de Claude Code construyendo una presentación de inversión de ocho diapositivas sobre energías renovables mediante el servidor MCP de genoffice: busca figuras y fotos, comprueba cada imagen candidata con media, deck_start escribe la hoja de estilos y el esquema, deck_page añade una página comprobada cada vez, deck_build ensambla el .pptx y slides_render devuelve una imagen de cada diapositiva; la presentación terminada se abre después en GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides mostrando la presentación de ocho diapositivas Renewable Energy 2026 que Claude Code construyó mediante el servidor MCP de genoffice: la diapositiva de portada con una fotografía de un parque eólico en el lienzo y ocho miniaturas a la izquierda"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="Ajustes de GenOffice, página Integraciones, parte de MCP: el comando de una línea claude mcp add para Claude Code, el bloque JSON para Cursor, Claude Desktop y otros clientes MCP, y la opción de servidor HTTP local debajo"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="Ajustes de GenOffice, página Integraciones, parte de MCP: el comando de una línea claude mcp add para Claude Code, el bloque JSON para Cursor, Claude Desktop y otros clientes MCP, y la opción de servidor HTTP local debajo"></td>
 </tr>
 <tr>
-<td><b>Un prompt, 38 llamadas a herramientas, sin terminal</b> — «Crea una presentación de inversión de ocho diapositivas sobre energías renovables en 2026, con una foto real en la portada y dondequiera que una foto ayude». El agente obtiene las figuras y las fotos con <code>search</code>, pregunta a <code>media</code> si cada imagen candidata es una fotografía real, llama a <code>deck_start</code> con una hoja de estilos y un esquema, después <code>deck_page</code> una vez por diapositiva; cada página se comprueba contra el esquema y la paleta antes de conservarla, <code>deck_build</code> ensambla el <code>.pptx</code>, <code>slides_audit</code> busca desbordes, <code>slides_render</code> devuelve un PNG por diapositiva como contenido de imagen que el modelo puede mirar, y <code>deck_replace</code> corrige las tres páginas que no le convencieron.</td>
 <td><b>Conéctate una vez, desde Ajustes → Integraciones</b> — copia la línea <code>claude mcp add</code> para Claude Code, o el bloque JSON en Cursor, Claude Desktop o cualquier otro cliente MCP. La opción B activa el servidor HTTP local para el editor de Word visible. Ambas se describen en <a href="#mcp-server">Servidor MCP</a>.</td>
 </tr>
 </table>

@@ -193,15 +193,11 @@ okna, i otrzymują 29 narzędzi oraz odniesienia do operacji jako zasoby.
 Drugi, serwer HTTP wewnątrz aplikacji pozwala agentowi budować dokument
 Word w widocznej karcie edytora, podczas gdy Ty patrzysz.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Poklatkowe nagranie Claude Code budującego ośmioslajdową prezentację inwestorską o energii odnawialnej przez serwer MCP genoffice: szuka ilustracji i zdjęć, sprawdza każde kandydujące zdjęcie za pomocą media, deck_start zapisuje arkusz stylów i konspekt, deck_page dodaje po jednej sprawdzonej stronie naraz, deck_build składa plik .pptx, a slides_render zwraca obraz każdego slajdu; gotowa prezentacja otwiera się potem w GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides pokazuje ośmioslajdową prezentację Renewable Energy 2026, którą Claude Code zbudował przez serwer MCP genoffice: slajd tytułowy ze zdjęciem farmy wiatrowej na płótnie i osiem miniatur po lewej"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="Ustawienia GenOffice, strona Integracje, część MCP: jednowierszowe polecenie claude mcp add dla Claude Code, blok JSON dla Cursor, Claude Desktop i innych klientów MCP oraz opcja lokalnego serwera HTTP poniżej"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="Ustawienia GenOffice, strona Integracje, część MCP: jednowierszowe polecenie claude mcp add dla Claude Code, blok JSON dla Cursor, Claude Desktop i innych klientów MCP oraz opcja lokalnego serwera HTTP poniżej"></td>
 </tr>
 <tr>
-<td><b>Jeden prompt, 38 wywołań narzędzi, bez terminala</b> — „Zbuduj ośmioslajdową prezentację inwestorską o energii odnawialnej w 2026 roku, z prawdziwym zdjęciem na okładce i wszędzie tam, gdzie zdjęcie się przyda”. Agent pobiera ilustracje i zdjęcia za pomocą <code>search</code>, pyta <code>media</code>, czy każde kandydujące zdjęcie jest prawdziwą fotografią, wywołuje <code>deck_start</code> z arkuszem stylów i konspektem, potem <code>deck_page</code> raz na slajd; każda strona jest sprawdzana względem konspektu i palety, zanim zostanie zachowana, <code>deck_build</code> składa plik <code>.pptx</code>, <code>slides_audit</code> szuka przepełnień, <code>slides_render</code> oddaje po jednym PNG na slajd jako treść obrazu, którą model może obejrzeć, a <code>deck_replace</code> poprawia trzy strony, które mu się nie spodobały.</td>
 <td><b>Połącz się raz, z Ustawienia → Integracje</b> — skopiuj linię <code>claude mcp add</code> dla Claude Code albo blok JSON do Cursor, Claude Desktop lub innego klienta MCP. Opcja B włącza lokalny serwer HTTP dla widocznego edytora Word. Obie opisano w <a href="#mcp-server">Serwer MCP</a>.</td>
 </tr>
 </table>

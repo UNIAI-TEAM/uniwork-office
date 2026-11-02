@@ -190,15 +190,11 @@ Cursor 및 다른 모든 MCP 클라이언트는 스킬을 설치하거나 창을
 얻을 수 있습니다. 앱 내부의 두 번째 HTTP 서버를 사용하면 에이전트가 눈에
 보이는 편집기 탭에서 Word 문서를 만드는 과정을 지켜볼 수도 있습니다.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Claude Code가 genoffice MCP 서버로 8장짜리 재생에너지 투자 브리핑 덱을 만드는 과정의 타임랩스: search로 도표와 사진을 찾고 media로 각 후보 사진을 확인한 뒤, deck_start가 스타일 시트와 개요를 작성하고, deck_page가 검사를 마친 페이지를 한 장씩 추가하며, deck_build가 .pptx를 조립하고 slides_render가 슬라이드마다 이미지를 돌려줍니다. 완성된 덱은 이후 GenOffice Slides에서 열립니다" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides가 Claude Code가 genoffice MCP 서버로 만든 8장짜리 재생에너지 2026 덱을 보여주는 화면: 캔버스에는 풍력 발전 단지 사진이 있는 표지 슬라이드, 왼쪽에는 여덟 개의 축소판"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice 설정의 연동 페이지, MCP 부분: Claude Code용 한 줄짜리 claude mcp add 명령, Cursor, Claude Desktop 및 다른 MCP 클라이언트용 JSON 블록, 그 아래의 로컬 HTTP 서버 옵션"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice 설정의 연동 페이지, MCP 부분: Claude Code용 한 줄짜리 claude mcp add 명령, Cursor, Claude Desktop 및 다른 MCP 클라이언트용 JSON 블록, 그 아래의 로컬 HTTP 서버 옵션"></td>
 </tr>
 <tr>
-<td><b>프롬프트 하나, 도구 호출 서른여덟 번, 터미널 없이</b> — "2026년 재생에너지에 관한 8장짜리 투자 브리핑을 만들어줘. 표지와 사진이 도움이 될 만한 곳에는 실제 사진을 넣어줘." 에이전트는 <code>search</code>로 도표와 사진을 가져오고, <code>media</code>로 각 후보 사진이 실제 사진인지 확인한 다음, 스타일 시트와 개요를 담아 <code>deck_start</code>를 호출하고, 이어서 슬라이드마다 <code>deck_page</code>를 호출합니다. 모든 페이지는 개요와 팔레트에 맞는지 검사를 통과해야 유지되며, <code>deck_build</code>가 <code>.pptx</code>를 조립하고, <code>slides_audit</code>이 넘치는 부분을 찾고, <code>slides_render</code>가 모델이 볼 수 있는 이미지 콘텐츠로 슬라이드마다 PNG를 돌려주면, 마지막으로 <code>deck_replace</code>가 마음에 들지 않았던 세 페이지를 고칩니다.</td>
 <td><b>설정 → 연동에서 한 번만 연결</b> — Claude Code용 <code>claude mcp add</code> 명령을 복사하거나, JSON 블록을 Cursor, Claude Desktop 또는 다른 MCP 클라이언트에 붙여넣으세요. 옵션 B는 눈에 보이는 Word 편집기를 위한 로컬 HTTP 서버를 켭니다. 두 방법 모두 <a href="#mcp-server">MCP 서버</a>에 설명되어 있습니다.</td>
 </tr>
 </table>

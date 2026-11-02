@@ -190,15 +190,11 @@ Desktop وCursor وأي عميل MCP آخر تشغيل `genoffice mcp` بأنف�
 العمليات كموارد (resources). كما يتيح خادم HTTP ثانٍ داخل التطبيق للوكيل
 بناء مستند Word في تبويب محرِّر مرئي بينما تشاهد.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="لقطات متسارعة لـ Claude Code وهو يبني عرضًا استثماريًا من ثماني شرائح عن الطاقة المتجدّدة عبر خادم MCP الخاص بـ genoffice: يبحث عن الرسوم البيانية والصور، ويتحقق من كل صورة مرشّحة عبر media، وdeck_start يكتب ورقة الأنماط والمخطط، وdeck_page يضيف صفحة واحدة مُتحقَّقة في كل مرة، وdeck_build يجمّع ملف .pptx، وslides_render يعيد صورة كل شريحة؛ ثم يُفتح العرض النهائي في GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides يعرض عرض Renewable Energy 2026 من ثماني شرائح الذي بناه Claude Code عبر خادم MCP الخاص بـ genoffice: شريحة الغلاف مع صورة فوتوغرافية لمزرعة رياح على لوحة الرسم وثماني مصغّرات على اليسار"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="إعدادات GenOffice، صفحة Integrations، جزء MCP: أمر claude mcp add من سطر واحد لـ Claude Code، وكتلة JSON لـ Cursor وClaude Desktop وعملاء MCP الآخرين، وخيار خادم HTTP المحلي أسفل ذلك"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="إعدادات GenOffice، صفحة Integrations، جزء MCP: أمر claude mcp add من سطر واحد لـ Claude Code، وكتلة JSON لـ Cursor وClaude Desktop وعملاء MCP الآخرين، وخيار خادم HTTP المحلي أسفل ذلك"></td>
 </tr>
 <tr>
-<td dir="rtl"><b>توجيه واحد، 38 استدعاءً للأدوات، بلا طرفية</b> — "ابنِ عرضًا استثماريًا من ثماني شرائح عن الطاقة المتجدّدة في 2026، بصورة حقيقية على الغلاف وحيثما تفيد صورة." يسحب الوكيل الرسوم البيانية والصور عبر <code>search</code>، ويسأل <code>media</code> عمّا إذا كانت كل صورة مرشّحة صورة فوتوغرافية حقيقية، ثم يستدعي <code>deck_start</code> بورقة أنماط ومخطط، ثم <code>deck_page</code> لكل شريحة؛ تُفحص كل صفحة مقابل المخطط والباليت قبل الاحتفاظ بها، ويجمّع <code>deck_build</code> ملف <code>.pptx</code>، ويبحث <code>slides_audit</code> عن التجاوزات، ويعيد <code>slides_render</code> صورة PNG لكل شريحة كمحتوى صوري يمكن للنموذج النظر إليه، ويُصلح <code>deck_replace</code> الصفحات الثلاث التي لم تعجبه.</td>
 <td dir="rtl"><b>اتصل مرة واحدة، من الإعدادات → التكاملات</b> — انسخ سطر <code>claude mcp add</code> لـ Claude Code، أو كتلة JSON إلى Cursor أو Claude Desktop أو أي عميل MCP آخر. يفعِّل الخيار B خادم HTTP المحلي لمحرِّر Word المرئي. كلاهما موضّح في <a href="#mcp-server">خادم MCP</a>.</td>
 </tr>
 </table>

@@ -222,15 +222,11 @@ Cursor 及任何其他 MCP 用戶端都能自行啟動 `genoffice mcp`，不必�
 應用程式內建的第二個 HTTP 伺服器，還能讓代理在一個可見的編輯器分頁中
 建立 Word 文件，讓你即時查看。
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Claude Code 透過 genoffice MCP 伺服器建立一份八頁再生能源投資簡報的縮時畫面：它會搜尋圖表與照片，並用 media 檢查每一張候選圖片，deck_start 寫入樣式表與大綱，deck_page 逐頁新增經過檢查的頁面，deck_build 組裝出 .pptx，slides_render 傳回每一頁的圖片；完成的簡報接著會在 GenOffice Slides 中開啟" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides 顯示 Claude Code 透過 genoffice MCP 伺服器建立的八頁再生能源 2026 簡報：畫布上是帶有風力發電場照片的封面投影片，左側有八張縮圖"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice 設定的「整合」頁面，MCP 部分：Claude Code 適用的一行 claude mcp add 指令、Cursor、Claude Desktop 與其他 MCP 用戶端適用的 JSON 程式碼區塊，以及下方的本機 HTTP 伺服器選項"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice 設定的「整合」頁面，MCP 部分：Claude Code 適用的一行 claude mcp add 指令、Cursor、Claude Desktop 與其他 MCP 用戶端適用的 JSON 程式碼區塊，以及下方的本機 HTTP 伺服器選項"></td>
 </tr>
 <tr>
-<td><b>一句提示詞，三十八次工具呼叫，不用終端機</b>——「做一份關於 2026 年再生能源的八頁投資簡報，封面和其他合適的地方都配上真實照片。」代理先用 <code>search</code> 蒐集圖表與照片，再用 <code>media</code> 確認每一張候選圖片是不是真實照片，然後帶著樣式表與大綱呼叫 <code>deck_start</code>，接著逐頁呼叫 <code>deck_page</code>；每一頁都會先對照大綱與配色方案檢查通過才會保留，接著 <code>deck_build</code> 組裝出 <code>.pptx</code>，<code>slides_audit</code> 檢查是否溢出，<code>slides_render</code> 為每一頁交回一張供模型檢視的 PNG 圖片內容，最後 <code>deck_replace</code> 修復了它不滿意的三頁。</td>
 <td><b>在設定 → 整合中連接一次即可</b>——複製 Claude Code 適用的 <code>claude mcp add</code> 指令，或把 JSON 程式碼區塊貼進 Cursor、Claude Desktop 或任何其他 MCP 用戶端。選項 B 會開啟本機 HTTP 伺服器，供可見的 Word 編輯器使用。兩者都在<a href="#mcp-server">MCP 伺服器</a>中有詳細說明。</td>
 </tr>
 </table>

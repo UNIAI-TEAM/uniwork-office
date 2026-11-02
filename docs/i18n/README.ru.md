@@ -192,15 +192,11 @@ mcp`, без установки скилла и без открытого окн
 HTTP-сервер внутри приложения позволяет агенту собирать документ Word
 прямо во вкладке редактора у вас на глазах.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Ускоренная съёмка того, как Claude Code строит презентацию для инвесторов из восьми слайдов о возобновляемой энергетике через MCP-сервер genoffice: ищет иллюстрации и фотографии, проверяет каждую фотографию-кандидата с помощью media, deck_start пишет таблицу стилей и план, deck_page добавляет по одной проверенной странице за раз, deck_build собирает .pptx и slides_render возвращает изображение каждого слайда; готовая презентация затем открывается в GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides показывает презентацию Renewable Energy 2026 из восьми слайдов, которую Claude Code построил через MCP-сервер genoffice: титульный слайд с фотографией ветропарка на холсте и восемь миниатюр слева"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice Settings, страница Integrations, часть MCP: однострочная команда claude mcp add для Claude Code, JSON-блок для Cursor, Claude Desktop и других MCP-клиентов, и опция локального HTTP-сервера ниже"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice Settings, страница Integrations, часть MCP: однострочная команда claude mcp add для Claude Code, JSON-блок для Cursor, Claude Desktop и других MCP-клиентов, и опция локального HTTP-сервера ниже"></td>
 </tr>
 <tr>
-<td><b>Один промпт, 38 вызовов инструментов, никакого терминала</b> — «Сделай инвесторскую презентацию из восьми слайдов о возобновляемой энергетике в 2026 году, с настоящей фотографией на обложке и везде, где фото уместно». Агент забирает иллюстрации и фотографии через <code>search</code>, спрашивает <code>media</code>, является ли каждая фотография-кандидат настоящей фотографией, вызывает <code>deck_start</code> с таблицей стилей и планом, затем <code>deck_page</code> для каждого слайда; каждая страница проверяется на соответствие плану и палитре, прежде чем её примут, <code>deck_build</code> собирает <code>.pptx</code>, <code>slides_audit</code> ищет переполнения, <code>slides_render</code> возвращает PNG для каждого слайда как графическое содержимое, которое модель может рассмотреть, а <code>deck_replace</code> исправляет три страницы, которые ей не понравились.</td>
 <td><b>Подключите один раз в разделе «Настройки → Интеграции»</b> — скопируйте строку <code>claude mcp add</code> для Claude Code или JSON-блок в Cursor, Claude Desktop или любой другой MCP-клиент. Вариант B включает локальный HTTP-сервер для видимого редактора Word. Оба варианта описаны в разделе <a href="#mcp-server">MCP-сервер</a>.</td>
 </tr>
 </table>

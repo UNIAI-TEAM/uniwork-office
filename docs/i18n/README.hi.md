@@ -168,15 +168,11 @@ skill इंस्टॉल करने की ज़रूरत, न को�
 दूसरा, HTTP सर्वर किसी एजेंट को एक दिखने वाले एडिटर टैब में Word डॉक्यूमेंट
 बनाने देता है, जबकि आप देखते रहते हैं।
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="Claude Code का genoffice MCP सर्वर के ज़रिए आठ स्लाइड के रिन्यूएबल एनर्जी इन्वेस्टर ब्रीफ़िंग डेक बनाने का टाइम-लैप्स: यह search से आँकड़े और तस्वीरें ढूँढ़ता है, media से हर उम्मीदवार तस्वीर को जाँचता है, deck_start स्टाइल शीट और आउटलाइन लिखता है, deck_page एक बार में एक जाँची गई पेज जोड़ता है, deck_build .pptx असेंबल करता है और slides_render हर स्लाइड की तस्वीर वापस देता है; बना हुआ डेक फिर GenOffice Slides में खुलता है" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides में आठ स्लाइड का रिन्यूएबल एनर्जी 2026 डेक दिखाया गया है जिसे Claude Code ने genoffice MCP सर्वर के ज़रिए बनाया: कैनवस पर विंड फ़ार्म की तस्वीर वाली कवर स्लाइड और बाईं ओर आठ थंबनेल"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice Settings का Integrations पेज, MCP हिस्सा: Claude Code के लिए एक-लाइन का claude mcp add कमांड, Cursor, Claude Desktop और दूसरे MCP क्लाइंट्स के लिए JSON ब्लॉक, और नीचे लोकल HTTP सर्वर का विकल्प"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="GenOffice Settings का Integrations पेज, MCP हिस्सा: Claude Code के लिए एक-लाइन का claude mcp add कमांड, Cursor, Claude Desktop और दूसरे MCP क्लाइंट्स के लिए JSON ब्लॉक, और नीचे लोकल HTTP सर्वर का विकल्प"></td>
 </tr>
 <tr>
-<td><b>एक प्रॉम्प्ट, अड़तीस टूल कॉल्स, कोई टर्मिनल नहीं</b> — "2026 में रिन्यूएबल एनर्जी के बारे में आठ स्लाइड की इन्वेस्टर ब्रीफ़िंग बनाएँ, कवर पर और जहाँ भी तस्वीर काम आए वहाँ एक असली तस्वीर लगाएँ।" एजेंट <code>search</code> से आँकड़े और तस्वीरें खींचता है, <code>media</code> से पूछता है कि हर उम्मीदवार तस्वीर असली फ़ोटोग्राफ़ है या नहीं, फिर एक स्टाइल शीट और आउटलाइन के साथ <code>deck_start</code> कॉल करता है, फिर हर स्लाइड के लिए एक बार <code>deck_page</code> कॉल करता है; हर पेज को रखे जाने से पहले आउटलाइन और पैलेट के हिसाब से जाँचा जाता है, <code>deck_build</code> <code>.pptx</code> असेंबल करता है, <code>slides_audit</code> ओवरफ़्लो ढूँढता है और <code>slides_render</code> मॉडल के देखने लायक इमेज कॉन्टेंट के रूप में हर स्लाइड का एक PNG वापस देता है, और आख़िर में <code>deck_replace</code> उन तीन पेजों को ठीक करता है जो पसंद नहीं आए थे।</td>
 <td><b>सेटिंग्स → इंटीग्रेशन से एक बार कनेक्ट करें</b> — Claude Code के लिए <code>claude mcp add</code> लाइन कॉपी करें, या JSON ब्लॉक को Cursor, Claude Desktop या किसी भी अन्य MCP क्लाइंट में डालें। विकल्प B दिखने वाले Word एडिटर के लिए लोकल HTTP सर्वर चालू करता है। दोनों के बारे में <a href="#mcp-server">MCP सर्वर</a> में बताया गया है।</td>
 </tr>
 </table>

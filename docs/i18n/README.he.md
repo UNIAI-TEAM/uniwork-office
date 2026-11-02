@@ -186,15 +186,11 @@ skill ובלי לפתוח חלון, ולקבל 29 כלים בתוספת מדרי
 (resources). שרת HTTP שני בתוך האפליקציה מאפשר לסוכן לבנות מסמך Word
 בלשונית עורך גלויה בזמן שאתם צופים.
 
-<img src="../assets/readme/mcp-deck-motion.webp" alt="צילום מואץ של Claude Code בונה תדריך משקיעים בן שמונה שקופיות על אנרגיה מתחדשת דרך שרת ה-MCP של genoffice: מחפש איורים ותמונות, בודק כל תמונה מועמדת עם media, deck_start כותב את גיליון הסטייל והתווה, deck_page מוסיף עמוד מאומת אחד בכל פעם, deck_build מרכיב את קובץ ה-.pptx ו-slides_render מחזיר תמונה של כל שקופית; המצגת המוגמרת נפתחת לאחר מכן ב-GenOffice Slides" width="100%">
-
 <table>
 <tr>
-<td width="50%"><img src="../assets/readme/mcp-deck-in-app.webp" alt="GenOffice Slides מציג את מצגת Renewable Energy 2026 בת שמונה השקופיות ש-Claude Code בנה דרך שרת ה-MCP של genoffice: שקופית השער עם תצלום של חוות רוח על הקנבס ושמונה תמונות ממוזערות בצד שמאל"></td>
-<td width="50%"><img src="../assets/readme/mcp-integrations.webp" alt="הגדרות GenOffice, עמוד Integrations, חלק ה-MCP: פקודת claude mcp add בשורה אחת עבור Claude Code, בלוק ה-JSON עבור Cursor,‏ Claude Desktop ולקוחות MCP אחרים, ואפשרות שרת ה-HTTP המקומי מתחת"></td>
+<td><img src="../assets/readme/mcp-integrations.webp" alt="הגדרות GenOffice, עמוד Integrations, חלק ה-MCP: פקודת claude mcp add בשורה אחת עבור Claude Code, בלוק ה-JSON עבור Cursor,‏ Claude Desktop ולקוחות MCP אחרים, ואפשרות שרת ה-HTTP המקומי מתחת"></td>
 </tr>
 <tr>
-<td dir="rtl"><b>פרומפט אחד, 38 קריאות לכלים, בלי shell</b> — ״בנו תדריך משקיעים בן שמונה שקופיות על אנרגיה מתחדשת ב-2026, עם תמונה אמיתית על השער ובכל מקום שתמונה עוזרת.״ הסוכן מושך את האיורים והתמונות עם <code>search</code>, שואל את <code>media</code> אם כל תמונה מועמדת היא תצלום אמיתי, קורא ל-<code>deck_start</code> עם גיליון סטייל ותווה, ואז <code>deck_page</code> פעם אחת לכל שקופית; כל עמוד נבדק מול התווה והפלטה לפני שהוא נשמר, <code>deck_build</code> מרכיב את ה-<code>.pptx</code>, <code>slides_audit</code> מחפש גלישות, <code>slides_render</code> מחזיר PNG לכל שקופית כתוכן תמונה שהמודל יכול להסתכל עליו, ו-<code>deck_replace</code> מתקן את שלושת העמודים שלא מצאו חן בעיניו.</td>
 <td dir="rtl"><b>התחברו פעם אחת, מתוך הגדרות → שילובים</b> — העתיקו את שורת <code>claude mcp add</code> עבור Claude Code, או את בלוק ה-JSON אל Cursor,‏ Claude Desktop או כל לקוח MCP אחר. אפשרות B מפעילה את שרת ה-HTTP המקומי עבור עורך ה-Word הגלוי. שתיהן מתוארות ב<a href="#mcp-server">שרת MCP</a>.</td>
 </tr>
 </table>
