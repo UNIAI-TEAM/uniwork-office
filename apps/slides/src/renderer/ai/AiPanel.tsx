@@ -478,7 +478,7 @@ export function AiPanel({
   // Shared AI panel pref (Settings → General): the bespoke slides composer
   // must honor it like the shared AiComposer does.
   const { spellcheck } = useAiPanelPrefs()
-  // no key or no known model (web): send stays off and the hint says why, as in AiComposer
+  // UniWork AI not offered here: send stays off and the hint says why, as in AiComposer
   const needModelHint = useAiModelNeedHint()
   const needModelAction = useAiModelNeedAction()
   // the panel's own composer gates Send on the UniWork disclosure and on a UniWork composer note

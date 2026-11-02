@@ -771,8 +771,6 @@ function currentAiPanelPrefs(): AiPanelPrefs {
 }
 
 // ---- first-run onboarding ----
-// Token Hub (OpenRouter) credits page opened from the Home credit wallet.
-// Kept main-side so the renderer never supplies the URL.
 
 const tMain = createI18n({
   zh: {

@@ -881,7 +881,7 @@ installDropOpenBridge()
 // window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
 installUniworkCommentsBridge()
 installAiRunBridge()
-// window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's provider list mirrors it)
+// window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's availability flag mirrors it)
 installUniworkAiFlagBridge()
 installUniworkCloudStatusBridge()
 // window.uniworkAskUniDoc: Ask UNI about the open document (main derives the document from this tab)

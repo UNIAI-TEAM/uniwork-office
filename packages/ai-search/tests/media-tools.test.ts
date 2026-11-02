@@ -51,7 +51,7 @@ describe('media tools with the cloud-tools switch off', () => {
     const r = await generateImageTool(
       switchedOffSettings(),
       { prompt: 'red podcast icon' },
-      { notLoggedInError: 'localized' },
+      { cloudToolsOffError: 'localized' },
     )
     expect(r).toEqual({ error: 'localized' })
   })

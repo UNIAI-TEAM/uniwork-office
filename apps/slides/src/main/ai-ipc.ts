@@ -207,7 +207,7 @@ export function registerSlidesOnlyAiIpc(): void {
           imageSize: op.imageSize ? String(op.imageSize) : undefined,
         },
         {
-          notLoggedInError: tm('errMediaNotConfigured'),
+          cloudToolsOffError: tm('errMediaNotConfigured'),
           mediaRoots: slidesMediaRoots(event.sender.id),
         },
       )
@@ -224,7 +224,7 @@ export function registerSlidesOnlyAiIpc(): void {
           requirements: String(op.requirements ?? ''),
         },
         {
-          notLoggedInError: tm('errMediaNotConfigured'),
+          cloudToolsOffError: tm('errMediaNotConfigured'),
           mediaRoots: slidesMediaRoots(event.sender.id),
         },
       )

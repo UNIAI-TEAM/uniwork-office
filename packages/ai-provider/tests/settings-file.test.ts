@@ -1,4 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -58,5 +67,16 @@ describe('saveAiSettingsFile', () => {
     })
     saveAiSettingsFile(path, { gskToolsEnabled: true })
     expect(JSON.parse(readFileSync(path, 'utf8')).gskToolsEnabled).toBe(true)
+  })
+})
+
+describe('the settings-file write', () => {
+  it('leaves no temporary file behind when the write cannot land (UNI-2309)', () => {
+    const parent = mkdtempSync(join(dir, 'torn-'))
+    // a directory where the file should be: the final rename fails after the temp file was written
+    const path = join(parent, 'ai-settings.json')
+    mkdirSync(join(path, 'occupied'), { recursive: true })
+    expect(() => saveAiSettingsFile(path, { gskToolsEnabled: false })).toThrow()
+    expect(readdirSync(parent)).toEqual(['ai-settings.json'])
   })
 })

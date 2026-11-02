@@ -94,6 +94,19 @@ describe('scanText', () => {
       'exa.ai',
       'firecrawl.dev',
       'perplexity.ai',
+      // the hosts of the deleted provider catalog
+      'api.moonshot.ai',
+      'router.requesty.ai',
+      'router.eu.requesty.ai',
+      'tokenhub.tencentcloudmaas.com',
+      'maas-api.cn-huabei-1.xf-yun.com',
+      'api.longcat.chat',
+      'api.xiaomimimo.com',
+      'api.ant-ling.com',
+      'api.opper.ai',
+      'api.typesafe.ai',
+      'api.cheaperinference.com',
+      'opencode.ai',
     ]
     const hits = scanText(hosts.map((h) => `const u = 'https://${h}/v1'`).join('\n'))
     assert.deepEqual(
@@ -144,6 +157,8 @@ describe('inScope', () => {
       'apps/docs/electron-builder.cjs',
       'apps/docs/electron.vite.config.ts',
       'apps/docs/vite.renderer.config.ts',
+      'web/docs/bridge/web-bridge.ts',
+      'web/modules/shared/ai/web-ai.ts',
     ]) {
       assert.equal(inScope(p), true, p)
     }
@@ -161,6 +176,9 @@ describe('inScope', () => {
       'packages/cli/node_modules/x/index.js',
       'apps/sheets/native/excel-sidecar/target/debug/build.rs',
       'apps/docs/README.md',
+      'web/modules/shared/ai/ai.test.ts',
+      'web/docs/bridge/tests/bridge.test.ts',
+      'web/e2e/ai-web.spec.ts',
     ]) {
       assert.equal(inScope(p), false, p)
     }
@@ -196,6 +214,21 @@ describe('scanTree', () => {
       [
         ['apps/docs/src/main/search.ts', 1, 'duckduckgo.com'],
         ['packages/ai-provider/src/vendor.ts', 1, 'openrouter.ai'],
+      ],
+    )
+  })
+
+  it('scans the web frames, leaving their tests out', () => {
+    const root = tree({
+      'web/modules/shared/ai/vendor.ts': "const BASE = 'https://api.moonshot.ai/v1'\n",
+      'web/docs/bridge/x.ts': "fetch('https://opencode.ai/zen')\n",
+      'web/modules/shared/ai/ai.test.ts': "const BASE = 'https://openrouter.ai/api/v1'\n",
+    })
+    assert.deepEqual(
+      scanTree(root, { allowlist: [] }).map((h) => [h.path, h.line, h.pattern]),
+      [
+        ['web/docs/bridge/x.ts', 1, 'opencode.ai'],
+        ['web/modules/shared/ai/vendor.ts', 1, 'api.moonshot.ai'],
       ],
     )
   })

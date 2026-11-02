@@ -300,7 +300,7 @@ describe('the cloud tools answer for the editors, and only the cloud', () => {
       await analyzeMediaTool(off, { mediaUrls: ['data:image/png;base64,AAAA'], requirements: 'r' }),
     ).toEqual({ error: OFF })
     expect(
-      await generateImageTool(off, { prompt: 'icon' }, { notLoggedInError: 'localized' }),
+      await generateImageTool(off, { prompt: 'icon' }, { cloudToolsOffError: 'localized' }),
     ).toEqual({ error: 'localized' })
     expect(transport.search).not.toHaveBeenCalled()
     expect(transport.generateImage).not.toHaveBeenCalled()

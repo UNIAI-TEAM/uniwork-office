@@ -213,7 +213,7 @@ import {
   type SheetsSkillDeps,
 } from './ai/tools'
 import { scopeLabel, type AiChatMessage } from './ai/AiChatPanel'
-import { markRunFailed } from './ai/run-error'
+import { markRunFailed, plannerAnswersFailedRun } from './ai/run-error'
 import { pruneFailedExchange } from './ai/retry-prune'
 import { withReceipt, withoutReceipts } from './ai/clarify-receipts'
 import { parseSheetNavHref } from './ai/sheet-nav'
@@ -1832,6 +1832,24 @@ export function App({
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },
         onError: (error, errorKey) => {
+          // offline (or the connection dropped) before any tool ran: the fixed planner answers, as
+          // it does while UniWork AI is not offered
+          if (plannerAnswersFailedRun(errorKey, runToolsRef.current.length > 0)) {
+            const outcome = runDeterministicPlan(runQuestionRef.current)
+            setMessage(outcome.text)
+            patchLastAssistant((entry) => ({
+              ...entry,
+              text: outcome.text,
+              status: '',
+              streaming: false,
+              isError: outcome.isError,
+              tools: [],
+            }))
+            persistChatMessage('assistant', outcome.text)
+            setAiRunScope(undefined)
+            void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
+            return
+          }
           // a refused question (too long, rejected) goes back into the composer to be shortened or
           // fixed, as the message says
           if (isUniworkRefusalErrorKey(errorKey))

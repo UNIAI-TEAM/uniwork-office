@@ -248,8 +248,8 @@ export async function loadMediaReference(
 }
 
 export interface MediaToolOptions {
-  /** localized replacement for the default "cloud tools are turned off" message */
-  notLoggedInError?: string
+  /** localized replacement for the default "cloud tools are turned off" message (the user switched them off) */
+  cloudToolsOffError?: string
   /** directories a bare local path may be read from; omitted = extension check only */
   mediaRoots?: readonly string[]
 }
@@ -319,7 +319,7 @@ export async function generateImageTool(
   const prompt = String(op.prompt ?? '').trim()
   if (!prompt) return { error: 'prompt must not be empty' }
   if (cloudToolsSwitchedOff(readAiSettingsFile(settingsPath))) {
-    return { error: options.notLoggedInError ?? MEDIA_NOT_CONFIGURED_ERROR }
+    return { error: options.cloudToolsOffError ?? MEDIA_NOT_CONFIGURED_ERROR }
   }
   try {
     // the snapshot may predate a plan change: re-read before the cloud is refused
@@ -350,7 +350,7 @@ export async function analyzeMediaTool(
   if (!mediaUrls.length) return { error: 'mediaUrls must not be empty' }
   if (!requirements) return { error: 'requirements must not be empty' }
   if (cloudToolsSwitchedOff(readAiSettingsFile(settingsPath))) {
-    return { error: options.notLoggedInError ?? MEDIA_NOT_CONFIGURED_ERROR }
+    return { error: options.cloudToolsOffError ?? MEDIA_NOT_CONFIGURED_ERROR }
   }
   try {
     await refreshUniworkCloudStatusIfNotReady()

@@ -16,7 +16,7 @@
 //   --report <file.md>    write the markdown report there, plus a .json sibling
 //   --pr-body <file.md>   write the report cut below 60000 characters (a pull request body limit)
 //   --exclude <glob>      leave matching upstream paths out of the patch (repeatable; listed in the report;
-//                         DROPPED_UPSTREAM_PATHS is always left out too)
+//                         DROPPED_UPSTREAM_PATHS is always left out too, listed apart)
 //   --prettier <path>     prettier.cjs used to format the files the rebrand touched
 //                         (default: node_modules/prettier of the repo or its main checkout; skipped if absent)
 //   --commit-conflicts    commit conflicted files with their markers and finish the remaining steps
@@ -71,7 +71,7 @@ export const REBRAND_TESTS = ['brand-scan.test.mjs', 'rebrand.test.mjs', 'sync-u
 /**
  * Upstream files the fork deleted with the own-key AI (UNI-2309: AI runs only on UniWork AI,
  * UniWork ADR 0051) or with the Genspark cloud sign-in before it (UNI-2289), and their tests. Always left out of the patch, on top of --exclude, so an
- * upstream edit to one is listed under "Left out by --exclude" instead of failing to apply.
+ * upstream edit to one is listed under "Removed in the fork (do not port)" instead of failing to apply.
  * Only files that came from upstream belong here; see docs/upstream/UPSTREAM_SYNC.md.
  */
 export const DROPPED_UPSTREAM_PATHS = [
@@ -185,6 +185,10 @@ export const WATCH = [
   {
     test: (p) => /^packages\/ai-(provider|search)\/src\//.test(p),
     note: 'own-key AI provider or search code: UniWork AI only (UniWork ADR 0051); skip new providers, keys, Codex CLI, keyless search',
+  },
+  {
+    test: (p) => /^packages\/ui\/src\/(AiModelPicker\.tsx|strings-ai-model-picker\.ts)$/.test(p),
+    note: 'provider chooser removed; UniWork AI only (UniWork ADR 0051)',
   },
   {
     test: (p) => /^apps\/shell\/src\/renderer\/src\/(SettingsModal|NewChatPane)\.tsx$/.test(p),
@@ -403,7 +407,7 @@ function splitZ(buf) {
 }
 
 /** Commits behind, upstream commit list, and the per-file shape of base..target. */
-export function rangeStats(git, base, target, { exclude = [] } = {}) {
+export function rangeStats(git, base, target, { exclude = [], dropped = [] } = {}) {
   const behind = Number(git(['rev-list', '--count', `${base}..${target}`]).text)
   const ancestor =
     git(['merge-base', '--is-ancestor', base, target], { allowFailure: true }).status === 0
@@ -434,13 +438,29 @@ export function rangeStats(git, base, target, { exclude = [] } = {}) {
       deletions += Number(del)
     }
   }
+  // left out: `dropped` (removed in the fork, never ported) apart from the caller's --exclude
   let excluded = []
+  let droppedHits = []
   if (exclude.length > 0) {
-    const all = splitZ(git([...DIFF_FLAGS, '--name-only', '-z', base, target]).stdout)
+    const nameOnly = (spec) =>
+      splitZ(git([...DIFF_FLAGS, '--name-only', '-z', base, target, ...spec]).stdout)
+    const all = nameOnly([])
     const kept = new Set(files.map((f) => f.path))
-    excluded = all.filter((p) => !kept.has(p))
+    const notDropped = new Set(dropped.length > 0 ? nameOnly(pathspec(dropped)) : all)
+    droppedHits = all.filter((p) => !notDropped.has(p))
+    excluded = all.filter((p) => !kept.has(p) && notDropped.has(p))
   }
-  return { behind, ancestor, commits, files, insertions, deletions, binary, excluded }
+  return {
+    behind,
+    ancestor,
+    commits,
+    files,
+    insertions,
+    deletions,
+    binary,
+    excluded,
+    dropped: droppedHits,
+  }
 }
 
 function unmergedPaths(git) {
@@ -836,6 +856,7 @@ function runSync({ options, root, git, checks, log, started }) {
     deletions: 0,
     binary: [],
     excluded: [],
+    dropped: [],
     apply: { clean: [], conflicted: [], failed: [], mode: 'none' },
     commitsCreated: [],
     rebrand: null,
@@ -871,7 +892,10 @@ function runSync({ options, root, git, checks, log, started }) {
     )
   }
 
-  Object.assign(summary, rangeStats(git, range.base, range.target, { exclude }))
+  Object.assign(
+    summary,
+    rangeStats(git, range.base, range.target, { exclude, dropped: DROPPED_UPSTREAM_PATHS }),
+  )
   if (!summary.ancestor && !options.force) {
     throw new Error(
       `upstream base ${short(range.base)} is not an ancestor of ${short(range.target)} (rewritten or unrelated history); pass --force to sync anyway`,
@@ -963,6 +987,8 @@ function applyMessage(s) {
     for (const f of s.apply.failed) lines.push(`- ${f.path}`)
   }
   if (s.excluded.length > 0) lines.push('', `Left out by --exclude: ${s.excluded.length} file(s).`)
+  if (s.dropped?.length > 0)
+    lines.push('', `Removed in the fork (do not port): ${s.dropped.length} file(s).`)
   return `${lines.join('\n')}\n`
 }
 
@@ -979,6 +1005,7 @@ function stateOf(s) {
     deletions,
     binary,
     excluded,
+    dropped,
     apply,
     watch,
     remote,
@@ -995,6 +1022,7 @@ function stateOf(s) {
     deletions,
     binary,
     excluded,
+    dropped,
     apply,
     watch,
     remote,
@@ -1315,6 +1343,16 @@ function reportLines(s) {
       `## Left out by --exclude (${s.excluded.length}, port by hand)`,
       '',
       ...capped(s.excluded, (p) => `\`${p}\``),
+      '',
+    )
+  }
+  if (s.dropped?.length > 0) {
+    r.push(
+      `## Removed in the fork (${s.dropped.length}, do not port)`,
+      '',
+      'The fork deleted these with the own-key AI (UniWork ADR 0051) or the Genspark cloud sign-in; keep them out. A reader fix to upstream `packages/ai-provider/src/protocols/openai-compatible.ts` goes into `packages/ai-provider/src/protocols/openai-sse.ts` by hand.',
+      '',
+      ...capped(s.dropped, (p) => `\`${p}\``),
       '',
     )
   }

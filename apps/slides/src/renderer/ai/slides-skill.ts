@@ -2571,7 +2571,7 @@ async function executeTool(
           t('aiFailGenDeck'),
           runLimited
             ? `No page was made.${runLimitMsg}`
-            : `All ${total} pages failed to generate; retry or check the AI model configuration.`,
+            : `All ${total} pages failed to generate; retry, or check that UniWork AI is available.`,
         )
       }
 
@@ -2588,7 +2588,7 @@ async function executeTool(
       // Faithfully report all unfinished pages (both HTML generation failures and conversion/landing failures; all already retried once)
       const briefErr = (s?: string) => (s ? (s.length > 80 ? `${s.slice(0, 80)}…` : s) : '')
       const cloudNote = cloudFallbackReason
-        ? ` Cloud page generation was unavailable (${briefErr(cloudFallbackReason)}); the deck was generated locally with your configured AI model instead.`
+        ? ` Cloud page generation was unavailable (${briefErr(cloudFallbackReason)}); the deck was generated page by page with UniWork AI instead.`
         : ''
       const okMsg = `Self-driven generation produced ${landedPages}/${total} pages (HTML written page by page, displayed as generated; failed pages were auto-retried).`
       const failDetail = stillFailed

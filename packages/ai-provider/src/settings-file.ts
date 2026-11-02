@@ -2,7 +2,8 @@
  * Node-only: reads and writes ai-settings.json, which holds `gskToolsEnabled` and nothing else
  * (see `aiSettingsFileOf`). Kept out of the package index so renderer bundles never pull `node:fs`.
  */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { aiSettingsFileOf } from './providers'
 
@@ -14,11 +15,28 @@ function readStored(path: string): unknown {
   }
 }
 
+/**
+ * Atomic and flushed, as replaceAppSettings writes app-settings.json: a torn file would read back
+ * as nothing, and the default would turn back on the cloud tools the user switched off.
+ */
 function write(path: string, value: unknown): void {
   mkdirSync(dirname(path), { recursive: true })
-  const tmp = `${path}.${process.pid}.tmp`
-  writeFileSync(tmp, JSON.stringify(value, null, 2), 'utf8')
-  renameSync(tmp, path)
+  const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`
+  try {
+    writeFileSync(tmp, JSON.stringify(value, null, 2), {
+      encoding: 'utf8',
+      flag: 'wx',
+      flush: true,
+    })
+    renameSync(tmp, path)
+  } catch (error) {
+    try {
+      unlinkSync(tmp)
+    } catch {
+      // the write may have failed before the temporary file was created
+    }
+    throw error
+  }
 }
 
 /**

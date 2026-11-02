@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 import {
   BASE_FILE,
   DROPPED_UPSTREAM_PATHS,
+  WATCH,
   codeSpan,
   defaultChecks,
   parsePorcelainZ,
@@ -348,7 +349,11 @@ test('--exclude leaves paths out of the patch and lists them', () => {
   const s = run(fork, upstream, { exclude: ['c.txt'] })
   assert.equal(s.exitCode, 0)
   assert.deepEqual(s.excluded, ['c.txt'])
+  assert.deepEqual(s.dropped, [])
   assert.equal(existsSync(join(fork, 'c.txt')), false)
+  const report = renderReport(s)
+  assert.match(report, /## Left out by --exclude \(1, port by hand\)/)
+  assert.doesNotMatch(report, /Removed in the fork/)
 })
 
 /** A fork that deleted `gone` and an upstream that edits it and adds `added` beside it. */
@@ -373,13 +378,30 @@ test('an upstream edit to a file the fork removed with the own-key AI is left ou
   const added = 'packages/ai-provider/src/new-vendor.ts'
   const { fork, upstream } = setupDropped({ gone, added })
   const s = run(fork, upstream)
-  assert.deepEqual(s.excluded, [gone])
+  // removed in the fork is its own list: nothing to port, unlike a caller's --exclude
+  assert.deepEqual(s.dropped, [gone])
+  assert.deepEqual(s.excluded, [])
   assert.deepEqual(s.apply.failed, [])
   assert.equal(existsSync(join(fork, gone)), false)
-  assert.match(renderReport(s), /Left out by --exclude/)
+  const report = renderReport(s)
+  assert.match(report, /## Removed in the fork \(1, do not port\)/)
+  assert.match(report, /protocols\/openai-sse\.ts/)
+  assert.doesNotMatch(report, /Left out by --exclude/)
+  assert.doesNotMatch(report, /port what the fork needs/)
   const hit = s.watch.find((w) => w.path === added)
   assert.ok(hit, 'the new provider file is on the watch list')
   assert.match(hit.note, /UniWork AI only/)
+})
+
+test('an upstream edit to the model chip is on the watch list: the provider chooser stays out', () => {
+  for (const path of [
+    'packages/ui/src/AiModelPicker.tsx',
+    'packages/ui/src/strings-ai-model-picker.ts',
+  ]) {
+    const hit = WATCH.find((w) => w.test(path))
+    assert.ok(hit, path)
+    assert.match(hit.note, /provider chooser removed; UniWork AI only/)
+  }
 })
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
