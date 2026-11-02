@@ -13,5 +13,5 @@ export const ja = {
   cloudCreditsRenews: '{date} にリセット',
   cloudToolsToggle: 'UniWork クラウドツールを使う',
   cloudToolsToggleDesc:
-    '独自プロバイダーがない場合、ウェブ検索・画像生成・メディア分析に UniWork クラウドを使います（AI クレジットを消費）。',
+    'ウェブ検索・画像生成・メディア分析に UniWork クラウドを使います（AI クレジットを消費）。',
 } satisfies Record<keyof typeof zh, string>

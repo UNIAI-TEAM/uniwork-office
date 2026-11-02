@@ -13,5 +13,5 @@ export const it = {
   cloudCreditsRenews: 'Si rinnova il {date}',
   cloudToolsToggle: 'Usa gli strumenti cloud UniWork',
   cloudToolsToggleDesc:
-    'Senza un fornitore proprio, ricerca web, generazione di immagini e analisi dei media usano il cloud UniWork (consuma crediti IA).',
+    'Ricerca web, generazione di immagini e analisi dei media usano il cloud UniWork (consuma crediti IA).',
 } satisfies Record<keyof typeof zh, string>

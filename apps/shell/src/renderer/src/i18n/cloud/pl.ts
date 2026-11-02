@@ -13,5 +13,5 @@ export const pl = {
   cloudCreditsRenews: 'Odnowienie {date}',
   cloudToolsToggle: 'Używaj narzędzi chmurowych UniWork',
   cloudToolsToggleDesc:
-    'Bez własnego dostawcy wyszukiwanie w sieci, generowanie obrazów i analiza multimediów działają przez chmurę UniWork (zużywa kredyty AI).',
+    'Wyszukiwanie w sieci, generowanie obrazów i analiza multimediów działają przez chmurę UniWork (zużywa kredyty AI).',
 } satisfies Record<keyof typeof zh, string>

@@ -13,5 +13,5 @@ export const nl = {
   cloudCreditsRenews: 'Vernieuwt op {date}',
   cloudToolsToggle: 'UniWork cloudtools gebruiken',
   cloudToolsToggleDesc:
-    'Zonder eigen provider lopen webzoeken, afbeeldingen maken en media-analyse via de UniWork cloud (kost AI-tegoed).',
+    'Webzoeken, afbeeldingen maken en media-analyse via de UniWork cloud (kost AI-tegoed).',
 } satisfies Record<keyof typeof zh, string>

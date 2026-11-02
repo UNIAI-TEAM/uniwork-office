@@ -13,5 +13,5 @@ export const hi = {
   cloudCreditsRenews: '{date} को रीन्यू',
   cloudToolsToggle: 'UniWork क्लाउड टूल इस्तेमाल करें',
   cloudToolsToggleDesc:
-    'अपना प्रदाता न होने पर वेब सर्च, इमेज जनरेशन और मीडिया विश्लेषण UniWork क्लाउड से चलते हैं (AI क्रेडिट खर्च होते हैं)।',
+    'वेब सर्च, इमेज जनरेशन और मीडिया विश्लेषण UniWork क्लाउड से चलते हैं (AI क्रेडिट खर्च होते हैं)।',
 } satisfies Record<keyof typeof zh, string>

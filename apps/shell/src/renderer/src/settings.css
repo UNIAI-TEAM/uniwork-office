@@ -1689,20 +1689,7 @@
   }
 }
 
-/* UniWork cloud AI (Settings → Account rows, AI media notice) */
-.cloud-notice {
-  margin-bottom: 12px;
-}
-
-.cloud-notice .acct-notice-text {
-  flex: 1;
-}
-
-.cloud-notice-action {
-  flex-shrink: 0;
-  align-self: center;
-}
-
+/* UniWork cloud AI (Settings → Account rows) */
 .cloud-state.credits-exhausted,
 .cloud-state.subscription-inactive,
 .cloud-state.unavailable {
@@ -1717,18 +1704,6 @@
 .cloud-renews {
   margin-left: 8px;
   font-size: 12px;
-}
-
-/* unsaved-changes prompt pinned to the bottom of the dialog */
-.set-leave {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 22px;
-  border-top: 1px solid var(--border-subtle);
-  background: var(--bg-content);
 }
 
 /* a pane that could not load: the reason and a retry, inline */

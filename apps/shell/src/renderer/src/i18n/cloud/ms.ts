@@ -13,5 +13,5 @@ export const ms = {
   cloudCreditsRenews: 'Diperbaharui {date}',
   cloudToolsToggle: 'Guna alat awan UniWork',
   cloudToolsToggleDesc:
-    'Tanpa penyedia sendiri, carian web, penjanaan imej dan analisis media berjalan melalui awan UniWork (menggunakan kredit AI).',
+    'Carian web, penjanaan imej dan analisis media berjalan melalui awan UniWork (menggunakan kredit AI).',
 } satisfies Record<keyof typeof zh, string>

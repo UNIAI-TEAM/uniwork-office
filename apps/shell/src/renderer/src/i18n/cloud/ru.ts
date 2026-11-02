@@ -13,5 +13,5 @@ export const ru = {
   cloudCreditsRenews: 'Обновится {date}',
   cloudToolsToggle: 'Использовать облачные инструменты UniWork',
   cloudToolsToggleDesc:
-    'Без собственного провайдера веб-поиск, генерация изображений и анализ медиа идут через облако UniWork (расходует кредиты ИИ).',
+    'Веб-поиск, генерация изображений и анализ медиа идут через облако UniWork (расходует кредиты ИИ).',
 } satisfies Record<keyof typeof zh, string>

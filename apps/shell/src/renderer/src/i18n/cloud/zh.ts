@@ -12,5 +12,5 @@ export const zh = {
   cloudCreditsRenews: '{date} 重置',
   cloudToolsToggle: '使用 UniWork 云端工具',
   cloudToolsToggleDesc:
-    '未设置自有服务商时，网页搜索、图片生成和媒体分析改用 UniWork 云端（消耗 AI 额度）。',
+    '网页搜索、图片生成和媒体分析改用 UniWork 云端（消耗 AI 额度）。',
 }

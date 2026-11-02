@@ -13,5 +13,5 @@ export const vi = {
   cloudCreditsRenews: 'Làm mới vào {date}',
   cloudToolsToggle: 'Dùng công cụ đám mây UniWork',
   cloudToolsToggleDesc:
-    'Khi chưa có nhà cung cấp riêng, tìm kiếm web, tạo ảnh và phân tích media sẽ chạy qua đám mây UniWork (trừ tín dụng AI).',
+    'Tìm kiếm web, tạo ảnh và phân tích media sẽ chạy qua đám mây UniWork (trừ tín dụng AI).',
 } satisfies Record<keyof typeof zh, string>

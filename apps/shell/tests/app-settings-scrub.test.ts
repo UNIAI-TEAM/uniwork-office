@@ -45,4 +45,10 @@ describe('scrubFileSearchSetting', () => {
     scrubFileSearchSetting(file)
     expect(() => readFileSync(file)).toThrow()
   })
+
+  it('leaves a corrupt file untouched and does not throw', () => {
+    writeFileSync(file, '{ "fileSearch": ')
+    expect(() => scrubFileSearchSetting(file)).not.toThrow()
+    expect(readFileSync(file, 'utf8')).toBe('{ "fileSearch": ')
+  })
 })

@@ -13,5 +13,5 @@ export const th = {
   cloudCreditsRenews: 'รีเซ็ตวันที่ {date}',
   cloudToolsToggle: 'ใช้เครื่องมือคลาวด์ของ UniWork',
   cloudToolsToggleDesc:
-    'เมื่อไม่มีผู้ให้บริการของคุณเอง การค้นหาเว็บ การสร้างภาพ และการวิเคราะห์สื่อจะทำผ่านคลาวด์ของ UniWork (ใช้เครดิต AI)',
+    'การค้นหาเว็บ การสร้างภาพ และการวิเคราะห์สื่อจะทำผ่านคลาวด์ของ UniWork (ใช้เครดิต AI)',
 } satisfies Record<keyof typeof zh, string>

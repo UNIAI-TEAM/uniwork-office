@@ -13,5 +13,5 @@ export const de = {
   cloudCreditsRenews: 'Erneuert am {date}',
   cloudToolsToggle: 'UniWork Cloud-Tools verwenden',
   cloudToolsToggleDesc:
-    'Ohne eigenen Anbieter laufen Websuche, Bildgenerierung und Medienanalyse über die UniWork Cloud (verbraucht KI-Guthaben).',
+    'Websuche, Bildgenerierung und Medienanalyse über die UniWork Cloud (verbraucht KI-Guthaben).',
 } satisfies Record<keyof typeof zh, string>

@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
-import { normalizeUniworkCloudStatus, setUniworkCloudStatus } from '@genoffice/ai-provider/browser'
-import type { AiSettings, UniworkCloudStatus } from '@genoffice/ai-provider/browser'
+import { normalizeUniworkCloudStatus } from '@genoffice/ai-provider/browser'
+import type { AiSettings } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
@@ -1833,17 +1833,6 @@ const homeApi: HomeApi = {
     return driveApi.getHistory(input)
   },
 }
-
-// Mirror the cloud status into this preload's seam (signed in + entitled).
-const mirrorCloudStatus = (status: unknown) =>
-  setUniworkCloudStatus(normalizeUniworkCloudStatus(status) satisfies UniworkCloudStatus)
-ipcRenderer.on(HOME_CHANNELS.uniworkCloudStatusEvent, (_event, status: unknown) =>
-  mirrorCloudStatus(status),
-)
-void ipcRenderer
-  .invoke(HOME_CHANNELS.uniworkCloudStatus)
-  .then(mirrorCloudStatus)
-  .catch(() => undefined)
 
 contextBridge.exposeInMainWorld('aiOffice', homeApi)
 // UNI-2052: the folder / multi-file upload as the renderer reads it (the same calls as above)

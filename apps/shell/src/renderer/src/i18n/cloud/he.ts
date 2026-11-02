@@ -13,5 +13,5 @@ export const he = {
   cloudCreditsRenews: 'יתחדש ב-{date}',
   cloudToolsToggle: 'שימוש בכלי הענן של UniWork',
   cloudToolsToggleDesc:
-    'ללא ספק משלך, חיפוש באינטרנט, יצירת תמונות וניתוח מדיה עוברים דרך הענן של UniWork (צורך קרדיטי AI).',
+    'חיפוש באינטרנט, יצירת תמונות וניתוח מדיה עוברים דרך הענן של UniWork (צורך קרדיטי AI).',
 } satisfies Record<keyof typeof zh, string>

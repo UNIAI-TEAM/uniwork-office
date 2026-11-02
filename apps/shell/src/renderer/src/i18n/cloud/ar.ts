@@ -13,5 +13,5 @@ export const ar = {
   cloudCreditsRenews: 'يتجدد في {date}',
   cloudToolsToggle: 'استخدام أدوات UniWork السحابية',
   cloudToolsToggleDesc:
-    'عند عدم وجود مزوّد خاص بك، يعمل البحث على الويب وإنشاء الصور وتحليل الوسائط عبر سحابة UniWork (يستهلك أرصدة الذكاء الاصطناعي).',
+    'يعمل البحث على الويب وإنشاء الصور وتحليل الوسائط عبر سحابة UniWork (يستهلك أرصدة الذكاء الاصطناعي).',
 } satisfies Record<keyof typeof zh, string>
