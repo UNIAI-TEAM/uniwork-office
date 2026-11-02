@@ -1,5 +1,10 @@
 import { Mark, Extension } from '@tiptap/core'
+<<<<<<< ours
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
+=======
+import { Plugin, PluginKey } from '@tiptap/pm/state'
+import type { Selection } from '@tiptap/pm/state'
+>>>>>>> theirs
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { EditorView } from '@tiptap/pm/view'
 import type { Node as PmNode } from '@tiptap/pm/model'
@@ -21,6 +26,7 @@ import { resolveImageSrc } from './localImage'
  * The target may hold anything but a bracket, pipe or newline; the alias runs
  * to the closing brackets. `[[]]` carries no name and is not a link.
  */
+<<<<<<< ours
 const WIKI_LINK_RE = /^\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+))?\]\]/
 
 /**
@@ -33,6 +39,9 @@ export function wikiTarget(raw: string): string {
   // a table cell writes the alias bar as `\|`; the backslash is not part of the name
   return (bar < 0 ? inner : inner.slice(0, bar)).replace(/\\$/, '').trim()
 }
+=======
+export const WIKI_LINK_RE = /^\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+))?\]\]/
+>>>>>>> theirs
 
 /**
  * Index of the first unescaped `[[`. The stock link tokenizer opens on a
@@ -123,11 +132,24 @@ function wikiSpans(doc: PmNode): WikiSpan[] {
   return spans
 }
 
+<<<<<<< ours
 /** every distinct bare wiki target in the document, in document order */
+=======
+/** the file part of a link as written: `[[Note|Alias]]` -> `Note`, `[[Note#H]]` -> `Note#H` */
+export function wikiTargetOf(raw: string): string {
+  // an embed's inner `Note#Heading|200` arrives without brackets; its hint is
+  // not part of the file name either
+  const inner = WIKI_LINK_RE.exec(raw)?.[1] ?? raw.split('|')[0]!
+  return inner.trim()
+}
+
+/** every distinct wiki link in the document as written, in document order */
+>>>>>>> theirs
 export function collectWikiTargets(doc: PmNode): string[] {
   const seen = new Set<string>()
   const out: string[] = []
   for (const span of wikiSpans(doc)) {
+<<<<<<< ours
     const target = wikiTarget(span.raw)
     if (!target || seen.has(target)) continue
     seen.add(target)
@@ -149,6 +171,11 @@ function collectWikiResolveTargets(doc: PmNode): string[] {
     if (!target || seen.has(target)) continue
     seen.add(target)
     out.push(target)
+=======
+    if (seen.has(span.raw)) continue
+    seen.add(span.raw)
+    out.push(span.raw)
+>>>>>>> theirs
   }
   return out
 }
@@ -200,6 +227,7 @@ function escapeRegex(text: string): string {
   return text.replace(/[.*+?${}()|[\]\\]/g, '\\$&')
 }
 
+<<<<<<< ours
 /** Put the caret at `pos` (from {@link wikiFragmentPosition}) and bring it into view. */
 export function revealWikiFragment(view: EditorView, pos: number): void {
   const selection = TextSelection.near(view.state.doc.resolve(pos))
@@ -209,6 +237,8 @@ export function revealWikiFragment(view: EditorView, pos: number): void {
   view.dispatch(view.state.tr.setSelection(selection).scrollIntoView())
 }
 
+=======
+>>>>>>> theirs
 export interface WikiLinkOptions {
   /** absolute path of the open document; '' while it is untitled */
   getDocumentPath(): string
@@ -273,6 +303,7 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
     // embed.
     const blockedPictures = new Set<string>()
 
+<<<<<<< ours
     /** paint every link and embed in the document from the answers at hand */
     const decorate = (view: EditorView, answers: Record<string, WikiLinkResolved>) => {
       const linkDecorations = wikiSpans(view.state.doc).map((span) =>
@@ -295,6 +326,65 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
         // `blockedPictures` holds the ones the browser refused, so the embed
         // falls back to its card instead.
         const picture = found && isImagePath(answer!.path) && !blockedPictures.has(span.inner)
+=======
+    /** `repaint` re-answers an unchanged document: a refused picture has to be
+     *  re-decided, and the "same question" guard would otherwise skip it */
+    const resolveNow = async (view: EditorView, repaint = false) => {
+      // one batch answers links and embeds: an embed is the same lookup with
+      // the `!` folded away, and both halves pay for a single traversal
+      const raws = [
+        ...collectWikiTargets(view.state.doc),
+        ...collectWikiEmbedTargets(view.state.doc),
+      ]
+      if (raws.length === 0) {
+        asked = ''
+        if (view.isDestroyed) return
+        view.dispatch(view.state.tr.setMeta(key, { decorations: DecorationSet.empty, answers: {} }))
+        return
+      }
+      const fromPath = options.getDocumentPath()
+      const question = `${fromPath}\u0000${raws.join('\u0000')}`
+      // the walk it triggers can read twenty thousand entries; typing prose
+      // around an unresolved link changes no target, so it asks nothing
+      if (!repaint && question === asked) return
+      const mine = ++generation
+      // the resolver takes file names; the answers are keyed back by the literal
+      const targets = [...new Set(raws.map(wikiTargetOf))]
+      let resolved: Record<string, WikiLinkResolved>
+      try {
+        resolved = await options.resolve(fromPath, targets)
+      } catch {
+        return // an unavailable resolver must not break editing
+      }
+      // a later keystroke started a newer resolution; its answer is the current one
+      if (mine !== generation || view.isDestroyed) return
+      asked = question
+      const answers: Record<string, WikiLinkResolved> = {}
+      for (const raw of raws) {
+        const answer = resolved[wikiTargetOf(raw)]
+        if (answer) answers[raw] = answer
+      }
+
+      const linkDecorations = wikiSpans(view.state.doc).map((span) =>
+        Decoration.inline(span.from, span.to, {
+          class: answers[span.raw]?.found ? 'wiki-link-resolved' : 'wiki-link-unresolved',
+          'data-wiki-target': span.raw,
+        }),
+      )
+      // embed targets whose <img> the md-asset protocol refused (see below)
+      const blocked = blockedPictures
+      const embedDecorations: Decoration[] = []
+      for (const span of wikiEmbedSpans(view.state.doc)) {
+        const answer = answers[span.inner]
+        const found = answer?.found === true
+        // a resolved picture swaps the literal for the image itself, so the
+        // node also carries the class that hides its own text
+        // the md-asset handler serves under the vault root the resolver walks;
+        // a picture that still fails (symlink escape, deleted file) 403s,
+        // which would show an empty box. `blocked` holds the ones the browser
+        // refused, so the embed falls back to its card instead.
+        const picture = found && isImagePath(answer!.path) && !blocked.has(span.inner)
+>>>>>>> theirs
         embedDecorations.push(
           Decoration.node(span.from, span.to, {
             class: `${found ? 'wiki-embed-resolved' : 'wiki-embed-unresolved'}${
@@ -321,7 +411,11 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
                 img.addEventListener('error', () => {
                   if (blockedPictures.has(target)) return
                   blockedPictures.add(target)
+<<<<<<< ours
                   void resolveNow(view)
+=======
+                  void resolveNow(view, true)
+>>>>>>> theirs
                 })
                 return img
               },
@@ -341,6 +435,7 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
       )
     }
 
+<<<<<<< ours
     const resolveNow = async (view: EditorView) => {
       // one batch answers links and embeds: an embed is the same lookup with
       // the `!` folded away, and both halves pay for a single traversal
@@ -380,6 +475,8 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
       decorate(view, answers)
     }
 
+=======
+>>>>>>> theirs
     const schedule = (view: EditorView) => {
       if (timer) clearTimeout(timer)
       // one traversal per burst of typing, not one per keystroke
@@ -407,7 +504,11 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
             const embed = el.getAttribute('data-wiki-embed') === '1'
             if (!embed && !event.metaKey && !event.ctrlKey) return false
             const raw = el.getAttribute('data-wiki-target') ?? ''
+<<<<<<< ours
             const answer = (key.getState(view.state) ?? EMPTY).answers[wikiTarget(raw)]
+=======
+            const answer = (key.getState(view.state) ?? EMPTY).answers[raw]
+>>>>>>> theirs
             if (answer?.found) options.onOpen(answer.path, answer.fragment)
             else options.onUnresolved(raw, embed)
             return true
@@ -434,9 +535,12 @@ export const WikiLink = Mark.create({
   // above Link (1000): a wiki link must open before a markdown link claims the
   // same bracket, and ProseMirror derives mark ranks from this order
   priority: 1100,
+<<<<<<< ours
   // a link ends where its literal ends: text typed after it, or the next line
   // after Enter, must not grow it
   inclusive: false,
+=======
+>>>>>>> theirs
 
   markdownTokenizer: {
     name: 'wikiLink',
@@ -471,10 +575,25 @@ export const WikiLink = Mark.create({
 })
 
 interface WikiAliasState {
+<<<<<<< ours
   decorations: DecorationSet
 }
 
 const aliasEmpty: WikiAliasState = { decorations: DecorationSet.empty }
+=======
+  /** hidden ranges per aliased link, recomputed on every document change */
+  links: HiddenLink[]
+  decorations: DecorationSet
+}
+
+interface HiddenLink {
+  from: number
+  to: number
+  hidden: [number, number][]
+}
+
+const aliasEmpty: WikiAliasState = { links: [], decorations: DecorationSet.empty }
+>>>>>>> theirs
 
 /** exported for tests: the alias display pass owns this slice of plugin state */
 export const wikiAliasDisplayKey = new PluginKey<WikiAliasState>('wikiAliasDisplay')
@@ -485,8 +604,13 @@ export const wikiAliasDisplayKey = new PluginKey<WikiAliasState>('wikiAliasDispl
  * mark inside the brackets) is left visible — no segment spans the whole
  * literal, so hiding part of one segment could clip text the next one carries.
  */
+<<<<<<< ours
 function aliasDecorations(doc: PmNode): Decoration[] {
   const out: Decoration[] = []
+=======
+function hiddenLinks(doc: PmNode): HiddenLink[] {
+  const out: HiddenLink[] = []
+>>>>>>> theirs
   for (const span of wikiSpans(doc)) {
     // positions come from the literal match, so a mark the edit grew past its
     // brackets contributes nothing
@@ -495,18 +619,52 @@ function aliasDecorations(doc: PmNode): Decoration[] {
     if (pipe < 0) continue
     // `[[Note|]]` never matches the link regex, so a matched pipe always has
     // alias text after it
+<<<<<<< ours
     out.push(Decoration.inline(span.from, span.from + pipe + 1, { class: 'wiki-alias-hidden' }))
     out.push(Decoration.inline(span.to - 2, span.to, { class: 'wiki-alias-hidden' }))
+=======
+    out.push({
+      from: span.from,
+      to: span.to,
+      hidden: [
+        [span.from, span.from + pipe + 1],
+        [span.to - 2, span.to],
+      ],
+    })
+>>>>>>> theirs
   }
   return out
+}
+
+/**
+<<<<<<< ours
+ * Obsidian shows `[[Note|Alias]]` as `Alias`. This pass hides the syntax of an
+ * aliased link in the view only: the document text keeps the whole literal, so
+ * the save, the block source map and the resolver all read what was written.
+ * It waits on nothing async — what to hide follows from the document alone,
+ * recomputed whole on every change to it.
+=======
+ * A link the selection touches shows its whole literal, as Obsidian's live
+ * preview does: hidden text is otherwise still caret-reachable, and arrow keys
+ * or Backspace would edit syntax the user cannot see.
+ */
+function aliasDecorations(doc: PmNode, links: HiddenLink[], sel: Selection): DecorationSet {
+  const out: Decoration[] = []
+  for (const link of links) {
+    if (sel.from <= link.to && sel.to >= link.from) continue
+    for (const [from, to] of link.hidden)
+      out.push(Decoration.inline(from, to, { class: 'wiki-alias-hidden' }))
+  }
+  return DecorationSet.create(doc, out)
 }
 
 /**
  * Obsidian shows `[[Note|Alias]]` as `Alias`. This pass hides the syntax of an
  * aliased link in the view only: the document text keeps the whole literal, so
  * the save, the block source map and the resolver all read what was written.
- * It waits on nothing async — what to hide follows from the document alone,
- * recomputed whole on every change to it.
+ * It waits on nothing async — what to hide follows from the document and the
+ * selection alone.
+>>>>>>> theirs
  */
 export const WikiAliasDisplay = Extension.create({
   name: 'wikiAliasDisplay',
@@ -516,6 +674,7 @@ export const WikiAliasDisplay = Extension.create({
       new Plugin<WikiAliasState>({
         key: wikiAliasDisplayKey,
         state: {
+<<<<<<< ours
           init: (_config, state) => ({
             decorations: DecorationSet.create(state.doc, aliasDecorations(state.doc)),
           }),
@@ -523,6 +682,17 @@ export const WikiAliasDisplay = Extension.create({
             tr.docChanged
               ? { decorations: DecorationSet.create(tr.doc, aliasDecorations(tr.doc)) }
               : old,
+=======
+          init: (_config, state) => {
+            const links = hiddenLinks(state.doc)
+            return { links, decorations: aliasDecorations(state.doc, links, state.selection) }
+          },
+          apply: (tr, old) => {
+            if (!tr.docChanged && !tr.selectionSet) return old
+            const links = tr.docChanged ? hiddenLinks(tr.doc) : old.links
+            return { links, decorations: aliasDecorations(tr.doc, links, tr.selection) }
+          },
+>>>>>>> theirs
         },
         props: {
           decorations: (state) => (wikiAliasDisplayKey.getState(state) ?? aliasEmpty).decorations,

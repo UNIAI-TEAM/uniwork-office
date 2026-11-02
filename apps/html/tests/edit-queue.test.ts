@@ -42,6 +42,19 @@ describe('resolveQueueItem', () => {
     expect(
       resolveQueueItem(buildProjection(html, map), map, item('b', 'img', 'x')).target?.excerpt,
     ).toBe('<img>')
+<<<<<<< ours
+=======
+  })
+
+  it('quotes the projection, so a withheld span is the placeholder, not the words', () => {
+    const marked = '<p>Call <span data-gx-redact="client phone">555-0100</span> now</p>'
+    const map = buildParseMap(marked, 1)
+    const sid = map.elements.find((e) => e.tag === 'p')!.sid
+    const q = { qid: 'a', sid, tag: 'p', capturedText: '', instruction: 'x' }
+    const excerpt = resolveQueueItem(buildProjection(marked, map), map, q).target?.excerpt
+    expect(excerpt).not.toContain('555-0100')
+    expect(excerpt).toContain('{{client phone}}')
+>>>>>>> theirs
   })
 
   it('marks an item stale when its sid is gone or now names another tag', () => {

@@ -10,7 +10,11 @@ export const pl = {
   redactDialogPlaceholder: 'Nazwa symbolu, np. telefon klienta',
   redactCancel: 'Anuluj',
   redactInsert: 'Ukryj',
+<<<<<<< ours
   redactEnable: 'Kliknij prawym na zaznaczeniu, aby ukryć je przed AI.',
+=======
+  redactEnable: 'Kliknij prawym na zaznaczeniu, aby ukryć je przed modelem.',
+>>>>>>> theirs
   redactNeedsSavedRow:
     'Ten wiersz nie jest jeszcze w pliku. Zapisz najpierw, a potem ukryj komórkę.',
   redactRecoveredFromNames:
@@ -347,7 +351,9 @@ export const pl = {
   appFullLoadRunning:
     'Trwa pełne wczytywanie skoroszytu — sortowanie i filtrowanie będą dostępne po zakończeniu…',
   appFullLoadTooLarge:
-    'Ten skoroszyt jest zbyt duży, aby w pełni zmieścić się w pamięci; sortowanie i filtrowanie są niedostępne dla tego pliku.',
+    'Ten skoroszyt jest zbyt duży, aby w całości załadować go do pamięci; sortowanie i przenoszenie zakresów są niedostępne dla tego pliku. Filtrowanie działa bezpośrednio na pliku.',
+  appLargeFilterLoading: 'Odczyt kolumny filtru z pliku…',
+  appLargeFilterApplying: 'Stosowanie filtru do pliku…',
   appSortValueModeFormulas:
     'Ten zakres zawiera formuły, które w tym dużym skoroszycie nie są obliczane na żywo — sortowanie lub przeniesienie zapisałoby je jako zwykłe wartości. Wybierz zakres bez formuł.',
   appSortRangeTooLarge:
@@ -408,6 +414,9 @@ export const pl = {
   appTableNameUsed: 'Nazwa tabeli „{name}” została już użyta w tej sesji.',
   appTableNameInFile: 'Nazwa tabeli "{name}" jest już używana przez tabelę w pliku.',
   appTableOverlapsSession: 'Zakres nakłada się na tabelę „{name}” utworzoną w tej sesji.',
+  appTableOverlapsFile: 'Zakres nakłada się na tabelę „{name}” w pliku.',
+  appTableAlreadyInTable:
+    'Zaznaczenie znajduje się już w tabeli „{name}” — zmień styl w Projektowaniu tabeli.',
   appTablesNeedFile: 'Najpierw otwórz plik XLSX — tabele są zapisywane w pliku.',
   appTableSelectRange: 'Najpierw zaznacz zakres danych — nagłówki w pierwszym wierszu.',
   appTableCreated: 'Utworzono tabelę — zapisz za pomocą {saveKeys}.',
@@ -493,6 +502,7 @@ export const pl = {
   appGridlinesHidden: 'Linie siatki ukryte.',
   appGridlinesShown: 'Linie siatki pokazane.',
   appShowingFormulas: 'Wyświetlanie formuł — przełącz ponownie, aby zobaczyć wartości.',
+  appShowingFormulasActive: 'Wyświetlanie formuł',
   appShowingValues: 'Wyświetlanie obliczonych wartości.',
   appTraceNoFormula: 'Śledź poprzedniki: aktywna komórka nie zawiera formuły.',
   appTraceNoRefs: 'Śledź poprzedniki: ta formuła nie zawiera odwołań do komórek.',
@@ -737,6 +747,7 @@ export const pl = {
   appExportPdfTitle: 'Eksportuj jako PDF',
   appSaveTitle: 'Zapisz',
   appSaveAs: 'Zapisz jako',
+  aiNameFile: 'Nazwij za pomocą AI…',
   appUndo: 'Cofnij',
   appRedo: 'Wykonaj ponownie',
   appUnsavedEditOne: '● {count} niezapisana zmiana',
@@ -769,7 +780,6 @@ export const pl = {
   appLinkPlaceholder: 'https://example.com lub Sheet1!A1',
   appRemoveLink: 'Usuń link',
   appNotAvailableYet: 'Jeszcze niedostępne',
-  appComingSoon: 'Wkrótce',
   appGroupChartLayouts: 'Układy wykresu',
   appAddChartElement: 'Dodaj element wykresu',
   appAddChartElementTitle: 'Tytuły, etykiety danych, legenda',
@@ -1204,6 +1214,8 @@ export const pl = {
   appRefreshAll: 'Odśwież wszystko',
   appWorkbookNoPivot: 'Brak tabel przestawnych w tym skoroszycie.',
   appRefreshAllTitle: 'Odśwież wszystkie tabele przestawne',
+  appQueriesConnections: 'Zapytania i połączenia',
+  appQueriesConnectionsTitle: 'Pokaż zapytania i połączenia danych skoroszytu',
   appErrorCheckingDetail: 'Skanuj arkusz w poszukiwaniu błędów',
   appErrorsFound: 'Błędy: {count} — w {cell}: {value}',
   appCheckingErrors: 'Skanowanie całego arkusza w poszukiwaniu błędów…',
@@ -1238,6 +1250,7 @@ export const pl = {
   appGroupForecast: 'Prognoza',
   appWhatIfAnalysis: 'Analiza warunkowa',
   appGoalSeek: 'Szukaj wyniku',
+  appDataTable: 'Tabela danych',
   appWhatIfTitle: 'Znajdź wejście dla wartości docelowej',
   appGoalSeekNeedsFormula: 'Komórka musi zawierać formułę.',
   appGoalSeekByCellNotNumber: 'Zmieniana komórka musi zawierać liczbę lub być pusta.',
@@ -1335,6 +1348,7 @@ export const pl = {
   appPasswordUpdating: 'Aktualizowanie…',
   appUpdatePassword: 'Aktualizuj hasło',
   appWorkbookNotPasswordProtected: 'Ten skoroszyt nie jest chroniony hasłem otwarcia.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Skoroszyt chroniony hasłem nie może zostać zapisany w dokumencie UniWork. Użyj opcji Zapisz jako, aby zachować zaszyfrowaną kopię na tym komputerze.',
   appPasswordChangeUniwork: 'Hasła dokumentu UniWork nie można tutaj zmienić.',
@@ -1342,6 +1356,8 @@ export const pl = {
     'Ten skoroszyt jest tylko do odczytu, więc nie można zmienić jego hasła.',
   appEncryptedWrongPassword: 'Hasło jest nieprawidłowe. Spróbuj ponownie.',
   appPasswordChangeRestored: 'Najpierw zapisz przywrócony skoroszyt, a potem zmień jego hasło.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Zezwalaj na edytowanie zakresów',
   appGroupClipboard: 'Schowek',
   appPaste: 'Wklej',
@@ -1604,6 +1620,7 @@ export const pl = {
   appVisualFlipV: 'Odbij w pionie',
   appVisualFlipH: 'Odbij w poziomie',
   appCtxPasteVisual: 'Wklej obraz lub kształt',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Tego skoroszytu nie można jeszcze otworzyć w sieci',
   appWebEngineBody:
@@ -1631,6 +1648,8 @@ export const pl = {
   appWebSavedReopenFailed:
     'Twoje zmiany zapisano w UniWork, ale nie udało się ponownie otworzyć skoroszytu tutaj. Załaduj edytor ponownie, aby kontynuować.',
   appDataTable: 'Tabela danych',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Pisownia',

@@ -53,7 +53,11 @@ describe('patchThemeXml', () => {
     expect(parsed.colors.accent2).toBe('#FFB74D')
     expect(parsed.majorFont).toBe('Segoe UI')
     expect(parsed.majorEaFont).toBeUndefined()
+<<<<<<< ours
     expect(parsed.majorScriptFonts?.Hans).toBe('等线')
+=======
+    expect(parsed.majorScriptFonts?.Hans).toBe('\u7b49\u7ebf')
+>>>>>>> theirs
   })
 })
 

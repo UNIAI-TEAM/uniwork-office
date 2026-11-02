@@ -1027,7 +1027,11 @@ describe('metafile pictures get an opaque white backdrop (PlanS academy banner)'
       deck.size,
       { fitWidthPx: 1280 },
     )
+<<<<<<< ours
     const [emf, png, lazyEmf, lazyPng] = rs.nodes as PictureRenderNode[]
+=======
+    const [emf, png, lazyEmf, lazyPng] = rs.nodes as any[]
+>>>>>>> theirs
     expect(emf.bgColor).toBe('#FFFFFF')
     expect(png.bgColor).toBeUndefined()
     expect(lazyEmf.bgColor).toBe('#FFFFFF')

@@ -9,13 +9,20 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs'
+<<<<<<< ours
 import { copyFile, link, open, rename, writeFile } from 'node:fs/promises'
+=======
+import { open, rename, writeFile, copyFile } from 'node:fs/promises'
+>>>>>>> theirs
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   atomicCopyFile,
+<<<<<<< ours
   atomicCopyFileExclusive,
+=======
+>>>>>>> theirs
   atomicWriteFile,
   atomicWriteVia,
   writeJsonAtomic,
@@ -138,8 +145,8 @@ describe('atomicWriteFile', () => {
     // the fallback failed, so the completed temp is kept as the rescue copy
     const leftovers = readdirSync(dir).sort()
     expect(leftovers).toHaveLength(2)
-    expect(leftovers[0]).toMatch(/^\.a\.docx\..{12}\.tmp$/)
-    expect(leftovers[1]).toBe('a.docx')
+    expect(leftovers[0]).toBe('a.docx')
+    expect(leftovers[1]).toMatch(/^a\.docx\..{12}\.tmp$/)
   })
 })
 
@@ -273,7 +280,11 @@ describe('atomicWriteVia', () => {
     expect(readdirSync(dir)).toEqual(['a.pptx'])
   })
 
+<<<<<<< ours
   // Same fallback contract as atomicWriteFile (#1878): a mount that refuses
+=======
+  // Same fallback contract as atomicWriteFile (genoffice#1878): a mount that refuses
+>>>>>>> theirs
   // rename-over-existing still receives the completed temp, copied in place.
   it('falls back to an in-place copy when the mount refuses the rename', async () => {
     dir = mkdtempSync(join(tmpdir(), 'eu-av-'))
@@ -304,6 +315,7 @@ describe('atomicWriteVia', () => {
     expect(leftovers[1]).toMatch(/a\.pptx\..{12}\.tmp$/)
     expect(readFileSync(join(dir, leftovers[1]!), 'utf8')).toBe('new')
   })
+<<<<<<< ours
 
   it.skipIf(process.platform === 'win32')(
     'preserves an existing 0600 target permission bits under umask 022',
@@ -396,6 +408,8 @@ describe('atomicCopyFileExclusive', () => {
       if (origPlatform) Object.defineProperty(process, 'platform', origPlatform)
     }
   })
+=======
+>>>>>>> theirs
 })
 
 describe('writeJsonAtomic', () => {

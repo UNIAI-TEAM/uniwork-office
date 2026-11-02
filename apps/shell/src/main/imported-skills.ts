@@ -86,7 +86,10 @@ export function readSkillBody(path: string): string {
 }
 
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024
+<<<<<<< ours
 const MAX_ZIP_ENTRIES = 2000
+=======
+>>>>>>> theirs
 
 /**
  * A symlink is refused rather than dereferenced: `cpSync` without
@@ -99,9 +102,15 @@ function inspectSkillDir(dir: string): void {
   try {
     rootIsLink = lstatSync(dir).isSymbolicLink()
   } catch {
+<<<<<<< ours
     throw new Error('skill-import:dir-unreadable')
   }
   if (rootIsLink) throw new Error('skill-import:dir-symlink')
+=======
+    throw new Error('the skill directory could not be read')
+  }
+  if (rootIsLink) throw new Error('the skill directory is a symlink, and imports refuse those')
+>>>>>>> theirs
   let total = 0
   const stack: string[] = [dir]
   while (stack.length > 0) {
@@ -110,11 +119,19 @@ function inspectSkillDir(dir: string): void {
     try {
       entries = readdirSync(cur, { withFileTypes: true })
     } catch {
+<<<<<<< ours
       throw new Error('skill-import:dir-unreadable')
     }
     for (const entry of entries) {
       if (entry.isSymbolicLink()) {
         throw new Error('skill-import:contains-symlink')
+=======
+      throw new Error('the skill directory could not be read')
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) {
+        throw new Error('the skill contains a symlink, and imports refuse those')
+>>>>>>> theirs
       }
       const full = join(cur, entry.name)
       if (entry.isDirectory()) {
@@ -125,11 +142,19 @@ function inspectSkillDir(dir: string): void {
       try {
         size = statSync(full).size
       } catch {
+<<<<<<< ours
         throw new Error('skill-import:dir-unreadable')
       }
       total += size
       if (total > MAX_IMPORT_BYTES) {
         throw new Error('skill-import:too-large')
+=======
+        throw new Error('the skill directory could not be read')
+      }
+      total += size
+      if (total > MAX_IMPORT_BYTES) {
+        throw new Error('the skill is larger than the 10 MB import cap')
+>>>>>>> theirs
       }
     }
   }
@@ -141,7 +166,11 @@ function readBack(dest: string): FoundSkill {
     join(dest, 'SKILL.md'),
     readFileSync(join(dest, 'SKILL.md'), 'utf8'),
   )
+<<<<<<< ours
   if (!skill) throw new Error('skill-import:read-back-failed')
+=======
+  if (!skill) throw new Error('the skill could not be read back')
+>>>>>>> theirs
   return skill
 }
 
@@ -150,10 +179,17 @@ function requireSkillMd(dir: string): void {
   try {
     text = readFileSync(join(dir, 'SKILL.md'), 'utf8')
   } catch {
+<<<<<<< ours
     throw new Error('skill-import:missing-skill-md')
   }
   if (!parseSkillFrontmatter(text)) {
     throw new Error('skill-import:invalid-frontmatter')
+=======
+    throw new Error('the folder has no SKILL.md')
+  }
+  if (!parseSkillFrontmatter(text)) {
+    throw new Error('SKILL.md needs name and description frontmatter')
+>>>>>>> theirs
   }
 }
 
@@ -165,6 +201,7 @@ function requireSkillMd(dir: string): void {
  * instructions. Refuses rather than overwrites when the name is taken.
  */
 export function importSkillDir(skillDir: string, userDataDir: string): FoundSkill {
+<<<<<<< ours
   const name = basename(skillDir)
   if (!isSkillName(name)) {
     throw new Error('skill-import:invalid-folder-name')
@@ -182,6 +219,13 @@ export function importSkillDir(skillDir: string, userDataDir: string): FoundSkil
     rmSync(scratch, { recursive: true, force: true })
     throw e
   }
+=======
+  const dest = join(skillsRoot(userDataDir), basename(skillDir))
+  if (existsSync(dest)) throw new Error('a skill of that name is already there')
+  requireSkillMd(skillDir)
+  inspectSkillDir(skillDir)
+  cpSync(skillDir, dest, { recursive: true })
+>>>>>>> theirs
   return readBack(dest)
 }
 
@@ -197,6 +241,7 @@ export function importSkillMd(mdPath: string, userDataDir: string): FoundSkill {
   try {
     text = readFileSync(mdPath, 'utf8')
   } catch {
+<<<<<<< ours
     throw new Error('skill-import:file-unreadable')
   }
   if (Buffer.byteLength(text) > MAX_IMPORT_BYTES) {
@@ -209,6 +254,20 @@ export function importSkillMd(mdPath: string, userDataDir: string): FoundSkill {
   if (!name) throw new Error('skill-import:invalid-file-name')
   const dest = join(skillsRoot(userDataDir), name)
   if (existsSync(dest)) throw new Error('skill-import:already-exists')
+=======
+    throw new Error('the file could not be read')
+  }
+  if (Buffer.byteLength(text) > MAX_IMPORT_BYTES) {
+    throw new Error('the skill is larger than the 10 MB import cap')
+  }
+  const fm = parseSkillFrontmatter(text)
+  if (!fm) throw new Error('SKILL.md needs name and description frontmatter')
+  const stem = basename(mdPath).replace(/\.md$/i, '')
+  const name = [fm.name.trim(), stem].find((n) => isSkillName(n))
+  if (!name) throw new Error('the file name cannot be used as a skill name')
+  const dest = join(skillsRoot(userDataDir), name)
+  if (existsSync(dest)) throw new Error('a skill of that name is already there')
+>>>>>>> theirs
   mkdirSync(skillsRoot(userDataDir), { recursive: true })
   const scratch = mkdtempSync(join(skillsRoot(userDataDir), '.import-'))
   try {
@@ -246,7 +305,11 @@ function inflateWithin(entry: JSZip.JSZipObject, limit: number): Promise<Buffer>
         if (size > limit) {
           stream.pause()
           stream.removeAllListeners('data')
+<<<<<<< ours
           reject(new Error('skill-import:too-large'))
+=======
+          reject(new Error('the skill is larger than the 10 MB import cap'))
+>>>>>>> theirs
           return
         }
         chunks.push(chunk)
@@ -274,6 +337,7 @@ export async function importSkillZip(zipPath: string, userDataDir: string): Prom
   try {
     zip = await JSZip.loadAsync(readFileSync(zipPath))
   } catch {
+<<<<<<< ours
     throw new Error('skill-import:not-zip')
   }
   const files = Object.values(zip.files).filter((f) => !f.dir && !f.name.startsWith('__MACOSX/'))
@@ -287,6 +351,18 @@ export async function importSkillZip(zipPath: string, userDataDir: string): Prom
     }
     if (f.unixPermissions != null && (Number(f.unixPermissions) & S_IFMT) === S_IFLNK) {
       throw new Error('skill-import:archive-symlink')
+=======
+    throw new Error('the file is not a zip archive')
+  }
+  const files = Object.values(zip.files).filter((f) => !f.dir && !f.name.startsWith('__MACOSX/'))
+  for (const f of files) {
+    const parts = f.name.split('/')
+    if (isAbsolute(f.name) || f.name.includes('\\') || parts.some((p) => p === '..' || p === '')) {
+      throw new Error(`the archive has an unsafe entry name: ${f.name}`)
+    }
+    if (f.unixPermissions != null && (Number(f.unixPermissions) & S_IFMT) === S_IFLNK) {
+      throw new Error('the archive contains a symlink, and imports refuse those')
+>>>>>>> theirs
     }
   }
   const atRoot = files.find((f) => f.name === 'SKILL.md')
@@ -299,6 +375,7 @@ export async function importSkillZip(zipPath: string, userDataDir: string): Prom
     prefix = `${[...tops][0]}/`
     name = [...tops][0]
   } else {
+<<<<<<< ours
     throw new Error('skill-import:archive-missing-skill-md')
   }
   if (!isSkillName(name)) {
@@ -306,6 +383,15 @@ export async function importSkillZip(zipPath: string, userDataDir: string): Prom
   }
   const dest = join(skillsRoot(userDataDir), name)
   if (existsSync(dest)) throw new Error('skill-import:already-exists')
+=======
+    throw new Error('the archive has no SKILL.md at its root or under one folder')
+  }
+  if (!isSkillName(name)) {
+    throw new Error('the archive name cannot be used as a skill name')
+  }
+  const dest = join(skillsRoot(userDataDir), name)
+  if (existsSync(dest)) throw new Error('a skill of that name is already there')
+>>>>>>> theirs
 
   mkdirSync(skillsRoot(userDataDir), { recursive: true })
   const scratch = mkdtempSync(join(skillsRoot(userDataDir), '.import-'))
@@ -334,9 +420,15 @@ export async function importSkillZip(zipPath: string, userDataDir: string): Prom
  * listing showed it.
  */
 export function removeSkill(name: string, userDataDir: string): void {
+<<<<<<< ours
   if (typeof name !== 'string' || !isListedName(name)) throw new Error('skill-import:unknown-skill')
   const dir = join(skillsRoot(userDataDir), name)
   if (!existsSync(join(dir, 'SKILL.md'))) throw new Error('skill-import:unknown-skill')
+=======
+  if (typeof name !== 'string' || !isListedName(name)) throw new Error('unknown skill')
+  const dir = join(skillsRoot(userDataDir), name)
+  if (!existsSync(join(dir, 'SKILL.md'))) throw new Error('unknown skill')
+>>>>>>> theirs
   rmSync(dir, { recursive: true, force: true })
 }
 
@@ -418,9 +510,15 @@ export function installRecommendedSkill(
   recommendedDir: string,
   userDataDir: string,
 ): FoundSkill {
+<<<<<<< ours
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) throw new Error('skill-import:unknown-skill')
   const src = join(recommendedDir, name)
   if (!existsSync(join(src, 'SKILL.md'))) throw new Error('skill-import:unknown-skill')
+=======
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) throw new Error('unknown skill')
+  const src = join(recommendedDir, name)
+  if (!existsSync(join(src, 'SKILL.md'))) throw new Error('unknown skill')
+>>>>>>> theirs
   const dest = join(skillsRoot(userDataDir), name)
   requireSkillMd(src)
   inspectSkillDir(src)

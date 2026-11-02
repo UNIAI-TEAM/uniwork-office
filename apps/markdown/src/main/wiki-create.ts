@@ -52,6 +52,7 @@ export interface CreatedNote {
   created: boolean
 }
 
+<<<<<<< ours
 /**
  * Whether a view holding `fromPath` may create notes. A bound UniWork working copy lives in a
  * hidden per-document folder, and a note created beside it would be a stray file there.
@@ -60,6 +61,8 @@ export function mayCreateWikiNote(fromPath: string, isBound: (path: string) => b
   return !fromPath || !isBound(fromPath)
 }
 
+=======
+>>>>>>> theirs
 async function fileExists(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isFile()

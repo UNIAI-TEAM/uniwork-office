@@ -24,6 +24,7 @@ import type {
 } from '../shared/home-api'
 import { isValidRenameName } from './rename-validation'
 import { statPathEntries } from './recent-files'
+import { mkdirDirs } from '@genoffice/electron-utils'
 
 /** files the home tree shows; mirrors the shell's open-dialog filter */
 export const TREE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -40,6 +41,13 @@ export const TREE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([
   'ots',
   'pptx',
   'ppt',
+<<<<<<< ours
+=======
+  'odt',
+  'ott',
+  'hwpx',
+  'hwp',
+>>>>>>> theirs
   'odp',
   'otp',
   'pdf',
@@ -109,6 +117,7 @@ export function isInsideRoot(root: string, path: string): boolean {
 export function describeRoot(root: string, opts: { create?: boolean } = {}): FolderRoot {
   let usable: boolean
   try {
+<<<<<<< ours
     if (opts.create === false && !existsSync(root)) {
       usable = true
     } else {
@@ -116,6 +125,14 @@ export function describeRoot(root: string, opts: { create?: boolean } = {}): Fol
       accessSync(root, constants.W_OK)
       usable = statSync(root).isDirectory()
     }
+=======
+    // per-level mkdir, not recursive: a filesystem that refuses the leaf while
+    // its parent exists (Defender Controlled Folder Access on Documents) makes
+    // the recursive form spin the main process forever — see mkdirDirs.
+    mkdirDirs(root)
+    accessSync(root, constants.W_OK)
+    usable = statSync(root).isDirectory()
+>>>>>>> theirs
   } catch {
     usable = false
   }

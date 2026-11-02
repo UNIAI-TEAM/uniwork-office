@@ -2107,7 +2107,7 @@ body.vib .slide-list {
 .ai-msg {
   position: relative;
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
@@ -2866,7 +2866,7 @@ body.vib .slide-list {
    * with the content, so clipped lines would sit flush against chips/footer */
   padding: 0 14px;
   margin: 12px 0 4px;
-  font-size: 16px;
+  font-size: 14px;
   font-family: inherit;
   line-height: 24px;
   outline: none;
@@ -7877,7 +7877,11 @@ body.show-curtain::after {
 .modal .dlg-note {
   margin: 4px 0 0;
   font-size: 12px;
+<<<<<<< ours
   color: var(--danger-text);
+=======
+  color: var(--danger);
+>>>>>>> theirs
 }
 
 /* Override .modal label / .modal input full-row styles: checkbox/radio rows lay out inline */
@@ -9323,6 +9327,46 @@ body.show-curtain::after {
 .master-close-btn:hover {
   background: var(--slides-on-accent-hover);
 }
+/* Insert controls (text box / shapes gallery) in the master bar; the accent
+ * background needs its own on-accent tokens, same as the close button */
+.master-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.master-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--slides-on-accent);
+  cursor: pointer;
+}
+.master-tool:hover,
+.master-tool.active {
+  background: var(--slides-on-accent-hover);
+}
+.master-tool-anchor {
+  position: relative;
+  display: flex;
+}
+.master-tool-drop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  padding: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--slides-shadow-drop);
+  color: var(--text);
+}
 .master-body {
   flex: 1;
   display: flex;
@@ -9642,6 +9686,7 @@ body.show-curtain::after {
   pointer-events: none;
 }
 
+<<<<<<< ours
 /* "Use the app" notes of the web frame (use-app.ts): the dialog is the shared frame dialog
    (UseAppDialog.tsx); this is the note over a media poster */
 
@@ -9773,6 +9818,8 @@ body.show-curtain::after {
   color: var(--color-text-secondary);
   padding: 4px 2px 0;
 }
+=======
+>>>>>>> theirs
 /* ── Slide Show > Record: the recording bar ─────────────────────── */
 
 .slideshow .ss-record {

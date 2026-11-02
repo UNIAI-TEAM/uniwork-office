@@ -7,7 +7,10 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Editor } from '@tiptap/core'
 
 import { buildExtensions } from '../src/renderer/editor/extensions'
+<<<<<<< ours
 import { placeWikiSuggestMenu } from '../src/renderer/components/WikiSuggestMenu'
+=======
+>>>>>>> theirs
 import {
   filterWikiNotes,
   refreshWikiNotes,
@@ -250,6 +253,7 @@ describe('create new note', () => {
     expect(editor.state.doc.textContent).toBe('See [[../evil')
   })
 })
+<<<<<<< ours
 
 describe('placeWikiSuggestMenu', () => {
   it('places the menu below the caret when it fits above the status bar', () => {
@@ -269,3 +273,5 @@ describe('placeWikiSuggestMenu', () => {
     expect(760 - Number(style.bottom)).toBeLessThanOrEqual(760 - 24 - 8)
   })
 })
+=======
+>>>>>>> theirs

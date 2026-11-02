@@ -56,7 +56,24 @@ export interface GlobalShortcutGuards {
   readonly formulaBarTarget: boolean
 }
 
+<<<<<<< ours
 type Gate = 'grid' | 'sheet' | 'idle' | 'formulaBar' | 'always'
+=======
+type Gate = 'grid' | 'sheet' | 'idle' | 'formulaBar'
+
+interface Chord {
+  /** Ctrl or Cmd (either is accepted, like the rest of the app) */
+  readonly mod?: boolean
+  readonly shift?: boolean
+  readonly alt?: boolean
+  /** Excel-for-Mac binding: Cmd on mac only */
+  readonly cmdMac?: boolean
+  /** Excel-for-Mac binding: Cmd+Ctrl together, mac only */
+  readonly cmdCtrlMac?: boolean
+  /** real Ctrl on every platform (Cmd+Backspace is the mac clear key) */
+  readonly ctrlOnly?: boolean
+}
+>>>>>>> theirs
 
 interface Binding {
   /** `shortcuts.csv` row id of the sheets table */
@@ -75,6 +92,7 @@ const bySubAction =
     command(isSecondSubAction(id, chord) ? second : first)
 
 const BINDINGS: readonly Binding[] = [
+<<<<<<< ours
   { id: 'sheets-04', gate: 'always', menu: true, action: { kind: 'menu', action: 'save-as' } },
   { id: 'sheets-08', gate: 'sheet', menu: true, action: { kind: 'menu', action: 'redo' } },
   { id: 'sheets-61', gate: 'grid', action: { kind: 'dialog', dialog: 'formatCells' } },
@@ -102,6 +120,35 @@ const BINDINGS: readonly Binding[] = [
   { id: 'sheets-52', gate: 'sheet', action: command('flash-fill') },
   { id: 'sheets-12', gate: 'sheet', action: command('paste-special:value') },
   { id: 'sheets-11', gate: 'sheet', action: command('paste-special-open') },
+=======
+  { code: 'Digit1', chord: { mod: true }, gate: 'grid', action: FORMAT_CELLS },
+  { code: 'KeyG', chord: { mod: true }, gate: 'grid', action: GO_TO },
+  { code: 'F5', chord: {}, gate: 'grid', action: GO_TO },
+  // Excel's F7: the Spelling dialog (Review ▸ Proofing here)
+  { code: 'F7', chord: {}, gate: 'grid', action: command('spell-check') },
+  {
+    code: 'Backquote',
+    chord: { mod: true },
+    gate: 'grid',
+    action: command('toggle-show-formulas'),
+  },
+  { code: 'KeyK', chord: { mod: true }, gate: 'grid', action: command('link-open') },
+  { code: 'F2', chord: { shift: true }, gate: 'grid', action: command('note-open') },
+  // Excel: Ctrl+Shift+F2 (Windows) / Cmd+Shift+M (Mac) start a threaded comment.
+  { code: 'F2', chord: { mod: true, shift: true }, gate: 'grid', action: command('comment-new') },
+  { code: 'KeyM', chord: { mod: true, shift: true }, gate: 'grid', action: command('comment-new') },
+  { code: 'F3', chord: { shift: true }, gate: 'grid', action: command('insert-function-open') },
+  { code: 'F3', chord: { mod: true }, gate: 'grid', action: command('name-manager-open') },
+  {
+    code: 'KeyU',
+    chord: { mod: true, shift: true },
+    gate: 'formulaBar',
+    action: command('formula-bar-toggle'),
+  },
+  { code: 'Digit5', chord: { mod: true }, gate: 'sheet', action: command('strike') },
+  { code: 'Equal', chord: { alt: true }, gate: 'sheet', action: command('autofn:SUM') },
+  { code: 'Semicolon', chord: { mod: true }, gate: 'sheet', action: command('insert-now:date') },
+>>>>>>> theirs
   {
     id: 'sheets-56',
     gate: 'sheet',
@@ -134,6 +181,7 @@ const BINDINGS: readonly Binding[] = [
     gate: 'sheet',
     action: bySubAction(BORDER_SHORTCUT_ROW, 'border:outer', 'border:none'),
   },
+<<<<<<< ours
 ]
 
 /**
@@ -145,6 +193,62 @@ function pageRowCommand(event: GlobalShortcutKeyEvent): string | null {
   if (event.key === 'PageDown') return 'page-row:1'
   if (event.key === 'PageUp') return 'page-row:-1'
   return null
+=======
+  {
+    code: 'Comma',
+    chord: { mod: true, shift: true },
+    gate: 'sheet',
+    action: command('font-size-step:-1'),
+  },
+  {
+    code: 'KeyF',
+    chord: { cmdMac: true, shift: true },
+    gate: 'sheet',
+    action: command('filter-toggle'),
+  },
+  // AutoSum beyond the mac-only ⇧⌘T: Ctrl+Shift+T on Windows/Linux, where
+  // Univer's own QuickSum already owns Alt+=. The filter's Ctrl/⌘+Shift+L is
+  // Univer's own SmartToggleFilterShortcut, so no row here for it.
+  {
+    code: 'KeyT',
+    chord: { mod: true, shift: true },
+    gate: 'sheet',
+    action: command('autofn:SUM'),
+  },
+  { code: 'KeyT', chord: { mod: true }, gate: 'sheet', action: command('table-create-open') },
+  { code: 'F9', chord: {}, gate: 'idle', action: command('calculate-now') },
+  { code: 'F9', chord: { shift: true }, gate: 'idle', action: command('calculate-sheet') },
+  { code: 'PageDown', chord: {}, gate: 'grid', action: command('page-row:1') },
+  { code: 'PageUp', chord: {}, gate: 'grid', action: command('page-row:-1') },
+  { code: 'PageDown', chord: { alt: true }, gate: 'grid', action: command('page-col:1') },
+  { code: 'PageUp', chord: { alt: true }, gate: 'grid', action: command('page-col:-1') },
+  // Excel's Ctrl+Y: Redo when the redo stack has entries, repeat-last-action
+  // otherwise (its F4 twin); Ctrl+Shift+Z stays a plain Redo alias.
+  { code: 'KeyY', chord: { mod: true }, gate: 'sheet', action: command('redo-or-repeat') },
+  { code: 'KeyZ', chord: { mod: true, shift: true }, gate: 'sheet', action: command('redo') },
+  { code: 'Quote', chord: { mod: true }, gate: 'sheet', action: command('copy-above:formula') },
+  {
+    code: 'Quote',
+    chord: { mod: true, shift: true },
+    gate: 'sheet',
+    action: command('copy-above:value'),
+  },
+  { code: 'ArrowDown', chord: { alt: true }, gate: 'sheet', action: command('dv-dropdown-open') },
+  {
+    code: 'Backspace',
+    chord: { ctrlOnly: true },
+    gate: 'sheet',
+    action: command('scroll-to-active'),
+  },
+]
+
+function chordMatches(event: GlobalShortcutKeyEvent, chord: Chord, isMac: boolean): boolean {
+  if (event.shiftKey !== Boolean(chord.shift) || event.altKey !== Boolean(chord.alt)) return false
+  if (chord.cmdMac) return isMac && event.metaKey && !event.ctrlKey
+  if (chord.cmdCtrlMac) return isMac && event.metaKey && event.ctrlKey
+  if (chord.ctrlOnly) return event.ctrlKey && !event.metaKey
+  return (event.metaKey || event.ctrlKey) === Boolean(chord.mod)
+>>>>>>> theirs
 }
 
 function gateOpen(gate: Gate, guards: GlobalShortcutGuards): boolean {
@@ -185,7 +289,14 @@ export function resolveGlobalShortcut(
     if (!gateOpen(binding.gate, guards)) return null
     return typeof binding.action === 'function' ? binding.action(chord) : binding.action
   }
+<<<<<<< ours
   const pageRow = pageRowCommand(event)
   if (pageRow && !isComposingEvent(event) && gateOpen('grid', guards)) return command(pageRow)
+=======
+  // number-format / border chords (Ctrl+Shift+digit, Ctrl+Shift+&/_, mac ⌘⌥
+  // borders) write to the range: same gate as the table's `sheet` rows
+  const formatCommand = formatShortcutCommand(event, guards.isMac)
+  if (formatCommand && gateOpen('sheet', guards)) return { kind: 'command', command: formatCommand }
+>>>>>>> theirs
   return null
 }

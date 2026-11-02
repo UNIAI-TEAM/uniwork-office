@@ -133,6 +133,7 @@
   border-color: var(--accent);
 }
 
+<<<<<<< ours
 .ai-plus-limit-hint {
   padding: 4px 8px 0;
   color: var(--text-secondary);
@@ -140,6 +141,8 @@
   line-height: 1.35;
 }
 
+=======
+>>>>>>> theirs
 .ai-plus-list {
   flex: 1;
   min-height: 0;
@@ -168,7 +171,11 @@
   cursor: pointer;
 }
 
+<<<<<<< ours
 .ai-plus-skill:hover:not(:disabled) {
+=======
+.ai-plus-skill:hover {
+>>>>>>> theirs
   background: var(--hover);
 }
 
@@ -176,11 +183,14 @@
   background: var(--accent-soft);
 }
 
+<<<<<<< ours
 .ai-plus-skill:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
+=======
+>>>>>>> theirs
 .ai-plus-avatar {
   display: inline-flex;
   align-items: center;
@@ -282,6 +292,7 @@
   background: var(--hover);
   color: var(--text);
 }
+<<<<<<< ours
 
 .ai-skills-too-long-notice {
   margin: 0 0 8px;
@@ -294,3 +305,5 @@
   line-height: 1.4;
   text-wrap: pretty;
 }
+=======
+>>>>>>> theirs

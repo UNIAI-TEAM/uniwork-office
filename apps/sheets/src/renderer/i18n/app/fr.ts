@@ -10,7 +10,11 @@ export const fr = {
   redactDialogPlaceholder: 'Nom du placeholder, ex. : téléphone du client',
   redactCancel: 'Annuler',
   redactInsert: 'Masquer',
+<<<<<<< ours
   redactEnable: 'Clic droit sur une sélection pour la masquer à l’IA.',
+=======
+  redactEnable: 'Clic droit sur une sélection pour la masquer au modèle.',
+>>>>>>> theirs
   redactNeedsSavedRow:
     "Cette ligne n'est pas encore dans le fichier. Enregistrez d'abord, puis masquez la cellule.",
   redactRecoveredFromNames:
@@ -365,7 +369,9 @@ export const fr = {
   appFullLoadRunning:
     'Chargement complet du classeur en cours — le tri et le filtrage seront disponibles une fois terminé…',
   appFullLoadTooLarge:
-    'Ce classeur est trop volumineux pour être chargé entièrement en mémoire ; le tri et le filtrage sont indisponibles pour ce fichier.',
+    "Ce classeur est trop volumineux pour être chargé entièrement en mémoire ; le tri et le déplacement de plages sont indisponibles pour ce fichier. Le filtrage s'exécute directement sur le fichier.",
+  appLargeFilterLoading: 'Lecture de la colonne de filtre depuis le fichier…',
+  appLargeFilterApplying: 'Application du filtre sur le fichier…',
   appSortValueModeFormulas:
     'Cette plage contient des formules qui ne sont pas calculées en direct dans ce grand classeur — la trier ou la déplacer les enregistrerait comme simples valeurs. Choisissez une plage sans formules.',
   appSortRangeTooLarge:
@@ -432,6 +438,9 @@ export const fr = {
   appTableNameUsed: 'Le nom de tableau « {name} » a déjà été utilisé pendant cette session.',
   appTableNameInFile: 'Le nom de tableau "{name}" est déjà utilisé par un tableau du fichier.',
   appTableOverlapsSession: 'La plage chevauche le tableau « {name} » créé pendant cette session.',
+  appTableOverlapsFile: 'La plage chevauche le tableau « {name} » du fichier.',
+  appTableAlreadyInTable:
+    'La sélection se trouve déjà dans le tableau « {name} » — modifiez le style depuis Création de tableau.',
   appTablesNeedFile: "Ouvrez d'abord un fichier XLSX — les tableaux sont écrits dans le fichier.",
   appTableSelectRange:
     "Sélectionnez d'abord la plage de données — les en-têtes dans sa première ligne.",
@@ -527,6 +536,7 @@ export const fr = {
   appGridlinesHidden: 'Quadrillage masqué.',
   appGridlinesShown: 'Quadrillage affiché.',
   appShowingFormulas: 'Affichage des formules — basculez à nouveau pour les valeurs.',
+  appShowingFormulasActive: 'Formules affichées',
   appShowingValues: 'Affichage des valeurs calculées.',
   appTraceNoFormula: "Repérer les antécédents : la cellule active n'a pas de formule.",
   appTraceNoRefs: "Repérer les antécédents : cette formule n'a aucune référence de cellule.",
@@ -779,6 +789,7 @@ export const fr = {
   appExportPdfTitle: 'Exporter en PDF',
   appSaveTitle: 'Enregistrer',
   appSaveAs: 'Enregistrer sous',
+  aiNameFile: "Nommer avec l'IA…",
   appUndo: 'Annuler',
   appRedo: 'Rétablir',
   appUnsavedEditOne: '● {count} modification non enregistrée',
@@ -810,7 +821,6 @@ export const fr = {
   appLinkPlaceholder: 'https://example.com ou Sheet1!A1',
   appRemoveLink: 'Supprimer le lien',
   appNotAvailableYet: 'Pas encore disponible',
-  appComingSoon: 'Bientôt disponible',
   appGroupChartLayouts: 'Dispositions du graphique',
   appAddChartElement: 'Ajouter un élément de graphique',
   appAddChartElementTitle: 'Titres, étiquettes de données, légende',
@@ -1245,6 +1255,8 @@ export const fr = {
   appRefreshAll: 'Actualiser tout',
   appWorkbookNoPivot: 'Aucun tableau croisé dans ce classeur.',
   appRefreshAllTitle: 'Actualiser tous les tableaux croisés',
+  appQueriesConnections: 'Requêtes et connexions',
+  appQueriesConnectionsTitle: 'Lister les requêtes et connexions de données du classeur',
   appErrorCheckingDetail: 'Rechercher les valeurs d’erreur de la feuille',
   appErrorsFound: '{count} erreurs — à {cell} : {value}',
   appCheckingErrors: 'Recherche d’erreurs dans toute la feuille…',
@@ -1279,6 +1291,7 @@ export const fr = {
   appGroupForecast: 'Prévision',
   appWhatIfAnalysis: 'Analyse de scénarios',
   appGoalSeek: 'Valeur cible',
+  appDataTable: 'Table de données',
   appWhatIfTitle: 'Trouver une entrée pour une valeur cible',
   appGoalSeekNeedsFormula: 'La cellule à définir doit contenir une formule.',
   appGoalSeekByCellNotNumber: 'La cellule à modifier doit contenir un nombre ou être vide.',
@@ -1376,6 +1389,7 @@ export const fr = {
   appPasswordUpdating: 'Mise à jour…',
   appUpdatePassword: 'Mettre à jour le mot de passe',
   appWorkbookNotPasswordProtected: "Ce classeur n'est pas protégé par un mot de passe d'ouverture.",
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Un classeur protégé par mot de passe ne peut pas être enregistré dans un document UniWork. Utilisez Enregistrer sous pour conserver une copie chiffrée sur cet ordinateur.',
   appPasswordChangeUniwork: 'Le mot de passe d’un document UniWork ne peut pas être modifié ici.',
@@ -1384,6 +1398,8 @@ export const fr = {
   appEncryptedWrongPassword: 'Le mot de passe est incorrect. Réessayez.',
   appPasswordChangeRestored:
     "Enregistrez d'abord le classeur restauré, puis modifiez son mot de passe.",
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Permettre la modification des plages',
   appGroupClipboard: 'Presse-papiers',
   appPaste: 'Coller',
@@ -1651,6 +1667,7 @@ export const fr = {
   appVisualFlipV: 'Retourner verticalement',
   appVisualFlipH: 'Retourner horizontalement',
   appCtxPasteVisual: "Coller l'image ou la forme",
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Ce classeur ne peut pas encore être ouvert sur le web',
   appWebEngineBody:
@@ -1679,6 +1696,8 @@ export const fr = {
   appWebSavedReopenFailed:
     "Vos modifications ont été enregistrées dans UniWork, mais le classeur n'a pas pu être rouvert ici. Rechargez l'éditeur pour continuer.",
   appDataTable: 'Table de données',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Orthographe',

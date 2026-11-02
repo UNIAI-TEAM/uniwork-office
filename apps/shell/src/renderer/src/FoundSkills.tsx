@@ -12,6 +12,7 @@ import type { FoundSkill, RecommendedSkill } from '../../shared/found-skill'
 
 const api = () => window.aiOfficeIntegrations
 
+<<<<<<< ours
 const ERROR_REASON_KEYS: Record<string, StringKey> = {
   'dir-unreadable': 'intgSkillsErrDirUnreadable',
   'dir-symlink': 'intgSkillsErrDirSymlink',
@@ -48,6 +49,8 @@ const failureReason = (e: unknown, t: TFunc): string => {
   return t(key, { max: detail, name: detail })
 }
 
+=======
+>>>>>>> theirs
 type Notice = { kind: 'done' | 'removed'; name: string } | { kind: 'failed'; reason: string }
 
 export function FoundSkills({ t }: { t: TFunc }) {
@@ -89,6 +92,7 @@ export function FoundSkills({ t }: { t: TFunc }) {
       setNotice({ kind: 'done', name: skill.name })
       await load()
     } catch (e) {
+<<<<<<< ours
       setNotice({
         kind: 'failed',
         reason: (e instanceof Error ? e.message : String(e)).replace(
@@ -96,6 +100,9 @@ export function FoundSkills({ t }: { t: TFunc }) {
           '',
         ),
       })
+=======
+      setNotice({ kind: 'failed', reason: e instanceof Error ? e.message : String(e) })
+>>>>>>> theirs
     } finally {
       setBusy(false)
     }
@@ -109,6 +116,7 @@ export function FoundSkills({ t }: { t: TFunc }) {
       setNotice({ kind: 'removed', name: skill.name })
       await load()
     } catch (e) {
+<<<<<<< ours
       setNotice({
         kind: 'failed',
         reason: (e instanceof Error ? e.message : String(e)).replace(
@@ -116,6 +124,9 @@ export function FoundSkills({ t }: { t: TFunc }) {
           '',
         ),
       })
+=======
+      setNotice({ kind: 'failed', reason: e instanceof Error ? e.message : String(e) })
+>>>>>>> theirs
     } finally {
       setBusy(false)
     }
@@ -196,7 +207,11 @@ export function FoundSkills({ t }: { t: TFunc }) {
           }
         >
           {notice.kind === 'failed'
+<<<<<<< ours
             ? t('intgSkillsImportFailed', { reason: failureReason(notice.reason, t) })
+=======
+            ? t('intgSkillsImportFailed', { reason: notice.reason })
+>>>>>>> theirs
             : notice.kind === 'done'
               ? t('intgSkillsImportDone', { name: notice.name })
               : t('intgSkillsRemoved', { name: notice.name })}

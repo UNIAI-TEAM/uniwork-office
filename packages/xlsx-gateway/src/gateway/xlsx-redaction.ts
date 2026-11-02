@@ -116,7 +116,11 @@ export function parseRedactionPart(text: string): SheetRedactionState[] {
   if (root.version !== PART_VERSION) {
     throw new RedactionError(
       `${REDACTION_PART_PATH} has version ${JSON.stringify(root.version)}, but this ` +
+<<<<<<< ours
         `version of UniWork Office only understands ${PART_VERSION}. Refusing to save.`,
+=======
+        `version of GenOffice only understands ${PART_VERSION}. Refusing to save.`,
+>>>>>>> theirs
     )
   }
   const sheets = root.sheets
@@ -228,6 +232,7 @@ export function rekeyRedactionStates(
     readonly sheetName: string
     readonly ops: readonly StructuralOp[]
   }[] = [],
+<<<<<<< ours
   additions: readonly {
     readonly name: string
     readonly sourceSheetName?: string | undefined
@@ -256,6 +261,17 @@ export function rekeyRedactionStates(
       const newName = renamed.get(state.sheetName)
       const renamedState = newName === undefined ? state : { ...state, sheetName: newName }
       const ops = structuralOps.find((entry) => entry.sheetName === state.sheetName)?.ops
+=======
+): SheetRedactionState[] {
+  const renamed = new Map(renames.map((rename) => [rename.sheetName, rename.newName]))
+  const removed = new Set(removals)
+  return states
+    .filter((state) => !removed.has(state.sheetName))
+    .map((state) => {
+      const newName = renamed.get(state.sheetName)
+      const renamedState = newName === undefined ? state : { ...state, sheetName: newName }
+      const ops = structuralOps.find((entry) => entry.sheetName === renamedState.sheetName)?.ops
+>>>>>>> theirs
       if (!ops || ops.length === 0) return renamedState
       // The marks name cells the file is about to move: this same save
       // applies the ops to the grid XML, so a rectangle left where it was
@@ -267,8 +283,12 @@ export function rekeyRedactionStates(
         return moved === null ? [] : [{ ...mark, ...moved }]
       })
       return { ...renamedState, marks }
+<<<<<<< ours
     },
   )
+=======
+    })
+>>>>>>> theirs
 }
 
 /**
@@ -445,6 +465,7 @@ function unmirrorFormula(body: string): string {
  * passing itself off as the whole string.
  */
 function labelFitter(payload: Omit<MirrorPayload, 'label'>): (label: string) => string {
+<<<<<<< ours
   const fits = (candidate: string) =>
     mirrorFormula({ ...payload, label: candidate }).length <= MIRROR_FORMULA_LIMIT
   return (label) => {
@@ -461,6 +482,15 @@ function labelFitter(payload: Omit<MirrorPayload, 'label'>): (label: string) => 
       }
     }
     return characters.slice(0, low).join('') + MIRROR_TRUNCATION_MARK
+=======
+  const overhead = Array.from(mirrorFormula({ ...payload, label: '' })).length
+  const room = MIRROR_FORMULA_LIMIT - overhead
+  return (label) => {
+    const characters = Array.from(label)
+    if (characters.length <= room) return label
+    const kept = Math.max(0, room - 1)
+    return characters.slice(0, kept).join('') + MIRROR_TRUNCATION_MARK
+>>>>>>> theirs
   }
 }
 
@@ -567,7 +597,11 @@ function mirrorMarkOf(
   if (record.v !== MIRROR_VERSION) {
     throw new RedactionError(
       `${where} holds mirror version ${JSON.stringify(record.v)}, but this version of ` +
+<<<<<<< ours
         `UniWork Office only understands ${MIRROR_VERSION}. Refusing to open the workbook.`,
+=======
+        `GenOffice only understands ${MIRROR_VERSION}. Refusing to open the workbook.`,
+>>>>>>> theirs
     )
   }
   if (!isNonNegativeInteger(record.sheet)) {

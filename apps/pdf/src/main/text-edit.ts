@@ -12,6 +12,15 @@ import type {
 import { SYNTHETIC_BOLD_STROKE_EM } from '../shared/ipc'
 import { foldRadicals } from '../shared/radicals'
 import { chainLayers } from '../shared/x-layers'
+import {
+  SHARED_TEMPLATE_REASON,
+  chainIsExclusive,
+  formDrawTree,
+  liftOutOfForms,
+  transformRect,
+  walkPageText,
+} from './form-text'
+import type { FormChain, FormDrawTree } from './form-text'
 
 export const FPDF_PAGEOBJ_TEXT = 1
 const FPDF_FONT_TYPE1 = 1
@@ -59,6 +68,7 @@ export interface Pdfium {
   _FPDFPageObj_GetType(obj: number): number
   _FPDFFormObj_CountObjects(form: number): number
   _FPDFFormObj_GetObject(form: number, index: number): number
+  _FPDFFormObj_RemoveObject(form: number, obj: number): number
   _FPDFPageObj_Destroy(obj: number): void
   _FPDFPageObj_GetBounds(obj: number, l: number, b: number, r: number, t: number): number
   _FPDFImageObj_GetImageDataRaw(obj: number, buffer: number, buflen: number): number
@@ -594,11 +604,15 @@ export function mergeEngineCodepoints(engineRaw: string, oldText: string, newTex
 
 interface PageTextObj {
   obj: number
+  /** Page object index; for text inside a Form XObject, its top-level ancestor's */
   index: number
   text: string
   font: number
   /** [x1, y1, x2, y2] */
   bounds: [number, number, number, number]
+  /** Enclosing Form XObjects, outermost first; empty for page-owned text */
+  chain: FormChain
+  ordinals: readonly number[]
 }
 
 function collectTextObjects(m: Pdfium, page: number, textPage: number): PageTextObj[] {
@@ -607,10 +621,7 @@ function collectTextObjects(m: Pdfium, page: number, textPage: number): PageText
   const bb = m._malloc(4)
   const br = m._malloc(4)
   const bt = m._malloc(4)
-  const count = m._FPDFPage_CountObjects(page)
-  for (let i = 0; i < count; i++) {
-    const obj = m._FPDFPage_GetObject(page, i)
-    if (m._FPDFPageObj_GetType(obj) !== FPDF_PAGEOBJ_TEXT) continue
+  walkPageText(m, page, FPDF_PAGEOBJ_TEXT, ({ obj, chain, ordinals, topIndex, toPage }) => {
     // Two-pass read: FPDFTextObj_GetText's length argument and return value are BYTES
     // including the 2-byte NUL terminator, and a too-small buffer is left untouched
     // (not truncated) — a fixed buffer would silently yield garbage for long runs
@@ -622,17 +633,70 @@ function collectTextObjects(m: Pdfium, page: number, textPage: number): PageText
       text = Buffer.from(m.HEAPU8.buffer, buf, len - 2).toString('utf16le')
       m._free(buf)
     }
-    if (!m._FPDFPageObj_GetBounds(obj, bl, bb, br, bt)) continue
+    if (!m._FPDFPageObj_GetBounds(obj, bl, bb, br, bt)) return
+    const local: [number, number, number, number] = [
+      m.HEAPF32[bl >> 2]!,
+      m.HEAPF32[bb >> 2]!,
+      m.HEAPF32[br >> 2]!,
+      m.HEAPF32[bt >> 2]!,
+    ]
     out.push({
       obj,
-      index: i,
+      index: topIndex,
       text,
       font: m._FPDFTextObj_GetFont(obj),
-      bounds: [m.HEAPF32[bl >> 2]!, m.HEAPF32[bb >> 2]!, m.HEAPF32[br >> 2]!, m.HEAPF32[bt >> 2]!],
+      bounds: chain.length > 0 ? transformRect(local, toPage) : local,
+      chain,
+      ordinals,
     })
-  }
+  })
   for (const p of [bl, bb, br, bt]) m._free(p)
   return out
+}
+
+/** Lazy per-document census of how often each Form XObject is painted; only built
+    when an edit resolves to template text */
+type FormExclusive = (pageIndex: number, t: PageTextObj) => Promise<boolean>
+
+function formExclusivity(bytes: Uint8Array): FormExclusive {
+  let tree: Promise<FormDrawTree> | null = null
+  return async (pageIndex, t) => {
+    if (t.chain.length === 0) return true
+    tree ??= formDrawTree(bytes)
+    return chainIsExclusive(await tree, pageIndex, t.ordinals)
+  }
+}
+
+/** Pull template-owned matches out to page level so the page-owned edit path can
+    remove/rewrite them. `objects` is in stream order and every lift lands right
+    after the same parent, so lifting back-to-front keeps the original order across
+    all edits. Returns the objects whose lift failed; page indices are refreshed
+    either way, since any lift that did succeed renumbered the page. */
+function liftMatches(
+  m: Pdfium,
+  page: number,
+  matches: Set<PageTextObj>,
+  objects: PageTextObj[],
+): Map<PageTextObj, string> {
+  const failed = new Map<PageTextObj, string>()
+  const lifted = objects.filter((t) => matches.has(t) && t.chain.length > 0)
+  if (lifted.length === 0) return failed
+  for (const t of lifted.reverse()) {
+    try {
+      liftOutOfForms(m, page, t.obj, t.chain)
+      t.chain = []
+    } catch (err) {
+      failed.set(t, errMsg(err))
+    }
+  }
+  const idx = new Map<number, number>()
+  const count = m._FPDFPage_CountObjects(page)
+  for (let i = 0; i < count; i++) idx.set(m._FPDFPage_GetObject(page, i), i)
+  for (const o of objects) {
+    const i = idx.get(o.obj)
+    if (i !== undefined) o.index = i
+  }
+  return failed
 }
 
 type Rect = readonly [number, number, number, number]
@@ -2225,10 +2289,19 @@ export async function withDocument<T>(
   m: Pdfium,
   bytes: Uint8Array,
   fn: (doc: number) => Promise<T>,
+  password?: string,
 ): Promise<T> {
   const docPtr = m._malloc(bytes.length)
   m.HEAPU8.set(bytes, docPtr)
-  const doc = m._FPDF_LoadMemDocument(docPtr, bytes.length, 0)
+  let pwPtr = 0
+  if (password) {
+    const pw = Buffer.from(password, 'utf8')
+    pwPtr = m._malloc(pw.length + 1)
+    m.HEAPU8.set(pw, pwPtr)
+    m.HEAPU8[pwPtr + pw.length] = 0
+  }
+  const doc = m._FPDF_LoadMemDocument(docPtr, bytes.length, pwPtr)
+  if (pwPtr) m._free(pwPtr)
   if (!doc) {
     m._free(docPtr)
     throw new Error('PDFium could not load the document')
@@ -2266,14 +2339,16 @@ async function applyPageEdits(
   doc: number,
   page: number,
   textPage: number,
+  pageIndex: number,
   pageEdits: TextEditInput[],
   skip: (edit: TextEditInput, reason: string) => void,
+  exclusive: FormExclusive,
 ): Promise<{ applied: number; embeddedCff: boolean }> {
   let embeddedCff = false
   const objects = collectTextObjects(m, page, textPage)
   // Two edits resolving to the same object would double-remove it; first claim wins
   const claimed = new Set<number>()
-  const planned: {
+  let planned: {
     edit: TextEditInput
     matches: PageTextObj[]
     newText: string
@@ -2286,9 +2361,24 @@ async function applyPageEdits(
     } else if (res.matches.some((t) => claimed.has(t.obj))) {
       skip(edit, 'overlaps another pending text edit')
     } else {
+      const verdicts = await Promise.all(res.matches.map((t) => exclusive(pageIndex, t)))
+      if (verdicts.includes(false)) {
+        skip(edit, SHARED_TEMPLATE_REASON)
+        continue
+      }
       for (const t of res.matches) claimed.add(t.obj)
       planned.push({ edit, ...res })
     }
+  }
+  // Template text is lifted before anything is sorted or removed: the lift inserts
+  // page objects, which renumbers everything after the template
+  const unlifted = liftMatches(m, page, new Set(planned.flatMap((p) => p.matches)), objects)
+  if (unlifted.size > 0) {
+    planned = planned.filter((p) => {
+      const bad = p.matches.find((t) => unlifted.has(t))
+      if (bad) skip(p.edit, unlifted.get(bad)!)
+      return !bad
+    })
   }
   // Descending object order keeps pending InsertObjectAtIndex targets valid
   planned.sort((a, b) => b.matches[0]!.index - a.matches[0]!.index)
@@ -2352,13 +2442,24 @@ export async function eraseTextRuns(
   m: Pdfium,
   doc: number,
   page: number,
+  pageIndex: number,
+  bytes: Uint8Array,
   probes: TextEditInput[],
 ): Promise<boolean[]> {
   const textPage = m._FPDFText_LoadPage(page)
   try {
     const edits = probes.map((p) => ({ ...p, newText: '', translate: undefined }))
     const failed = new Set<TextEditInput>()
-    const { applied } = await applyPageEdits(m, doc, page, textPage, edits, (e) => failed.add(e))
+    const { applied } = await applyPageEdits(
+      m,
+      doc,
+      page,
+      textPage,
+      pageIndex,
+      edits,
+      (e) => failed.add(e),
+      formExclusivity(bytes),
+    )
     if (applied > 0) m._FPDFPage_GenerateContent(page)
     return edits.map((e) => !failed.has(e))
   } finally {
@@ -2377,6 +2478,7 @@ async function applyTextEditsInner(
 
   return withDocument(m, bytes, async (doc) => {
     const byPage = groupByPage(m, doc, edits, (e) => skip(e, 'page does not exist'))
+    const exclusive = formExclusivity(bytes)
     let appliedTotal = 0
     let embeddedCff = false
     for (const [pageIndex, pageEdits] of byPage) {
@@ -2384,7 +2486,16 @@ async function applyTextEditsInner(
       if (!page) throw new Error(`could not load page ${pageIndex + 1}`)
       const textPage = m._FPDFText_LoadPage(page)
       try {
-        const res = await applyPageEdits(m, doc, page, textPage, pageEdits, skip)
+        const res = await applyPageEdits(
+          m,
+          doc,
+          page,
+          textPage,
+          pageIndex,
+          pageEdits,
+          skip,
+          exclusive,
+        )
         embeddedCff = res.embeddedCff || embeddedCff
         if (res.applied > 0 && !m._FPDFPage_GenerateContent(page)) {
           throw new Error(`could not regenerate page ${pageIndex + 1}`)
@@ -2425,6 +2536,7 @@ async function validateTextEditsInner(
   return withDocument(m, bytes, async (doc) => {
     const results: TextEditValidation[] = edits.map(() => ({ reason: null }))
     const indexOf = new Map(edits.map((e, i) => [e, i]))
+    const exclusive = formExclusivity(bytes)
     const byPage = groupByPage(m, doc, edits, (e) => {
       results[indexOf.get(e)!] = { reason: 'page does not exist' }
     })
@@ -2445,9 +2557,15 @@ async function validateTextEditsInner(
             results[indexOf.get(e)!] = { reason: res.reason }
             continue
           }
-          // Same gate the apply path enforces: a move must own its objects outright
+          // Same gates the apply path enforces: a move must own its objects outright,
+          // and template text may only be edited where the template is painted once
           if (e.translate && !res.whole) {
             results[indexOf.get(e)!] = { reason: 'the text block cannot be moved as one unit' }
+            continue
+          }
+          const verdicts = await Promise.all(res.matches.map((t) => exclusive(pageIndex, t)))
+          if (verdicts.includes(false)) {
+            results[indexOf.get(e)!] = { reason: SHARED_TEMPLATE_REASON }
             continue
           }
           // Fragment edits resolve to their whole container object; covering all of it
@@ -2520,10 +2638,15 @@ async function validateTextEditsInner(
 export function verifyTextEdits(
   bytes: Uint8Array,
   edits: { pageIndex: number; newText: string }[],
+  /** the password when the saved output is encrypted again */
+  password?: string,
 ): Promise<{ pageIndex: number; reason: string }[]> {
   return chainPdfium(async () => {
     const m = await loadPdfium()
-    return withDocument(m, bytes, async (doc) => {
+    // the saved output carries its protection again: verification opens it with
+    // the same password the save just wrote, or every edit reads as missing
+    const open = <T>(fn: (doc: number) => Promise<T>) => withDocument(m, bytes, fn, password)
+    return open(async (doc) => {
       const failures: { pageIndex: number; reason: string }[] = []
       const pageCount = m._FPDF_GetPageCount(doc)
       const byPage = new Map<number, string[]>()

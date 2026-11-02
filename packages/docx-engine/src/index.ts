@@ -23,6 +23,7 @@ export {
 export {
   parseDocx,
   reconcileGridColumns,
+  paraCsFormat,
   styleRunFormat,
   type ParseExtras,
   type ParseOptions,
@@ -59,18 +60,39 @@ export {
   APP_PROPERTY_KEYS,
   CORE_PROPERTIES_PATH,
   CORE_PROPERTY_KEYS,
+<<<<<<< ours
   applyPropertyChanges,
   emptyDocumentProperties,
   parseAppPropertiesXml,
   parseCorePropertiesXml,
   parseCustomPropertiesXml,
+=======
+  NEW_DOCUMENT_APPLICATION,
+  NEW_DOCUMENT_APP_VERSION,
+  NEW_DOCUMENT_TEMPLATE,
+  applyPropertyChanges,
+  emptyDocumentProperties,
+  newDocumentAppPropertiesXml,
+  newDocumentCorePropertiesXml,
+  parseAppPropertiesXml,
+  parseCorePropertiesXml,
+  parseCustomPropertiesXml,
+  parseCustomPropertyTypesXml,
+>>>>>>> theirs
   parsePropertyChanges,
   patchAppPropertiesXml,
   patchCorePropertiesXml,
   patchCustomPropertiesXml,
   readDocumentProperties,
+<<<<<<< ours
   type DocumentProperties,
   type PropertyChanges,
+=======
+  w3cdtfStamp,
+  type DocumentProperties,
+  type PropertyChanges,
+  type PropertyValue,
+>>>>>>> theirs
 } from './doc-properties'
 export {
   saveDocx,
@@ -82,6 +104,16 @@ export {
   type StyleUpsert,
   type ParsedDocFull,
 } from './patch'
+export {
+  REMOVE_PARTS_KINDS,
+  applyRemoveParts,
+  planRemoveParts,
+  removePartsRefusalMessage,
+  type RemovePartsKind,
+  type RemovePartsOptions,
+  type RemovePartsPlan,
+  type RemovedPartBinding,
+} from './remove-parts'
 export {
   TABLE_HEADER_FILL,
   applyImageWrap,
@@ -104,7 +136,16 @@ export {
   mergePPrFormat,
   setPPrChange,
   stripPPrChange,
+<<<<<<< ours
   stripParaMarkRevision,
+=======
+  paraMarkRevisionXml,
+  setParaMarkRevision,
+  stripParaMarkRevision,
+  resolveParaMarkRPrChange,
+  paraMarkColor,
+  stripParaMarkColor,
+>>>>>>> theirs
   patchFieldParagraphXml,
   patchImageParagraphXml,
   patchMathTokens,
@@ -125,6 +166,10 @@ export {
   type ImagePatch,
   type TextboxParaPatch,
   type TextboxParasPatchSet,
+  inlinePictureDrawingXml,
+  resizeInlinePictureXml,
+  NEW_PICTURE_TOKEN_PREFIX,
+  type InlinePictureXmlOptions,
   type TableGenOptions,
   type TocEntry,
 } from './generate'
@@ -148,7 +193,11 @@ export {
   ommlToLatex,
   ommlToMathML,
 } from './math'
+<<<<<<< ours
 export { patchRunPictureXml, type RunPictureGeometry } from './run-picture'
+=======
+export { patchHfPicturesXml, patchRunPictureXml, type RunPictureGeometry } from './run-picture'
+>>>>>>> theirs
 export { scanBody, type BodyElement, type BodyScan } from './scan'
 export {
   BLANK_BULLET_NUM_ID,
@@ -241,14 +290,42 @@ export {
 
 export { previewFontSettings } from './font-settings'
 export {
+<<<<<<< ours
   applyTrackedChangesXml,
   countTrackedChangesXml,
+=======
+  applyRevisionResolutions,
+  applyTrackedChangesXml,
+  cleanMoveRangeMarkers,
+  countTrackedChangesXml,
+  readPropChangeXml,
+  resolvePropChangeXml,
+  type PropChangeRecord,
+  type RevisionResolution,
+>>>>>>> theirs
   type RevisionXmlFilter,
   type RevisionXmlMode,
   type RevisionXmlResult,
   type RevisionXmlType,
 } from './revision-xml'
 export {
+<<<<<<< ours
+=======
+  resolveParagraphProps,
+  resolveCtxOf,
+  resolveParagraphPropsXml,
+  resolveRunProps,
+  shadowCompare,
+  type EffectivePPr,
+  type EffectiveRPr,
+  type PropSource,
+  type ResolveCompat,
+  type ResolveCtx,
+  type ResolveDiff,
+  type TableCond,
+} from './resolve-props'
+export {
+>>>>>>> theirs
   compareBlocks,
   compareDocuments,
   DEFAULT_COMPARE_AUTHOR,
@@ -258,3 +335,7 @@ export {
   type CompareResult,
   type CompareSummary,
 } from './compare'
+<<<<<<< ours
+=======
+export { keepsHangulKanaSingle } from './parse-block-passes'
+>>>>>>> theirs

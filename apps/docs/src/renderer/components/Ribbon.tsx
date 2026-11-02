@@ -1,6 +1,8 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Lang } from '@genoffice/i18n'
+
+export type ConvertFormat = 'pdf' | 'html' | 'md' | 'images'
 import type {
   ChangeEvent,
   KeyboardEvent as ReactKeyboardEvent,
@@ -43,7 +45,11 @@ import {
   isSymbolFontFamily,
   useDismissablePopover,
   useRibbonCollapse,
+<<<<<<< ours
   UniAiMark,
+=======
+  useScrollWindow,
+>>>>>>> theirs
 } from '@genoffice/ui'
 import { HIGHLIGHT_CSS } from '../editor/extensions'
 import { applyCase, type CaseMode } from '../editor/case-transform'
@@ -80,6 +86,7 @@ import {
   deleteTableColumn,
   distributeRowsEvenly,
   enterSelectedTable,
+  inTableOrSelected,
   selectTablePart,
   tableCellsSelection,
   setCellAlignment,
@@ -148,6 +155,7 @@ import {
 } from '../font-sizes'
 import { useSystemFontFamilies } from '../system-fonts'
 import { cssFontFamily } from '../line-metrics'
+import type { RevisionFilter, RevisionScope } from '../editor/revision-filters'
 import {
   DesignTab,
   DrawTab,
@@ -159,12 +167,14 @@ import {
   ReviewTab,
   ViewTab,
   type InkPenSettings,
+  type BalloonMode,
   type RevisionDisplayMode,
   type ViewMode,
   applyGalleryStyle,
   setParaAttrs,
   toggleParaSpace as toggleParaSpaceImpl,
 } from './ribbon-tabs'
+import type { CommentsMode } from './comments-mode'
 import { WRAP_OPTIONS } from './ContextMenu'
 import { CropDialog, CutoutDialog } from './PictureDialogs'
 import {
@@ -187,6 +197,7 @@ import {
   IconBorderTop,
   IconBullets,
   IconCaret,
+  IconConvert,
   IconColDelete,
   IconColInsertLeft,
   IconColInsertRight,
@@ -237,6 +248,7 @@ import {
   IconBringToFront,
   IconSendBackward,
   IconSendToBack,
+  IconComments,
 } from './icons'
 interface RibbonProps {
   /** App keyboard shortcuts reuse ribbon closures through here (font-size stepping keeps its coalescing) */
@@ -283,10 +295,16 @@ interface RibbonProps {
   onOpen: () => void
   onSave: () => void
   onSaveAs: () => void
+<<<<<<< ours
   /** File ▸ Save as a copy: web bridge only — the locked-out tab's copy (UNI-1920); absent on desktop */
   onSaveCopy?: () => void
   onExportPdf?: () => void
   onPrint?: () => void
+=======
+  onConvert: (format: ConvertFormat) => void
+  /** File ▸ Name with AI…: ask the model for a name and offer it in the dialog */
+  onNameWithAi: () => void
+>>>>>>> theirs
   showAi: boolean
   onToggleAi: () => void
   section: SectionSettings | null
@@ -331,7 +349,7 @@ interface RibbonProps {
   zoom: number
   onZoom: (zoom: number) => void
   /** compute zoom from the current window size (Word: page width / whole page) */
-  onZoomFit: (mode: 'width' | 'page') => void
+  onZoomFit: (mode: 'width' | 'page' | 'multi') => void
   onZoomDialog: () => void
   darkPage: boolean
   onDarkPage: (v: boolean) => void
@@ -365,6 +383,11 @@ interface RibbonProps {
   openCommentCount: number
   resolvedCommentCount: number
   onShowComments: () => void
+  /** Word-style top-right cluster: Show Comments toggle with its Contextual / List caret */
+  showComments: boolean
+  onToggleComments: () => void
+  commentsMode: CommentsMode
+  onCommentsMode: (mode: CommentsMode) => void
   /** Review → comments / revisions / compare / protection */
   canComment: boolean
   onNewComment: () => void
@@ -379,10 +402,18 @@ interface RibbonProps {
   onSpellcheck: (on: boolean) => void
   revisionDisplay: RevisionDisplayMode
   onRevisionDisplay: (mode: RevisionDisplayMode) => void
+  balloonMode: BalloonMode
+  onBalloonMode: (mode: BalloonMode) => void
+  onTrackChangesOptions: () => void
   revisionCount: number
-  onAcceptRevision: (all: boolean) => void
-  onRejectRevision: (all: boolean) => void
+  onAcceptRevision: (scope: RevisionScope) => void
+  onRejectRevision: (scope: RevisionScope) => void
   onGotoRevision: (dir: 1 | -1) => void
+  revisionFilter: RevisionFilter
+  onRevisionFilter: (filter: RevisionFilter) => void
+  revisionAuthors: string[]
+  showReviewPane: boolean
+  onToggleReviewPane: () => void
   isProtected: boolean
   /** comments restriction: adding comments stays allowed although the body is read-only */
   commentsAllowed: boolean
@@ -725,6 +756,17 @@ export const PICTURE_TWIPS_MAX = 31680
 export const clampPictureTwips = (twips: number) =>
   Math.min(PICTURE_TWIPS_MAX, Math.max(PICTURE_TWIPS_MIN, twips))
 
+/** Word's top-right document mode: Viewing wins over Reviewing (read mode hides editing state) */
+export type DocMode = 'editing' | 'reviewing' | 'viewing'
+export const docModeOf = (readMode: boolean, trackChanges: boolean): DocMode =>
+  readMode ? 'viewing' : trackChanges ? 'reviewing' : 'editing'
+
+const DOC_MODE_KEYS = {
+  editing: 'ribbonModeEditing',
+  reviewing: 'ribbonModeReviewing',
+  viewing: 'ribbonModeViewing',
+} as const
+
 /** swallows every command when the document is read-only (protected / read mode) */
 const NOOP_CHAIN = new Proxy(
   {},
@@ -831,9 +873,14 @@ function RibbonInner({
   onOpen,
   onSave,
   onSaveAs,
+<<<<<<< ours
   onSaveCopy,
   onExportPdf,
   onPrint,
+=======
+  onConvert,
+  onNameWithAi,
+>>>>>>> theirs
   showAi,
   onToggleAi,
   section,
@@ -896,6 +943,10 @@ function RibbonInner({
   openCommentCount,
   resolvedCommentCount,
   onShowComments,
+  showComments,
+  onToggleComments,
+  commentsMode,
+  onCommentsMode,
   canComment,
   onNewComment,
   commentAtCaret,
@@ -908,10 +959,18 @@ function RibbonInner({
   onSpellcheck,
   revisionDisplay,
   onRevisionDisplay,
+  balloonMode,
+  onBalloonMode,
+  onTrackChangesOptions,
   revisionCount,
   onAcceptRevision,
   onRejectRevision,
   onGotoRevision,
+  revisionFilter,
+  onRevisionFilter,
+  revisionAuthors,
+  showReviewPane,
+  onToggleReviewPane,
   isProtected,
   commentsAllowed,
   trackChangesForced,
@@ -1061,6 +1120,19 @@ function RibbonInner({
   // read-only (Restrict Editing / Read Mode): every edit command is fenced here,
   // button disabled states are only the visual layer on top
   const canEdit = hasDoc && fs.editable
+  const docMode = docModeOf(readMode, trackChanges)
+  const applyDocMode = (m: DocMode) => {
+    if (m === 'viewing') {
+      onReadMode(true)
+      return
+    }
+    if (readMode) onReadMode(false)
+    if (m === 'reviewing') {
+      if (!trackChanges) onTrackChanges(true)
+    } else if (trackChanges && !trackChangesForced) {
+      onTrackChanges(false)
+    }
+  }
   const chain = () => (canEdit ? ed.chain().focus() : NOOP_CHAIN)
   const inTable = fs.inTable
 
@@ -1434,6 +1506,26 @@ function RibbonInner({
     )
   }
 
+  // Word's Home ▸ Borders is the table gallery whenever the selection sits in a
+  // table: the lines go on the selected cells, not on their paragraphs. A
+  // focused textbox / header / footer sub-editor is never "in a table".
+  const HOME_BORDER_CELL_MODE: Record<string, TableBorderMode> = {
+    b: 'bottom',
+    t: 'top',
+    l: 'left',
+    r: 'right',
+    tblr: 'all',
+    none: 'none',
+  }
+  const applyHomeBorders = (borders: string | null) => {
+    if (!sub && inTableOrSelected(editor.state)) {
+      applyCellBorders(HOME_BORDER_CELL_MODE[borders ?? 'none'])
+      setDropdown(null)
+      return
+    }
+    setParaAttr({ borders })
+  }
+
   /** Set row height for selected rows (twips; null = auto) */
   const applyRowHeight = (height: number | null) => {
     if (!canEdit) return
@@ -1579,6 +1671,7 @@ function RibbonInner({
     ...fontFamilies.map((name) => ({ key: `b:${name}`, name, section: 'b' as const })),
     ...systemFontFamilies.map((name) => ({ key: `s:${name}`, name, section: 's' as const })),
   ]
+  const fontMenuWindow = useScrollWindow(dropdown === 'fontFamily')
   const openFontMenu = () => {
     if (dropdown === 'fontFamily') return
     loadSystemFonts()
@@ -2244,6 +2337,26 @@ function RibbonInner({
     </button>
   )
 
+  const convertItems = (
+    [
+      ['pdf', 'ribbonConvertPdf'],
+      ['html', 'ribbonConvertHtml'],
+      ['md', 'ribbonConvertMarkdown'],
+      ['images', 'ribbonConvertImages'],
+    ] as const
+  ).map(([format, key]) => (
+    <button
+      key={format}
+      disabled={!hasDoc}
+      onClick={() => {
+        setDropdown(null)
+        onConvert(format)
+      }}
+    >
+      {t(key)}
+    </button>
+  ))
+
   return (
     <div
       className={`ribbon ${collapse.rootClass}`}
@@ -2266,6 +2379,7 @@ function RibbonInner({
               {t('ribbonTabFile')}
             </button>
             {dropdown === 'file' && (
+<<<<<<< ours
               <div data-rb-panel="" className="file-menu" ref={fileMenuRef}>
                 {cap('open') && (
                   <button
@@ -2336,6 +2450,47 @@ function RibbonInner({
                     {t('appFilePrint')} <FileMenuKey command="print" />
                   </button>
                 )}
+=======
+              <div data-rb-panel="" className="file-menu">
+                <button
+                  onClick={() => {
+                    setDropdown(null)
+                    onOpen()
+                  }}
+                >
+                  {t('ribbonOpen')} <span className="file-menu-key">Ctrl+O</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setDropdown(null)
+                    onSave()
+                  }}
+                >
+                  {t('ribbonSave')} <span className="file-menu-key">Ctrl+S</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setDropdown(null)
+                    onSaveAs()
+                  }}
+                >
+                  {t('ribbonSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
+                </button>
+                <button
+                  className="qa-name-with-ai"
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setDropdown(null)
+                    onNameWithAi()
+                  }}
+                >
+                  {t('ribbonNameWithAi')}
+                </button>
+                <div className="file-menu-sep" />
+                {convertItems}
+>>>>>>> theirs
               </div>
             )}
           </div>
@@ -2423,6 +2578,88 @@ function RibbonInner({
             </button>
           ))}
         <span className="ribbon-tabs-spacer" />
+        <div className="ribbon-mode-cluster">
+          <div className="ribbon-mode-split">
+            <button
+              type="button"
+              className={`ribbon-mode-btn ${showComments ? 'on' : ''}`}
+              disabled={!hasDoc}
+              aria-pressed={showComments}
+              data-tip={t('ribbonShowCommentsTip', { count: commentCount })}
+              onClick={onToggleComments}
+            >
+              <IconComments size={14} />
+              <span className="ribbon-mode-text">{t('ribbonShowComments')}</span>
+            </button>
+            <div className="mode-menu-wrap">
+              <button
+                type="button"
+                className={`ribbon-mode-btn ${dropdown === 'commentsMode' ? 'open' : ''}`}
+                disabled={!hasDoc}
+                aria-label={t('ribbonShowComments')}
+                aria-haspopup="menu"
+                aria-expanded={dropdown === 'commentsMode'}
+                onClick={() => setDropdown((v) => (v === 'commentsMode' ? null : 'commentsMode'))}
+              >
+                <span className="ribbon-mode-caret">▾</span>
+              </button>
+              {dropdown === 'commentsMode' && (
+                <div data-rb-panel="" className="file-menu mode-menu" role="menu">
+                  {(['contextual', 'list'] as const).map((m) => (
+                    <button
+                      key={m}
+                      role="menuitemradio"
+                      aria-checked={commentsMode === m}
+                      onClick={() => {
+                        setDropdown(null)
+                        onCommentsMode(m)
+                      }}
+                    >
+                      <span className="mode-menu-check">{commentsMode === m ? '✓' : ''}</span>
+                      {t(m === 'list' ? 'ribbonShowCommentsList' : 'ribbonShowCommentsContextual')}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="mode-menu-wrap">
+            <button
+              type="button"
+              className={`ribbon-mode-btn ${dropdown === 'docMode' ? 'open' : ''}`}
+              disabled={!hasDoc}
+              onClick={() => setDropdown((v) => (v === 'docMode' ? null : 'docMode'))}
+            >
+              <span className="ribbon-mode-text">{t(DOC_MODE_KEYS[docMode])}</span>
+              <span className="ribbon-mode-caret">▾</span>
+            </button>
+            {dropdown === 'docMode' && (
+              <div data-rb-panel="" className="file-menu mode-menu">
+                {(['editing', 'reviewing', 'viewing'] as const).map((m) => (
+                  <button
+                    key={m}
+                    // Editing needs the recorder off (impossible under forced track changes);
+                    // Reviewing records changes, so it needs an editable document
+                    disabled={
+                      m === 'editing'
+                        ? !fs.editable || trackChangesForced
+                        : m === 'reviewing'
+                          ? !fs.editable
+                          : false
+                    }
+                    onClick={() => {
+                      setDropdown(null)
+                      applyDocMode(m)
+                    }}
+                  >
+                    <span className="mode-menu-check">{docMode === m ? '✓' : ''}</span>
+                    {t(DOC_MODE_KEYS[m])}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
         {trailingActions}
       </div>
 
@@ -2797,6 +3034,7 @@ function RibbonInner({
                   <div className="table-tool-row">
                     {(
                       [
+<<<<<<< ours
                         [
                           'left',
                           <IconAlignLeft key="l" />,
@@ -2824,6 +3062,11 @@ function RibbonInner({
                             'align-right',
                           ),
                         ],
+=======
+                        ['left', <IconAlignLeft key="l" />, t('ribbonAlignLeftTip')],
+                        ['center', <IconAlignCenter key="c" />, t('ribbonAlignCenterTip')],
+                        ['right', <IconAlignRight key="r" />, t('ribbonAlignRightTip')],
+>>>>>>> theirs
                       ] as const
                     ).map(([value, icon, label]) => (
                       <button
@@ -2834,7 +3077,12 @@ function RibbonInner({
                             : 'table-tool-button'
                         }
                         disabled={!canEdit}
+<<<<<<< ours
                         {...label}
+=======
+                        data-tip={label}
+                        aria-label={label}
+>>>>>>> theirs
                         onClick={() => {
                           if (!canEdit) return
                           editor
@@ -3471,6 +3719,7 @@ function RibbonInner({
           </div>
         ) : tab === 'home' ? (
           <>
+<<<<<<< ours
             {/* ---- AI (first slot: entry + one-click AI actions) ---- */}
             {cap('ai') && (
               <>
@@ -3613,10 +3862,178 @@ function RibbonInner({
                   </div>
                   <div className="ribbon-group-label">AI</div>
                 </div>
+=======
+            {/* ---- Genspark AI (first slot: entry + one-click AI actions) ---- */}
+            <div className="ribbon-group">
+              <div className="ribbon-group-items">
+                <button
+                  className={`rb-big ai-entry ${showAi ? 'active' : ''}`}
+                  data-tip={t('aiOpenAssistant')}
+                  onClick={onToggleAi}
+                >
+                  <span className="rb-big-icon">
+                    <GensparkMark size={26} />
+                  </span>
+                  <span>Genspark AI</span>
+                </button>
+                <button
+                  className="rb-big ai-entry"
+                  disabled={docEmpty}
+                  data-tip={t('aiSummarizeBtn')}
+                  onClick={() => onAiPreset(t('aiSummarizePrompt'))}
+                >
+                  <span className="rb-big-icon">
+                    <span className="ai-feature-icon" aria-hidden="true">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path
+                          d="M13.875 21H12H6.5C5.39543 21 4.5 20.1046 4.5 19V5C4.5 3.89543 5.39543 3 6.5 3H17.5C18.6046 3 19.5 3.89543 19.5 5V9V12V13"
+                          strokeLinecap="round"
+                        />
+                        <path d="M8.00001 7H16" strokeLinecap="round" />
+                        <path d="M8.00007 10.2032H14.0001" strokeLinecap="round" />
+                        <path d="M8.00007 13.4062H12.0001" strokeLinecap="round" />
+                        <path
+                          d="M17 14L17.2579 14.697C17.5961 15.611 17.7652 16.068 18.0986 16.4014C18.432 16.7348 18.889 16.9039 19.803 17.2421L20.5 17.5L19.803 17.7579C18.889 18.0961 18.432 18.2652 18.0986 18.5986C17.7652 18.932 17.5961 19.389 17.2579 20.303L17 21L16.7421 20.303C16.4039 19.389 16.2348 18.932 15.9014 18.5986C15.568 18.2652 15.111 18.0961 14.197 17.7579L13.5 17.5L14.197 17.2421C15.111 16.9039 15.568 16.7348 15.9014 16.4014C16.2348 16.068 16.4039 15.611 16.7421 14.697L17 14Z"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </span>
+                  <span>{t('aiSummarizeBtn')}</span>
+                </button>
+                <button
+                  className="rb-big ai-entry"
+                  disabled={docEmpty}
+                  data-tip={t('aiPolishBtn')}
+                  onClick={() =>
+                    onAiPreset(
+                      t(
+                        editor.state.selection.empty ? 'aiPolishPrompt' : 'aiPolishSelectionPrompt',
+                      ),
+                    )
+                  }
+                >
+                  <span className="rb-big-icon">
+                    <span className="ai-feature-icon" aria-hidden="true">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path
+                          d="M5.00012 20.7481L8.80319 20.7482L21.7482 7.80317L17.945 4L5 16.945L5.00012 20.7481Z"
+                          strokeLinejoin="round"
+                        />
+                        <path d="M15.1406 6.80469L18.9438 10.6079" />
+                        <path
+                          d="M8 3L8.22106 3.59745C8.51094 4.38087 8.65589 4.77259 8.94166 5.05833C9.22743 5.34409 9.61914 5.48903 10.4026 5.77893L11 6L10.4026 6.22107C9.61914 6.51097 9.22743 6.65592 8.94166 6.94167C8.65589 7.22741 8.51094 7.61913 8.22106 8.40255L8 9L7.77894 8.40255C7.48906 7.61913 7.34411 7.22741 7.05834 6.94167C6.77257 6.65592 6.38086 6.51097 5.59743 6.22107L5 6L5.59743 5.77893C6.38086 5.48903 6.77257 5.34409 7.05834 5.05833C7.34411 4.77259 7.48906 4.38087 7.77894 3.59745L8 3Z"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </span>
+                  <span>{t('aiPolishBtn')}</span>
+                </button>
+                <button
+                  className="rb-big ai-entry"
+                  disabled={docEmpty}
+                  data-tip={t('aiTidyBtn')}
+                  onClick={() => onAiPreset(t('aiTidyPrompt'))}
+                >
+                  <span className="rb-big-icon">
+                    <span className="ai-feature-icon" aria-hidden="true">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M4 5H20" strokeLinecap="round" />
+                        <path d="M4 9H16" strokeLinecap="round" />
+                        <path d="M4 13H11" strokeLinecap="round" />
+                        <path d="M4 17H10" strokeLinecap="round" />
+                        <path
+                          d="M17 14L17.2579 14.697C17.5961 15.611 17.7652 16.068 18.0986 16.4014C18.432 16.7348 18.889 16.9039 19.803 17.2421L20.5 17.5L19.803 17.7579C18.889 18.0961 18.432 18.2652 18.0986 18.5986C17.7652 18.932 17.5961 19.389 17.2579 20.303L17 21L16.7421 20.303C16.4039 19.389 16.2348 18.932 15.9014 18.5986C15.568 18.2652 15.111 18.0961 14.197 17.7579L13.5 17.5L14.197 17.2421C15.111 16.9039 15.568 16.7348 15.9014 16.4014C16.2348 16.068 16.4039 15.611 16.7421 14.697L17 14Z"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </span>
+                  <span>{t('aiTidyBtn')}</span>
+                </button>
+                <button
+                  className="rb-big ai-entry"
+                  disabled={docEmpty}
+                  data-tip={t('aiMindMapBtn')}
+                  onClick={() => onAiPreset(t('aiMindMapPrompt'))}
+                >
+                  <span className="rb-big-icon">
+                    <span className="ai-feature-icon" aria-hidden="true">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="2.5" y="9.5" width="6" height="5" rx="1.5" />
+                        <rect x="15.5" y="4" width="6" height="5" rx="1.5" />
+                        <rect x="15.5" y="15" width="6" height="5" rx="1.5" />
+                        <path d="M8.5 12h3.5M12 12V6.5h3.5M12 12v5.5h3.5" />
+                      </svg>
+                    </span>
+                  </span>
+                  <span>{t('aiMindMapBtn')}</span>
+                </button>
+              </div>
+              <div className="ribbon-group-label">Genspark AI</div>
+            </div>
+>>>>>>> theirs
 
                 <div className="ribbon-sep" />
               </>
             )}
+
+            <div className="ribbon-group">
+              <div className="ribbon-group-items">
+                <div className="rb-split-wrap">
+                  <button
+                    className={`rb-big${dropdown === 'convert' ? ' active' : ''}`}
+                    disabled={!hasDoc}
+                    data-tip={t('ribbonConvertTip')}
+                    aria-expanded={dropdown === 'convert'}
+                    onClick={() => setDropdown((v) => (v === 'convert' ? null : 'convert'))}
+                  >
+                    <span className="rb-big-icon">
+                      <IconConvert size={22} />
+                      <IconCaret />
+                    </span>
+                    <span>{t('ribbonConvert')}</span>
+                  </button>
+                  {dropdown === 'convert' && (
+                    <div data-rb-panel="" className="spacing-menu paste-menu" role="menu">
+                      {convertItems}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="ribbon-group-label">{t('ribbonConvert')}</div>
+            </div>
+
+            <div className="ribbon-sep" />
 
             {/* ---- Clipboard ---- */}
             <div className="ribbon-group">
@@ -3777,16 +4194,22 @@ function RibbonInner({
                       <IconCaret />
                     </button>
                     {dropdown === 'fontFamily' && (
-                      <div data-rb-panel="" className="spacing-menu rb-font-family-menu">
+                      <div
+                        data-rb-panel=""
+                        className="spacing-menu rb-font-family-menu"
+                        ref={fontMenuWindow.ref}
+                        onScroll={fontMenuWindow.onScroll}
+                      >
                         {(['b', 's'] as const).map((section) => {
                           const items = fontMenuItems.filter((it) => it.section === section)
                           if (items.length === 0) return null
+                          const offset = section === 'b' ? 0 : fontFamilies.length
                           return (
                             <div key={section}>
                               <div className="rb-menu-group-label">
                                 {t(section === 'b' ? 'ribbonFontsCommon' : 'ribbonFontsSystem')}
                               </div>
-                              {items.map((it) => (
+                              {items.map((it, i) => (
                                 <button
                                   key={it.key}
                                   data-font-key={it.key}
@@ -3795,9 +4218,11 @@ function RibbonInner({
                                   }`}
                                   // symbol fonts would render their own name as pictographs
                                   style={{
-                                    fontFamily: isSymbolFontFamily(it.name)
-                                      ? undefined
-                                      : cssFontFamily(it.name),
+                                    fontFamily:
+                                      isSymbolFontFamily(it.name) ||
+                                      !fontMenuWindow.inWindow(offset + i)
+                                        ? undefined
+                                        : cssFontFamily(it.name),
                                   }}
                                   onClick={() => setFont(it.name)}
                                 >
@@ -4505,22 +4930,22 @@ function RibbonInner({
                     </button>
                     {dropdown === 'borders' && (
                       <div data-rb-panel="" className="spacing-menu borders-menu">
-                        <button onClick={() => setParaAttr({ borders: 'b' })}>
+                        <button onClick={() => applyHomeBorders('b')}>
                           {t('ribbonBorderBottom')}
                         </button>
-                        <button onClick={() => setParaAttr({ borders: 't' })}>
+                        <button onClick={() => applyHomeBorders('t')}>
                           {t('ribbonBorderTop')}
                         </button>
-                        <button onClick={() => setParaAttr({ borders: 'l' })}>
+                        <button onClick={() => applyHomeBorders('l')}>
                           {t('ribbonBorderLeft')}
                         </button>
-                        <button onClick={() => setParaAttr({ borders: 'r' })}>
+                        <button onClick={() => applyHomeBorders('r')}>
                           {t('ribbonBorderRight')}
                         </button>
-                        <button onClick={() => setParaAttr({ borders: 'tblr' })}>
+                        <button onClick={() => applyHomeBorders('tblr')}>
                           {t('ribbonBorderBox')}
                         </button>
-                        <button onClick={() => setParaAttr({ borders: null })}>
+                        <button onClick={() => applyHomeBorders(null)}>
                           {t('ribbonNoBorders')}
                         </button>
                       </div>
@@ -4726,10 +5151,18 @@ function RibbonInner({
             onSpellcheck={onSpellcheck}
             revisionDisplay={revisionDisplay}
             onRevisionDisplay={onRevisionDisplay}
+            balloonMode={balloonMode}
+            onBalloonMode={onBalloonMode}
+            onTrackChangesOptions={onTrackChangesOptions}
             revisionCount={revisionCount}
             onAcceptRevision={onAcceptRevision}
             onRejectRevision={onRejectRevision}
             onGotoRevision={onGotoRevision}
+            revisionFilter={revisionFilter}
+            onRevisionFilter={onRevisionFilter}
+            revisionAuthors={revisionAuthors}
+            showReviewPane={showReviewPane}
+            onToggleReviewPane={onToggleReviewPane}
             isProtected={isProtected}
             commentsAllowed={commentsAllowed}
             trackChangesForced={trackChangesForced}
@@ -4745,8 +5178,6 @@ function RibbonInner({
             onZoom={onZoom}
             onZoomFit={onZoomFit}
             onZoomDialog={onZoomDialog}
-            showAi={showAi}
-            onToggleAi={onToggleAi}
             darkPage={darkPage}
             onDarkPage={onDarkPage}
             showRuler={showRuler}

@@ -4,7 +4,10 @@ import { resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { LAUNCHABLE_EXTS } from '../src/main/launch-paths'
+<<<<<<< ours
 import { OFFICE_TYPES } from '../src/main/default-app'
+=======
+>>>>>>> theirs
 
 const require = createRequire(import.meta.url)
 // Inspect packaging metadata without downloading Electron or compiling OCR
@@ -25,10 +28,20 @@ describe('packaged file associations', () => {
   // declares. A routing entry without a matching declaration means a file the
   // app opens fine can never reach it from Finder/Explorer — the .txt/.json
   // gap this closes.
+<<<<<<< ours
   it('keeps LAUNCHABLE_EXTS and electron-builder fileAssociations in 1-to-1 agreement', () => {
     const declaredExts = config.fileAssociations.map((entry: { ext: string }) => entry.ext)
     expect(new Set(declaredExts)).toEqual(new Set(LAUNCHABLE_EXTS))
     expect(declaredExts).toHaveLength(LAUNCHABLE_EXTS.length)
+=======
+  it('advertises every extension the app launches', () => {
+    for (const ext of LAUNCHABLE_EXTS) {
+      const association = config.fileAssociations.find(
+        (entry: { ext: string }) => entry.ext === ext,
+      )
+      expect(association, `no file association declared for .${ext}`).toBeTruthy()
+    }
+>>>>>>> theirs
   })
 
   it('gives every association the mimeType the Linux desktop entry needs', () => {
@@ -40,6 +53,7 @@ describe('packaged file associations', () => {
     }
   })
 
+<<<<<<< ours
   it('registers the six OpenDocument formats as rank Alternate with plain descriptions and matching Linux MimeType entries', () => {
     const expectedOdf = [
       {
@@ -125,6 +139,29 @@ describe('packaged file associations', () => {
       expect(OFFICE_TYPES.some((t) => t.ext === expected.ext || t.mime === expected.mimeType)).toBe(
         false,
       )
+=======
+  it('gives the legacy Word associations the Word mimeType', () => {
+    for (const ext of ['doc', 'dot']) {
+      const association = config.fileAssociations.find(
+        (entry: { ext: string }) => entry.ext === ext,
+      )
+      expect(association, `no file association declared for .${ext}`).toBeTruthy()
+      expect(
+        association.mimeType,
+        `.${ext} must declare application/msword for the Linux desktop entry`,
+      ).toBe('application/msword')
+      expect(association.icon).toBe('docx')
+    }
+  })
+
+  it('keeps plain text, JSON and legacy .doc/.dot off the Windows default list', () => {
+    const winExts = config.win.fileAssociations.map((entry: { ext: string }) => entry.ext)
+    for (const ext of ['txt', 'json', 'doc', 'dot']) {
+      expect(winExts, `.${ext} must not become a Windows default opener`).not.toContain(ext)
+    }
+    for (const ext of ['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html']) {
+      expect(winExts, `.${ext} missing from the Windows associations`).toContain(ext)
+>>>>>>> theirs
     }
   })
 })

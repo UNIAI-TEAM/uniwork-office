@@ -1,11 +1,15 @@
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
+<<<<<<< ours
 import {
   convertOdtToDocx,
   MAX_ODT_DOCUMENT_TABLE_CELLS,
   MAX_ODT_TABLE_CELLS,
   OdfConvertError,
 } from '../src/index'
+=======
+import { convertOdtToDocx, OdfConvertError } from '../src/index'
+>>>>>>> theirs
 
 const NAMESPACES =
   'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"' +
@@ -145,6 +149,7 @@ describe('convertOdtToDocx', () => {
     )
   })
 
+<<<<<<< ours
   it('does not shift cells when a vertical merge emits covered-table-cell elements', async () => {
     // LibreOffice writes <table:covered-table-cell/> in the row below a vertical
     // merge; the occupancy grid already reserves those slots from rowSpan, so
@@ -256,6 +261,8 @@ describe('convertOdtToDocx', () => {
     expect(document).toContain('1. Giới thiệu OpenDocument')
   })
 
+=======
+>>>>>>> theirs
   it('carries the page geometry into the section properties', async () => {
     const body = '<text:p>page</text:p>'
     const result = await convertOdtToDocx(await buildOdt(contentXml(body), stylesXml('', PAGE_A4)))
@@ -312,6 +319,7 @@ describe('convertOdtToDocx', () => {
     expect(await docxHasMedia(result.docx, '.png')).toBe(false)
   })
 
+<<<<<<< ours
   it('does not report an empty office:forms as a dropped block, but does report form controls', async () => {
     const FORM_NS = 'xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0"'
     const empty =
@@ -328,6 +336,8 @@ describe('convertOdtToDocx', () => {
     expect(controlResult.dropped).toContainEqual({ what: 'unhandled-blocks', count: 1 })
   })
 
+=======
+>>>>>>> theirs
   it('counts constructs it cannot represent instead of guessing', async () => {
     const body =
       '<text:p>keep <text:note text:id="n1" text:note-class="footnote"><text:note-body><text:p>lost</text:p></text:note-body></text:note></text:p>' +
@@ -340,6 +350,7 @@ describe('convertOdtToDocx', () => {
     expect(document).not.toContain('lost')
   })
 
+<<<<<<< ours
   it('reports master-page headers/footers and tracked changes in dropped', async () => {
     const body =
       '<text:tracked-changes text:track-changes="true">' +
@@ -367,6 +378,8 @@ describe('convertOdtToDocx', () => {
     expect(document).not.toContain('deleted words')
   })
 
+=======
+>>>>>>> theirs
   it('flattens a text frame into the flow and says so', async () => {
     const body =
       '<draw:frame svg:width="8cm" svg:height="2cm"><draw:text-box><text:p>boxed words</text:p></draw:text-box></draw:frame>'

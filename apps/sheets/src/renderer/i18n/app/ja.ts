@@ -346,7 +346,9 @@ export const ja = {
   appFullLoadStart: 'すべて読み込む',
   appFullLoadRunning: 'ブック全体を読み込んでいます。完了すると並べ替えとフィルターが使用できます…',
   appFullLoadTooLarge:
-    'このブックは大きすぎるため完全に読み込めません。このファイルでは並べ替えとフィルターを使用できません。',
+    'このブックは大きすぎるため完全に読み込めません。このファイルでは並べ替えと範囲の移動を使用できません。フィルターはファイル上で直接実行されます。',
+  appLargeFilterLoading: 'ファイルからフィルター列を読み込んでいます…',
+  appLargeFilterApplying: 'ファイルにフィルターを適用しています…',
   appSortValueModeFormulas:
     '選択範囲に数式が含まれていますが、この大きなブックでは数式はライブ計算されません。並べ替えや移動を行うと数式が値として保存されます。数式を含まない範囲を選択してください。',
   appSortRangeTooLarge:
@@ -415,6 +417,9 @@ export const ja = {
   appTableNameInFile: 'テーブル名 "{name}" はファイル内のテーブルで既に使用されています。',
   appTableOverlapsSession:
     'この範囲は、このセッションで作成したテーブル "{name}" と重なっています。',
+  appTableOverlapsFile: '範囲がファイル内のテーブル「{name}」と重なっています。',
+  appTableAlreadyInTable:
+    '選択範囲はすでにテーブル「{name}」の中です。スタイルは「テーブル デザイン」から変更してください。',
   appTablesNeedFile: '先に XLSX ファイルを開いてください。テーブルはファイルに書き込まれます。',
   appTableSelectRange: '先にデータ範囲を選択してください。先頭行がヘッダーになります。',
   appTableCreated: 'テーブルを作成しました — {saveKeys} で保存します。',
@@ -506,6 +511,7 @@ export const ja = {
   appGridlinesHidden: '目盛線を非表示にしました。',
   appGridlinesShown: '目盛線を表示しました。',
   appShowingFormulas: '数式を表示しています — もう一度切り替えると値を表示します。',
+  appShowingFormulasActive: '数式を表示中',
   appShowingValues: '計算結果を表示しています。',
   appTraceNoFormula: '参照元のトレース：アクティブセルに数式がありません。',
   appTraceNoRefs: '参照元のトレース：この数式にはセル参照がありません。',
@@ -752,6 +758,7 @@ export const ja = {
   appExportPdfTitle: 'PDF としてエクスポート',
   appSaveTitle: '保存',
   appSaveAs: '名前を付けて保存',
+  aiNameFile: 'AI で名前を変更…',
   appUndo: '元に戻す',
   appRedo: 'やり直し',
   appUnsavedEditOne: '● 未保存の編集 {count} 件',
@@ -788,7 +795,6 @@ export const ja = {
   appRemoveLink: 'リンクの削除',
   // Ribbon common
   appNotAvailableYet: '現在利用できません',
-  appComingSoon: '近日提供予定',
   // Chart Design tab
   appGroupChartLayouts: 'グラフのレイアウト',
   appAddChartElement: 'グラフ要素を追加',
@@ -1228,6 +1234,8 @@ export const ja = {
   appRefreshAll: 'すべて更新',
   appWorkbookNoPivot: 'ブックにピボットテーブルがありません。',
   appRefreshAllTitle: 'すべてのピボットテーブルを更新',
+  appQueriesConnections: 'クエリと接続',
+  appQueriesConnectionsTitle: 'ブックのクエリとデータ接続を一覧表示',
   appErrorCheckingDetail: 'シート内のエラー値をスキャン',
   appErrorsFound: '{count} 件のエラー — {cell}:{value}',
   appCheckingErrors: 'シート全体のエラーをスキャンしています…',
@@ -1262,6 +1270,7 @@ export const ja = {
   appGroupForecast: '予測',
   appWhatIfAnalysis: 'What-If 分析',
   appGoalSeek: 'ゴールシーク',
+  appDataTable: 'データテーブル',
   appWhatIfTitle: '目標値から入力を逆算',
   appGoalSeekNeedsFormula: '数式入力セルには数式が必要です。',
   appGoalSeekByCellNotNumber: '変化させるセルは数値または空白にしてください。',
@@ -1361,12 +1370,15 @@ export const ja = {
   appPasswordUpdating: '更新中…',
   appUpdatePassword: 'パスワードを更新',
   appWorkbookNotPasswordProtected: 'このブックには読み取りパスワードが設定されていません。',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'パスワード付きのブックは UniWork ドキュメントに保存できません。「名前を付けて保存」で暗号化したコピーをこのコンピューターに残してください。',
   appPasswordChangeUniwork: 'UniWork ドキュメントのパスワードはここでは変更できません。',
   appPasswordChangeReadOnly: 'このブックは閲覧専用のため、パスワードを変更できません。',
   appEncryptedWrongPassword: 'パスワードが正しくありません。もう一度お試しください。',
   appPasswordChangeRestored: '復元したブックを先に保存してから、パスワードを変更してください。',
+=======
+>>>>>>> theirs
   appAllowEditRanges: '範囲の編集を許可',
   // Home tab
   appGroupClipboard: 'クリップボード',
@@ -1629,6 +1641,7 @@ export const ja = {
   appVisualFlipV: '上下反転',
   appVisualFlipH: '左右反転',
   appCtxPasteVisual: '図または図形を貼り付け',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'このブックはまだ Web で開けません',
   appWebEngineBody:
@@ -1655,15 +1668,23 @@ export const ja = {
   appWebSavedReopenFailed:
     '変更は UniWork に保存されましたが、ここでブックを開き直せませんでした。エディターを再読み込みして作業を続けてください。',
   appDataTable: 'データテーブル',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'スペル チェック',
   appSpellBtnDetail: 'ワークシートのテキストをチェック (F7)',
   appSpellToggle: 'スペル チェック',
   appSpellToggleTip:
+<<<<<<< ours
     'スペル チェック（F7 と校閲ボタン）を有効にします。オフにするとコメント入力欄のスペルの波線が消えます',
   appSpellOn: 'スペル チェックをオンにしました。',
   appSpellOff: 'スペル チェックはオフです。校閲 ▸ 文章校正 からオンにできます。',
+=======
+    'スペル チェック（F7 と Review ボタン）を有効にします。オフにするとコメント入力欄のスペルの波線が消えます',
+  appSpellOn: 'スペル チェックをオンにしました。',
+  appSpellOff: 'スペル チェックはオフです。Review ▸ 校対 からオンにできます。',
+>>>>>>> theirs
   appSpellRecheck: '再チェック',
   appSpellNone: '疑わしいスペルミスは見つかりませんでした。',
   appSpellFindings: '疑わしいスペルミスが {count} 件あります。行をクリックすると移動します。',

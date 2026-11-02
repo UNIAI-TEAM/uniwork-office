@@ -1,3 +1,4 @@
+<<<<<<< ours
 import {
   chmodSync,
   existsSync,
@@ -10,6 +11,9 @@ import {
   writeFileSync,
 } from 'node:fs'
 import type * as FsModule from 'node:fs'
+=======
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+>>>>>>> theirs
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
@@ -242,7 +246,10 @@ describe('the legacy per-tool skill copies', () => {
     const h = home()
     const ledger: SkillLedger = {}
     const b = bundled()
+<<<<<<< ours
     installSkill(join(h, '.agents', 'skills'), b, ledger)
+=======
+>>>>>>> theirs
     const codexPath = installSkill(join(h, '.codex', 'skills'), b, ledger)
     const cursorPath = installSkill(join(h, '.cursor', 'skills'), b, ledger)
     // someone edited this one by hand
@@ -250,8 +257,12 @@ describe('the legacy per-tool skill copies', () => {
 
     const sweep = sweepLegacySkillCopies(ledger, {}, h)
     expect(sweep.removed.map((c) => c.agent)).toEqual(['codex'])
+<<<<<<< ours
     expect(sweep.kept).toMatchObject([{ agent: 'cursor', reason: 'edited' }])
     expect(sweep.failed).toEqual([])
+=======
+    expect(sweep.kept.map((c) => c.agent)).toEqual(['cursor'])
+>>>>>>> theirs
     expect(existsSync(codexPath)).toBe(false)
     expect(existsSync(join(h, '.codex', 'skills', 'genoffice'))).toBe(false)
     expect(existsSync(cursorPath)).toBe(true)
@@ -274,6 +285,7 @@ describe('the legacy per-tool skill copies', () => {
     expect(found.map((c) => c.path).sort()).toEqual([codexPath, opencodePath].sort())
   })
 
+<<<<<<< ours
   it('never lists or deletes the shared .agents copy when CODEX_HOME points at .agents (R1-01)', () => {
     const h = home()
     const ledger: SkillLedger = {}
@@ -517,5 +529,28 @@ describe('the legacy per-tool skill copies', () => {
     } finally {
       chmodSync(cursorDir, 0o700)
     }
+=======
+  it('the shared .agents copy gates the sweep', () => {
+    const h = home()
+    const ledger: SkillLedger = {}
+    const b = bundled()
+    installSkill(join(h, '.codex', 'skills'), b, ledger)
+    expect(currentSkillInstalled(ledger, {}, h)).toBe(false)
+
+    const sharedPath = installSkill(join(h, '.agents', 'skills'), b, ledger)
+    expect(currentSkillInstalled(ledger, {}, h)).toBe(true)
+    // a ledger row for a file that is gone must not open the gate
+    rmSync(sharedPath)
+    expect(currentSkillInstalled(ledger, {}, h)).toBe(false)
+  })
+
+  it('a ledger row whose legacy file is already gone is dropped, not kept as edited', () => {
+    const h = home()
+    const ledger: SkillLedger = {}
+    const codexPath = installSkill(join(h, '.codex', 'skills'), bundled(), ledger)
+    rmSync(codexPath)
+    expect(findLegacySkillCopies(ledger, {}, h)).toEqual([])
+    expect(ledger[codexPath]).toBeUndefined()
+>>>>>>> theirs
   })
 })

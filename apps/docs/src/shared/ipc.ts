@@ -116,6 +116,39 @@ export type {
   AgentToolResult,
 } from '@genoffice/agent-core'
 
+// ---- PDF export ----
+
+/**
+ * In-document link to stamp into an exported PDF as a GoTo annotation. All
+ * coordinates are fractions of the page box (top-left origin) so the main
+ * process can scale them to whatever page size Chromium produced.
+ */
+export interface PdfInternalLink {
+  page: number
+  x: number
+  y: number
+  w: number
+  h: number
+  toPage: number
+  toY: number
+}
+
+// ---- Markdown export ----
+
+export interface MarkdownImage {
+  /** file name inside the media folder */
+  name: string
+  /** data: URL or lazy docx-media URL the main process resolves */
+  src: string
+}
+
+/**
+ * Folder token the Markdown references pictures under; the writer swaps it
+ * for the real `<file>_files` folder once the save path is known. User text
+ * can never spell it: `_` is escaped on the way out.
+ */
+export const MARKDOWN_MEDIA_DIR_TOKEN = '__genoffice_media__'
+
 // ---- chat attachments (local files fed to the agent via tools) ----
 
 /** Image attachment extensions: no text extraction; read as base64 on send and passed to the model as a multimodal image with the user message */
@@ -172,6 +205,7 @@ export type MenuCommand =
   /** the shell's own flush of a converted document for the UniWork first save: write in place, no dialog */
   | 'save-in-place'
   | 'save-as'
+  | 'name-with-ai'
   | 'undo'
   | 'redo'
   | 'zoom-in'
@@ -180,6 +214,7 @@ export type MenuCommand =
   | 'zoom-set'
   | 'zoom-page-width'
   | 'zoom-whole-page'
+  | 'zoom-multi-page'
   | 'toggle-ai'
   | 'toggle-dark'
   | 'insert-table'
@@ -204,6 +239,7 @@ export type MenuCommand =
   | 'print'
   | 'export-pdf'
   | 'export-html'
+  | 'export-markdown'
   | 'export-images'
   | 'word-count'
   | 'autocorrect-options'
@@ -419,6 +455,29 @@ export interface SpellLanguages {
   available: string[]
 }
 
+export type PrintDuplex = 'simplex' | 'longEdge' | 'shortEdge'
+
+/** job options from the in-app print dialog; deviceName null = system dialog, '' = OS default printer */
+export interface PrintJobOptions {
+  deviceName: string | null
+  copies?: number
+  collate?: boolean
+  duplex?: PrintDuplex
+}
+
+/** the document's own paper size in twips, read off the pagination preview's
+ * first sheet: the CUPS print route bakes printToPDF pages at this size
+ * instead of Chromium's Letter default. Optional — absent falls back. */
+export interface PrintPaper {
+  widthTwips: number
+  heightTwips: number
+}
+
+export interface PrinterInfo {
+  name: string
+  displayName: string
+}
+
 export interface DesktopApi {
   /** platform capability flags; absent on desktop (see DesktopCapabilities) */
   capabilities?: DesktopCapabilities
@@ -459,6 +518,9 @@ export interface DesktopApi {
   /** shell-wide AutoSave default (see useAutoSavePref) */
   getAutoSaveDefault(): Promise<AutoSaveDefault>
   onAutoSaveDefaultChanged(handler: (value: AutoSaveDefault) => void): () => void
+  /** author of comments and tracked changes (Settings → General, falling back to the OS account) */
+  getAuthorName(): Promise<string>
+  onAuthorNameChanged(handler: (name: string) => void): () => void
   /** AI panel text size + chat-input spellcheck (Settings → General in the shell) */
   getAiPanelPrefs(): Promise<AiPanelPrefs>
   setAiPanelPrefs(patch: Partial<AiPanelPrefs>): Promise<AiPanelPrefs>
@@ -618,10 +680,28 @@ export interface DesktopApi {
   onAiSettingsChanged(handler: () => void): () => void
   /** shell only: switch to Home and open Settings › Account, UniWork AI sign-in (rejects in standalone) */
   openAiModelSettings(): Promise<void>
+<<<<<<< ours
   /** system print dialog for the current window; ok=false without error = canceled.
    *  scale: print scale inverting the preview's print zoom (print-zoom.ts) */
   /** noPrinter: the machine has no printer, so nothing was sent (offer Save as PDF instead) */
   print(scale?: number): Promise<{ ok: boolean; error?: string; noPrinter?: boolean }>
+=======
+  /** shell: switch to Home and open Settings › Integrations (the skills list) */
+  openSkillsSettings(): Promise<void>
+  /** print the current window; ok=false without error = canceled.
+   *  scale: print scale inverting the preview's print zoom (print-zoom.ts).
+   *  job: printer/copies/duplex from the in-app dialog; a named printer ('' = OS
+   *  default) prints silently, null or omitted opens the system dialog.
+   *  paper: the document's own page size in twips (the preview's first sheet),
+   *  used by the CUPS print route to size printToPDF's pages */
+  print(
+    scale?: number,
+    job?: PrintJobOptions,
+    paper?: PrintPaper,
+  ): Promise<{ ok: boolean; error?: string }>
+  /** installed printers for the in-app print dialog */
+  listPrinters(): Promise<PrinterInfo[]>
+>>>>>>> theirs
   /** render the document to PDF and ask where to save; size in twips.
    *  outPath is only honored when a previous export dialog chose that exact path */
   exportPdf(
@@ -630,12 +710,23 @@ export interface DesktopApi {
     pageHeightTwips: number,
     outPath?: string,
     scale?: number,
+<<<<<<< ours
   ): Promise<PdfExportResult>
+=======
+    links?: PdfInternalLink[],
+  ): Promise<{ ok: boolean; path?: string; error?: string }>
+>>>>>>> theirs
   exportHtml(
     defaultName: string,
     html: string,
     outPath?: string,
   ): Promise<{ ok: boolean; path?: string; error?: string }>
+  exportMarkdown(
+    defaultName: string,
+    markdown: string,
+    images: MarkdownImage[],
+    outPath?: string,
+  ): Promise<{ ok: boolean; path?: string; error?: string; imagesDropped?: number }>
   /** Mixed paper-size export: produce a set of PDF bytes (base64) at given sizes per the current print layout */
   printPdfBuffer(
     pageWidthTwips: number,
@@ -648,7 +739,12 @@ export interface DesktopApi {
     defaultName: string,
     base64Parts: string[],
     outPath?: string,
+<<<<<<< ours
   ): Promise<PdfExportResult>
+=======
+    links?: PdfInternalLink[],
+  ): Promise<{ ok: boolean; path?: string; error?: string }>
+>>>>>>> theirs
   /** Export as images: the folder picker plus a pre-authorized temp PDF path the
    *  regular PDF export writes to silently (no reveal, no open) */
   pickExportImagesTarget(): Promise<{ dir: string; pdfPath: string } | null>
@@ -719,10 +815,34 @@ export interface DesktopApi {
   readAttachment(path: string, offset: number, maxChars: number): Promise<AttachmentReadResult>
   /** read an image attachment as base64 for multimodal input (≤5MB) */
   readAttachmentImage(path: string): Promise<AttachmentImageResult>
+  /** the reader's starred files as the AI's knowledge base */
+  kbList(): Promise<
+    Array<{
+      path: string
+      folder: string
+      folderPath: string
+      name: string
+      ext: string
+      sizeBytes: number
+    }>
+  >
+  /** full-text search over the starred set; q capped like the home search box */
+  kbSearch(query: {
+    q: string
+    limit?: number
+  }): Promise<Array<{ path: string; name: string; ext: string; folder: string; snippet: string }>>
+  /** one page of a starred file's parsed text (path must be in kbList) */
+  kbRead(
+    path: string,
+    offset: number,
+  ): Promise<{ text: string; totalChars: number; offset: number }>
+
   /** absolute path of a File dropped onto the window (Electron webUtils) */
   getPathForFile(file: File): string
   /** View → New Tab: open another docs tab, optionally loading the same document */
   openNewTab(openPath?: string | null): Promise<void>
+  /** open any shell-routed document path (an AI answer's filenav citation) */
+  openSourcePath(path: string): Promise<void>
   /** all open docs tabs, for View → Switch Tab */
   listDocsTabs(): Promise<DocsTabInfo[]>
   focusDocsTab(id: string): Promise<void>
@@ -738,6 +858,7 @@ export interface DesktopApi {
   reportCloseSaveResult(ok: boolean): void
   /** keep the native View menu's checkbox items in sync with renderer state */
   reportViewMenuState(state: { aiSidebar: boolean; darkCanvas: boolean }): void
+<<<<<<< ours
   /** web frame only (SIZE-F1): notify the host that the document was refused on open */
   reportOpenRefused?(info: {
     path?: string | null
@@ -750,6 +871,40 @@ export interface DesktopApi {
     }
     message?: string
   }): void
+=======
+  /** the skills the user installed (userData/skills), for the AI panel's skills skill */
+  skillsList(): Promise<UserSkillEntry[]>
+  /** the body of one installed skill, by name — the main process resolves the path */
+  skillText(name: string): Promise<string>
+  /** run the bundled genoffice CLI; failures come back as ok:false, never a throw */
+  runCli(args: string[]): Promise<UserCliRun>
+}
+
+export interface UserSkillEntry {
+  name: string
+  description: string
+  relevant: boolean
+}
+
+export interface UserCliRun {
+  ok: boolean
+  /** process exit code, or -1 when the process never started */
+  code: number
+  json?: {
+    status: string
+    command: string | null
+    code?: number
+    summary?: string
+    output_path?: string
+    message?: string
+  }
+  stdout: string
+  stderr: string
+  /** where relative paths resolved; absent in a window with no document and no save folder */
+  cwd?: string
+  /** the folders the CLI may read and write */
+  allowedRoots?: string[]
+>>>>>>> theirs
 }
 
 /** mirrors VIEW_IMAGE_CHANNEL in @genoffice/electron-utils (kept literal so the preload stays free of main-only deps) */

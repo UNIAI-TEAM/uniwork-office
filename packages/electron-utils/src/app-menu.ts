@@ -25,6 +25,10 @@ export interface AppMenuLabels extends ContextMenuLabels {
   checkUpdates: string
   version: string
   settings: string
+<<<<<<< ours
+=======
+  nameWithAi: string
+>>>>>>> theirs
 }
 
 type Labels = Omit<AppMenuLabels, keyof ContextMenuLabels>
@@ -50,6 +54,10 @@ const EN: Labels = {
   checkUpdates: 'Check for Updates…',
   version: 'Version',
   settings: 'Settings…',
+<<<<<<< ours
+=======
+  nameWithAi: 'Name with AI…',
+>>>>>>> theirs
 }
 
 // Shared table, same rationale as context-menu.ts: one copy instead of
@@ -75,6 +83,10 @@ const LABELS: Record<string, Labels> = {
     about: '关于 UniWork Office',
     checkUpdates: '检查更新…',
     version: '版本',
+<<<<<<< ours
+=======
+    nameWithAi: '用 AI 命名…',
+>>>>>>> theirs
     settings: '设置…',
   },
   en: EN,
@@ -98,6 +110,10 @@ const LABELS: Record<string, Labels> = {
     about: 'UniWork Office について',
     checkUpdates: '更新を確認…',
     version: 'バージョン',
+<<<<<<< ours
+=======
+    nameWithAi: 'AI で名前を変更…',
+>>>>>>> theirs
     settings: '設定…',
   },
   ko: {
@@ -120,6 +136,10 @@ const LABELS: Record<string, Labels> = {
     about: 'UniWork Office 정보',
     checkUpdates: '업데이트 확인…',
     version: '버전',
+<<<<<<< ours
+=======
+    nameWithAi: 'AI로 이름 지정…',
+>>>>>>> theirs
     settings: '설정…',
   },
   fr: {
@@ -142,6 +162,10 @@ const LABELS: Record<string, Labels> = {
     about: 'À propos de UniWork Office',
     checkUpdates: 'Rechercher les mises à jour…',
     version: 'Version',
+<<<<<<< ours
+=======
+    nameWithAi: "Nommer avec l'IA…",
+>>>>>>> theirs
     settings: 'Réglages…',
   },
   de: {
@@ -164,6 +188,10 @@ const LABELS: Record<string, Labels> = {
     about: 'Über UniWork Office',
     checkUpdates: 'Nach Updates suchen…',
     version: 'Version',
+<<<<<<< ours
+=======
+    nameWithAi: 'Mit KI benennen…',
+>>>>>>> theirs
     settings: 'Einstellungen…',
   },
   es: {
@@ -186,6 +214,10 @@ const LABELS: Record<string, Labels> = {
     about: 'Acerca de UniWork Office',
     checkUpdates: 'Buscar actualizaciones…',
     version: 'Versión',
+<<<<<<< ours
+=======
+    nameWithAi: 'Nombrar con IA…',
+>>>>>>> theirs
     settings: 'Ajustes…',
   },
   th: {
@@ -208,6 +240,10 @@ const LABELS: Record<string, Labels> = {
     about: 'เกี่ยวกับ UniWork Office',
     checkUpdates: 'ตรวจหาการอัปเดต…',
     version: 'เวอร์ชัน',
+<<<<<<< ours
+=======
+    nameWithAi: 'ตั้งชื่อด้วย AI…',
+>>>>>>> theirs
     settings: 'การตั้งค่า…',
   },
   id: {
@@ -230,6 +266,10 @@ const LABELS: Record<string, Labels> = {
     about: 'Tentang UniWork Office',
     checkUpdates: 'Periksa Pembaruan…',
     version: 'Versi',
+<<<<<<< ours
+=======
+    nameWithAi: 'Beri nama dengan AI…',
+>>>>>>> theirs
     settings: 'Pengaturan…',
   },
   ru: {
@@ -252,6 +292,10 @@ const LABELS: Record<string, Labels> = {
     about: 'О UniWork Office',
     checkUpdates: 'Проверить обновления…',
     version: 'Версия',
+<<<<<<< ours
+=======
+    nameWithAi: 'Назвать с помощью ИИ…',
+>>>>>>> theirs
     settings: 'Настройки…',
   },
   ar: {
@@ -274,6 +318,10 @@ const LABELS: Record<string, Labels> = {
     about: 'حول UniWork Office',
     checkUpdates: 'التحقق من التحديثات…',
     version: 'الإصدار',
+<<<<<<< ours
+=======
+    nameWithAi: 'التسمية بالذكاء الاصطناعي…',
+>>>>>>> theirs
     settings: 'الإعدادات…',
   },
   pt: {
@@ -296,6 +344,10 @@ const LABELS: Record<string, Labels> = {
     about: 'Sobre o UniWork Office',
     checkUpdates: 'Procurar atualizações…',
     version: 'Versão',
+<<<<<<< ours
+=======
+    nameWithAi: 'Nomear com IA…',
+>>>>>>> theirs
     settings: 'Configurações…',
   },
   it: {
@@ -318,6 +370,10 @@ const LABELS: Record<string, Labels> = {
     about: 'Informazioni su UniWork Office',
     checkUpdates: 'Controlla aggiornamenti…',
     version: 'Versione',
+<<<<<<< ours
+=======
+    nameWithAi: 'Assegna un nome con IA…',
+>>>>>>> theirs
     settings: 'Impostazioni…',
   },
   pl: {
@@ -340,6 +396,10 @@ const LABELS: Record<string, Labels> = {
     about: 'O programie UniWork Office',
     checkUpdates: 'Sprawdź aktualizacje…',
     version: 'Wersja',
+<<<<<<< ours
+=======
+    nameWithAi: 'Nazwij za pomocą AI…',
+>>>>>>> theirs
     settings: 'Ustawienia…',
   },
   cs: {
@@ -362,6 +422,10 @@ const LABELS: Record<string, Labels> = {
     about: 'O aplikaci UniWork Office',
     checkUpdates: 'Zkontrolovat aktualizace…',
     version: 'Verze',
+<<<<<<< ours
+=======
+    nameWithAi: 'Pojmenovat pomocí AI…',
+>>>>>>> theirs
     settings: 'Nastavení…',
   },
   nl: {
@@ -384,6 +448,10 @@ const LABELS: Record<string, Labels> = {
     about: 'Over UniWork Office',
     checkUpdates: 'Controleren op updates…',
     version: 'Versie',
+<<<<<<< ours
+=======
+    nameWithAi: 'Naam geven met AI…',
+>>>>>>> theirs
     settings: 'Instellingen…',
   },
   ms: {
@@ -406,6 +474,10 @@ const LABELS: Record<string, Labels> = {
     about: 'Perihal UniWork Office',
     checkUpdates: 'Semak Kemas Kini…',
     version: 'Versi',
+<<<<<<< ours
+=======
+    nameWithAi: 'Namakan dengan AI…',
+>>>>>>> theirs
     settings: 'Tetapan…',
   },
   he: {
@@ -428,6 +500,10 @@ const LABELS: Record<string, Labels> = {
     about: 'אודות UniWork Office',
     checkUpdates: 'בדוק עדכונים…',
     version: 'גרסה',
+<<<<<<< ours
+=======
+    nameWithAi: 'מתן שם באמצעות AI…',
+>>>>>>> theirs
     settings: 'הגדרות…',
   },
   hi: {
@@ -450,6 +526,10 @@ const LABELS: Record<string, Labels> = {
     about: 'UniWork Office के बारे में',
     checkUpdates: 'अपडेट जांचें…',
     version: 'संस्करण',
+<<<<<<< ours
+=======
+    nameWithAi: 'AI से नाम दें…',
+>>>>>>> theirs
     settings: 'सेटिंग्स…',
   },
   vi: {
@@ -472,7 +552,35 @@ const LABELS: Record<string, Labels> = {
     about: 'Giới thiệu UniWork Office',
     checkUpdates: 'Kiểm tra bản cập nhật…',
     version: 'Phiên bản',
+<<<<<<< ours
     settings: 'Cài đặt…',
+=======
+    nameWithAi: 'Đặt tên bằng AI…',
+    settings: 'Cài đặt…',
+  },
+  tr: {
+    window: 'Pencere',
+    minimize: 'Simge Durumuna Küçült',
+    closeWindow: 'Pencereyi Kapat',
+    edit: 'Düzenle',
+    undo: 'Geri Al',
+    redo: 'Yinele',
+    delete: 'Sil',
+    view: 'Görünüm',
+    reload: 'Yeniden Yükle',
+    forceReload: 'Zorla Yeniden Yükle',
+    toggleDevTools: 'Geliştirici Araçları',
+    actualSize: 'Gerçek Boyut',
+    zoomIn: 'Yakınlaştır',
+    zoomOut: 'Uzaklaştır',
+    fullscreen: 'Tam Ekran',
+    help: 'Yardım',
+    about: 'GenOffice Hakkında',
+    checkUpdates: 'Güncellemeleri Denetle…',
+    version: 'Sürüm',
+    nameWithAi: 'AI ile adlandır…',
+    settings: 'Ayarlar…',
+>>>>>>> theirs
   },
   'zh-TW': {
     window: '視窗',
@@ -494,6 +602,10 @@ const LABELS: Record<string, Labels> = {
     about: '關於 UniWork Office',
     checkUpdates: '檢查更新…',
     version: '版本',
+<<<<<<< ours
+=======
+    nameWithAi: '用 AI 命名…',
+>>>>>>> theirs
     settings: '設定…',
   },
 }
@@ -673,11 +785,18 @@ export function aboutMenuItem(labels: AppMenuLabels): MenuItemConstructorOptions
   }
 }
 
+<<<<<<< ours
 /** The Settings entry, shared by every app: one label, one action, and an
  * accelerator (`CmdOrCtrl+,` by default; editor menus on Windows/Linux pass
  * `{ accelerator: false }` so the Docs `Ctrl+Comma` subscript shortcut keeps
  * working). The shell owns the Settings view, so it registers the action; an
  * app running on its own falls back to its own preferences entry. */
+=======
+/** The Settings entry, shared by every app: one label, one accelerator
+ * (⌘, on macOS and Ctrl+, elsewhere), one action. The shell owns the
+ * Settings view, so it registers the action; an app running on its own
+ * falls back to its own preferences entry. */
+>>>>>>> theirs
 let settingsInvoker: (() => void) | null = null
 
 export function setSettingsInvoker(invoke: (() => void) | null): void {
@@ -687,12 +806,19 @@ export function setSettingsInvoker(invoke: (() => void) | null): void {
 export function settingsMenuItem(
   labels: AppMenuLabels,
   fallback?: () => void,
+<<<<<<< ours
   options: { accelerator?: boolean } = {},
 ): MenuItemConstructorOptions {
   const withAccelerator = options.accelerator !== false
   return {
     label: labels.settings,
     ...(withAccelerator ? { accelerator: 'CmdOrCtrl+,' } : {}),
+=======
+): MenuItemConstructorOptions {
+  return {
+    label: labels.settings,
+    accelerator: 'CmdOrCtrl+,',
+>>>>>>> theirs
     click: () => (settingsInvoker ?? fallback)?.(),
   }
 }
@@ -706,7 +832,11 @@ export function appMenuTemplate(
   labels: AppMenuLabels,
   {
     extra = [],
+<<<<<<< ours
     appLabel = 'UniWork Office',
+=======
+    appLabel = 'GenOffice',
+>>>>>>> theirs
   }: { extra?: MenuItemConstructorOptions[]; appLabel?: string } = {},
 ): MenuItemConstructorOptions | undefined {
   if (platform !== 'darwin') return undefined

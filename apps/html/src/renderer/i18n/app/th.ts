@@ -9,6 +9,14 @@ export const th = {
   redactDialogPlaceholder: 'ชื่อตัวแทน เช่น เบอร์โทรศัพท์ลูกค้า',
   redactCancel: 'ยกเลิก',
   redactInsert: 'ซ่อน',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'ไฟล์นี้ถูกแก้ไขโดยโปรแกรมอื่น',
+  diskConflictMsg: 'ไฟล์นี้ถูกแก้ไขในดิสก์ การบันทึกจะเขียนทับการเปลี่ยนแปลงเหล่านั้น',
+  diskReload: 'โหลดใหม่',
+  diskKeepMine: 'เก็บของฉันไว้',
+  diskOverwrite: 'เขียนทับต่อไป',
+>>>>>>> theirs
 
   loading: 'กำลังโหลด…',
   loadFailed: 'ไม่สามารถเปิดไฟล์ได้',
@@ -74,6 +82,7 @@ export const th = {
   linkNeedsSelection: 'เลือกข้อความในพรีวิวก่อน',
   save: 'บันทึก (⌘S)',
   saveAs: 'บันทึกเป็น…',
+  aiNameFile: 'ตั้งชื่อด้วย AI…',
   ribbonCollapse: 'ยุบ Ribbon',
   ribbonExpand: 'ขยาย Ribbon',
   ribbonGroupInsert: 'แทรก',
@@ -104,6 +113,7 @@ export const th = {
   alignLeft: 'จัดชิดซ้าย',
   alignCenter: 'จัดกึ่งกลาง',
   alignRight: 'จัดชิดขวา',
+  alignJustify: 'จัดเต็มแนว',
   fontSizeDec: 'ลดขนาดตัวอักษร',
   fontSizeInc: 'เพิ่มขนาดตัวอักษร',
   typography: 'ตัวอักษร',

@@ -12,7 +12,10 @@ import {
   createBlankPptx,
   deleteElement,
   glbBounds,
+<<<<<<< ours
   isGlbContainer,
+=======
+>>>>>>> theirs
   openPptx,
   savePptx,
   setModel3dView,
@@ -69,6 +72,7 @@ describe('glbBounds', () => {
     expect(glbBounds(new Uint8Array([1, 2, 3, 4]))).toBeNull()
     expect(glbBounds(cubeScene([{}]))).toBeNull()
   })
+<<<<<<< ours
 
   it('validates 4-byte alignment while accepting padded JSON, JSON+BIN, byteOffset views, and Draco containers (R2-01)', async () => {
     // 22-byte misaligned container: magic glTF, version 2, totalLength 22, chunkLength 2, JSON "{}"
@@ -109,6 +113,8 @@ describe('glbBounds', () => {
     const opened = await openPptx(await createBlankPptx())
     expect(addModel3d(opened, 0, { bytes: dracoGlb, ext: 'glb', offset: OFF })).not.toBeNull()
   })
+=======
+>>>>>>> theirs
 })
 
 describe('3D model', () => {

@@ -22,7 +22,11 @@ function nodeHasVisibleText(node: RenderNode): boolean {
 }
 
 export function contextElementTypeForNode(node: RenderNode): ContextElementType {
+<<<<<<< ours
   if (node.type === 'picture' && node.model3d && cap('model3d')) return 'model3d'
+=======
+  if (node.type === 'picture' && node.model3d) return 'model3d'
+>>>>>>> theirs
   if (node.type === 'table' || node.type === 'chart' || node.type === 'picture') return node.type
   if (node.type === 'shape') return nodeHasVisibleText(node) ? 'textShape' : 'shape'
   if (node.type === 'group') return nodeHasVisibleText(node) ? 'textShape' : 'shape'
@@ -32,7 +36,11 @@ export function contextElementTypeForNode(node: RenderNode): ContextElementType 
 export function contextTabForElement(type: ContextElementType): ContextTab | null {
   if (type === 'table') return 'tableDesign'
   if (type === 'chart') return 'chartDesign'
+<<<<<<< ours
   if (type === 'model3d') return cap('model3d') ? 'model3dFormat' : 'pictureFormat'
+=======
+  if (type === 'model3d') return 'model3dFormat'
+>>>>>>> theirs
   // Mixed selections use picture-format: its outline command spans the whole
   // selection while picture-only tools (crop/transparency) stay disabled
   if (type === 'picture' || type === 'mixed') return 'pictureFormat'

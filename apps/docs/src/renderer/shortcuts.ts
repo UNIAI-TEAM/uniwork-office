@@ -159,7 +159,13 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     labelKey: 'appScMoveDown',
     native: { win: ['Alt+Shift+Down'], mac: ['Alt+Shift+Down'] },
   },
+<<<<<<< ours
   // docs-062: the editor's list keymap
+=======
+  // ⌘M is macOS' Minimize accelerator, so the indent chord is Control+M there
+  // (Windows/Linux: plain Ctrl+M)
+  { id: 'indent', group: 'para', labelKey: 'ribbonIncreaseIndent', keys: '⌃M', win: 'Ctrl+M' },
+>>>>>>> theirs
   {
     id: 'list-demote',
     group: 'para',

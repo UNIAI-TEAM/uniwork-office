@@ -114,6 +114,11 @@ export const vi = {
     'Bật theo dõi thay đổi: Các nội dung AI chỉnh sửa được đánh dấu là bản sửa đổi (chèn có gạch chân, xóa có gạch ngang); chấp nhận hoặc từ chối trong mục Xem lại',
   aiTrackOffTitle:
     'Tắt theo dõi thay đổi: Các chỉnh sửa của AI được áp dụng ngay lập tức (bạn vẫn có thể khôi phục qua bản chụp nhanh)',
+  aiRevisionBarTitle: 'Sửa đổi',
+  aiRevisionCount: '{count} thay đổi đang chờ',
+  aiRevisionRejectAll: 'Từ chối tất cả',
+  aiRevisionAcceptAll: 'Chấp nhận tất cả',
+  aiRevisionPara: 'Đoạn {n}',
   aiTurnLimit:
     'Tác vụ này đã tạm dừng trước khi hoàn tất tất cả các bước. Các chỉnh sửa đã hoàn thành được giữ nguyên; chọn Tiếp tục để hoàn thành công việc còn lại.',
   aiStopped: '(Đã dừng)',
@@ -126,6 +131,8 @@ export const vi = {
   aiUnknownError: 'Lỗi không xác định',
   aiTimeoutError:
     'Yêu cầu AI đã hết thời gian chờ: mạng không phản hồi nên quá trình xử lý đã dừng. Kiểm tra kết nối của bạn và thử lại',
+  aiRegionError:
+    'Nhà cung cấp của mô hình này không phục vụ khu vực hiện tại của bạn — hãy chọn mô hình khác hoặc đổi mạng',
   aiOverloadedError: 'Dịch vụ AI hiện đang bận — vui lòng thử lại sau giây lát',
   aiNetworkError:
     'Sự cố mạng: không thể kết nối tới dịch vụ AI. Kiểm tra kết nối của bạn và thử lại',
@@ -133,6 +140,9 @@ export const vi = {
   aiSumImageAttachment: 'Hình ảnh đính kèm {name}',
   aiSumRead: 'Đọc {name}',
   aiSumReadAttachmentName: 'Đọc tệp đính kèm {name}',
+  aiSumSkillsList: 'Đã liệt kê skill đã cài',
+  aiSumSkillRead: 'Đã đọc skill {name}',
+  aiSumRunCli: 'Đã chạy {args}',
   aiSumWebSearch: 'Tìm kiếm trên web',
   aiSumWebSearchDone: 'Đã tìm kiếm "{query}" ({count} kết quả)',
   aiSumImageSearch: 'Tìm kiếm hình ảnh',
@@ -195,6 +205,7 @@ export const vi = {
   aiCmdImages: 'Đã cập nhật {count} hình ảnh',
   aiCmdToc: 'Đã chèn mục lục ({count} mục)',
   aiCmdSkipped: ' (đã bỏ qua {count} khối được bảo vệ)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
   aiClarifyTitle: 'Vài câu hỏi trước khi tiếp tục',
@@ -209,6 +220,8 @@ export const vi = {
   aiClarifySubmit: 'Tiếp tục',
   aiSumClarify: 'Đã trả lời câu hỏi làm rõ',
   aiSumClarifySkipped: 'Đã bỏ qua câu hỏi làm rõ',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Tạo bản đồ tư duy cho tài liệu này',
   aiMindMapBtn: 'Bản đồ tư duy AI',
   aiMindMapPrompt:
@@ -219,7 +232,18 @@ export const vi = {
   aiMindMapAskPrompt: 'Hãy giới thiệu về "{label}" trong tài liệu này',
   aiMindMapJump: 'Đến đoạn được trích dẫn',
   aiMindMapExport: 'Xuất PNG',
+<<<<<<< ours
   aiMindMapReset: 'Đặt lại khung nhìn',
   aiMindMapExpand: 'Mở rộng nhánh',
   aiMindMapCollapse: 'Thu gọn nhánh',
+=======
+  aiMindMapExportSvg: 'Xuất SVG',
+  aiMindMapInsert: 'Chèn vào tài liệu',
+  aiMindMapReset: 'Đặt lại khung nhìn',
+  aiMindMapExpand: 'Mở rộng nhánh',
+  aiMindMapCollapse: 'Thu gọn nhánh',
+  aiMindMapToggleLayout: 'Đổi bố cục',
+  aiMindMapLayoutTopDown: 'Chuyển sang bố cục từ trên xuống dưới',
+  aiMindMapLayoutLeftRight: 'Chuyển sang bố cục từ trái sang phải',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

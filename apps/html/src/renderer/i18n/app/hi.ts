@@ -9,6 +9,14 @@ export const hi = {
   redactDialogPlaceholder: 'प्लेसहोल्डर का नाम, जैसे ग्राहक का फ़ोन',
   redactCancel: 'रद्द करें',
   redactInsert: 'छिपाएँ',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'यह फ़ाइल किसी अन्य प्रोग्राम द्वारा बदली गई।',
+  diskConflictMsg: 'यह फ़ाइल डिस्क पर बदल गई है; सहेजने से वे बदलाव मिट जाएँगे।',
+  diskReload: 'फिर से लोड करें',
+  diskKeepMine: 'मेरा रखें',
+  diskOverwrite: 'फिर भी अधिलेखित करें',
+>>>>>>> theirs
 
   loading: 'लोड हो रहा है…',
   loadFailed: 'फ़ाइल नहीं खोली जा सकी',
@@ -78,6 +86,7 @@ export const hi = {
   linkNeedsSelection: 'पहले पूर्वावलोकन में टेक्स्ट चुनें',
   save: 'सहेजें (⌘S)',
   saveAs: 'इस रूप में सहेजें…',
+  aiNameFile: 'AI से नाम दें…',
   ribbonCollapse: 'रिबन संक्षिप्त करें',
   ribbonExpand: 'रिबन विस्तृत करें',
   ribbonGroupInsert: 'सम्मिलित करें',
@@ -108,6 +117,7 @@ export const hi = {
   alignLeft: 'बाएँ संरेखित करें',
   alignCenter: 'केंद्र में',
   alignRight: 'दाएँ संरेखित करें',
+  alignJustify: 'जस्टिफ़ाई',
   fontSizeDec: 'फ़ॉन्ट आकार घटाएँ',
   fontSizeInc: 'फ़ॉन्ट आकार बढ़ाएँ',
   typography: 'टाइपोग्राफी',

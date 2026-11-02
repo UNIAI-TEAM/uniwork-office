@@ -39,17 +39,48 @@ describe('blockAttrs .doc-grid-strut class', () => {
     })
     expect(pOf(editor).classList.contains('doc-grid-strut')).toBe(true)
     expect(pOf(editor).style.fontFamily).toBe('')
+    const run = pOf(editor).querySelector('span[style*="font-family"]') as HTMLElement
+    expect(run.style.getPropertyValue('--doc-run-ff').replace(/'/g, '"').replace(/,/g, ', ')).toBe(
+      run.style.fontFamily,
+    )
     editor.destroy()
   })
 
-  it('all-declared paragraphs keep the direct family swap instead', () => {
+  it('a declared Latin + East Asian face pair marks the paragraph', () => {
     const editor = new Editor({
       element: document.createElement('div'),
       extensions: editorExtensions,
-      content: para([text('本研究は', { font: 'ＭＳ 明朝', fontAscii: 'ＭＳ 明朝' })]),
+      content: para([text('\u4e2d\u6587', { font: 'Microsoft YaHei', fontAscii: 'Calibri' })]),
+    })
+    expect(pOf(editor).classList.contains('doc-grid-strut')).toBe(true)
+    editor.destroy()
+  })
+
+  // the strut face carries the document base face's box (doc-style-css), so a
+  // single declared face has nothing to union and keeps its own face leading
+  // the line: Meiryo UI body lines under a Mincho default sat 2-3px above Word
+  it('a single declared face on every slot keeps the family swap and stays unmarked', () => {
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions: editorExtensions,
+      content: para([text('\u4e2d\u6587', { font: 'Meiryo UI', fontAscii: 'Meiryo UI' })]),
+    })
+    const p = pOf(editor)
+    expect(p.classList.contains('doc-grid-strut')).toBe(false)
+    expect(p.style.fontFamily).not.toBe('')
+    expect(
+      p.style.getPropertyValue('--doc-grid-strut-tail').replace(/'/g, '"').replace(/,/g, ', '),
+    ).toBe(p.style.fontFamily)
+    editor.destroy()
+  })
+
+  it('all-declared Latin paragraphs stay unmarked', () => {
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions: editorExtensions,
+      content: para([text('Latin', { font: 'Arial', fontAscii: 'Arial' })]),
     })
     expect(pOf(editor).classList.contains('doc-grid-strut')).toBe(false)
-    expect(pOf(editor).style.fontFamily).not.toBe('')
     editor.destroy()
   })
 
@@ -135,7 +166,8 @@ describe('docStyleCss grid strut face', () => {
     // the Office-private MS Mincho renders through a stand-in, so the
     // inheriting .doc-ea-strut paragraphs share the strut too
     expect(css).toContain(
-      ".doc-page :is(.doc-grid-strut,.doc-ea-strut) { font-family:'GenOffice Grid Strut',var(--doc-grid-strut-tail,serif) }",
+      // !important: all-declared CJK paragraphs carry their chain inline and get the class too
+      ".doc-page :is(.doc-grid-strut,.doc-ea-strut) { font-family:'GenOffice Grid Strut',var(--doc-grid-strut-tail,serif) !important }",
     )
     expect(css).toContain('--doc-grid-strut-tail:')
   })
@@ -156,6 +188,11 @@ describe('docStyleCss grid strut face', () => {
     expect(css).toContain("@font-face { font-family:'GenOffice Grid Strut'")
     expect(css).toContain('ascent-override:88%')
     expect(css).toContain('.doc-page :is(.doc-grid-strut,.doc-ea-strut) {')
+    // the CJK spans lead with the strut face too: their loaded range alias is
+    // not the face the strut measured, and offset boxes union past the grid
+    expect(css).toContain(
+      ".doc-page :is(.doc-grid-strut,.doc-ea-strut) .doc-east-asian-font { font-family:'GenOffice Grid Strut',",
+    )
     expect(docStyleCss(parsedWith(null, '\uff2d\uff33 \u660e\u671d'))).toContain('.doc-ea-strut')
   })
 

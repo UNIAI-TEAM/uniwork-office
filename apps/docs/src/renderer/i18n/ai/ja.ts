@@ -114,6 +114,11 @@ export const ja = {
     '変更履歴オン:AI による内容の変更は変更履歴として記録されます(挿入は下線、削除は取り消し線)。校閲で承諾または元に戻せます',
   aiTrackOffTitle:
     '変更履歴オフ:AI の変更はすぐに反映されます(バージョンスナップショットからロールバック可能)',
+  aiRevisionBarTitle: '変更履歴',
+  aiRevisionCount: '{count} 件の変更',
+  aiRevisionRejectAll: 'すべて元に戻す',
+  aiRevisionAcceptAll: 'すべて承諾',
+  aiRevisionPara: '段落 {n}',
   aiTurnLimit:
     '（1 回のリクエストのツール呼び出し上限に達したため、ここまでに完了した内容に基づく回答です。不完全な場合があります。）',
   aiStopped: '(停止しました)',
@@ -126,6 +131,8 @@ export const ja = {
   aiUnknownError: '不明なエラー',
   aiTimeoutError:
     'AIリクエストがタイムアウトしました：ネットワークからの応答がないため中断しました。接続を確認して再試行してください',
+  aiRegionError:
+    'このモデルの提供元は現在の地域ではサービスを提供していません。別のモデルを選ぶか、ネットワークを切り替えてください',
   aiOverloadedError: 'AI サービスが混み合っています。しばらくしてからもう一度お試しください',
   aiNetworkError:
     'ネットワークに問題があり、AI サービスに接続できません。接続を確認して再試行してください',
@@ -133,6 +140,9 @@ export const ja = {
   aiSumImageAttachment: '画像添付 {name}',
   aiSumRead: '{name} を読み取り',
   aiSumReadAttachmentName: '添付ファイル {name} を読み取り',
+  aiSumSkillsList: 'インストール済みスキルを一覧表示',
+  aiSumSkillRead: 'スキル {name} を読み込み',
+  aiSumRunCli: '{args} を実行',
   aiSumWebSearch: 'ウェブ検索',
   aiSumWebSearchDone: '「{query}」を検索({count} 件)',
   aiSumImageSearch: '画像検索',
@@ -196,6 +206,7 @@ export const ja = {
   aiCmdImages: '{count} 枚の画像を更新しました',
   aiCmdToc: '目次を挿入しました({count} 項目)',
   aiCmdSkipped: '({count} 個の保護されたブロックをスキップ)',
+<<<<<<< ours
   aiViewOnlyNotice:
     '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
   aiClarifyTitle: '続ける前にいくつか確認させてください',
@@ -210,6 +221,8 @@ export const ja = {
   aiClarifySubmit: '続ける',
   aiSumClarify: '確認の質問に回答済み',
   aiSumClarifySkipped: '確認の質問をスキップ',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'このドキュメントのマインドマップを生成',
   aiMindMapBtn: 'AI マインドマップ',
   aiMindMapPrompt:
@@ -220,7 +233,18 @@ export const ja = {
   aiMindMapAskPrompt: 'このドキュメントの「{label}」について教えて',
   aiMindMapJump: '該当段落へジャンプ',
   aiMindMapExport: 'PNG で書き出す',
+<<<<<<< ours
   aiMindMapReset: '表示をリセット',
   aiMindMapExpand: 'ブランチを展開',
   aiMindMapCollapse: 'ブランチを折りたたむ',
+=======
+  aiMindMapExportSvg: 'SVG で書き出す',
+  aiMindMapInsert: 'ドキュメントに挿入',
+  aiMindMapReset: '表示をリセット',
+  aiMindMapExpand: 'ブランチを展開',
+  aiMindMapCollapse: 'ブランチを折りたたむ',
+  aiMindMapToggleLayout: 'レイアウトを切り替え',
+  aiMindMapLayoutTopDown: '上から下のレイアウトに切り替える',
+  aiMindMapLayoutLeftRight: '左右のレイアウトに切り替える',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

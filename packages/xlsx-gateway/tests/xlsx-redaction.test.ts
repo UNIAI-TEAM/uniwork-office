@@ -15,7 +15,10 @@ import {
   type SheetRedactionState,
 } from '../src/gateway/xlsx-redaction'
 import { shiftDefinedNames } from '../src/gateway/xlsx-structure'
+<<<<<<< ours
 import { unescapeXml } from '../src/gateway/xlsx-defined-names'
+=======
+>>>>>>> theirs
 
 const MARK = { startRow: 1, endRow: 3, startColumn: 2, endColumn: 2, label: 'client phone' }
 
@@ -199,6 +202,7 @@ describe('rekeying for sheet edits done in the same save', () => {
     ])
   })
 
+<<<<<<< ours
   it('moves the marks before re-keying when the same save renames and inserts rows or columns', () => {
     expect(
       rekeyRedactionStates(
@@ -228,6 +232,8 @@ describe('rekeying for sheet edits done in the same save', () => {
     ])
   })
 
+=======
+>>>>>>> theirs
   it('drops a mark whose rows the same save deletes outright', () => {
     // The value it withheld is gone; a rectangle clamped onto a neighbour
     // would withhold something the reader never hid. A delete that only takes
@@ -258,6 +264,7 @@ describe('rekeying for sheet edits done in the same save', () => {
       STATES,
     )
   })
+<<<<<<< ours
 
   it('clones source marks onto duplicated sheets and applies the copy shifts without double-copying explicit destination states', () => {
     expect(
@@ -293,6 +300,8 @@ describe('rekeying for sheet edits done in the same save', () => {
       ),
     ).toEqual([...STATES, { sheetName: 'Copy', marks: [explicitCopyMark] }])
   })
+=======
+>>>>>>> theirs
 })
 
 describe('writing the part into the package', () => {
@@ -551,6 +560,7 @@ describe('the defined-name mirror', () => {
     expect(mark.label.length).toBeLessThan(label.length)
   })
 
+<<<<<<< ours
   it('budgets the fully encoded formula within 255 characters for quotes, backslashes, and newlines', () => {
     for (const char of ['"', '\\', '\n']) {
       const label = char.repeat(255)
@@ -572,6 +582,8 @@ describe('the defined-name mirror', () => {
     }
   })
 
+=======
+>>>>>>> theirs
   it('drops marks for a sheet the file no longer has', () => {
     const written = applyRedactionNameMirror(WORKBOOK_XML, DATA_STATES, ['Q3'])
     expect(parseRedactionNameMirror(written, ['Q3'])).toEqual([])

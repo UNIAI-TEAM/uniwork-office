@@ -121,13 +121,14 @@ describe('grid reconciliation from tcW boundaries', () => {
         `<w:tr>${cell}</w:tr></w:tbl>`,
     )
     expect(declared.colWidthsTwips).toEqual([10469])
-    // a percent width is declared too: the grid stays authoritative
+    // a percent width: a grid that does not sum to the pct width is not Word's
+    // layout, the cells' preferred widths win (probe 2026-10-29)
     const pct = await tableOf(
       '<w:tbl><w:tblPr><w:tblW w:w="100%" w:type="pct"/></w:tblPr>' +
         gridXml([10469]) +
         `<w:tr>${cell}</w:tr></w:tbl>`,
     )
-    expect(pct.colWidthsTwips).toEqual([10469])
+    expect(pct.colWidthsTwips).toEqual([6480])
   })
 
   it('keeps the grid of an undeclared-width table whose preferred widths overflow the column', async () => {
@@ -223,6 +224,32 @@ describe('grid reconciliation from tcW boundaries', () => {
     const plain = await tableOf(tbl(''))
     expect(plain.colWidthsTwips).toEqual([4200, 2100, 4300])
     expect(plain.layoutGrid).toBeUndefined()
+  })
+})
+
+describe('content autofit flag', () => {
+  const pctTbl = (cells: string, layout = '') =>
+    `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>${layout}</w:tblPr>` +
+    gridXml([3960, 3960]) +
+    `<w:tr>${cells}</w:tr></w:tbl>`
+
+  it('a pct table with no w:tcW on any cell autofits to content', async () => {
+    const table = await tableOf(pctTbl(tc('Domaine') + tc('Resultat')))
+    expect(table.contentAutofit).toBe(true)
+    expect(table.autoLayout).toBe(true)
+  })
+
+  it('any w:tcW, a fixed layout or a dxa width keeps the grid path', async () => {
+    const tcw = await tableOf(pctTbl(tc('a', '<w:tcW w:w="3960" w:type="dxa"/>') + tc('b')))
+    expect(tcw.contentAutofit).toBeUndefined()
+    const fixed = await tableOf(pctTbl(tc('a') + tc('b'), '<w:tblLayout w:type="fixed"/>'))
+    expect(fixed.contentAutofit).toBeUndefined()
+    const dxa = await tableOf(
+      '<w:tbl><w:tblPr><w:tblW w:w="7920" w:type="dxa"/></w:tblPr>' +
+        gridXml([3960, 3960]) +
+        `<w:tr>${tc('a') + tc('b')}</w:tr></w:tbl>`,
+    )
+    expect(dxa.contentAutofit).toBeUndefined()
   })
 })
 

@@ -11,10 +11,16 @@
  *
  * Each substitution is Goal Seek's mutateAndAwaitRecalc pattern — a journaled
  * setValue, then wait for the recalculation it triggers (Calculate Now in
+<<<<<<< ours
  * manual mode), then read the formula cell. The result block sits in one undo
  * batch, so a single ⌘Z removes every result; the input writes stay out of
  * the undo stack and the cells end the run at their original contents (also
  * on any failure, which restores them before the throw).
+=======
+ * manual mode), then read the formula cell. The whole run sits inside one
+ * undo batch, so a single ⌘Z removes every result and restores the input
+ * cells; on any failure the input cells are restored before the throw.
+>>>>>>> theirs
  */
 import {
   parseAddress,
@@ -26,7 +32,11 @@ import {
 import { calculateNow, isManualCalculation } from './calc-options'
 import { t } from './i18n/locale'
 import { beginUndoBatch } from './op-executor'
+<<<<<<< ours
 import { undoSuppression, type UniverRuntime, type UniverWorksheet } from './univer-state'
+=======
+import type { UniverRuntime, UniverWorksheet } from './univer-state'
+>>>>>>> theirs
 
 /// Excel caps nothing; we do, because every result cell is a full
 /// mutate-recalc-read cycle and the run must stay undoable in one step.
@@ -180,6 +190,7 @@ function mutateAndAwaitRecalc(runtime: UniverRuntime, mutate: () => void): Promi
   })
 }
 
+<<<<<<< ours
 /// An input-cell write (substitution or restore) nets to nothing, so it stays
 /// out of the undo batch: batched undo mutations replay in push order, which
 /// would leave the input at its last substituted value after one ⌘Z.
@@ -192,6 +203,8 @@ async function writeInputCell(runtime: UniverRuntime, mutate: () => void): Promi
   }
 }
 
+=======
+>>>>>>> theirs
 export interface DataTableInput {
   /// The whole table region in A1 notation, e.g. "B4:D8" — corner, value
   /// headers and the (existing or empty) result cells.
@@ -294,7 +307,11 @@ export async function applyDataTable(
     for (let index = 0; index < inputRanges.length; index += 1) {
       const { range } = inputRanges[index]!
       const original = originals[index] ?? null
+<<<<<<< ours
       await writeInputCell(runtime, () =>
+=======
+      await mutateAndAwaitRecalc(runtime, () =>
+>>>>>>> theirs
         original === null ? range.setValue({ v: null }) : range.setValue(original),
       )
     }
@@ -311,9 +328,15 @@ export async function applyDataTable(
       const columnInputRange = inputRanges[1]!.range
       for (const columnValue of columnValues) {
         const row: ScalarValue[] = []
+<<<<<<< ours
         await writeInputCell(runtime, () => columnInputRange.setValue(columnValue))
         for (const rowValue of rowValues) {
           await writeInputCell(runtime, () => rowInputRange.setValue(rowValue))
+=======
+        await mutateAndAwaitRecalc(runtime, () => columnInputRange.setValue(columnValue))
+        for (const rowValue of rowValues) {
+          await mutateAndAwaitRecalc(runtime, () => rowInputRange.setValue(rowValue))
+>>>>>>> theirs
           row.push(readFormula())
           report()
         }
@@ -324,7 +347,11 @@ export async function applyDataTable(
       const values = plan.kind === 'column' ? columnValues : rowValues
       const evaluated: ScalarValue[] = []
       for (const value of values) {
+<<<<<<< ours
         await writeInputCell(runtime, () => axisRange.setValue(value))
+=======
+        await mutateAndAwaitRecalc(runtime, () => axisRange.setValue(value))
+>>>>>>> theirs
         evaluated.push(readFormula())
         report()
       }

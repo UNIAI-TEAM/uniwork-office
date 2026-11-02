@@ -38,7 +38,11 @@ describe('Home file creation is atomic', () => {
 
   it('publishes a duplicate through a temporary file', () => {
     expect(duplicateFile).toContain('await duplicateFile(path)')
+<<<<<<< ours
     expect(sharedDuplicate).toContain('await atomicCopyFileExclusive(path, target)')
+=======
+    expect(sharedDuplicate).toContain('await atomicCopyFile(path, target)')
+>>>>>>> theirs
     expect(sharedDuplicate).not.toMatch(/copyFileSync\(path, target\)/)
     // a kernel copy, never the whole file through renderer-visible memory
     expect(sharedDuplicate).not.toMatch(/readFileSync\(path\)/)
@@ -54,7 +58,11 @@ describe('Home duplicate error handling', () => {
   })
 
   it('does not record a recent for a duplicate that was never written', () => {
+<<<<<<< ours
     const write = sharedDuplicate.indexOf('await atomicCopyFileExclusive(path, target)')
+=======
+    const write = sharedDuplicate.indexOf('await atomicCopyFile(path, target)')
+>>>>>>> theirs
     const catchBlock = sharedDuplicate.indexOf('catch (error)')
     const record = sharedDuplicate.indexOf('deps.recordRecentFile(target)')
     expect(catchBlock).toBeGreaterThan(write)

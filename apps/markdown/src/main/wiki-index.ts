@@ -90,9 +90,16 @@ const WIKI_TARGET_RE = /!?\[\[([^[|\n]+?)(?:\|[^[|\n]*)?\]\]/g
  * `#tag` as Obsidian reads it: `#` followed by a letter (any script), then
  * letters/digits/`-`/`_`/`/`. Not a heading (`#` needs a space after to be
  * one), not inside a fence or inline code — the same stripping walk
+<<<<<<< ours
  * extractWikiTargets uses.
  */
 const TAG_RE = /(^|[^\w#])#(\p{L}[\p{L}\p{N}/_-]*)/gu
+=======
+ * extractWikiTargets uses — and not the fragment of a link destination or a
+ * URL (`[x](#heading)`, `https://a.b/#top`), which are anchors, not tags.
+ */
+const TAG_RE = /(^|[^\w#/])#(\p{L}[\p{L}\p{N}/_-]*)/gu
+>>>>>>> theirs
 
 export function extractTags(text: string): string[] {
   const out: string[] = []
@@ -113,7 +120,15 @@ export function extractTags(text: string): string[] {
       continue
     }
     if (inFence) continue
+<<<<<<< ours
     const clean = line.replace(/`[^`\n]*`/g, ' ')
+=======
+    const clean = line
+      .replace(/`[^`\n]*`/g, ' ')
+      .replace(/\]\([^)\n]*\)/g, ']')
+      .replace(/<[a-z][a-z0-9+.-]*:[^>\s]*>/gi, ' ')
+      .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, ' ')
+>>>>>>> theirs
     for (const match of clean.matchAll(TAG_RE)) {
       const tag = match[2]!
       if (!seen.has(tag)) {
@@ -142,8 +157,13 @@ interface IndexState {
 
 const indexes = new Map<string, IndexState>()
 
+<<<<<<< ours
 /** in-flight builds per root, chained — see refreshEdges */
 const building = new Map<string, Promise<Map<string, { target: string; path: string }[]>>>()
+=======
+/** in-flight builds per root, chained — see chained() */
+const building = new Map<string, Promise<unknown>>()
+>>>>>>> theirs
 
 function indexFor(root: string): IndexState {
   let state = indexes.get(root)
@@ -232,6 +252,7 @@ function refreshFiles(root: string, fs: VaultFs): Promise<IndexState> {
 }
 
 /**
+<<<<<<< ours
  * Resolved outgoing edges for every indexed file, computing what is missing.
  *
  * Chained per root. The panel and the graph usually open together, and each
@@ -239,10 +260,29 @@ function refreshFiles(root: string, fs: VaultFs): Promise<IndexState> {
  * interleave across their awaits and read a half-written file set. The second
  * caller waits and then finds the memo warm.
  */
+=======
+ * Every walk over one root runs after the one before it. The panel, the graph
+ * and the tags pane usually open together, and each build walks the tree and
+ * writes one shared IndexState — left unchained they interleave across their
+ * awaits and read a half-written file set. The second caller waits and then
+ * finds the memo warm.
+ */
+function chained<T>(root: string, work: () => Promise<T>): Promise<T> {
+  const previous = building.get(root) ?? Promise.resolve()
+  const next = previous.catch(() => undefined).then(work)
+  building.set(root, next)
+  return next.finally(() => {
+    if (building.get(root) === next) building.delete(root)
+  })
+}
+
+/** Resolve every link in the vault to the note it lands on, memoised per file mtime. */
+>>>>>>> theirs
 function refreshEdges(
   root: string,
   fs: VaultFs,
 ): Promise<Map<string, { target: string; path: string }[]>> {
+<<<<<<< ours
   const previous = building.get(root) ?? Promise.resolve(new Map())
   const next = previous
     .catch(() => new Map())
@@ -273,6 +313,31 @@ function refreshEdges(
   building.set(root, next)
   return next.finally(() => {
     if (building.get(root) === next) building.delete(root)
+=======
+  return chained(root, async () => {
+    const state = await refreshFiles(root, fs)
+    const out = new Map<string, { target: string; path: string }[]>()
+    for (const [path, entry] of state.files) {
+      const done = state.edges.get(path)
+      if (done && done.mtimeMs === entry.mtimeMs) {
+        out.set(path, done.to)
+        continue
+      }
+      const answers =
+        entry.targets.length > 0
+          ? await resolveWikiLinks(entry.targets, { fromPath: path, root }, fs)
+          : new Map()
+      const to: { target: string; path: string }[] = []
+      for (const [target, answer] of answers) {
+        if (answer.found && answer.path && answer.path !== path) {
+          to.push({ target, path: answer.path })
+        }
+      }
+      state.edges.set(path, { mtimeMs: entry.mtimeMs, to })
+      out.set(path, to)
+    }
+    return out
+>>>>>>> theirs
   })
 }
 
@@ -320,7 +385,11 @@ export interface WikiTagEntry {
  * Falls out of the same index the backlinks and graph read — no second walk.
  */
 export async function wikiTags(root: string, fs: VaultFs): Promise<WikiTagEntry[]> {
+<<<<<<< ours
   const state = await refreshFiles(root, fs)
+=======
+  const state = await chained(root, () => refreshFiles(root, fs))
+>>>>>>> theirs
   const byTag = new Map<string, string[]>()
   for (const [path, entry] of state.files) {
     for (const tag of entry.tags) {

@@ -71,6 +71,11 @@ export const IPC_CHANNELS = {
   readPivotDefinition: 'workbook:read-pivot-definition',
   /** The cells the reader withheld from the model (xl/gxRedactions.json) */
   readWorkbookRedactions: 'workbook:read-redactions',
+<<<<<<< ours
+=======
+  /** Data › Queries & Connections: the workbook's connections, read-only (xl/connections.xml) */
+  readWorkbookQueries: 'workbook:read-queries',
+>>>>>>> theirs
   readLocalImage: 'shell:read-local-image',
   closeWorkbook: 'workbook:close',
   saveWorkbook: 'workbook:save',

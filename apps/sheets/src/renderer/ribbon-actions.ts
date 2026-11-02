@@ -12,6 +12,10 @@ import {
   FOCUSING_EDITOR_INPUT_FORMULA,
   FOCUSING_EDITOR_STANDALONE,
   IContextService,
+<<<<<<< ours
+=======
+  IUndoRedoService,
+>>>>>>> theirs
   WrapStrategy,
   type ICellData,
   type IStyleData,
@@ -90,6 +94,7 @@ import { requestCellsAction } from './insert-delete-cells'
 import { applyRightToLeftView, sheetIsRightToLeft } from './sheet-rtl-view'
 import type { CellsMode } from './insert-delete-cells'
 import { mergeWorkbooksIntoCurrent } from './merge-workbooks'
+import { openActiveDataValidationDropdown } from './data-validation-dropdown'
 import {
   handleOpenSlicerPicker,
   handleOpenTimelinePicker,
@@ -120,6 +125,7 @@ import {
   type LazyWorkbookState,
   type UniverRuntime,
 } from './univer-state'
+import { stepSelectionDecimals } from './decimal-step'
 import {
   handleInsertChart,
   handleInsertPicture,
@@ -254,6 +260,15 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
   if (!runtime) return
   if (command === 'undo' || command === 'redo') {
     void runtime.univerAPI[command]()
+    return
+  }
+  if (command === 'redo-or-repeat') {
+    // Excel's Ctrl+Y semantics: Redo when there is something to redo,
+    // otherwise repeat the last action on the current selection (F4's
+    // command). Keeps "Ctrl+Y after typing" doing what Excel users expect.
+    const undoRedo = runtime.univer.__getInjector().get(IUndoRedoService)
+    if (undoRedo.pitchTopRedoElement()) void runtime.univerAPI.redo()
+    else void runtime.univerAPI.executeCommand('sheet.command.repeat-last-action')
     return
   }
   if (command.startsWith('error:')) {
@@ -393,6 +408,14 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
     case 'find':
       void runtime.univerAPI.executeCommand('ui.operation.open-find-dialog')
       return
+    case 'dv-dropdown-open':
+      openActiveDataValidationDropdown(runtime)
+      return
+    case 'scroll-to-active': {
+      const active = runtime.univerAPI.getActiveWorkbook()?.getActiveCell()
+      if (worksheet && active) worksheet.scrollToCell(active.getRow(), active.getColumn())
+      return
+    }
     case 'copy':
     case 'cut':
     case 'paste':
@@ -643,24 +666,27 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
       return
     case 'decimal-inc':
     case 'decimal-dec':
-      // Univer's decimal commands read the displayed value's decimals for
-      // General; SetNumfmt mutations journal like any format edit.
-      void runtime.univerAPI.executeCommand(
-        command === 'decimal-inc'
-          ? 'sheet.command.numfmt.add.decimal.command'
-          : 'sheet.command.numfmt.subtract.decimal.command',
-      )
+      // Not Univer's add/subtract-decimal commands: those read an explicit
+      // "General" record as 9 decimals, so one click exploded to 10 places.
+      // SetNumfmt mutations journal like any format edit either way.
+      stepSelectionDecimals(runtime, command === 'decimal-inc' ? 1 : -1)
       return
     case 'filter-toggle': {
+<<<<<<< ours
       // A declined command — nothing selected, a range the filter cannot take —
       // says nothing on its own, and a filter that never appeared reads as a dead
       // button. While the sheet is still loading, the gate in App.tsx already
       // says why (a footer note, a "load it all" prompt, or the projection
       // path's own progress), so this stays quiet rather than talking over it.
+=======
+      // While the sheet is still loading the App.tsx gate already explains the
+      // decline, so stay quiet rather than talk over it.
+>>>>>>> theirs
       const lazy = ctx.lazyWorkbookRef.current
       const stillLoading = lazy !== null && !lazy.flags.preloadComplete
       void runtime.univerAPI.executeCommand('sheet.command.smart-toggle-filter').then((ok) => {
         if (ok !== false || stillLoading) return
+<<<<<<< ours
         // A canceling guard also answers `false`: when the sheet's protection
         // has already spoken — blocked outright, or unknown while still being
         // indexed — this notice would overwrite it with the wrong advice.
@@ -668,6 +694,15 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
         const sheetId = worksheet?.getSheetId()
         const protection = state && sheetId ? effectiveSheetProtection(state, sheetId) : null
         if (!protection || (protection.protected && !protection.allow.autoFilter)) return
+=======
+        // A canceling protection guard also answers false and has already spoken.
+        const state = ctx.lazyWorkbookRef.current
+        const sheetId = worksheet?.getSheetId()
+        if (state && sheetId) {
+          const protection = effectiveSheetProtection(state, sheetId)
+          if (!protection || (protection.protected && !protection.allow.autoFilter)) return
+        }
+>>>>>>> theirs
         ctx.setMessage(t('appFilterToggleFailed'))
       })
       return
@@ -1364,7 +1399,9 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
     return
   }
   if (command === 'format-as-table') {
-    handleFormatAsTable(ctx.dataToolsContext(), 'TableStyleMedium2')
+    const existing = selectedTableEcho(ctx.tableDesignContext())
+    if (existing) ctx.setMessage(t('appTableAlreadyInTable', { name: existing.name }))
+    else handleFormatAsTable(ctx.dataToolsContext(), 'TableStyleMedium2')
     return
   }
   if (command.startsWith('page-layout:')) {
@@ -1888,6 +1925,25 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
           const dayShift = ctx.lazyWorkbookRef.current?.file.date1904 === true ? 1462 : 0
           cell.setValue(Math.floor(serial) - dayShift)
           cell.setNumberFormat('yyyy/m/d')
+        }
+        return
+      }
+      case 'copy-above': {
+        // Excel's Ctrl+' / Ctrl+Shift+": the cell above's formula text verbatim
+        // (no reference shift) or its value only, into the ACTIVE cell.
+        if (!worksheet) return
+        const active = runtime.univerAPI.getActiveWorkbook()?.getActiveCell()
+        const row = active?.getRow() ?? range.getRow()
+        const column = active?.getColumn() ?? range.getColumn()
+        if (row <= 0) return
+        const above = worksheet.getRange(row - 1, column).getCellData()
+        const target = worksheet.getRange(row, column)
+        if (argument === 'formula') {
+          const formula = above?.f
+          if (typeof formula === 'string' && formula.length > 0) target.setValue({ f: formula })
+          else if (above?.v !== undefined && above.v !== null) target.setValue(above.v)
+        } else if (above?.v !== undefined && above.v !== null) {
+          target.setValue(above.v)
         }
         return
       }

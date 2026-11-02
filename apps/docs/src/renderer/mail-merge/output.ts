@@ -1,3 +1,4 @@
+<<<<<<< ours
 import {
   mergeFieldName,
   mergeOutputFileName,
@@ -10,6 +11,14 @@ import { buildDocBytes, type FileActionContext } from '../file-actions'
 import type { PmNode } from '../editor/convert'
 import type { TFunc } from '../i18n/locale'
 import { mergeAllRecords, substituteMergeFields } from './template'
+=======
+import { mergeOutputFileName, type MergeRecord } from '@genoffice/docx-engine'
+import type { MergeOutputMode } from '../../shared/ipc'
+import { buildDocBytes, type FileActionContext } from '../file-actions'
+import type { PmNode } from '../editor/convert'
+import { mergeAllRecords, substituteMergeFields } from './template'
+
+>>>>>>> theirs
 /**
  * The output half of the mail merge: the documents the merge writes.
  *
@@ -54,6 +63,7 @@ export interface MailMergeResponse {
 }
 
 /**
+<<<<<<< ours
  * A merge writes ordinary local .docx copies of the template: no open password and no UniWork
  * binding. For a password-protected or UniWork-bound document the user must confirm that first
  * (never a silent plaintext copy); the returned string is the i18n key of the question, null
@@ -98,6 +108,8 @@ export function mergeWrittenLabel(tr: TFunc, lang: Lang, n: number): string {
   return tr(isSingular(lang, n) ? 'appMergeWrittenOne' : 'appMergeWritten', { n })
 }
 /**
+=======
+>>>>>>> theirs
  * The documents a merge writes.
  *
  * One document per record is the letter case: every record gets its own

@@ -41,6 +41,7 @@ function renderRibbon(sourceMode: boolean, sourceViewOpen = false) {
         dirty: false,
         onSave: vi.fn(),
         onSaveAs: vi.fn(),
+        onNameWithAi: vi.fn(),
         onFind: vi.fn(),
         autoSave: false,
         onToggleAutoSave: vi.fn(),
@@ -83,6 +84,8 @@ function counts(container: HTMLElement) {
     styleDropdown: container.querySelectorAll('.rb-style').length,
     // every icon button in the toolbar body, minus the one the source ribbon keeps
     iconButtons: container.querySelectorAll('.ribbon-body button.rb-btn').length,
+    themePickerDisabled: container.querySelector<HTMLButtonElement>('.md-theme-wrap > .rb-btn')
+      ?.disabled,
   }
 }
 
@@ -95,6 +98,7 @@ describe('Ribbon source mode', () => {
     // 14 block-formatting controls, plus this PR's withhold toggle, plus the
     // markdown-only source-view toggle (absent for a .txt/.json, which has no
     // use for it), plus the image-host button, which is not a formatting
+<<<<<<< ours
     // control and so renders in either mode, plus the paper-theme picker,
     // which the source view benefits from just as much, plus the highlight
     // button next to bold/italic/strike, plus the backlinks, tags and graph
@@ -105,12 +109,26 @@ describe('Ribbon source mode', () => {
     // toggle gates the block editor's marks, which source mode does not carry)
     // and the paper-theme picker (the paper exists in source view too)
     expect(source.iconButtons).toBe(2)
+=======
+    // control and so renders in either mode, plus the paper-theme picker and
+    // the backlinks and graph buttons, which are markdown-only views like the
+    // source-view toggle, plus the copy-block-link button beside the link one.
+    expect(markdown.iconButtons).toBe(23)
+    // source mode keeps exactly two: the spellcheck toggle (the withhold
+    // toggle gates the block editor's marks, which source mode does not carry)
+    // and the paper-theme picker, disabled there (source text sits outside
+    // the themed paper)
+    expect(source.iconButtons).toBe(2)
+    expect(source.themePickerDisabled).toBe(true)
+    expect(markdown.themePickerDisabled).toBe(false)
+>>>>>>> theirs
   })
 
   it('keeps the actions that still apply to source text', () => {
     const container = renderRibbon(true)
-    // the quick-access row is untouched: save, save-as, undo, redo, find
-    expect(container.querySelectorAll('.ribbon-tabs .qa-btn').length).toBe(5)
+    // the quick-access row is untouched: save, save-as, name-with-ai, undo,
+    // redo, find
+    expect(container.querySelectorAll('.ribbon-tabs .qa-btn').length).toBe(6)
     expect(container.querySelector('.autosave-toggle')).not.toBeNull()
   })
 
@@ -136,22 +154,25 @@ describe('Ribbon source mode', () => {
   })
 
   it('keeps Save As live in both modes and Find live only outside the source view', () => {
-    const quick = (container: HTMLElement) =>
-      Array.from(container.querySelectorAll<HTMLButtonElement>('.ribbon-tabs .qa-btn'))
-    const [, saveAsPlain, , , findPlain] = quick(renderRibbon(false))
-    const [, saveAsSource, , , findSource] = quick(renderRibbon(true))
-    const [, saveAsView, , , findView] = quick(renderRibbon(false, true))
-    expect(saveAsPlain!.disabled).toBe(false)
-    expect(saveAsSource!.disabled).toBe(false)
-    expect(saveAsView!.disabled).toBe(false)
-    expect(findPlain!.disabled).toBe(false)
-    expect(findSource!.disabled).toBe(false)
-    expect(findView!.disabled).toBe(true)
+    // By class, not by position: the quick-access row grew a "Name with AI"
+    // button, and a positional lookup would silently start pointing at the
+    // wrong control the next time one is added.
+    const button = (container: HTMLElement, cls: string) =>
+      container.querySelector<HTMLButtonElement>(`.ribbon-tabs .${cls}`)
+    const saveAs = (container: HTMLElement) => button(container, 'qa-save-as')!
+    const find = (container: HTMLElement) => button(container, 'qa-find')!
+    expect(saveAs(renderRibbon(false)).disabled).toBe(false)
+    expect(saveAs(renderRibbon(true)).disabled).toBe(false)
+    expect(saveAs(renderRibbon(false, true)).disabled).toBe(false)
+    expect(find(renderRibbon(false)).disabled).toBe(false)
+    expect(find(renderRibbon(true)).disabled).toBe(false)
+    expect(find(renderRibbon(false, true)).disabled).toBe(true)
   })
 
   it('shows the formatting controls again for a markdown file', () => {
     const { styleDropdown, iconButtons } = counts(renderRibbon(false))
     expect(styleDropdown).toBe(1)
+<<<<<<< ours
     // 23 here too: the source-view toggle is present here and absent above,
     // the withhold toggle, the image-host button, the paper-theme picker, the
     // highlight button and the vault buttons are present in both
@@ -191,5 +212,11 @@ describe('Ribbon without the note vault (web: cap wikiVault off)', () => {
     ])
     // the alias display only hides syntax in the view: it needs no notes folder
     expect(names(false)).toEqual(['wikiAliasDisplay'])
+=======
+    // 20 here too: the source-view toggle is present here and absent above,
+    // the withhold toggle, the image-host button, the paper-theme picker and
+    // the backlinks and graph buttons are present in both
+    expect(iconButtons).toBe(23)
+>>>>>>> theirs
   })
 })

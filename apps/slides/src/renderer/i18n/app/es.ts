@@ -67,6 +67,10 @@ export const es = {
   appStatusAudioInserted: 'Audio insertado (incrustado en el .pptx)',
   appStatusModel3dInserted:
     'Modelo 3D insertado: selecciónelo para girarlo (PowerPoint también lo muestra en 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'No se pudo dibujar el modelo 3D aquí; su imagen no cambia',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'La grabación está vacía; no se insertó nada',
   appStatusRecordingInserted:
     'Grabación de pantalla insertada en la diapositiva actual (webm incrustado)',
@@ -228,6 +232,8 @@ export const es = {
   appMasterFillNone: 'Sin relleno',
   appMasterStroke: 'Color del contorno…',
   appMasterStrokeNone: 'Sin contorno',
+  appMasterInsertTextBox: 'Cuadro de texto',
+  appMasterInsertShape: 'Formas',
   appStartOpening: 'Abriendo…',
   appReadingSlideTitle:
     'Haga clic para ir a la diapositiva siguiente (Esc para salir de la vista de lectura)',
@@ -257,6 +263,27 @@ export const es = {
     'La duración total de la presentación fue {duration}. ¿Desea guardar los intervalos de las diapositivas para el avance automático?',
   appRehearseDiscard: 'No guardar',
   appRehearseSave: 'Guardar',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Grabar narración',
+  appRecordSummary:
+    'Duración de la grabación: {duration}. ¿Guardar la narración y el tiempo de cada diapositiva?',
+  appRecordDiscard: 'No guardar',
+  appRecordSave: 'Guardar',
+  appStatusRecordSaved:
+    'Narración guardada en {count} diapositivas (PowerPoint también la reproduce)',
+  appStatusRecordFailed: 'No se pudo guardar la grabación',
+  appStatusNarrationCleared: 'Narración borrada',
+  appSettingsTitle: 'Configuración de IA',
+  appSettingsAccount: 'Cuenta de Genspark',
+  appSettingsChecking: 'Comprobando…',
+  appSettingsLoggedIn: 'Sesión iniciada',
+  appSettingsLoggedInEmail: 'Sesión iniciada: {email}',
+  appSettingsLoggedOut: 'Sesión no iniciada (las funciones de IA requieren una cuenta de Genspark)',
+  appSettingsLoginPending: 'Esperando el inicio de sesión en el navegador…',
+  appSettingsLogin: 'Iniciar sesión en Genspark',
+  appSettingsModel: 'Modelo',
+>>>>>>> theirs
   appSettingsCancel: 'Cancelar',
   appCropHint: 'Entrar para confirmar · Esc para cancelar · Haga clic fuera para confirmar',
   appStatusZoomsInserted:

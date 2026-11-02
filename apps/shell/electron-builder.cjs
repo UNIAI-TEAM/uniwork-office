@@ -91,6 +91,7 @@ if (winArm64 && !process.env.ELECTRON_BUILDER_7Z_FILTER) {
   process.env.ELECTRON_BUILDER_7Z_FILTER = 'BCJ'
 }
 const winArch = winArm64 ? 'arm64' : 'x64'
+<<<<<<< ours
 // The x64 sidecar defaults to the MinGW cross-compile path (built on a
 // mac/linux host). A Windows host builds it natively with MSVC instead, where
 // native/xlsx-engine/.cargo/config.toml links the CRT statically;
@@ -104,6 +105,24 @@ if (!WIN_X64_SIDECAR_TARGETS.includes(winX64SidecarTarget)) {
 }
 const winSidecarTarget = winArm64 ? 'aarch64-pc-windows-msvc' : winX64SidecarTarget
 const WIN_SIDECAR = `../sheets/native/xlsx-engine/target/${winSidecarTarget}/release/xlsx-sidecar.exe`
+=======
+const winSidecarTarget = winArm64 ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-gnu'
+// Where the release pipeline puts the sidecar: an explicit cross-compilation
+// triple (CI builds it that way). A Windows contributor's plain
+// `npm run build:all` instead leaves it in cargo's host-native target/release
+// (MSVC, statically linked per native/xlsx-engine/.cargo/config.toml), so that
+// output is accepted too — but only when the host arch really matches the
+// packaged one: an x64 host build must never be shipped inside an arm64
+// installer, which has to come from a cross build.
+const winSidecarCandidates = [
+  `../sheets/native/xlsx-engine/target/${winSidecarTarget}/release/xlsx-sidecar.exe`,
+  ...(process.platform === 'win32' && (process.arch === 'arm64') === winArm64
+    ? ['../sheets/native/xlsx-engine/target/release/xlsx-sidecar.exe']
+    : []),
+]
+const WIN_SIDECAR =
+  winSidecarCandidates.find((rel) => existsSync(join(__dirname, rel))) ?? winSidecarCandidates[0]
+>>>>>>> theirs
 
 // Shipped next to THIRD-PARTY-NOTICES.txt (see extraResources)
 const LEGAL_FILES = ['LICENSE', 'NOTICE', 'MODIFICATIONS', 'LICENSE-UNICODE.txt']
@@ -118,12 +137,16 @@ function assertExtraResourceSources() {
     '../../node_modules/electron/dist/LICENSES.chromium.html',
     '../../node_modules/@embedpdf/pdfium/dist/pdfium.wasm',
     '../pdf/node_modules/harfbuzzjs/hb-subset.wasm',
+<<<<<<< ours
     `../../${OCR_TESSERACT}/tess-ocr.cjs`,
     `../../${OCR_TESSERACT}/tessdata/vie.traineddata`,
     `../../${OCR_TESSERACT}/tessdata/LICENSE`,
     `../../${OCR_TESSERACT}/tessdata/README.md`,
     `../../${OCR_TESSERACT}/LICENSES-tesseract-core.txt`,
     ...LEGAL_FILES.map((name) => `../../${name}`),
+=======
+    '../../node_modules/@rhwp/core/rhwp_bg.wasm',
+>>>>>>> theirs
   ]) {
     if (!existsSync(join(__dirname, rel))) {
       throw new Error(
@@ -377,6 +400,196 @@ function ensureThirdPartyNotices() {
 }
 
 /** @type {import('electron-builder').Configuration} */
+// NSIS makes every declared ProgId the extension's default opener; for the
+// office types that is the point, for plain text/JSON and the legacy Word
+// 97-2003 .doc/.dot it would hijack the system editor, so Windows leaves those
+// out (mac/Linux still declare them for Open With). GenOffice opens .doc/.dot
+// through its own Open dialog on every platform.
+const WIN_OPEN_WITH_ONLY_EXTS = new Set(['txt', 'json', 'doc', 'dot'])
+const FILE_ASSOCIATIONS = [
+  {
+    ext: 'docx',
+    name: 'Word Document',
+    description: 'Word Document',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  },
+  {
+    // import-only: opens as a converted .docx copy, GenOffice never writes .doc
+    ext: 'doc',
+    name: 'Word 97-2003 Document',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/msword',
+  },
+  {
+    // import-only: the template opens as a converted .docx copy
+    ext: 'dot',
+    name: 'Word 97-2003 Template',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/msword',
+  },
+  {
+    ext: 'xlsx',
+    name: 'Excel Workbook',
+    description: 'Excel Workbook',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  },
+  {
+    ext: 'xlsm',
+    name: 'Excel Macro-Enabled Workbook',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'application/vnd.ms-excel.sheet.macroEnabled.12',
+  },
+  {
+    ext: 'pptx',
+    name: 'PowerPoint Presentation',
+    description: 'PowerPoint Presentation',
+    role: 'Editor',
+    icon: 'pptx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  },
+  {
+    ext: 'xls',
+    name: 'Excel 97-2003 Workbook',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'application/vnd.ms-excel',
+  },
+  {
+    ext: 'csv',
+    name: 'CSV Document',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'text/csv',
+  },
+  {
+    // opens as a converted copy and saves as .xlsx (genoffice#1146)
+    ext: 'tsv',
+    name: 'TSV Document',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'text/tab-separated-values',
+  },
+  {
+    // import-only: opens as a converted .xlsx copy, GenOffice never writes ODF
+    ext: 'ods',
+    name: 'OpenDocument Spreadsheet',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'application/vnd.oasis.opendocument.spreadsheet',
+  },
+  {
+    ext: 'ots',
+    name: 'OpenDocument Spreadsheet Template',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'application/vnd.oasis.opendocument.spreadsheet-template',
+  },
+  {
+    // import-only: opens as a converted .docx copy, GenOffice never writes ODF
+    ext: 'odt',
+    name: 'OpenDocument Text',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/vnd.oasis.opendocument.text',
+  },
+  {
+    ext: 'ott',
+    name: 'OpenDocument Text Template',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/vnd.oasis.opendocument.text-template',
+  },
+  {
+    // import-only: opens as a converted .docx copy, GenOffice never writes HWPX
+    ext: 'hwpx',
+    name: 'Hancom HWPX Document',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/hwp+zip',
+  },
+  {
+    // import-only, like .hwpx: HWP binaries are read through rhwp into HWPX first
+    ext: 'hwp',
+    name: 'Hancom HWP Document',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/x-hwp',
+  },
+  {
+    // import-only: opens as a converted .pptx copy, GenOffice never writes ODF
+    ext: 'odp',
+    name: 'OpenDocument Presentation',
+    role: 'Editor',
+    icon: 'pptx',
+    mimeType: 'application/vnd.oasis.opendocument.presentation',
+  },
+  {
+    ext: 'otp',
+    name: 'OpenDocument Presentation Template',
+    role: 'Editor',
+    icon: 'pptx',
+    mimeType: 'application/vnd.oasis.opendocument.presentation-template',
+  },
+  {
+    ext: 'pdf',
+    name: 'PDF Document',
+    role: 'Editor',
+    icon: 'pdf',
+    mimeType: 'application/pdf',
+  },
+  {
+    ext: 'md',
+    name: 'Markdown Document',
+    role: 'Editor',
+    icon: 'md',
+    mimeType: 'text/markdown',
+  },
+  {
+    ext: 'markdown',
+    name: 'Markdown Document',
+    role: 'Editor',
+    icon: 'md',
+    mimeType: 'text/markdown',
+  },
+  {
+    ext: 'txt',
+    name: 'Text Document',
+    description: 'Text Document',
+    role: 'Editor',
+    icon: 'txt',
+    mimeType: 'text/plain',
+  },
+  {
+    ext: 'json',
+    name: 'JSON Document',
+    description: 'JSON Document',
+    role: 'Editor',
+    icon: 'json',
+    mimeType: 'application/json',
+  },
+  {
+    ext: 'html',
+    name: 'HTML Document',
+    role: 'Editor',
+    icon: 'html',
+    mimeType: 'text/html',
+  },
+  {
+    ext: 'htm',
+    name: 'HTML Document',
+    role: 'Editor',
+    icon: 'html',
+    mimeType: 'text/html',
+  },
+]
+
 const config = {
   appId: 'com.uniwork.office',
   productName: 'UniWork Office',
@@ -461,6 +674,11 @@ const config = {
     {
       from: '../pdf/node_modules/harfbuzzjs/hb-subset.wasm',
       to: 'wasm/hb-subset.wasm',
+    },
+    // .hwp import (packages/hwp2docx/src/hwp.ts): rhwp reads HWP binaries into HWPX
+    {
+      from: '../../node_modules/@rhwp/core/rhwp_bg.wasm',
+      to: 'wasm/rhwp_bg.wasm',
     },
     // platform system-OCR helpers for scanned-page recovery (each exists only
     // on its own build platform; electron-builder skips absent sources and the
@@ -557,6 +775,7 @@ const config = {
   // bare UniWork Office logo instead of a per-type document icon. The icns/ico
   // pairs are generated from the shell renderer's file-type tiles by
   // tools/gen-file-association-icons.mjs.
+<<<<<<< ours
   //
   // `rank: 'Alternate'` (LSHandlerRank, macOS): the app is listed under "Open
   // With" but never claims the default by itself; Settings → General has the
@@ -765,6 +984,9 @@ const config = {
     { name: 'UniWork', schemes: ['uniwork'] },
     { name: 'UniWork Office sign-in', schemes: ['uniwork-office'] },
   ],
+=======
+  fileAssociations: FILE_ASSOCIATIONS,
+>>>>>>> theirs
   npmRebuild: false,
   mac: {
     // Two separate arch packages (NOT universal): arm64 keeps the exact
@@ -787,7 +1009,11 @@ const config = {
     // audio-input entitlement, and macOS asks for it with this text
     extendInfo: {
       NSMicrophoneUsageDescription:
+<<<<<<< ours
         'UniWork Office records your narration when you record a slide show.',
+=======
+        'GenOffice records your narration when you record a slide show.',
+>>>>>>> theirs
     },
     notarize: true,
     extraResources: [
@@ -808,6 +1034,7 @@ const config = {
         arch: [winArch],
       },
     ],
+    fileAssociations: FILE_ASSOCIATIONS.filter((a) => !WIN_OPEN_WITH_ONLY_EXTS.has(a.ext)),
     extraResources: [
       {
         from: WIN_SIDECAR,
@@ -873,6 +1100,7 @@ const config = {
         from: '../sheets/native/xlsx-engine/target/release/xlsx-sidecar',
         to: 'native/xlsx-sidecar',
       },
+<<<<<<< ours
       // public key of the signed apt repository; the deb postinst installs it
       // under /usr/share/keyrings (build/linux-after-install.sh)
       {
@@ -882,6 +1110,17 @@ const config = {
       {
         from: `${LO_CACHE_PREFIX}/linux-\${arch}/libreoffice`,
         to: 'libreoffice',
+=======
+      // Same blank templates the Windows installer registers for Explorer's
+      // "New" menu. The deb/rpm post-install step copies them into
+      // /usr/share/templates, which KDE Plasma's Dolphin "Create New" menu
+      // scans (genoffice#2384). AppImage gets the payload too but runs no
+      // install script, so it adds no templates.
+      {
+        from: 'build/shell-new',
+        to: 'shell-new',
+        filter: ['*.docx', '*.xlsx', '*.pptx'],
+>>>>>>> theirs
       },
     ],
   },
@@ -945,7 +1184,8 @@ const config = {
     }
     if (context.electronPlatformName === 'win32' && !existsSync(join(__dirname, WIN_SIDECAR))) {
       throw new Error(
-        `win extraResources source missing: ${WIN_SIDECAR} (cargo build --target ${winSidecarTarget} first)`,
+        `win extraResources source missing: ${winSidecarCandidates.join(' or ')} ` +
+          `(run "npm run native:build -w @genoffice/sheets", or cargo build --target ${winSidecarTarget})`,
       )
     }
   },

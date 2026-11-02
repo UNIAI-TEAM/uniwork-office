@@ -10,7 +10,11 @@ export const es = {
   redactDialogPlaceholder: 'Nombre del marcador, p. ej.: teléfono del cliente',
   redactCancel: 'Cancelar',
   redactInsert: 'Ocultar',
+<<<<<<< ours
   redactEnable: 'Clic derecho en una selección para ocultarla a la IA.',
+=======
+  redactEnable: 'Clic derecho en una selección para ocultarla al modelo.',
+>>>>>>> theirs
   redactNeedsSavedRow:
     'Esta fila todavía no está en el archivo. Guarda primero y luego oculta la celda.',
   redactRecoveredFromNames:
@@ -353,7 +357,9 @@ export const es = {
   appFullLoadRunning:
     'Cargando el libro completo: ordenar y filtrar estarán disponibles al terminar…',
   appFullLoadTooLarge:
-    'Este libro es demasiado grande para cargarlo por completo en memoria; ordenar y filtrar no están disponibles para este archivo.',
+    'Este libro es demasiado grande para cargarlo por completo en memoria; ordenar y mover rangos no están disponibles para este archivo. El filtrado se ejecuta directamente sobre el archivo.',
+  appLargeFilterLoading: 'Leyendo la columna de filtro desde el archivo…',
+  appLargeFilterApplying: 'Aplicando el filtro sobre el archivo…',
   appSortValueModeFormulas:
     'Este rango contiene fórmulas que no se calculan en vivo en este libro grande: ordenarlo o moverlo las guardaría como valores simples. Elija un rango sin fórmulas.',
   appSortRangeTooLarge:
@@ -418,6 +424,9 @@ export const es = {
   appTableNameUsed: 'El nombre de tabla "{name}" ya se usó en esta sesión.',
   appTableNameInFile: 'El nombre de tabla "{name}" ya lo usa una tabla del archivo.',
   appTableOverlapsSession: 'El rango se superpone con la tabla "{name}" creada en esta sesión.',
+  appTableOverlapsFile: 'El rango se superpone con la tabla "{name}" del archivo.',
+  appTableAlreadyInTable:
+    'La selección ya está en la tabla "{name}": cambie el estilo desde Diseño de tabla.',
   appTablesNeedFile: 'Abra primero un archivo XLSX — las tablas se escriben en el archivo.',
   appTableSelectRange:
     'Seleccione primero el rango de datos — con los encabezados en su primera fila.',
@@ -507,6 +516,7 @@ export const es = {
   appGridlinesHidden: 'Líneas de cuadrícula ocultas.',
   appGridlinesShown: 'Líneas de cuadrícula mostradas.',
   appShowingFormulas: 'Mostrando fórmulas — vuelva a alternar para ver los valores.',
+  appShowingFormulasActive: 'Mostrando fórmulas',
   appShowingValues: 'Mostrando los valores calculados.',
   appTraceNoFormula: 'Rastrear precedentes: la celda activa no tiene fórmula.',
   appTraceNoRefs: 'Rastrear precedentes: esta fórmula no tiene referencias de celda.',
@@ -754,6 +764,7 @@ export const es = {
   appExportPdfTitle: 'Exportar como PDF',
   appSaveTitle: 'Guardar',
   appSaveAs: 'Guardar como',
+  aiNameFile: 'Nombrar con IA…',
   appUndo: 'Deshacer',
   appRedo: 'Rehacer',
   appUnsavedEditOne: '● {count} edición sin guardar',
@@ -786,7 +797,6 @@ export const es = {
   appLinkPlaceholder: 'https://example.com o Sheet1!A1',
   appRemoveLink: 'Quitar vínculo',
   appNotAvailableYet: 'Aún no disponible',
-  appComingSoon: 'Próximamente',
   appGroupChartLayouts: 'Diseños de gráfico',
   appAddChartElement: 'Agregar elemento de gráfico',
   appAddChartElementTitle: 'Títulos, etiquetas de datos, leyenda',
@@ -1221,6 +1231,8 @@ export const es = {
   appRefreshAll: 'Actualizar todo',
   appWorkbookNoPivot: 'No hay tablas dinámicas en este libro.',
   appRefreshAllTitle: 'Actualizar todas las tablas dinámicas',
+  appQueriesConnections: 'Consultas y conexiones',
+  appQueriesConnectionsTitle: 'Mostrar las consultas y conexiones de datos del libro',
   appErrorCheckingDetail: 'Buscar valores de error en la hoja',
   appErrorsFound: '{count} errores — en {cell}: {value}',
   appCheckingErrors: 'Buscando errores en toda la hoja…',
@@ -1255,6 +1267,7 @@ export const es = {
   appGroupForecast: 'Previsión',
   appWhatIfAnalysis: 'Análisis de hipótesis',
   appGoalSeek: 'Buscar objetivo',
+  appDataTable: 'Tabla de datos',
   appWhatIfTitle: 'Resolver una entrada para un valor objetivo',
   appGoalSeekNeedsFormula: 'La celda debe contener una fórmula.',
   appGoalSeekByCellNotNumber: 'La celda a cambiar debe contener un número o estar vacía.',
@@ -1352,6 +1365,7 @@ export const es = {
   appPasswordUpdating: 'Actualizando…',
   appUpdatePassword: 'Actualizar contraseña',
   appWorkbookNotPasswordProtected: 'Este libro no está protegido con una contraseña de apertura.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Un libro protegido con contraseña no se puede guardar en un documento de UniWork. Use Guardar como para conservar una copia cifrada en este equipo.',
   appPasswordChangeUniwork: 'La contraseña de un documento de UniWork no se puede cambiar aquí.',
@@ -1359,6 +1373,8 @@ export const es = {
     'Este libro es de solo lectura, por lo que no se puede cambiar su contraseña.',
   appEncryptedWrongPassword: 'La contraseña es incorrecta. Inténtalo de nuevo.',
   appPasswordChangeRestored: 'Guarda primero el libro restaurado y después cambia su contraseña.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Permitir editar rangos',
   appGroupClipboard: 'Portapapeles',
   appPaste: 'Pegar',
@@ -1625,6 +1641,7 @@ export const es = {
   appVisualFlipV: 'Voltear verticalmente',
   appVisualFlipH: 'Voltear horizontalmente',
   appCtxPasteVisual: 'Pegar imagen o forma',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Este libro aún no se puede abrir en la web',
   appWebEngineBody:
@@ -1652,6 +1669,8 @@ export const es = {
   appWebSavedReopenFailed:
     'Tus cambios se guardaron en UniWork, pero no se pudo volver a abrir el libro aquí. Recarga el editor para seguir trabajando.',
   appDataTable: 'Tabla de datos',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Ortografía',
@@ -1660,7 +1679,11 @@ export const es = {
   appSpellToggleTip:
     'Activa la comprobación ortográfica (F7 y el botón de Revisar); desactivada, los cuadros de comentarios dejan de mostrar subrayados',
   appSpellOn: 'Comprobación ortográfica activada.',
+<<<<<<< ours
   appSpellOff: 'La comprobación ortográfica está desactivada. Actívala en Revisar ▸ Revisión.',
+=======
+  appSpellOff: 'La comprobación ortográfica está desactivada. Actívala en Revisar ▸ Corrección.',
+>>>>>>> theirs
   appSpellRecheck: 'Volver a comprobar',
   appSpellNone: 'No se encontraron errores ortográficos sospechosos.',
   appSpellFindings: '{count} errores sospechosos. Haz clic en una fila para localizarlo.',

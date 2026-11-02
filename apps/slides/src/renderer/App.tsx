@@ -42,6 +42,7 @@ import type {
   TransitionKind,
 } from '../shared/ipc'
 import { baseName } from '../shared/base-name'
+<<<<<<< ours
 import {
   createBroadcastRecovery,
   mergeBroadcastUpdate,
@@ -49,6 +50,9 @@ import {
   type BroadcastRecovery,
 } from '../shared/slide-update'
 import { openedStatusKey } from '../shared/opened-status'
+=======
+import { mergeBroadcastUpdate, mergeSlideUpdate, setDeckRefresh } from '../shared/slide-update'
+>>>>>>> theirs
 import { SlideCanvas, selectionChromeColor, type SlideCanvasHandle } from './SlideCanvas'
 import { tableCellOverlayBox } from './table-hit'
 import { ZOOM_PREVIEW_EVENT } from './zoom-preview'
@@ -87,7 +91,10 @@ import {
   type ContextTabRequest,
 } from './components/context-tabs'
 import { SlideShowView } from './components/SlideShowView'
+<<<<<<< ours
 import { RecordNarrationDialog } from './narration/RecordingBar'
+=======
+>>>>>>> theirs
 import type { NarrationTake } from './narration/use-recording'
 import { IconNotes, IconPlayBoxed } from './components/icons'
 import { PresenterView } from './components/PresenterView'
@@ -129,7 +136,10 @@ import {
 import { AnimationPane } from './components/AnimationPane'
 import { AnimPreviewOverlay } from './components/AnimatedSlide'
 import { EquationDialog, HeaderFooterDialog, LinkDialog } from './components/InsertDialogs'
+<<<<<<< ours
 import { UseAppDialog } from './components/UseAppDialog'
+=======
+>>>>>>> theirs
 import { RedactDialog } from './components/RedactDialog'
 import { ZoomDialog } from './components/ZoomDialog'
 import { SlideSizeDialog } from './components/SlideSizeDialog'
@@ -144,7 +154,10 @@ import {
   type WordArtPreset,
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
+<<<<<<< ours
   UniAiMark,
+=======
+>>>>>>> theirs
   useAiSidebarEnabled,
 } from '@genoffice/ui'
 import type { ChartPresetDef, IconDef, SmartArtDef } from './insert-presets'
@@ -560,9 +573,13 @@ export function App() {
   useEffect(() => {
     window.slidesApi.setAutoSavePref?.(autoSave)
   }, [autoSave])
+<<<<<<< ours
   const aiEnabled = cap('ai')
   const [showAiPref, setShowAi] = useState(() => aiPanelInitiallyOpen('ai-slides-show-ai'))
   const showAi = aiEnabled && showAiPref
+=======
+  const [showAi, setShowAi] = useState(() => aiPanelInitiallyOpen('ai-slides-show-ai'))
+>>>>>>> theirs
   // Settings › "show the AI sidebar" off hides the panel and its rail (Word's
   // Copilot-pane model): an explicit Ask-AI action still opens the panel for
   // this deck, and closing it returns to hidden. The dock stays mounted; the
@@ -1095,6 +1112,7 @@ export function App() {
   // Shared session (a second window on the same file): apply the other window's
   // edits without touching local selection or an open editor — the ids are stable,
   // so the selection stays valid; a same-element conflict resolves last-write-wins.
+<<<<<<< ours
   const broadcastRecoveryRef = useRef<BroadcastRecovery | null>(null)
   useEffect(() => {
     const recovery = createBroadcastRecovery(
@@ -1131,6 +1149,35 @@ export function App() {
       off?.()
     }
   }, [])
+=======
+  const refreshDeck = useCallback(() => {
+    void window.slidesApi
+      .getRenderSlides()
+      .then((slides) => {
+        if (slides) setSlides(slides)
+      })
+      .catch((error) => console.error('Failed to refresh deck:', error))
+  }, [])
+  useEffect(() => {
+    setDeckRefresh(refreshDeck)
+    return () => setDeckRefresh(null)
+  }, [refreshDeck])
+  useEffect(
+    () =>
+      window.slidesApi.onDeckChanged?.(({ slides: all, order }) => {
+        setSlides((current) =>
+          order
+            ? (mergeBroadcastUpdate(current, { slides: all, order }, refreshDeck) ?? current)
+            : all,
+        )
+        setCurrent((c) => Math.min(c, Math.max(0, (order?.length ?? all.length) - 1)))
+        // The broadcast also fires for undo back to a clean state — ask the
+        // session instead of assuming the change dirtied it
+        void window.slidesApi.isDirty?.().then((d) => setDirty(!!d))
+      }),
+    [refreshDeck],
+  )
+>>>>>>> theirs
 
   // Auto-save (off by default): when on and a file path exists, silently write back every 30s + on blur.
   // Saving rebuilds element ids; skipped during text editing/mouse-down (dragging) to avoid interrupting the current operation.
@@ -1171,7 +1218,11 @@ export function App() {
   }, [autoSave, path, editing, editingCell, save])
 
   const saveAs = useCallback(() => fileActions.saveAs(() => ctxRef.current), [])
-  const exportImages = useCallback(() => fileActions.exportImages(ctxRef.current), [])
+  const nameWithAi = useCallback(() => fileActions.nameWithAi(() => ctxRef.current), [])
+  const exportImages = useCallback(
+    (format: 'png' | 'jpg' = 'png') => fileActions.exportImages(ctxRef.current, format),
+    [],
+  )
   const exportPdf = useCallback(() => void fileActions.exportPdf(ctxRef.current), [])
 
   // Headless export mode (--headless-export): this renderer lives in a hidden
@@ -2570,10 +2621,18 @@ export function App() {
       else if (cmd === 'save') void save()
       else if (cmd === 'save-in-place') void save(false, 'in-place')
       else if (cmd === 'save-as') void saveAs()
+      else if (cmd === 'name-with-ai') void nameWithAi()
       // macOS has no File ribbon tab, so these only exist in the menu
+<<<<<<< ours
       else if (cmd === 'export-pdf' && cap('exportPdf')) void exportPdf()
       else if (cmd === 'export-images' && cap('saveAs')) void exportImages()
       else if (cmd === 'print' && cap('print')) setPrintDlgOpen(true)
+=======
+      else if (cmd === 'export-pdf') void exportPdf()
+      else if (cmd === 'export-images') void exportImages('png')
+      else if (cmd === 'export-images-jpg') void exportImages('jpg')
+      else if (cmd === 'print') setPrintDlgOpen(true)
+>>>>>>> theirs
       // Through the preview path so the zoom pivots on the viewport center, not the scroll origin
       else if (cmd === 'zoom-in') previewZoom(nextPreset)
       else if (cmd === 'zoom-out') previewZoom(prevPreset)
@@ -2597,6 +2656,7 @@ export function App() {
     openDialog,
     save,
     saveAs,
+    nameWithAi,
     exportPdf,
     exportImages,
     undo,
@@ -2889,6 +2949,42 @@ export function App() {
     [current],
   )
 
+  const onTransformMulti = useCallback(
+    async (
+      items: Array<{
+        sourceId: string
+        groupId?: string
+        box: { x: number; y: number; w: number; h: number; rotationDeg: number }
+      }>,
+    ) => {
+      const updated = await window.slidesApi.editTransformMulti({
+        slideIndex: current,
+        fitWidthPx: FIT_WIDTH,
+        items: items.map((it) => ({
+          sourceId: it.sourceId,
+          ...(it.groupId ? { groupId: it.groupId } : {}),
+          xPx: it.box.x,
+          yPx: it.box.y,
+          wPx: it.box.w,
+          hPx: it.box.h,
+          rotationDeg: it.box.rotationDeg,
+        })),
+      })
+      if (updated) {
+        setSlides((s) => s.map((sl, i) => (i === current ? updated : sl)))
+        setDirty(true)
+      }
+    },
+    [current],
+  )
+
+  const onTransformCancel = useCallback(async () => {
+    const updated = await window.slidesApi.cancelTransformPreview({ slideIndex: current })
+    if (updated) setSlides((s) => s.map((sl, i) => (i === current ? updated : sl)))
+    // Preview frames marked the deck dirty; the rollback may have made it clean again
+    void window.slidesApi.isDirty().then(setDirty)
+  }, [current])
+
   // Yellow adjust-handle drag: throttled preview commits keep the geometry live,
   // the release commit is never dropped (edit-transform gesture undo semantics)
   const adjustLastSent = useRef(0)
@@ -3105,7 +3201,11 @@ export function App() {
 
   const model3dNode = useMemo(
     () =>
+<<<<<<< ours
       cap('model3d') && selectedNode?.type === 'picture' && selectedNode.model3d
+=======
+      selectedNode?.type === 'picture' && selectedNode.model3d
+>>>>>>> theirs
         ? (selectedNode as PictureRenderNode & { model3d: Model3dRotation })
         : null,
     [selectedNode],
@@ -3565,10 +3665,12 @@ export function App() {
         onUndo={() => void undo()}
         onRedo={() => void redo()}
         onSaveAs={() => void saveAs()}
+        onNameWithAi={() => void nameWithAi()}
         onExportPdf={() => void exportPdf()}
         onUseApp={setUseAppFeature}
         onPrint={() => setPrintDlgOpen(true)}
-        onExportImages={() => void exportImages()}
+        onExportImages={() => void exportImages('png')}
+        onExportImagesJpg={() => void exportImages('jpg')}
         onFormat={onFormat}
         zoom={zoom}
         onZoom={previewZoom}
@@ -3879,14 +3981,21 @@ export function App() {
       />
 
       <div className="app-main">
+<<<<<<< ours
         {aiEnabled && slide && viewMode !== 'reading' && viewMode !== 'sorter' && (
           <div
             className={`ai-dock${aiDockOpen && aiSettings ? '' : ' collapsed'}${
+=======
+        {slide && viewMode !== 'reading' && viewMode !== 'sorter' && (
+          <div
+            className={`ai-dock${showAi && aiSettings ? '' : ' collapsed'}${
+>>>>>>> theirs
               !aiSidebarEnabled && !showAi ? ' ai-dock-off' : ''
             }`}
           >
             {/* always mounted once settings load: collapse must not drop state or in-flight runs */}
             {aiSettings ? (
+<<<<<<< ours
               <Suspense fallback={null}>
                 <AiPanel
                   key={aiPanelKey}
@@ -3928,6 +4037,44 @@ export function App() {
                   }
                 />
               </Suspense>
+=======
+              <AiPanel
+                key={aiPanelKey}
+                slides={slides}
+                current={current}
+                selectedIds={selectedIds}
+                deckEmpty={deckEmpty}
+                images={images}
+                applySlide={applySlide}
+                applyDeck={applyDeck}
+                fitWidthPx={FIT_WIDTH}
+                settings={aiSettings}
+                preset={aiPreset}
+                open={showAi}
+                hideRail={!aiSidebarEnabled}
+                onExpand={toggleAi}
+                onCollapse={toggleAi}
+                onUndo={() => void undo()}
+                onPathChange={(p) => {
+                  setPath(p)
+                  setDirty(false)
+                }}
+                onBeforeRun={flushNotes}
+                currentFilePath={path}
+                editQueue={editQueue}
+                onQueueEditInstruction={(key, instruction) =>
+                  setEditQueue((prev) =>
+                    prev.map((it) => (it.key === key ? { ...it, instruction } : it)),
+                  )
+                }
+                onQueueRemove={(key) => setEditQueue((prev) => prev.filter((it) => it.key !== key))}
+                onQueueClear={() => setEditQueue([])}
+                onQueueFocus={focusQueueItem}
+                onQueueConsume={(keys) =>
+                  setEditQueue((prev) => prev.filter((it) => !keys.includes(it.key)))
+                }
+              />
+>>>>>>> theirs
             ) : aiSidebarEnabled ? (
               <button
                 className="ai-rail"
@@ -4404,7 +4551,9 @@ export function App() {
                               onOpenContextTab={openContextTab}
                               onContextMenu={onCanvasContextMenu}
                               onMarqueeSelect={setSelectedIds}
-                              onDuplicateTo={(id, dx, dy) => void duplicateSelected([id], dx, dy)}
+                              onDuplicateTo={(ids, dx, dy) => void duplicateSelected(ids, dx, dy)}
+                              onTransformMulti={onTransformMulti}
+                              onTransformCancel={onTransformCancel}
                               images={images}
                               zoom={zoom}
                               enteredGroupId={enteredGroupId}
@@ -4978,6 +5127,7 @@ export function App() {
       )}
 
       {pendingRecording && (
+<<<<<<< ours
         <RecordNarrationDialog
           durationMs={pendingRecording.endMs}
           onDiscard={() => setPendingRecording(null)}
@@ -4987,6 +5137,25 @@ export function App() {
 
       {aiEnabled &&
         !askState &&
+=======
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h2>{t('appRecordTitle')}</h2>
+            <p className="rehearse-summary">
+              {t('appRecordSummary', { duration: formatClock(pendingRecording.endMs) })}
+            </p>
+            <div className="modal-actions">
+              <button onClick={() => setPendingRecording(null)}>{t('appRecordDiscard')}</button>
+              <button className="primary" onClick={() => void saveRecording()}>
+                {t('appRecordSave')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!askState &&
+>>>>>>> theirs
         !editing &&
         !editingCell &&
         !cropTarget &&

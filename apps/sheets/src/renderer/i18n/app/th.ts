@@ -10,7 +10,11 @@ export const th = {
   redactDialogPlaceholder: 'ชื่อตัวแทน เช่น เบอร์โทรศัพท์ลูกค้า',
   redactCancel: 'ยกเลิก',
   redactInsert: 'ซ่อน',
+<<<<<<< ours
   redactEnable: 'คลิกขวาที่ส่วนที่เลือกเพื่อซ่อนจาก AI',
+=======
+  redactEnable: 'คลิกขวาที่ข้อความที่เลือกเพื่อซ่อนจาก AI',
+>>>>>>> theirs
   redactNeedsSavedRow: 'แถวนี้ยังไม่อยู่ในไฟล์ กรุณาบันทึกก่อน แล้วจึงซ่อนเซลล์',
   redactRecoveredFromNames:
     'แอปอื่นเขียนไฟล์นี้ขึ้นใหม่และทำให้บันทึกสิ่งที่ถูกซ่อนหายไป เซลล์ที่ซ่อนไว้กู้คืนมาจากชื่อที่กำหนดไว้ในเวิร์กบุ๊ก การบันทึกจะคืนบันทึกทั้งหมด',
@@ -317,7 +321,9 @@ export const th = {
   appFullLoadStart: 'โหลดทั้งหมด',
   appFullLoadRunning: 'กำลังโหลดเวิร์กบุ๊กทั้งหมด เมื่อเสร็จแล้วจะเรียงลำดับและกรองได้…',
   appFullLoadTooLarge:
-    'เวิร์กบุ๊กนี้ใหญ่เกินกว่าจะโหลดทั้งหมดลงหน่วยความจำ ไม่สามารถเรียงลำดับและกรองกับไฟล์นี้ได้',
+    'เวิร์กบุ๊กนี้ใหญ่เกินกว่าจะโหลดทั้งหมดลงหน่วยความจำ การเรียงลำดับและการย้ายช่วงใช้ไม่ได้กับไฟล์นี้ การกรองทำงานบนไฟล์โดยตรง',
+  appLargeFilterLoading: 'กำลังอ่านคอลัมน์ตัวกรองจากไฟล์…',
+  appLargeFilterApplying: 'กำลังใช้ตัวกรองกับไฟล์…',
   appSortValueModeFormulas:
     'ช่วงนี้มีสูตรซึ่งไม่ได้คำนวณแบบสดในเวิร์กบุ๊กขนาดใหญ่นี้ การเรียงลำดับหรือย้ายจะบันทึกสูตรเป็นค่าธรรมดา โปรดเลือกช่วงที่ไม่มีสูตร',
   appSortRangeTooLarge:
@@ -373,6 +379,8 @@ export const th = {
   appTableNameUsed: 'ชื่อตาราง "{name}" ถูกใช้ไปแล้วในเซสชันนี้',
   appTableNameInFile: 'ชื่อตาราง "{name}" ถูกใช้โดยตารางในไฟล์แล้ว',
   appTableOverlapsSession: 'ช่วงนี้ทับซ้อนกับตาราง "{name}" ที่สร้างในเซสชันนี้',
+  appTableOverlapsFile: 'ช่วงนี้ทับซ้อนกับตาราง "{name}" ในไฟล์',
+  appTableAlreadyInTable: 'ส่วนที่เลือกอยู่ในตาราง "{name}" แล้ว — เปลี่ยนสไตล์ได้จากออกแบบตาราง',
   appTablesNeedFile: 'เปิดไฟล์ XLSX ก่อน — ตารางจะถูกเขียนลงไฟล์',
   appTableSelectRange: 'เลือกช่วงข้อมูลก่อน — แถวแรกเป็นหัวเรื่อง',
   appTableCreated: 'สร้างตารางแล้ว — บันทึกด้วย {saveKeys}',
@@ -450,6 +458,7 @@ export const th = {
   appGridlinesHidden: 'ซ่อนเส้นตารางแล้ว',
   appGridlinesShown: 'แสดงเส้นตารางแล้ว',
   appShowingFormulas: 'กำลังแสดงสูตร — สลับอีกครั้งเพื่อแสดงค่า',
+  appShowingFormulasActive: 'กำลังแสดงสูตร',
   appShowingValues: 'กำลังแสดงค่าที่คำนวณแล้ว',
   appTraceNoFormula: 'แกะรอยเซลล์ที่ถูกอ้าง: เซลล์ที่ใช้งานอยู่ไม่มีสูตร',
   appTraceNoRefs: 'แกะรอยเซลล์ที่ถูกอ้าง: สูตรนี้ไม่มีการอ้างอิงเซลล์',
@@ -676,6 +685,7 @@ export const th = {
   appExportPdfTitle: 'ส่งออกเป็น PDF',
   appSaveTitle: 'บันทึก',
   appSaveAs: 'บันทึกเป็น',
+  aiNameFile: 'ตั้งชื่อด้วย AI…',
   appUndo: 'เลิกทำ',
   appRedo: 'ทำซ้ำ',
   appUnsavedEditOne: '● การแก้ไข {count} รายการยังไม่บันทึก',
@@ -707,7 +717,6 @@ export const th = {
   appLinkPlaceholder: 'เช่น https://example.com หรือ Sheet1!A1',
   appRemoveLink: 'ลบลิงก์',
   appNotAvailableYet: 'ยังใช้ไม่ได้',
-  appComingSoon: 'เร็ว ๆ นี้',
   appGroupChartLayouts: 'เค้าโครงแผนภูมิ',
   appAddChartElement: 'เพิ่มองค์ประกอบแผนภูมิ',
   appAddChartElementTitle: 'ชื่อเรื่อง ป้ายชื่อข้อมูล คำอธิบายแผนภูมิ',
@@ -1140,6 +1149,8 @@ export const th = {
   appRefreshAll: 'รีเฟรชทั้งหมด',
   appWorkbookNoPivot: 'ไม่มี PivotTable ในเวิร์กบุ๊กนี้',
   appRefreshAllTitle: 'รีเฟรช PivotTable ทั้งหมด',
+  appQueriesConnections: 'คิวรีและการเชื่อมต่อ',
+  appQueriesConnectionsTitle: 'แสดงคิวรีและการเชื่อมต่อข้อมูลของเวิร์กบุ๊ก',
   appErrorCheckingDetail: 'สแกนหาค่าผิดพลาดในชีต',
   appErrorsFound: 'พบข้อผิดพลาด {count} รายการ — ที่ {cell}: {value}',
   appCheckingErrors: 'กำลังสแกนหาข้อผิดพลาดทั่วทั้งชีต…',
@@ -1174,6 +1185,7 @@ export const th = {
   appGroupForecast: 'การพยากรณ์',
   appWhatIfAnalysis: 'การวิเคราะห์แบบ What-If',
   appGoalSeek: 'ค้นหาค่าเป้าหมาย',
+  appDataTable: 'ตารางข้อมูล',
   appWhatIfTitle: 'หาค่าป้อนเข้าจากค่าเป้าหมาย',
   appGoalSeekNeedsFormula: 'เซลล์เป้าหมายต้องมีสูตร',
   appGoalSeekByCellNotNumber: 'เซลล์ที่จะเปลี่ยนต้องเป็นตัวเลขหรือว่าง',
@@ -1270,12 +1282,15 @@ export const th = {
   appPasswordUpdating: 'กำลังอัปเดต…',
   appUpdatePassword: 'อัปเดตรหัสผ่าน',
   appWorkbookNotPasswordProtected: 'เวิร์กบุ๊กนี้ไม่ได้ป้องกันด้วยรหัสผ่านสำหรับเปิด',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'ไม่สามารถบันทึกสมุดงานที่มีรหัสผ่านลงในเอกสาร UniWork ได้ ใช้ บันทึกเป็น เพื่อเก็บสำเนาที่เข้ารหัสไว้ในเครื่องนี้',
   appPasswordChangeUniwork: 'ไม่สามารถเปลี่ยนรหัสผ่านของเอกสาร UniWork ที่นี่ได้',
   appPasswordChangeReadOnly: 'สมุดงานนี้เป็นแบบอ่านอย่างเดียว จึงไม่สามารถเปลี่ยนรหัสผ่านได้',
   appEncryptedWrongPassword: 'รหัสผ่านไม่ถูกต้อง ลองอีกครั้ง',
   appPasswordChangeRestored: 'บันทึกสมุดงานที่กู้คืนก่อน แล้วจึงเปลี่ยนรหัสผ่าน',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'อนุญาตให้แก้ไขช่วง',
   appGroupClipboard: 'คลิปบอร์ด',
   appPaste: 'วาง',
@@ -1534,6 +1549,7 @@ export const th = {
   appVisualFlipV: 'พลิกแนวตั้ง',
   appVisualFlipH: 'พลิกแนวนอน',
   appCtxPasteVisual: 'วางรูปภาพหรือรูปร่าง',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'ยังเปิดเวิร์กบุ๊กนี้บนเว็บไม่ได้',
   appWebEngineBody:
@@ -1561,15 +1577,23 @@ export const th = {
   appWebSavedReopenFailed:
     'บันทึกการเปลี่ยนแปลงของคุณไปยัง UniWork แล้ว แต่เปิดสมุดงานนี้ซ้ำที่นี่ไม่ได้ โปรดโหลดตัวแก้ไขใหม่เพื่อทำงานต่อ',
   appDataTable: 'ตารางข้อมูล',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'ตรวจการสะกดคำ',
   appSpellBtnDetail: 'ตรวจข้อความในชีต (F7)',
   appSpellToggle: 'ตรวจการสะกด',
   appSpellToggleTip:
+<<<<<<< ours
     'เปิดการตรวจการสะกดคำ (F7 และปุ่มในแท็บรีวิว) เมื่อปิด กล่องความคิดเห็นจะไม่แสดงเส้นใต้คลื่นอีกต่อไป',
   appSpellOn: 'เปิดการตรวจการสะกดคำแล้ว',
   appSpellOff: 'การตรวจการสะกดคำถูกปิดอยู่ เปิดได้ที่ รีวิว ▸ การพิสูจน์อักษร',
+=======
+    'เปิดการตรวจการสะกดคำ (F7 และปุ่มในแท็บ Review) เมื่อปิด กล่องความคิดเห็นจะไม่แสดงเส้นใต้คลื่นอีกต่อไป',
+  appSpellOn: 'เปิดการตรวจการสะกดคำแล้ว',
+  appSpellOff: 'การตรวจการสะกดคำถูกปิดอยู่ เปิดได้ที่ Review ▸ ตรวจทาน',
+>>>>>>> theirs
   appSpellRecheck: 'ตรวจอีกครั้ง',
   appSpellNone: 'ไม่พบคำสะกดผิดที่น่าสงสัย',
   appSpellFindings: 'พบข้อผิดพลาดที่น่าสงสัย {count} จุด คลิกแถวเพื่อไปยังตำแหน่ง',

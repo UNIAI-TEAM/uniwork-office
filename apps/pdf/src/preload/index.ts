@@ -13,11 +13,19 @@ import type { PdfApi, UiTheme } from '../shared/ipc'
 
 const api: PdfApi = {
   consumePending: () => ipcRenderer.invoke(PDF_CHANNELS.consumePending),
+<<<<<<< ours
   consumeAiPreset: () => ipcRenderer.invoke(PDF_CHANNELS.consumeAiPreset),
   // the shell no longer pushes presets into a running editor (My AI is gone); only a web host does
   onAiPreset: () => () => {},
+=======
+  openSourcePath: (path: string) => ipcRenderer.invoke('home:open-path', path),
+>>>>>>> theirs
   readFile: (path) => ipcRenderer.invoke(PDF_CHANNELS.readFile, path),
+  decryptPdf: (bytes, password) => ipcRenderer.invoke(PDF_CHANNELS.decryptPdf, bytes, password),
   save: (request) => ipcRenderer.invoke(PDF_CHANNELS.save, request),
+  pickAttachmentFile: () => ipcRenderer.invoke(PDF_CHANNELS.pickAttachmentFile),
+  exportAttachment: (path, name, bytesBase64) =>
+    ipcRenderer.invoke(PDF_CHANNELS.exportAttachment, path, name, bytesBase64),
   requestRedactionCopy: (path) => ipcRenderer.invoke(PDF_CHANNELS.requestRedactionCopy, path),
   autoRename: (path, baseName) => ipcRenderer.invoke(PDF_CHANNELS.autoRename, path, baseName),
   isUntitled: (path) => ipcRenderer.invoke(PDF_CHANNELS.isUntitled, path),
@@ -49,10 +57,16 @@ const api: PdfApi = {
   extractPages: (request) => ipcRenderer.invoke(PDF_CHANNELS.extractPages, request),
   insertPdf: (request) => ipcRenderer.invoke(PDF_CHANNELS.insertPdf, request),
   compareReadPdf: () => ipcRenderer.invoke(PDF_CHANNELS.compareReadPdf),
+<<<<<<< ours
   compareReadOpen: (path: string) => ipcRenderer.invoke(PDF_CHANNELS.compareReadOpen, path),
   reduceFileSize: (path) => ipcRenderer.invoke(PDF_CHANNELS.reduceFileSize, path),
   pickAttachmentFile: () => ipcRenderer.invoke(PDF_CHANNELS.pickAttachmentFile),
   exportAttachment: (request) => ipcRenderer.invoke(PDF_CHANNELS.exportAttachment, request),
+=======
+  compareReadOpen: (path: string, password?: string) =>
+    ipcRenderer.invoke(PDF_CHANNELS.compareReadOpen, path, password),
+  reduceFileSize: (path) => ipcRenderer.invoke(PDF_CHANNELS.reduceFileSize, path),
+>>>>>>> theirs
   insertBlankPage: (request) => ipcRenderer.invoke(PDF_CHANNELS.insertBlankPage, request),
   splitPdf: (request) => ipcRenderer.invoke(PDF_CHANNELS.splitPdf, request),
   mergePdf: (request) => ipcRenderer.invoke(PDF_CHANNELS.mergePdf, request),
@@ -102,8 +116,13 @@ const api: PdfApi = {
   },
   setDirty: (dirty) => ipcRenderer.send(PDF_CHANNELS.dirtyChanged, dirty),
   onCloseSaveRequest: (handler) => {
+<<<<<<< ours
     const listener = (_e: Electron.IpcRendererEvent, request?: { origin?: unknown }) =>
       handler({ origin: request?.origin === 'internal' ? 'internal' : 'user' })
+=======
+    const listener = (_e: unknown, opts?: { flushAll?: boolean }) =>
+      handler({ flushAll: opts?.flushAll === true })
+>>>>>>> theirs
     ipcRenderer.on(PDF_CHANNELS.closeSaveRequest, listener)
     return () => ipcRenderer.removeListener(PDF_CHANNELS.closeSaveRequest, listener)
   },
@@ -119,6 +138,8 @@ const api: PdfApi = {
     ipcRenderer.on(PDF_CHANNELS.saveAsFlow, listener)
     return () => ipcRenderer.removeListener(PDF_CHANNELS.saveAsFlow, listener)
   },
+  print: (job) => ipcRenderer.invoke(PDF_CHANNELS.print, job),
+  listPrinters: () => ipcRenderer.invoke(PDF_CHANNELS.printers),
   onPrintRequest: (handler) => {
     const listener = () => handler()
     ipcRenderer.on(PDF_CHANNELS.printRequest, listener)
@@ -161,6 +182,9 @@ const api: PdfApi = {
     return () => ipcRenderer.removeListener(AI_CHANNELS.settingsChanged, listener)
   },
   openAiModelSettings: () => ipcRenderer.invoke(AI_CHANNELS.openModelSettings),
+  openSkillsSettings: () => ipcRenderer.invoke(AI_CHANNELS.openSkillsSettings),
+  skillsList: () => ipcRenderer.invoke(AI_CHANNELS.skillsList),
+  skillText: (name: string) => ipcRenderer.invoke(AI_CHANNELS.skillText, name),
   gskStatus: () => ipcRenderer.invoke(AI_CHANNELS.gskStatus),
   aiStream: (request) => ipcRenderer.invoke(AI_CHANNELS.stream, request),
   aiStreamCancel: (requestId) => ipcRenderer.invoke(AI_CHANNELS.streamCancel, requestId),

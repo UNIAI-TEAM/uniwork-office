@@ -69,6 +69,11 @@ export const nl = {
   appStatusAudioInserted: 'Audio ingevoegd (ingesloten in het .pptx-bestand)',
   appStatusModel3dInserted:
     '3D-model ingevoegd: selecteer het om het te draaien (PowerPoint toont het ook in 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview:
+    'Het 3D-model kan hier niet worden getekend; de afbeelding blijft ongewijzigd',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'De opname is leeg; er is niets ingevoegd',
   appStatusRecordingInserted: 'Schermopname ingevoegd op de huidige dia (ingesloten webm)',
   appStatusRecording:
@@ -232,6 +237,8 @@ export const nl = {
   appMasterFillNone: 'Geen opvulling',
   appMasterStroke: 'Contourkleur…',
   appMasterStrokeNone: 'Geen contour',
+  appMasterInsertTextBox: 'Tekstvak',
+  appMasterInsertShape: 'Vormen',
   appStartOpening: 'Openen…',
   appReadingSlideTitle:
     'Klik om naar de volgende dia te gaan (Esc om de leesweergave af te sluiten)',
@@ -261,6 +268,26 @@ export const nl = {
     'De totale duur van de voorstelling was {duration}. Wilt u de diatijden opslaan voor automatische diadoorloop?',
   appRehearseDiscard: 'Niet opslaan',
   appRehearseSave: 'Opslaan',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Gesproken tekst opnemen',
+  appRecordSummary: 'Opnameduur {duration}. De gesproken tekst en de tijd van elke dia opslaan?',
+  appRecordDiscard: 'Niet opslaan',
+  appRecordSave: 'Opslaan',
+  appStatusRecordSaved:
+    'Gesproken tekst opgeslagen op {count} dia’s (PowerPoint speelt die ook af)',
+  appStatusRecordFailed: 'De opname kan niet worden opgeslagen',
+  appStatusNarrationCleared: 'Gesproken tekst gewist',
+  appSettingsTitle: 'AI-instellingen',
+  appSettingsAccount: 'Genspark-account',
+  appSettingsChecking: 'Controleren…',
+  appSettingsLoggedIn: 'Aangemeld',
+  appSettingsLoggedInEmail: 'Aangemeld: {email}',
+  appSettingsLoggedOut: 'Niet aangemeld (AI-functies vereisen een Genspark-account)',
+  appSettingsLoginPending: 'Wachten op aanmelding in de browser…',
+  appSettingsLogin: 'Aanmelden bij Genspark',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Annuleren',
   appCropHint: 'Enter om te bevestigen · Esc om te annuleren · Klik erbuiten om te bevestigen',
   appStatusZoomsInserted:

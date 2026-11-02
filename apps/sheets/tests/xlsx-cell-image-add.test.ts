@@ -1,4 +1,8 @@
+<<<<<<< ours
 import { afterEach, describe, expect, it, vi } from 'vitest'
+=======
+import { describe, expect, it } from 'vitest'
+>>>>>>> theirs
 
 import {
   assertOnlyTouchedEntriesChanged,
@@ -87,6 +91,7 @@ async function applyDirect(
   return pkg
 }
 
+<<<<<<< ours
 afterEach(() => vi.unstubAllGlobals())
 
 describe('cell image additions: fresh rich-value parts', () => {
@@ -98,6 +103,9 @@ describe('cell image additions: fresh rich-value parts', () => {
     ])
   })
 
+=======
+describe('cell image additions: fresh rich-value parts', () => {
+>>>>>>> theirs
   it('writes media, rich-value bookkeeping, and vm-marked cells', async () => {
     const pkg = await applyDirect([addition(), addition({ row: 6, column: 3 })])
 

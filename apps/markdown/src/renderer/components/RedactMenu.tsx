@@ -56,6 +56,7 @@ export function RedactMenu({ editor, enabled }: Props) {
     if (!point) return
     const close = () => setPoint(null)
     const onKey = (e: KeyboardEvent) => {
+<<<<<<< ours
       if (e.key === 'Escape') {
         e.preventDefault()
         close()
@@ -64,11 +65,22 @@ export function RedactMenu({ editor, enabled }: Props) {
     const timer = window.setTimeout(() => {
       window.addEventListener('mousedown', close)
       window.addEventListener('keydown', onKey, true)
+=======
+      if (e.key === 'Escape') close()
+    }
+    const timer = window.setTimeout(() => {
+      window.addEventListener('mousedown', close)
+      window.addEventListener('keydown', onKey)
+>>>>>>> theirs
     }, 0)
     return () => {
       window.clearTimeout(timer)
       window.removeEventListener('mousedown', close)
+<<<<<<< ours
       window.removeEventListener('keydown', onKey, true)
+=======
+      window.removeEventListener('keydown', onKey)
+>>>>>>> theirs
     }
   }, [point])
 
@@ -81,7 +93,10 @@ export function RedactMenu({ editor, enabled }: Props) {
       {point && (
         <div
           className="redact-menu"
+<<<<<<< ours
           data-esc-local=""
+=======
+>>>>>>> theirs
           style={{ left: point.x, top: point.y }}
           // stopPropagation as well as preventDefault: this listener is on
           // window in the bubble phase, and preventDefault does not stop the

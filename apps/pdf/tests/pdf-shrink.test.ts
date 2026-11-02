@@ -33,6 +33,7 @@ describe('shrinkDocument', () => {
     expect(after.length).toBeLessThan(before)
   })
 
+<<<<<<< ours
   it('leaves a stream whose inflated size exceeds the cap byte-identical', async () => {
     const doc = await PDFDocument.create()
     doc.addPage([200, 200])
@@ -51,6 +52,8 @@ describe('shrinkDocument', () => {
     expect(Buffer.from(kept.contents).equals(weak)).toBe(true)
   })
 
+=======
+>>>>>>> theirs
   it('downsamples an oversized Flate image and rewrites its dimensions', async () => {
     const doc = await PDFDocument.create()
     doc.addPage([300, 300])

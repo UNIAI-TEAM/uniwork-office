@@ -205,8 +205,11 @@ export const BlockLink = Extension.create<BlockLinkOptions>({
         () =>
         ({ state, tr, dispatch }) => {
           const plan = planBlockLink(state, noteNameOf(this.options.getDocumentPath()))
+<<<<<<< ours
           // a new id is written into the document: a view-only or locked copy only reads
           if (plan?.write && !this.editor.isEditable) return false
+=======
+>>>>>>> theirs
           if (!plan) {
             if (dispatch) this.options.onNothing()
             return false
@@ -222,6 +225,15 @@ export const BlockLink = Extension.create<BlockLinkOptions>({
     }
   },
 
+<<<<<<< ours
+=======
+  addKeyboardShortcuts() {
+    return {
+      'Mod-Shift-l': () => this.editor.commands.copyBlockLink(),
+    }
+  },
+
+>>>>>>> theirs
   addProseMirrorPlugins() {
     return [
       new Plugin<DecorationSet>({

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 /** lets one test make the final rename of an install fail, without touching the disk */
+<<<<<<< ours
 const h = vi.hoisted(() => ({ failRenameTo: '', failRmOf: '', fakeHome: '' }))
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
@@ -9,19 +10,34 @@ vi.mock('node:fs', async (importOriginal) => {
   return {
     ...actual,
     rmSync: (path: PathLike, opts?: RmOptions) => {
+=======
+const h = vi.hoisted(() => ({ failRenameTo: '', failRmOf: '' }))
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  return {
+    ...actual,
+    rmSync: (path: import('node:fs').PathLike, opts?: import('node:fs').RmOptions) => {
+>>>>>>> theirs
       if (h.failRmOf && new RegExp(h.failRmOf).test(String(path))) {
         const e = new Error('resource busy') as NodeJS.ErrnoException
         e.code = 'EBUSY'
         throw e
       }
+<<<<<<< ours
       return rmOrig(path, opts)
     },
     renameSync: (from: PathLike, to: PathLike) => {
+=======
+      return actual.rmSync(path, opts)
+    },
+    renameSync: (from: import('node:fs').PathLike, to: import('node:fs').PathLike) => {
+>>>>>>> theirs
       if (h.failRenameTo && String(to) === h.failRenameTo) {
         // fail once: the restore of the parked copy is a plain rename to the same place
         h.failRenameTo = ''
         throw new Error('disk full')
       }
+<<<<<<< ours
       return renameOrig(from, to)
     },
   }
@@ -33,6 +49,12 @@ vi.mock('node:os', async (importOriginal) => {
     homedir: () => h.fakeHome || actual.homedir(),
   }
 })
+=======
+      return actual.renameSync(from, to)
+    },
+  }
+})
+>>>>>>> theirs
 import {
   existsSync,
   mkdirSync,
@@ -41,8 +63,11 @@ import {
   rmSync,
   symlinkSync,
   writeFileSync,
+<<<<<<< ours
   type PathLike,
   type RmOptions,
+=======
+>>>>>>> theirs
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -104,6 +129,7 @@ describe('usableSkills', () => {
     cleanup()
   })
 
+<<<<<<< ours
   it('never scans the user home or coding agent directories', async () => {
     const { root, save, cleanup } = scaffold()
     const home = join(root, 'home')
@@ -128,6 +154,15 @@ describe('usableSkills', () => {
       h.fakeHome = ''
       cleanup()
     }
+=======
+  it('never looks in a coding agent directory', async () => {
+    const { root, save, cleanup } = scaffold()
+    const agents = join(root, 'home', '.agents', 'skills', 'deploy')
+    mkdirSync(agents, { recursive: true })
+    writeFileSync(join(agents, 'SKILL.md'), SKILL('deploy', 'Roll back a release'))
+    expect(await usableSkills(save)).toEqual([])
+    cleanup()
+>>>>>>> theirs
   })
 
   it('skips a directory with no SKILL.md and one whose frontmatter is unusable', async () => {
@@ -177,12 +212,19 @@ describe('importSkillDir', () => {
     const { save, src, cleanup } = scaffold()
     mkdirSync(join(src, 'plain'))
     writeFileSync(join(src, 'plain', 'README.md'), 'not a skill')
+<<<<<<< ours
     expect(() => importSkillDir(join(src, 'plain'), save)).toThrow('skill-import:missing-skill-md')
     mkdirSync(join(src, 'bare'))
     writeFileSync(join(src, 'bare', 'SKILL.md'), 'no frontmatter')
     expect(() => importSkillDir(join(src, 'bare'), save)).toThrow(
       'skill-import:invalid-frontmatter',
     )
+=======
+    expect(() => importSkillDir(join(src, 'plain'), save)).toThrow('no SKILL.md')
+    mkdirSync(join(src, 'bare'))
+    writeFileSync(join(src, 'bare', 'SKILL.md'), 'no frontmatter')
+    expect(() => importSkillDir(join(src, 'bare'), save)).toThrow('frontmatter')
+>>>>>>> theirs
     expect(existsSync(join(save, 'skills'))).toBe(false)
     cleanup()
   })
@@ -192,7 +234,11 @@ describe('importSkillDir', () => {
       { shared: SKILL('shared', 'Mine', 'mine wins') },
       { shared: SKILL('shared', 'Theirs', 'theirs loses') },
     )
+<<<<<<< ours
     expect(() => importSkillDir(join(src, 'shared'), save)).toThrow('skill-import:already-exists')
+=======
+    expect(() => importSkillDir(join(src, 'shared'), save)).toThrow('already there')
+>>>>>>> theirs
     expect(readSkillBody(join(save, 'skills', 'shared', 'SKILL.md'))).toBe('mine wins\n')
     cleanup()
   })
@@ -200,7 +246,11 @@ describe('importSkillDir', () => {
   it('refuses a skill directory that is itself a symlink', () => {
     const { save, src, cleanup } = scaffold({}, { real: SKILL('real', 'A docx thing') })
     symlinkSync(join(src, 'real'), join(src, 'linked'))
+<<<<<<< ours
     expect(() => importSkillDir(join(src, 'linked'), save)).toThrow('skill-import:dir-symlink')
+=======
+    expect(() => importSkillDir(join(src, 'linked'), save)).toThrow('symlink')
+>>>>>>> theirs
     expect(existsSync(join(save, 'skills', 'linked'))).toBe(false)
     cleanup()
   })
@@ -210,7 +260,11 @@ describe('importSkillDir', () => {
     const dir = join(src, 'linked')
     writeFileSync(join(dir, 'outside.md'), 'somewhere else')
     symlinkSync(join(dir, 'outside.md'), join(dir, 'reference.md'))
+<<<<<<< ours
     expect(() => importSkillDir(dir, save)).toThrow('skill-import:contains-symlink')
+=======
+    expect(() => importSkillDir(dir, save)).toThrow('symlink')
+>>>>>>> theirs
     expect(existsSync(join(save, 'skills', 'linked'))).toBe(false)
     cleanup()
   })
@@ -219,7 +273,11 @@ describe('importSkillDir', () => {
     const { save, src, cleanup } = scaffold({}, { heavy: SKILL('heavy', 'A docx thing') })
     mkdirSync(join(src, 'heavy', 'corpus'), { recursive: true })
     writeFileSync(join(src, 'heavy', 'corpus', 'big.bin'), Buffer.alloc(11 * 1024 * 1024, 0))
+<<<<<<< ours
     expect(() => importSkillDir(join(src, 'heavy'), save)).toThrow('skill-import:too-large')
+=======
+    expect(() => importSkillDir(join(src, 'heavy'), save)).toThrow('import cap')
+>>>>>>> theirs
     expect(existsSync(join(save, 'skills', 'heavy'))).toBe(false)
     cleanup()
   })
@@ -229,6 +287,7 @@ describe('importSkillDir', () => {
     expect(importSkillDir(join(src, 'pdf-tools'), save).name).toBe('pdf-tools')
     cleanup()
   })
+<<<<<<< ours
 
   it('refuses a folder whose name cannot be used as a skill name', () => {
     const { save, src, cleanup } = scaffold(
@@ -264,6 +323,8 @@ describe('importSkillDir', () => {
     expect(readdirSync(join(save, 'skills'))).toEqual([])
     cleanup()
   })
+=======
+>>>>>>> theirs
 })
 
 describe('importSkillZip', () => {
@@ -302,7 +363,11 @@ describe('importSkillZip', () => {
     expect(imported.name).toBe('trip-planner')
     expect(imported.path).toBe(join(save, 'skills', 'trip-planner', 'SKILL.md'))
     expect(readSkillBody(imported.path)).toBe('Do the thing.\n')
+<<<<<<< ours
     expect(() => importSkillMd(md, save)).toThrow('skill-import:already-exists')
+=======
+    expect(() => importSkillMd(md, save)).toThrow(/already there/)
+>>>>>>> theirs
     cleanup()
   })
 
@@ -318,11 +383,16 @@ describe('importSkillZip', () => {
     const { root, save, cleanup } = scaffold()
     const md = join(root, 'notes.md')
     writeFileSync(md, '# just notes\n')
+<<<<<<< ours
     expect(() => importSkillMd(md, save)).toThrow('skill-import:invalid-frontmatter')
+=======
+    expect(() => importSkillMd(md, save)).toThrow(/frontmatter/)
+>>>>>>> theirs
     expect(existsSync(join(save, 'skills', 'notes'))).toBe(false)
     cleanup()
   })
 
+<<<<<<< ours
   it('cleans up the scratch copy when importSkillMd fails', () => {
     const { root, save, cleanup } = scaffold()
     const md = join(root, 'trip.md')
@@ -348,6 +418,13 @@ describe('importSkillZip', () => {
     expect(() => removeSkill('../other', save)).toThrow('skill-import:unknown-skill')
     expect(() => removeSkill('absent', save)).toThrow('skill-import:unknown-skill')
     expect(existsSync(join(save, 'other', 'SKILL.md'))).toBe(true)
+=======
+  it('removes a listed skill and refuses anything else', () => {
+    const { save, cleanup } = scaffold({ mine: SKILL('mine', 'docx') })
+    writeFileSync(join(save, 'stray.txt'), 'x')
+    expect(() => removeSkill('../stray.txt', save)).toThrow(/unknown skill/)
+    expect(() => removeSkill('absent', save)).toThrow(/unknown skill/)
+>>>>>>> theirs
     removeSkill('mine', save)
     expect(existsSync(join(save, 'skills', 'mine'))).toBe(false)
     expect(existsSync(join(save, 'stray.txt'))).toBe(true)
@@ -355,9 +432,16 @@ describe('importSkillZip', () => {
   })
 
   it.skipIf(process.platform === 'win32')(
+<<<<<<< ours
     'removes a skill in our folder whose name importSkillDir/Zip would refuse',
     async () => {
       const { save, cleanup } = scaffold({ 'draft:v2': SKILL('draft', 'docx') })
+=======
+    'removes a folder-imported skill whose name a zip would refuse',
+    async () => {
+      const { save, src, cleanup } = scaffold({}, { 'draft:v2': SKILL('draft', 'docx') })
+      importSkillDir(join(src, 'draft:v2'), save)
+>>>>>>> theirs
       expect((await usableSkills(save)).map((s) => s.name)).toEqual(['draft:v2'])
       removeSkill('draft:v2', save)
       expect(existsSync(join(save, 'skills', 'draft:v2'))).toBe(false)
@@ -385,6 +469,7 @@ describe('importSkillZip', () => {
       { 'a/SKILL.md': SKILL('a', 'docx'), 'b/SKILL.md': SKILL('b', 'pdf') },
       join(root, 'two.zip'),
     )
+<<<<<<< ours
     await expect(importSkillZip(two, save)).rejects.toThrow('skill-import:archive-missing-skill-md')
     const none = await zipOf({ 'a/README.md': 'hi' }, join(root, 'none.zip'))
     await expect(importSkillZip(none, save)).rejects.toThrow(
@@ -394,6 +479,15 @@ describe('importSkillZip', () => {
   })
 
   it('refuses an entry that climbs out or uses an absolute or backslash name, and writes nothing', async () => {
+=======
+    await expect(importSkillZip(two, save)).rejects.toThrow('no SKILL.md')
+    const none = await zipOf({ 'a/README.md': 'hi' }, join(root, 'none.zip'))
+    await expect(importSkillZip(none, save)).rejects.toThrow('no SKILL.md')
+    cleanup()
+  })
+
+  it('refuses an entry that climbs out, and writes nothing', async () => {
+>>>>>>> theirs
     const { root, save, cleanup } = scaffold()
     const zip = await zipOf(
       { 'tool/SKILL.md': SKILL('tool', 'docx'), '../escape.txt': 'out' },
@@ -403,6 +497,7 @@ describe('importSkillZip', () => {
     await expect(importSkillZip(zip, save)).rejects.toThrow()
     expect(existsSync(join(root, 'escape.txt'))).toBe(false)
     expect(existsSync(join(save, 'skills', 'tool'))).toBe(false)
+<<<<<<< ours
 
     const absZip = await zipOf(
       { 'tool/SKILL.md': SKILL('tool', 'docx'), '/abs.txt': 'out' },
@@ -418,6 +513,8 @@ describe('importSkillZip', () => {
     await expect(importSkillZip(backslashZip, save)).rejects.toThrow(
       'skill-import:unsafe-entry:a\\b.txt',
     )
+=======
+>>>>>>> theirs
     cleanup()
   })
 
@@ -428,7 +525,11 @@ describe('importSkillZip', () => {
     z.file('tool/link', '/etc/passwd', { unixPermissions: 0o120777 })
     const zip = join(root, 'link.zip')
     writeFileSync(zip, await z.generateAsync({ type: 'nodebuffer', platform: 'UNIX' }))
+<<<<<<< ours
     await expect(importSkillZip(zip, save)).rejects.toThrow('skill-import:archive-symlink')
+=======
+    await expect(importSkillZip(zip, save)).rejects.toThrow('symlink')
+>>>>>>> theirs
     expect(existsSync(join(save, 'skills', 'tool'))).toBe(false)
     cleanup()
   })
@@ -439,6 +540,7 @@ describe('importSkillZip', () => {
       { 'heavy/SKILL.md': SKILL('heavy', 'docx'), 'heavy/big.bin': Buffer.alloc(11 * 1024 * 1024) },
       join(root, 'heavy.zip'),
     )
+<<<<<<< ours
     await expect(importSkillZip(zip, save)).rejects.toThrow('skill-import:too-large')
     expect(readdirSync(join(save, 'skills'))).toEqual([])
     cleanup()
@@ -455,10 +557,14 @@ describe('importSkillZip', () => {
       join(root, 'running-heavy.zip'),
     )
     await expect(importSkillZip(zip, save)).rejects.toThrow('skill-import:too-large')
+=======
+    await expect(importSkillZip(zip, save)).rejects.toThrow('import cap')
+>>>>>>> theirs
     expect(readdirSync(join(save, 'skills'))).toEqual([])
     cleanup()
   })
 
+<<<<<<< ours
   it('refuses a zip with more than 2000 entries', async () => {
     const { root, save, cleanup } = scaffold()
     const z = new JSZip()
@@ -477,6 +583,12 @@ describe('importSkillZip', () => {
     const { root, save, cleanup } = scaffold({ tool: SKILL('tool', 'Mine', 'mine wins') })
     const zip = await zipOf({ 'tool/SKILL.md': SKILL('tool', 'Theirs') }, join(root, 't.zip'))
     await expect(importSkillZip(zip, save)).rejects.toThrow('skill-import:already-exists')
+=======
+  it('refuses to overwrite an installed skill', async () => {
+    const { root, save, cleanup } = scaffold({ tool: SKILL('tool', 'Mine', 'mine wins') })
+    const zip = await zipOf({ 'tool/SKILL.md': SKILL('tool', 'Theirs') }, join(root, 't.zip'))
+    await expect(importSkillZip(zip, save)).rejects.toThrow('already there')
+>>>>>>> theirs
     expect(readSkillBody(join(save, 'skills', 'tool', 'SKILL.md'))).toBe('mine wins\n')
     cleanup()
   })
@@ -485,7 +597,11 @@ describe('importSkillZip', () => {
     const { root, save, cleanup } = scaffold()
     const file = join(root, 'not.zip')
     writeFileSync(file, 'plain text')
+<<<<<<< ours
     await expect(importSkillZip(file, save)).rejects.toThrow('skill-import:not-zip')
+=======
+    await expect(importSkillZip(file, save)).rejects.toThrow('not a zip')
+>>>>>>> theirs
     cleanup()
   })
 })
@@ -656,6 +772,7 @@ describe('recommendedSkills / installRecommendedSkill', () => {
     cleanup()
   })
 
+<<<<<<< ours
   it('refuses a name that is not a shipped skill, including path-shaped ones even when a sibling SKILL.md exists', () => {
     const { root, save, cleanup } = scaffold()
     const rec = join(root, 'recommended')
@@ -668,6 +785,16 @@ describe('recommendedSkills / installRecommendedSkill', () => {
     expect(existsSync(join(save, 'skills'))).toBe(false)
     expect(existsSync(join(save, 'other'))).toBe(false)
     expect(existsSync(join(root, 'other', 'SKILL.md'))).toBe(true)
+=======
+  it('refuses a name that is not a shipped skill, including path-shaped ones', () => {
+    const { root, save, cleanup } = scaffold()
+    const rec = join(root, 'recommended')
+    mkdirSync(rec, { recursive: true })
+    for (const bad of ['nope', '../save', '/etc', '.hidden', 'a/b']) {
+      expect(() => installRecommendedSkill(bad, rec, save)).toThrow('unknown skill')
+    }
+    expect(existsSync(join(save, 'skills'))).toBe(false)
+>>>>>>> theirs
     cleanup()
   })
 })

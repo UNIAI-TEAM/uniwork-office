@@ -116,6 +116,11 @@ export const nl = {
     'Wijzigingen bijhouden aan: AI-inhoudsbewerkingen worden gemarkeerd als revisies (invoegingen onderstreept, verwijderingen doorgehaald); accepteer of weiger ze in Controleren',
   aiTrackOffTitle:
     'Wijzigingen bijhouden uit: AI-bewerkingen worden direct toegepast (terugdraaien kan nog steeds via versiesnapshots)',
+  aiRevisionBarTitle: 'Revisies',
+  aiRevisionCount: '{count} openstaande wijzigingen',
+  aiRevisionRejectAll: 'Alles weigeren',
+  aiRevisionAcceptAll: 'Alles accepteren',
+  aiRevisionPara: 'Alinea {n}',
   aiTurnLimit:
     '(Limiet voor toolaanroepen voor dit verzoek bereikt; het antwoord hierboven is gebaseerd op de tot nu toe voltooide stappen en is mogelijk onvolledig.)',
   aiStopped: '(Gestopt)',
@@ -128,6 +133,8 @@ export const nl = {
   aiUnknownError: 'Onbekende fout',
   aiTimeoutError:
     'AI-verzoek verlopen: geen reactie van het netwerk, uitvoering gestopt. Controleer je verbinding en probeer het opnieuw',
+  aiRegionError:
+    'De aanbieder van dit model bedient uw huidige regio niet — kies een ander model of wissel van netwerk',
   aiOverloadedError: 'De AI-service is momenteel overbelast — probeer het zo opnieuw',
   aiNetworkError:
     'Netwerkprobleem: kan de AI-service niet bereiken. Controleer je verbinding en probeer het opnieuw',
@@ -135,6 +142,9 @@ export const nl = {
   aiSumImageAttachment: 'Afbeeldingsbijlage {name}',
   aiSumRead: '{name} lezen',
   aiSumReadAttachmentName: 'Bijlage {name} lezen',
+  aiSumSkillsList: 'Geïnstalleerde skills opgelijst',
+  aiSumSkillRead: 'Skill {name} gelezen',
+  aiSumRunCli: '{args} uitgevoerd',
   aiSumWebSearch: 'Zoeken op internet',
   aiSumWebSearchDone: 'Gezocht naar "{query}" ({count} resultaten)',
   aiSumImageSearch: 'Afbeeldingen zoeken',
@@ -198,6 +208,7 @@ export const nl = {
   aiCmdImages: '{count} afbeelding(en) bijgewerkt',
   aiCmdToc: 'Inhoudsopgave ingevoegd ({count} vermeldingen)',
   aiCmdSkipped: ' ({count} beveiligde blok(ken) overgeslagen)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
   aiClarifyTitle: 'Een paar vragen voordat ik verder ga',
@@ -212,6 +223,8 @@ export const nl = {
   aiClarifySubmit: 'Doorgaan',
   aiSumClarify: 'Verduidelijking beantwoord',
   aiSumClarifySkipped: 'Verduidelijking overgeslagen',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Maak een mindmap van dit document',
   aiMindMapBtn: 'AI-mindmap',
   aiMindMapPrompt:
@@ -222,7 +235,18 @@ export const nl = {
   aiMindMapAskPrompt: 'Vertel me over "{label}" in dit document',
   aiMindMapJump: 'Ga naar het geciteerde fragment',
   aiMindMapExport: 'PNG exporteren',
+<<<<<<< ours
   aiMindMapReset: 'Weergave opnieuw instellen',
   aiMindMapExpand: 'Tak uitklappen',
   aiMindMapCollapse: 'Tak inklappen',
+=======
+  aiMindMapExportSvg: 'SVG exporteren',
+  aiMindMapInsert: 'In document invoegen',
+  aiMindMapReset: 'Weergave opnieuw instellen',
+  aiMindMapExpand: 'Tak uitklappen',
+  aiMindMapCollapse: 'Tak inklappen',
+  aiMindMapToggleLayout: 'Lay-out wisselen',
+  aiMindMapLayoutTopDown: 'Overschakelen naar de lay-out van boven naar beneden',
+  aiMindMapLayoutLeftRight: 'Overschakelen naar de lay-out van links naar rechts',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

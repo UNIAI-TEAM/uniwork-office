@@ -1,10 +1,16 @@
 import { clipText } from '../preview'
 import type { Editor } from '@tiptap/core'
+import JSZip from 'jszip'
 import {
+  applyTrackedChangesXml,
   BLANK_BULLET_NUM_ID,
   BLANK_ORDERED_NUM_ID,
   buildBlankDocx,
   compareDocuments,
+<<<<<<< ours
+=======
+  countTrackedChangesXml,
+>>>>>>> theirs
   findChartWorkbookPath,
   nextNoteId,
   parseChartPartXml,
@@ -13,8 +19,10 @@ import {
   patchChartPartXml,
   patchChartWorkbookXlsxBase64,
   pendingHeadingLevel,
+  planRemoveParts,
   readDocxPartBase64,
   readSections,
+  removePartsRefusalMessage,
   saveDocx,
   type CommentInfo,
   type CompareGranularity,
@@ -25,6 +33,13 @@ import {
   type HfPartInfo,
   type NoteInfo,
   type PropertyChanges,
+<<<<<<< ours
+=======
+  type RemovePartsOptions,
+  type RemovedPartBinding,
+  type RemovePartsPlan,
+  type RevisionXmlFilter,
+>>>>>>> theirs
   type SaveOptions,
   type StyleUpsert,
   type PictureWatermarkSpec,
@@ -138,8 +153,18 @@ interface SideState {
   footnotes: NoteInfo[]
   endnotes: NoteInfo[]
   notesDirty: boolean
+<<<<<<< ours
   /** set_properties changes; written into the docProps parts on save */
   properties?: PropertyChanges
+=======
+  /** header / footer / footnote / endnote part XML by zip path, loaded on the first accept_changes / reject_changes */
+  revisionParts: Map<string, string> | null
+  revisionPartsDirty: Set<string>
+  /** set_properties changes; written into the docProps parts on save */
+  properties?: PropertyChanges
+  /** remove_parts package scrub applied in the final save pass */
+  removeParts?: RemovePartsOptions
+>>>>>>> theirs
   /** block-level content controls to write on save: wrap a range of body blocks in one new control, or unwrap the control with a tag */
   contentControls?: SaveOptions['contentControls']
 }
@@ -196,6 +221,8 @@ function sideStateOf(parsed: Parsed): SideState {
     footnotes: [...parsed.footnotes],
     endnotes: [...parsed.endnotes],
     notesDirty: false,
+    revisionParts: null,
+    revisionPartsDirty: new Set(),
   }
 }
 
@@ -228,6 +255,7 @@ export async function saveDocument(doc: OpenDocument): Promise<Uint8Array> {
   const sectionEdits = applySectionEdits(doc, plan)
   const options: SaveOptions = {
     ...sectionEdits.options,
+    trailingSectPrChange: plan.trailingSectPrChange,
     header: hf('header'),
     footer: hf('footer'),
     headerFirst: hf('headerFirst'),
@@ -242,8 +270,15 @@ export async function saveDocument(doc: OpenDocument): Promise<Uint8Array> {
     footnotes: side.notesDirty ? side.footnotes : undefined,
     endnotes: side.notesDirty ? side.endnotes : undefined,
     properties: side.properties,
+<<<<<<< ours
+=======
+    removeParts: side.removeParts,
+>>>>>>> theirs
     contentControls: side.contentControls,
     ...(await chartPartPatches(doc, plan.chartPatches)),
+  }
+  for (const path of side.revisionPartsDirty) {
+    options.partXml = { ...options.partXml, [path]: side.revisionParts!.get(path)! }
   }
   return saveDocx(doc.parsed, sectionEdits.saveBlocks, options)
 }
@@ -273,6 +308,29 @@ export async function compareDocxFiles(
   return { bytes: result.bytes, summary: result.summary }
 }
 
+<<<<<<< ours
+=======
+const REVISION_PART_RE = /^word\/(?:header\d*|footer\d*|footnotes|endnotes)\.xml$/
+
+async function revisionParts(doc: OpenDocument): Promise<Map<string, string>> {
+  if (doc.side.revisionParts) return doc.side.revisionParts
+  const zip = await JSZip.loadAsync(doc.parsed.internal.originalBytes)
+  const parts = new Map<string, string>()
+  for (const [name, entry] of Object.entries(zip.files)) {
+    if (REVISION_PART_RE.test(name) && !entry.dir) parts.set(name, await entry.async('string'))
+  }
+  doc.side.revisionParts = parts
+  return parts
+}
+
+/** tracked changes outside the body (headers, footers, footnotes, endnotes) */
+export async function countRevisionsElsewhere(doc: OpenDocument): Promise<number> {
+  let n = 0
+  for (const xml of (await revisionParts(doc)).values()) n += countTrackedChangesXml(xml)
+  return n
+}
+
+>>>>>>> theirs
 /**
  * wrap_content_control / unwrap_content_control: the control is written on
  * save, so the op only records the change; the document body is untouched.
@@ -287,9 +345,16 @@ function setContentControl(
   if (name === 'unwrap_content_control') {
     const tag = typeof op.tag === 'string' ? op.tag.trim() : ''
     if (!tag) return { error: 'unwrap_content_control needs a tag' }
+<<<<<<< ours
     if (!doc.parsed.blocks.some((b) => b.sdtShell?.tag === tag)) {
       return { error: `no content control is tagged ${tag}` }
     }
+=======
+    const anyShell = doc.parsed.blocks.some((b) =>
+      (b.sdtShells ?? (b.sdtShell ? [b.sdtShell] : [])).some((shell) => shell.tag === tag),
+    )
+    if (!anyShell) return { error: `no content control is tagged ${tag}` }
+>>>>>>> theirs
     side.contentControls = { ...controls, unwrap: [...(controls.unwrap ?? []), { tag }] }
     return { output: `unwrap the content control tagged ${tag}` }
   }
@@ -346,6 +411,60 @@ function setContentControl(
   }
 }
 
+<<<<<<< ours
+=======
+/**
+ * accept_changes / reject_changes: the body goes through the editor; the parts it
+ * never loads are rewritten as XML. Positional selectors (ids, blockIndex,
+ * blockRange) address the body only.
+ */
+async function applyRevisionOp(
+  doc: OpenDocument,
+  op: Record<string, unknown>,
+  mode: 'accept' | 'reject',
+): Promise<{ output?: string; error?: string }> {
+  const { op: _op, ...input } = op
+  const ops = doc.mods.revisionOps
+  const sel = ops.validateSelector(input)
+  if ('error' in sel) return { error: sel.error }
+  const bodyOnly = !!sel.ids || sel.blockIndex !== undefined || !!sel.blockRange
+  const body = ops.applyRevisionSelection(doc.editor, sel, mode)
+  let elsewhere = 0
+  if (!bodyOnly) {
+    const filter: RevisionXmlFilter = {
+      ...(sel.author !== undefined ? { author: sel.author } : {}),
+      ...(sel.type !== undefined ? { type: sel.type } : {}),
+      ...(sel.before !== undefined ? { before: sel.before } : {}),
+    }
+    for (const [path, xml] of await revisionParts(doc)) {
+      const r = applyTrackedChangesXml(xml, mode, filter)
+      if (r.xml === xml) continue
+      elsewhere += r.applied
+      doc.side.revisionParts!.set(path, r.xml)
+      doc.side.revisionPartsDirty.add(path)
+    }
+  }
+  if ('error' in body && elsewhere === 0) return { error: body.error }
+  const verb = mode === 'accept' ? 'Accepted' : 'Rejected'
+  const done = 'error' in body ? [] : body.entries
+  const parts: string[] = []
+  if (done.length)
+    parts.push(`${done.length} tracked change(s) (${done.map((e) => e.id).join(', ')})`)
+  if (elsewhere) parts.push(`${elsewhere} in headers, footers and notes`)
+  const left = ops.listRevisionEntries(doc.editor.state.doc)
+  const leftElsewhere = await countRevisionsElsewhere(doc)
+  const still: string[] = []
+  if (left.length) still.push(`Still ${ops.describePending(left)}`)
+  if (leftElsewhere)
+    still.push(
+      `${left.length ? 'and' : 'Still'} ${leftElsewhere} in headers, footers and notes${bodyOnly ? ' (ids address the body; all: true or author / type / before reach them)' : ''}`,
+    )
+  return {
+    output: `${verb} ${parts.join(' and ')}. ${still.length ? `${still.join(' ')}.` : 'No tracked changes remain.'}`,
+  }
+}
+
+>>>>>>> theirs
 /** edit_chart changes live in the chart's own part and its embedded workbook, not in the body XML */
 async function chartPartPatches(
   doc: OpenDocument,
@@ -395,10 +514,34 @@ export interface BlockSummary {
   table?: ReturnType<Modules['tableOps']['describeTable']>
   /** the block-level content control this block sits in (w:sdt), when it is in one */
   contentControl?: ContentControlSummary
+<<<<<<< ours
+=======
+  /**
+   * every block-level control wrapping this block, outermost first; set
+   * whenever the block sits in at least one control (so a single-control block
+   * carries a one-element array, and contentControl keeps the outermost)
+   */
+  contentControls?: ContentControlSummary[]
+  /** run-level (inline) controls inside this paragraph, read-only (their bytes stay in place) */
+  inlineContentControls?: InlineContentControlSummary[]
+>>>>>>> theirs
   /** the text was clipped to the preview length; `--full` or `--max-chars` returns the rest */
   truncated?: true
 }
 
+<<<<<<< ours
+=======
+/** a run-level (inline) w:sdt inside a paragraph */
+export interface InlineContentControlSummary {
+  tag: string
+  title: string
+  lock: string
+  id: string
+  /** the plain text inside the control */
+  text: string
+}
+
+>>>>>>> theirs
 /** what a block-level content control (w:sdt) carries */
 export interface ContentControlSummary {
   /** programmatic tag (w:sdtPr/w:tag) */
@@ -413,6 +556,17 @@ export interface ContentControlSummary {
 
 export const PREVIEW_CHARS = 200
 
+/**
+ * Text a non-text leaf contributes to a block's plain text. A soft line break
+ * (Shift+Enter, <w:br/>) reads as "\n" so the two lines never run together;
+ * page/column/wrap breaks and every other leaf keep contributing nothing.
+ */
+function plainLeafText(leaf: { type: { name: string }; attrs: Record<string, unknown> }): string {
+  if (leaf.type.name !== 'hardBreak') return ''
+  const { pageBreak, colBreak, wrapBreak, mathBreak } = leaf.attrs ?? {}
+  return pageBreak || colBreak || wrapBreak || mathBreak ? '' : '\n'
+}
+
 /** Block list an agent targets ops at: index, node type, heading level, text (clipped to `maxChars`). */
 export function describeDocument(
   doc: OpenDocument,
@@ -424,7 +578,11 @@ export function describeDocument(
   const [start, end] = range ?? [0, root.childCount - 1]
   for (let i = start; i <= Math.min(end, root.childCount - 1); i++) {
     const node = root.child(i)
-    const { text, truncated } = clipText(node.textContent, maxChars)
+    // textContent skips leaves without a leafText; read the soft breaks back in
+    const { text, truncated } = clipText(
+      node.textBetween(0, node.content.size, '', plainLeafText),
+      maxChars,
+    )
     out.push({
       index: i,
       type: node.type.name.replace(/^doc/, '').toLowerCase(),
@@ -432,6 +590,15 @@ export function describeDocument(
       ...(node.type.name === 'docProtected' ? { kind: protectedKind(node.attrs) } : {}),
       ...(node.type.name === 'docTable' ? { table: doc.mods.tableOps.describeTable(node) } : {}),
       ...(contentControlOf(doc, node) ? { contentControl: contentControlOf(doc, node)! } : {}),
+<<<<<<< ours
+=======
+      ...(contentControlsOf(doc, node).length > 0
+        ? { contentControls: contentControlsOf(doc, node) }
+        : {}),
+      ...(inlineControlsOf(doc, node).length > 0
+        ? { inlineContentControls: inlineControlsOf(doc, node) }
+        : {}),
+>>>>>>> theirs
       text,
       ...(truncated ? { truncated } : {}),
     })
@@ -446,18 +613,58 @@ export function listTableStyles(doc: OpenDocument): Array<{ id: string; name: st
     .map((s) => ({ id: s.styleId, name: s.name }))
 }
 
+<<<<<<< ours
+=======
+/** the parsed block behind an editor block (the editor block keeps the body index of its original) */
+function parsedBlockOf(doc: OpenDocument, block: Editor['state']['doc']) {
+  const docxIndex = block.attrs.docxIndex
+  if (typeof docxIndex !== 'number') return null
+  return doc.parsed.blocks[docxIndex] ?? null
+}
+
+>>>>>>> theirs
 /** the content control (w:sdt) a block sits in: the editor block keeps the body index of its original, and the shell rides on it */
 function contentControlOf(
   doc: OpenDocument,
   block: Editor['state']['doc'],
 ): ContentControlSummary | null {
+<<<<<<< ours
   const docxIndex = block.attrs.docxIndex
   if (typeof docxIndex !== 'number') return null
   const shell = doc.parsed.blocks[docxIndex]?.sdtShell
+=======
+  const shell = parsedBlockOf(doc, block)?.sdtShell
+>>>>>>> theirs
   if (!shell) return null
   return { tag: shell.tag, title: shell.alias, lock: shell.lock, id: shell.id }
 }
 
+<<<<<<< ours
+=======
+/** every block-level control the block sits in, outermost first (a single control gives a one-element array) */
+function contentControlsOf(
+  doc: OpenDocument,
+  block: Editor['state']['doc'],
+): ContentControlSummary[] {
+  const parsed = parsedBlockOf(doc, block)
+  const chain = parsed?.sdtShells ?? (parsed?.sdtShell ? [parsed.sdtShell] : [])
+  return chain.map((shell) => ({
+    tag: shell.tag,
+    title: shell.alias,
+    lock: shell.lock,
+    id: shell.id,
+  }))
+}
+
+/** run-level controls inside the paragraph (read-only reporting) */
+function inlineControlsOf(
+  doc: OpenDocument,
+  block: Editor['state']['doc'],
+): InlineContentControlSummary[] {
+  return parsedBlockOf(doc, block)?.inlineContentControls ?? []
+}
+
+>>>>>>> theirs
 /** native docx charts are passthrough blocks carrying chartDisplay; edit_chart targets them like AI-made ones */
 function protectedKind(attrs: Record<string, unknown>): string {
   if (attrs.chartDisplay) return 'chart'
@@ -624,7 +831,15 @@ const CONTENT_CONTROL_SCHEMAS: Record<(typeof CONTENT_CONTROL_OPS)[number], Json
   unwrap_content_control: {
     type: 'object',
     properties: {
+<<<<<<< ours
       tag: { type: 'string', description: 'the tag of the control to unwrap' },
+=======
+      tag: {
+        type: 'string',
+        description:
+          'the tag of the control to unwrap (outermost or a nested inner control; the tag may repeat)',
+      },
+>>>>>>> theirs
     },
     required: ['tag'],
   },
@@ -632,9 +847,52 @@ const CONTENT_CONTROL_SCHEMAS: Record<(typeof CONTENT_CONTROL_OPS)[number], Json
 
 const CONTENT_CONTROL_NOTES: Record<(typeof CONTENT_CONTROL_OPS)[number], string> = {
   wrap_content_control:
+<<<<<<< ours
     'put a block range into one block-level content control (w:sdt); the blocks stay editable and the control carries the tag/title/lock; `genoffice docs read` shows the control on every block in it',
   unwrap_content_control:
     'remove the content control with that tag and leave its blocks as plain body blocks',
+=======
+    'put a block range into one block-level content control (w:sdt); the blocks stay editable and the control carries the tag/title/lock; `genoffice docs read` shows the control chain on every block in it (contentControls, outermost first) and run-level controls as inlineContentControls',
+  unwrap_content_control:
+    'remove every content control carrying that tag and leave its blocks as plain body blocks; nested controls unwrap level by level (unwrapping an inner tag keeps the outer shell around the content), inline/run-level controls are reported but not unwrapped',
+}
+
+/**
+ * Package-level scrubs (remove_parts). CLI-only like the content controls: the
+ * app has no AI tool for them, so the catalog carries their schema here.
+ */
+const PACKAGE_OPS = ['remove_parts'] as const
+
+const PACKAGE_SCHEMAS: Record<(typeof PACKAGE_OPS)[number], JsonSchema> = {
+  remove_parts: {
+    type: 'object',
+    properties: {
+      kinds: {
+        type: 'array',
+        items: { type: 'string', enum: ['customXml', 'webExtensions'] },
+        description:
+          'part families to remove: customXml (template/DMS data stores: customXml/item*.xml + itemProps*.xml) or webExtensions (task panes/add-ins under word/webextensions/)',
+      },
+      paths: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'explicit part paths relative to the package root (no leading slash), e.g. "word/activeX/activeX1.bin"; unknown paths are ignored and listed',
+      },
+      dataBinding: {
+        type: 'string',
+        enum: ['refuse', 'strip'],
+        description:
+          'a removed customXml store can back content controls through w:dataBinding: refuse (default) fails the batch and names the controls, strip removes the binding and keeps the control and its text',
+      },
+    },
+  },
+}
+
+const PACKAGE_NOTES: Record<(typeof PACKAGE_OPS)[number], string> = {
+  remove_parts:
+    'drop metadata-carrying package parts for a pre-filing scrub (customXml stores, web-extension/add-in parts, or explicit package paths); their relationships, [Content_Types].xml entries and empty folders go with them and every other part keeps its bytes; content controls bound to a removed customXml store refuse the batch unless dataBinding: "strip" unbinds them',
+>>>>>>> theirs
 }
 
 export interface ApplyOptions {
@@ -698,10 +956,24 @@ export async function applyDocOps(
       const r = setDocumentProperties(doc, op)
       if (r.error) failed = rejected(r.error)
       else results.push({ index, op: name, output: r.output! })
+<<<<<<< ours
+=======
+    } else if (name === 'remove_parts') {
+      const r = await setRemoveParts(doc, op)
+      if (r.error) failed = rejected(r.error)
+      else results.push({ index, op: name, output: r.output! })
+>>>>>>> theirs
     } else if (name === 'wrap_content_control' || name === 'unwrap_content_control') {
       const r = setContentControl(doc, op, name)
       if (r.error) failed = rejected(r.error)
       else results.push({ index, op: name, output: r.output! })
+<<<<<<< ours
+=======
+    } else if (name === 'accept_changes' || name === 'reject_changes') {
+      const r = await applyRevisionOp(doc, op, name === 'accept_changes' ? 'accept' : 'reject')
+      if (r.error) failed = rejected(r.error)
+      else results.push({ index, op: name, output: r.output! })
+>>>>>>> theirs
     } else {
       const call = HTML_TOOLS.has(name)
         ? { id: `genoffice-${index}`, name, input: htmlToolInput(doc, name, op) }
@@ -759,11 +1031,17 @@ function mergePropertyChanges(
 ): PropertyChanges {
   if (!current || next.clear) return next
   const merged: PropertyChanges = { ...current }
+<<<<<<< ours
   for (const section of ['core', 'app', 'custom'] as const) {
     const values = next[section]
     if (!values) continue
     merged[section] = { ...(current[section] ?? {}), ...values }
   }
+=======
+  if (next.core) merged.core = { ...(current.core ?? {}), ...next.core }
+  if (next.app) merged.app = { ...(current.app ?? {}), ...next.app }
+  if (next.custom) merged.custom = { ...(current.custom ?? {}), ...next.custom }
+>>>>>>> theirs
   return merged
 }
 
@@ -778,6 +1056,115 @@ function describePropertyChanges(changes: PropertyChanges): string {
   return parts.join(', ')
 }
 
+<<<<<<< ours
+=======
+const REMOVE_PARTS_KINDS = ['customXml', 'webExtensions'] as const
+
+/** Validate a remove_parts op; kinds are de-duplicated and at least one selector is required. */
+function parseRemovePartsOp(op: Record<string, unknown>): {
+  options?: RemovePartsOptions
+  error?: string
+} {
+  const kinds: NonNullable<RemovePartsOptions['kinds']> = []
+  if (op.kinds !== undefined) {
+    if (!Array.isArray(op.kinds))
+      return { error: 'remove_parts needs kinds as an array of customXml | webExtensions' }
+    for (const kind of op.kinds) {
+      if (!REMOVE_PARTS_KINDS.includes(kind as (typeof REMOVE_PARTS_KINDS)[number]))
+        return {
+          error: `remove_parts: unknown kind ${JSON.stringify(kind)} (customXml | webExtensions)`,
+        }
+      const known = kind as (typeof REMOVE_PARTS_KINDS)[number]
+      if (!kinds.includes(known)) kinds.push(known)
+    }
+  }
+  const paths: string[] = []
+  if (op.paths !== undefined) {
+    if (!Array.isArray(op.paths))
+      return { error: 'remove_parts needs paths as an array of package paths' }
+    for (const path of op.paths) {
+      if (typeof path !== 'string' || !path.trim())
+        return { error: 'remove_parts: every paths entry must be a non-empty package path' }
+      const trimmed = path.trim()
+      if (!paths.includes(trimmed)) paths.push(trimmed)
+    }
+  }
+  if (kinds.length === 0 && paths.length === 0)
+    return {
+      error:
+        'remove_parts needs kinds (customXml | webExtensions) or paths (package-relative part paths)',
+    }
+  if (op.dataBinding !== undefined && op.dataBinding !== 'refuse' && op.dataBinding !== 'strip')
+    return { error: 'remove_parts: dataBinding must be "refuse" or "strip"' }
+  const options: RemovePartsOptions = {}
+  if (kinds.length > 0) options.kinds = kinds
+  if (paths.length > 0) options.paths = paths
+  if (op.dataBinding === 'refuse' || op.dataBinding === 'strip')
+    options.dataBinding = op.dataBinding
+  return { options }
+}
+
+/** two remove_parts ops in one batch compose: union of kinds/paths, the later explicit dataBinding wins */
+function mergeRemoveParts(
+  current: RemovePartsOptions | undefined,
+  next: RemovePartsOptions,
+): RemovePartsOptions {
+  const kinds = [...(current?.kinds ?? [])]
+  for (const kind of next.kinds ?? []) if (!kinds.includes(kind)) kinds.push(kind)
+  const paths = [...(current?.paths ?? [])]
+  for (const path of next.paths ?? []) if (!paths.includes(path)) paths.push(path)
+  const merged: RemovePartsOptions = {}
+  if (kinds.length > 0) merged.kinds = kinds
+  if (paths.length > 0) merged.paths = paths
+  const dataBinding = next.dataBinding ?? current?.dataBinding
+  if (dataBinding) merged.dataBinding = dataBinding
+  return merged
+}
+
+function describeControlBinding(binding: RemovedPartBinding): string {
+  const label = binding.tag ? `"${binding.tag}"` : 'untagged control'
+  const id = binding.controlId ? ` w:id ${binding.controlId}` : ''
+  return `${label}${id} in ${binding.part}`
+}
+
+/** One-line plan/report for remove_parts (the dry-run plan keeps the first line). */
+function describeRemovePartsPlan(plan: RemovePartsPlan, options: RemovePartsOptions): string {
+  const families = options.kinds?.length ? ` [${options.kinds.join(', ')}]` : ''
+  const paths =
+    plan.removedPaths.length > 0 ? plan.removedPaths.join(', ') : 'nothing (already absent)'
+  const action = options.dataBinding ?? 'refuse'
+  const binding =
+    plan.dataBindings.length > 0
+      ? `; dataBinding: ${action} would unbind ${plan.dataBindings.length} control(s) (${plan.dataBindings.map(describeControlBinding).join(', ')})`
+      : `; dataBinding: ${action} (no bound controls)`
+  const unknown = plan.unknownPaths.length
+    ? `; ignored unknown paths: ${plan.unknownPaths.join(', ')}`
+    : ''
+  return `remove ${plan.removedPaths.length} package part(s)${families}: ${paths}${binding}${unknown}`
+}
+
+/**
+ * remove_parts: the parts are dropped in the final package pass on save, so the
+ * op only records the change; the package is planned against the source bytes
+ * here so the dry run lists the parts and a dataBinding refusal fails the batch
+ * (nothing is written either way).
+ */
+async function setRemoveParts(
+  doc: OpenDocument,
+  op: Record<string, unknown>,
+): Promise<{ output?: string; error?: string }> {
+  const parsed = parseRemovePartsOp(op)
+  if (!parsed.options) return { error: parsed.error! }
+  const merged = mergeRemoveParts(doc.side.removeParts, parsed.options)
+  const plan = await planRemoveParts(doc.parsed.internal.originalBytes, merged)
+  const strip = merged.dataBinding === 'strip'
+  if (plan.dataBindings.length > 0 && !strip)
+    return { error: removePartsRefusalMessage(plan.dataBindings) }
+  doc.side.removeParts = merged
+  return { output: describeRemovePartsPlan(plan, merged) }
+}
+
+>>>>>>> theirs
 /** the document properties (core, extended/app, custom) of the open document */
 export function listProperties(doc: OpenDocument): DocumentProperties {
   return doc.parsed.properties
@@ -1432,7 +1819,7 @@ const CONTENT_NOTES: Record<(typeof CONTENT_OPS)[number], string> = {
   reply_comment: 'ids from `genoffice docs read --comments`; replies attach to the thread root',
   resolve_comment: 'ids from `genoffice docs read --comments`',
   accept_changes:
-    'selector: all: true, ids from `genoffice docs read --revisions` (positional, re-read after every edit), or author / type / blockIndex / blockRange / before; insertions become plain text, deleted text goes',
+    'selector: all: true, ids from `genoffice docs read --revisions` (positional, re-read after every edit), or author / type / blockIndex / blockRange / before; insertions become plain text, deleted text goes, moved text stays at its destination; all / author / type / before also cover headers, footers, footnotes and endnotes',
   reject_changes:
     'same selector as accept_changes; inserted text goes, deleted text comes back, formatting reverts',
   insert_footnote:
@@ -1445,7 +1832,11 @@ const CONTENT_NOTES: Record<(typeof CONTENT_OPS)[number], string> = {
   delete_comment:
     'removes the comment and its anchor; a thread root with replies needs withReplies: true, a reply id removes just that reply',
   set_properties:
+<<<<<<< ours
     'the document properties of the file: core (title, subject, creator, keywords, description, lastModifiedBy, revision, created, modified, category, contentStatus, identifier, language, version), app (template, totalTime, pages, words, characters, application, docSecurity, lines, paragraphs, scaleCrop, company, linksUpToDate, charactersWithSpaces, sharedDoc, hyperlinksChanged, appVersion, manager) and custom (by name); a string sets the value, null removes the property, clear: "all" empties all three parts; `genoffice docs read --properties` lists the current ones',
+=======
+    'the document properties of the file: core (title, subject, creator, keywords, description, lastModifiedBy, revision, created, modified, category, contentStatus, identifier, language, version), app (template, totalTime, pages, words, characters, application, docSecurity, lines, paragraphs, scaleCrop, company, linksUpToDate, charactersWithSpaces, sharedDoc, hyperlinksChanged, appVersion, manager) and custom (by name); a string sets a value, a number or boolean gives a typed custom value (i4/bool; an existing i4/i8/r8/bool/filetime/date property keeps its vt type when the value fits), null removes the property, clear: "all" empties all three parts; `genoffice docs read --properties` lists the current ones with their customTypes',
+>>>>>>> theirs
 }
 
 const AFTER_BLOCK_INDEX =
@@ -1461,12 +1852,25 @@ const INSERT_IMAGE_SCHEMA: JsonSchema = {
   required: ['url'],
 }
 
+<<<<<<< ours
 /** set_properties: the values of a property part, by key (a string sets, null removes) */
+=======
+/** set_properties: the text values of a core/app property, by key (a string sets, null removes) */
+>>>>>>> theirs
 const PROPERTY_VALUES: JsonSchema = {
   type: 'object',
   additionalProperties: { type: ['string', 'null'] },
 }
 
+<<<<<<< ours
+=======
+/** set_properties.custom: text stays lpwstr, a number/boolean keeps or takes a typed vt value */
+const CUSTOM_PROPERTY_VALUES: JsonSchema = {
+  type: 'object',
+  additionalProperties: { type: ['string', 'number', 'boolean', 'null'] },
+}
+
+>>>>>>> theirs
 const SET_PROPERTIES_SCHEMA: JsonSchema = {
   type: 'object',
   properties: {
@@ -1481,9 +1885,15 @@ const SET_PROPERTIES_SCHEMA: JsonSchema = {
         'extended (app) properties by friendly key (company, template, application, manager, …); a string sets the value, null removes the element',
     },
     custom: {
+<<<<<<< ours
       ...PROPERTY_VALUES,
       description:
         'custom properties by name (MatterId, Reviewer, …); a string sets the value, null removes the property',
+=======
+      ...CUSTOM_PROPERTY_VALUES,
+      description:
+        'custom properties by name (MatterId, Reviewer, …): a string stores vt:lpwstr, a number vt:i4 (or i8/r8 when out of int32), a boolean vt:bool; an existing typed property keeps its vt type when the value fits it (i4/i8/r8/ui*/bool/filetime/date); null removes the property',
+>>>>>>> theirs
     },
     clear: {
       type: 'string',
@@ -1560,6 +1970,16 @@ export async function docsCatalog(): Promise<{ catalog: OpCatalog; htmlRules: st
     note: CONTENT_CONTROL_NOTES[op],
     schema: CONTENT_CONTROL_SCHEMAS[op],
   }))
+<<<<<<< ours
+=======
+  const packages: OpEntry[] = PACKAGE_OPS.map((op) => ({
+    op,
+    group: 'package',
+    signature: signatureFromSchema(PACKAGE_SCHEMAS[op]),
+    note: PACKAGE_NOTES[op],
+    schema: PACKAGE_SCHEMAS[op],
+  }))
+>>>>>>> theirs
   const groups = [
     {
       name: 'block',
@@ -1577,9 +1997,25 @@ export async function docsCatalog(): Promise<{ catalog: OpCatalog; htmlRules: st
       summary: 'block-level content controls (w:sdt): wrap blocks in one, or unwrap it',
       ops: [...CONTENT_CONTROL_OPS],
     },
+<<<<<<< ours
   ]
   return {
     catalog: withFingerprint({ domain: 'docs', groups, ops: [...block, ...content, ...controls] }),
+=======
+    {
+      name: 'package',
+      summary:
+        'package parts: remove metadata-carrying custom XML / web-extension parts (pre-filing scrubs)',
+      ops: [...PACKAGE_OPS],
+    },
+  ]
+  return {
+    catalog: withFingerprint({
+      domain: 'docs',
+      groups,
+      ops: [...block, ...content, ...controls, ...packages],
+    }),
+>>>>>>> theirs
     htmlRules: mods.protocol.HTML_RULES,
   }
 }

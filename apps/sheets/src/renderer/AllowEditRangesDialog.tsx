@@ -64,7 +64,11 @@ export function AllowEditRangesDialog({
       {
         name: trimmedName,
         sqref: trimmedRef.replaceAll('$', ''),
+<<<<<<< ours
         ...(password.trim() === '' ? {} : { password }),
+=======
+        ...(password.trim() === '' ? {} : { password: password.trim() }),
+>>>>>>> theirs
       },
     ]
     setWorking(next)

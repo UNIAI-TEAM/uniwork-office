@@ -21,7 +21,7 @@ const RENAME_RETRY_DELAYS_MS = [50, 100, 200, 400]
  * locks or on filesystems without fsync. The bytes are already written, so a
  * refused flush only weakens power-loss durability and must not fail the save.
  */
-const TOLERATED_SYNC_CODES = new Set(['EPERM', 'EACCES', 'EBUSY', 'EINVAL', 'ENOSYS'])
+const TOLERATED_SYNC_CODES = new Set(['EPERM', 'EACCES', 'EBUSY', 'EINVAL', 'ENOSYS', 'ENOTSUP'])
 
 const HARDLINK_UNSUPPORTED_CODES: Record<string, true> = {
   EPERM: true,
@@ -35,8 +35,10 @@ const isRetryableRename = (error: unknown) => RETRYABLE_RENAME_CODES.has(errorCo
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const sleepSync = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 
+// No leading dot: the macOS SMB client marks dot-files hidden and the flag
+// survives the rename onto the real document (genoffice#2145).
 const tempPathBeside = (filePath: string) =>
-  join(dirname(filePath), `.${basename(filePath)}.${randomBytes(6).toString('hex')}.tmp`)
+  join(dirname(filePath), `${basename(filePath)}.${randomBytes(6).toString('hex')}.tmp`)
 
 async function syncFileBestEffort(path: string): Promise<void> {
   let handle
@@ -146,6 +148,7 @@ export async function atomicWriteVia(
   write: (tempPath: string) => Promise<void>,
 ): Promise<void> {
   const tmp = tempPathBeside(filePath)
+<<<<<<< ours
   const existingMode =
     process.platform === 'win32'
       ? null
@@ -159,6 +162,10 @@ export async function atomicWriteVia(
   try {
     await write(tmp)
     if (existingMode !== null) await chmod(tmp, existingMode)
+=======
+  try {
+    await write(tmp)
+>>>>>>> theirs
     await syncFileBestEffort(tmp)
   } catch (error) {
     await unlink(tmp).catch(() => {})
@@ -176,6 +183,7 @@ export async function atomicWriteVia(
 }
 
 /**
+<<<<<<< ours
  * Exclusive copy via sibling temp: publishes with `link(tmp, filePath)` so an
  * existing destination fails with `EEXIST` instead of being replaced. On
  * filesystems without hard links (FAT/exFAT), falls back to `copyFile` with
@@ -205,6 +213,8 @@ export async function atomicCopyFileExclusive(source: string, filePath: string):
 }
 
 /**
+=======
+>>>>>>> theirs
  * Atomic replacement for small userData JSON state files (recents, stars, AI
  * settings). Same retry + in-place fallback as atomicWriteFile; the retry
  * sleeps block the caller, which is acceptable for a few KB under a transient

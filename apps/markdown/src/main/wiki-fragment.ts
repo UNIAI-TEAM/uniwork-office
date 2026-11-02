@@ -7,6 +7,7 @@
  * could not say where to land by riding along with the open request. The
  * fragment waits here instead, keyed by path, until a renderer loads that path
  * and takes it.
+<<<<<<< ours
  *
  * Paths are matched by their real location: the shell finds a note's tab with
  * its realpath, so a symlinked folder must not hide a tab that is already open.
@@ -23,16 +24,27 @@ function canon(path: string): string {
 }
 
 /** real paths whose fragment is still waiting; a click whose note is never opened must not pile up */
+=======
+ */
+
+/** paths whose fragment is still waiting; a click whose note is never opened must not pile up */
+>>>>>>> theirs
 const MAX_PENDING = 32
 
 const pending = new Map<string, string>()
 
 export function rememberWikiFragment(path: string, fragment: string): void {
   if (!path) return
+<<<<<<< ours
   const key = canon(path)
   // a link with no fragment cancels an earlier one aimed at the same note
   if (!fragment) {
     pending.delete(key)
+=======
+  // a link with no fragment cancels an earlier one aimed at the same note
+  if (!fragment) {
+    pending.delete(path)
+>>>>>>> theirs
     return
   }
   while (pending.size >= MAX_PENDING) {
@@ -40,11 +52,16 @@ export function rememberWikiFragment(path: string, fragment: string): void {
     if (oldest === undefined) break
     pending.delete(oldest)
   }
+<<<<<<< ours
   pending.set(key, fragment)
+=======
+  pending.set(path, fragment)
+>>>>>>> theirs
 }
 
 export function takeWikiFragment(path: string): string {
   if (!path) return ''
+<<<<<<< ours
   const key = canon(path)
   const fragment = pending.get(key) ?? ''
   pending.delete(key)
@@ -87,3 +104,9 @@ export function notifyViewsShowingNote(
   if (!fragment) return
   for (const view of viewsShowingNote(pathByView, path, senderId)) send(view.id, view.path)
 }
+=======
+  const fragment = pending.get(path) ?? ''
+  pending.delete(path)
+  return fragment
+}
+>>>>>>> theirs

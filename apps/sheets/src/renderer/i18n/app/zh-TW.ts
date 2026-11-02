@@ -10,7 +10,11 @@ export const zhTW = {
   redactDialogPlaceholder: '佔位名稱，例如：客戶電話',
   redactCancel: '取消',
   redactInsert: '隱藏',
+<<<<<<< ours
   redactEnable: '選中儲存格後右鍵，即可對 AI 隱藏。',
+=======
+  redactEnable: '選中文字後右鍵，即可對 AI 隱藏。',
+>>>>>>> theirs
   redactNeedsSavedRow: '這一列還沒存進檔案。請先存檔，再隱藏其中的儲存格。',
   redactRecoveredFromNames:
     '這個檔案被其他軟體改寫過，記錄隱藏內容的元件不見了。已從活頁簿裡的名稱找回隱藏的儲存格；存檔一次即可還原完整記錄。',
@@ -295,7 +299,10 @@ export const zhTW = {
     '此活頁簿較大，目前以串流方式僅載入了部分資料。排序、篩選和移動範圍需要完整資料才能給出正確結果。要現在完整載入整個活頁簿嗎？',
   appFullLoadStart: '完整載入',
   appFullLoadRunning: '正在完整載入活頁簿，完成後即可排序和篩選……',
-  appFullLoadTooLarge: '此活頁簿過大，無法完整載入記憶體，排序和篩選在此檔案上暫不可用。',
+  appFullLoadTooLarge:
+    '此活頁簿過大，無法完整載入記憶體，排序和移動範圍在此檔案上暫不可用；篩選可直接在檔案上進行。',
+  appLargeFilterLoading: '正在從檔案讀取篩選欄……',
+  appLargeFilterApplying: '正在對檔案套用篩選……',
   appSortValueModeFormulas:
     '所選範圍含有公式，而此大型活頁簿中公式不是即時計算的——排序或移動會把它們儲存為純數值。請選擇不含公式的範圍。',
   appSortRangeTooLarge: '所選範圍過大，無法一次排序或移動，請減少選取的儲存格。',
@@ -345,6 +352,8 @@ export const zhTW = {
   appTableNameUsed: '表格名稱 "{name}" 本次工作階段已使用過。',
   appTableNameInFile: '表格名稱 "{name}" 已被檔案中的表格使用。',
   appTableOverlapsSession: '該範圍與本次工作階段建立的表格 "{name}" 重疊。',
+  appTableOverlapsFile: '該範圍與檔案中的表格 "{name}" 重疊。',
+  appTableAlreadyInTable: '所選範圍已在表格 "{name}" 內——請到「表格設計」更改樣式。',
   appTablesNeedFile: '請先開啟 XLSX 檔案——表格會寫入檔案。',
   appTableSelectRange: '請先選取資料範圍——首列為標題。',
   appTableCreated: '表格已建立——{saveKeys} 儲存。',
@@ -416,6 +425,7 @@ export const zhTW = {
   appGridlinesHidden: '格線已隱藏。',
   appGridlinesShown: '格線已顯示。',
   appShowingFormulas: '正在顯示公式——再次切換顯示數值。',
+  appShowingFormulasActive: '正在顯示公式',
   appShowingValues: '正在顯示計算結果。',
   appTraceNoFormula: '追蹤前導參照：作用中儲存格沒有公式。',
   appTraceNoRefs: '追蹤前導參照：該公式沒有儲存格參照。',
@@ -626,6 +636,7 @@ export const zhTW = {
   appExportPdfTitle: '匯出為 PDF',
   appSaveTitle: '儲存',
   appSaveAs: '另存新檔',
+  aiNameFile: '用 AI 命名…',
   appUndo: '復原',
   appRedo: '取消復原',
   appUnsavedEditOne: '● {count} 處未儲存的編輯',
@@ -657,7 +668,6 @@ export const zhTW = {
   appLinkPlaceholder: '如 https://example.com 或 Sheet1!A1',
   appRemoveLink: '移除連結',
   appNotAvailableYet: '暫不可用',
-  appComingSoon: '即將推出',
   appGroupChartLayouts: '圖表版面配置',
   appAddChartElement: '新增圖表項目',
   appAddChartElementTitle: '標題、資料標籤、圖例',
@@ -1090,6 +1100,8 @@ export const zhTW = {
   appRefreshAll: '全部重新整理',
   appWorkbookNoPivot: '活頁簿中沒有樞紐分析表。',
   appRefreshAllTitle: '重新整理全部樞紐分析表',
+  appQueriesConnections: '查詢與連線',
+  appQueriesConnectionsTitle: '檢視活頁簿中的查詢與資料連線',
   appErrorCheckingDetail: '掃描目前工作表中的錯誤值',
   appErrorsFound: '發現 {count} 個錯誤,已定位 {cell}:{value}',
   appCheckingErrors: '正在掃描整個工作表的錯誤…',
@@ -1124,6 +1136,7 @@ export const zhTW = {
   appGroupForecast: '預測',
   appWhatIfAnalysis: '模擬分析',
   appGoalSeek: '目標搜尋',
+  appDataTable: '資料表',
   appWhatIfTitle: '對目標值反解輸入',
   appGoalSeekNeedsFormula: '目標儲存格需要包含公式。',
   appGoalSeekByCellNotNumber: '變數儲存格需要是數字或空白。',
@@ -1220,12 +1233,15 @@ export const zhTW = {
   appPasswordUpdating: '正在更新…',
   appUpdatePassword: '更新密碼',
   appWorkbookNotPasswordProtected: '此活頁簿沒有設定開啟密碼。',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     '設有密碼的活頁簿無法儲存到 UniWork 文件。請使用「另存新檔」在本機保留加密副本。',
   appPasswordChangeUniwork: '無法在此變更 UniWork 文件的密碼。',
   appPasswordChangeReadOnly: '此活頁簿為唯讀，無法變更密碼。',
   appEncryptedWrongPassword: '密碼不正確，請再試一次。',
   appPasswordChangeRestored: '請先儲存已復原的活頁簿，再變更其密碼。',
+=======
+>>>>>>> theirs
   appAllowEditRanges: '允許編輯範圍',
   appGroupClipboard: '剪貼簿',
   appPaste: '貼上',
@@ -1482,6 +1498,7 @@ export const zhTW = {
   appVisualFlipV: '垂直翻轉',
   appVisualFlipH: '水平翻轉',
   appCtxPasteVisual: '貼上圖片/圖形',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: '此活頁簿暫時無法在網頁版開啟',
   appWebEngineBody:
@@ -1506,14 +1523,22 @@ export const zhTW = {
   appWebSavedReopenFailed:
     '您的變更已儲存到 UniWork，但此處無法重新開啟活頁簿。請重新載入編輯器後繼續。',
   appDataTable: '資料表',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: '拼字檢查',
   appSpellBtnDetail: '檢查工作表文字 (F7)',
   appSpellToggle: '檢查拼字',
+<<<<<<< ours
   appSpellToggleTip: '開啟拼字檢查（F7 與校閱按鈕）；關閉後註解輸入框不再顯示拼字波浪線',
   appSpellOn: '拼字檢查已開啟。',
   appSpellOff: '拼字檢查已關閉，可在 校閱 ▸ 校訂 中開啟。',
+=======
+  appSpellToggleTip: '開啟拼字檢查（F7 與 Review 按鈕）；關閉後註解輸入框不再顯示拼字波浪線',
+  appSpellOn: '拼字檢查已開啟。',
+  appSpellOff: '拼字檢查已關閉，可在 Review ▸ 校對 中開啟。',
+>>>>>>> theirs
   appSpellRecheck: '重新檢查',
   appSpellNone: '未發現疑似拼字錯誤。',
   appSpellFindings: '{count} 處疑似拼字錯誤，點擊列可定位。',

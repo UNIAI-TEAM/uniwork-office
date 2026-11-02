@@ -10,7 +10,10 @@ import {
   type FindTarget,
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
+<<<<<<< ours
   UniAiMark,
+=======
+>>>>>>> theirs
   useAiSidebarEnabled,
 } from '@genoffice/ui'
 import {
@@ -32,7 +35,10 @@ import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import { keyHintAfterName } from '@genoffice/shortcuts'
 import { useNarrowFrame } from './narrow-frame'
 import { parseDocText, serializeDocText, type Envelope } from './document/envelope'
+<<<<<<< ours
 import { textWithPendingStyles } from './document/pending-draft'
+=======
+>>>>>>> theirs
 import {
   SourceEditor,
   type CursorInfo,
@@ -89,7 +95,12 @@ import { compileOps, type HtmlOp, type OpError } from './document/ops'
 import { injectBrief, parseBrief, type Brief } from './document/brief'
 import { applyPatches } from './document/patch'
 import { adoptImageRewrites } from './document/image-rewrites'
+<<<<<<< ours
 import { deriveDocumentName } from './document/auto-name'
+=======
+import { deriveAutoFileName, deriveNameFromPrompt } from './document/auto-name'
+import { localFileName, modelSaveAsName } from './file-naming'
+>>>>>>> theirs
 import { runGuardedPrint } from './print-guard'
 import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
 
@@ -259,6 +270,15 @@ export default function App() {
   const envelopeRef = useRef<Envelope>(DEFAULT_ENVELOPE)
   const textRef = useRef('')
   const savedTextRef = useRef('')
+  /** text last read from or written to disk; a watcher tick that reads the same text is a touch, not an edit */
+  const diskTextRef = useRef<string | null>(null)
+  const overwriteRef = useRef(false)
+  const [diskNotice, setDiskNoticeState] = useState<'changed' | 'conflict' | null>(null)
+  const diskNoticeRef = useRef<'changed' | 'conflict' | null>(null)
+  const setDiskNotice = (next: 'changed' | 'conflict' | null) => {
+    diskNoticeRef.current = next
+    setDiskNoticeState(next)
+  }
   const savingRef = useRef(false)
   const statusRef = useRef<LoadStatus>('loading')
   const pushedTextRef = useRef<string | null>(null)
@@ -350,6 +370,7 @@ export default function App() {
         ])
         const raw = pending ? await window.htmlApi.readFile(pending) : ''
         if (cancelled) return
+        diskTextRef.current = raw
         const doc = parseDocText(raw)
         envelopeRef.current = doc.envelope
         textRef.current = doc.text
@@ -761,8 +782,13 @@ export default function App() {
     const src = textRef.current
     // one pin per element; several queued edits on the same element share it and list their ordinals
     const bySid = new Map<number, string[]>()
+    const proj = map && buildProjection(src, map)
     items.forEach((item, i) => {
+<<<<<<< ours
       const target = map && resolveQueueItem(buildProjection(src, map), map, item).target
+=======
+      const target = proj && resolveQueueItem(proj, map, item).target
+>>>>>>> theirs
       if (target) bySid.set(target.sid, [...(bySid.get(target.sid) ?? []), String(i + 1)])
     })
     const marks = [...bySid].map(([sid, ordinals]) => ({ sid, label: ordinals.join('·') }))
@@ -815,13 +841,18 @@ export default function App() {
         }
         case 'gx:markClick': {
           const map = getMap()
+          const proj = buildProjection(textRef.current, map)
           // a shared pin opens the most recent edit on that element; the others stay reachable from the queue card
           const item = editQueueRef.current
+<<<<<<< ours
             .filter(
               (q) =>
                 resolveQueueItem(buildProjection(textRef.current, map), map, q).target?.sid ===
                 msg.sid,
             )
+=======
+            .filter((q) => resolveQueueItem(proj, map, q).target?.sid === msg.sid)
+>>>>>>> theirs
             .at(-1)
           if (!item) return
           selectSid(item.sid, { reveal: true })
@@ -1368,6 +1399,7 @@ export default function App() {
   }
 
   const doSave = useCallback(
+<<<<<<< ours
     async (mode: SaveMode, suggestedName?: string, origin?: 'auto'): Promise<boolean> => {
       const allowed = mode === 'saveAs' ? cap('saveAs') : cap('save')
       if (statusRef.current !== 'ready' || !allowed) return false
@@ -1376,6 +1408,13 @@ export default function App() {
       // today's path)
       if (mode === 'save' && !origin && uniworkRef.current.bound && uniworkRef.current.readOnly) {
         void (window.htmlApi as HtmlUniworkLockSeam).uniworkReadOnlySave?.()?.catch(() => {})
+=======
+    async (mode: SaveMode, suggestedName?: string, proposedName?: string): Promise<boolean> => {
+      if (statusRef.current !== 'ready') return false
+      if (diskNoticeRef.current && !overwriteRef.current) {
+        // the user has not chosen between the two versions yet; autosave must not pick for them
+        setDiskNotice('conflict')
+>>>>>>> theirs
         return false
       }
       // uncommitted live style pokes belong to the document being saved
@@ -1388,15 +1427,37 @@ export default function App() {
       try {
         const textAtSave = textRef.current
         const serialized = serializeDocText({ text: textAtSave, envelope: envelopeRef.current })
+        // A page that has never been saved is offered a name derived from its
+        // own content: the model's, when the reader asked for one, and the
+        // page's own title otherwise. It prefills the save dialog rather than
+        // replacing it — the reader still chooses where the file goes. A plain
+        // Save of a page that already has a path needs no name at all, and a
+        // Save As of one opens on the file's own name: a name the reader asked
+        // for arrives as `proposedName`, before the save begins, and a prompt
+        // left over from an earlier request is nobody's default.
+        const untitled = !pathRef.current
+        const defaultName = proposedName
+          ? proposedName
+          : untitled
+            ? localFileName(textAtSave, provisionalNameRef.current)
+            : undefined
         const result = await window.htmlApi.save({
           text: serialized,
           imageSources: [],
           mode,
           suggestedName,
+<<<<<<< ours
           defaultName: (!pathRef.current && deriveDocumentName(textAtSave)) || undefined,
           ...(origin ? { origin } : {}),
+=======
+          defaultName,
+          overwrite: overwriteRef.current,
+>>>>>>> theirs
         })
         if (result.ok && 'path' in result) {
+          diskTextRef.current = serialized
+          overwriteRef.current = false
+          setDiskNotice(null)
           const adopted = adoptImageRewrites(textAtSave, textRef.current, result.imageRewrites)
           if (adopted.liveText !== textRef.current) {
             editorRef.current?.setDoc(adopted.liveText)
@@ -1414,6 +1475,7 @@ export default function App() {
           pushPreview(adopted.liveText)
           return true
         }
+        if (!result.ok && result.conflict) setDiskNotice('conflict')
         setSaveState(result.ok ? 'idle' : 'failed')
         return false
       } catch (err) {
@@ -1426,6 +1488,64 @@ export default function App() {
     },
     [commitText, flushPending, pushPreview],
   )
+
+  /** another program wrote the file: swap the text in and show it as the saved state */
+  const reloadFromDisk = useCallback(
+    (raw: string) => {
+      diskTextRef.current = raw
+      overwriteRef.current = false
+      setDiskNotice(null)
+      const doc = parseDocText(raw)
+      envelopeRef.current = doc.envelope
+      editorRef.current?.setDoc(doc.text)
+      commitText(doc.text, false)
+      savedTextRef.current = doc.text
+      setSavedText(doc.text)
+      setSaveState('idle')
+      pushPreview(doc.text)
+    },
+    [commitText, pushPreview],
+  )
+
+  const reloadNow = useCallback(async () => {
+    const current = pathRef.current
+    if (!current) return
+    try {
+      window.htmlApi.ackFileChangedOnDisk()
+      reloadFromDisk(await window.htmlApi.readFile(current))
+    } catch (err) {
+      console.error('[html] reload from disk failed:', err)
+    }
+  }, [reloadFromDisk])
+
+  const keepMine = useCallback(() => {
+    overwriteRef.current = true
+    setDiskNotice(null)
+    window.htmlApi.ackFileChangedOnDisk()
+  }, [])
+
+  const overwriteNow = useCallback(() => {
+    overwriteRef.current = true
+    setDiskNotice(null)
+    void doSave('save')
+  }, [doSave])
+
+  /**
+   * Ask the model to name this page, on request, then open Save As with its
+   * answer prefilled.
+   *
+   * The stem goes into the dialog rather than renaming the file on disk: a file
+   * that may be open elsewhere, referenced from a note, or synced is not
+   * something to move behind the reader's back. A declined or empty answer
+   * leaves the dialog on the page's current name, so this is a no-op rather
+   * than a failure.
+   */
+  const nameWithAi = useCallback(async () => {
+    if (statusRef.current !== 'ready') return
+    const stem = await modelSaveAsName(textRef.current, getMap())
+    if (!stem) return
+    await doSave('saveAs', undefined, stem)
+  }, [doSave, getMap])
 
   const zoomIn = useCallback(() => setZoom((z) => clampZoom(Math.round(z) + ZOOM_STEP)), [])
   const zoomOut = useCallback(() => setZoom((z) => clampZoom(Math.round(z) - ZOOM_STEP)), [])
@@ -1580,6 +1700,34 @@ export default function App() {
       })()
     })
     const offRenamed = window.htmlApi.onFileRenamed((next) => setPath(next))
+    const offDisk = window.htmlApi.onFileChangedOnDisk((changedPath) => {
+      // the watcher keeps refusing saves until the change is acknowledged; a
+      // change parked behind the bar stays unacknowledged until the user decides
+      let awaitingUser = false
+      void (async () => {
+        try {
+          if (changedPath !== pathRef.current || statusRef.current !== 'ready') return
+          const raw = await window.htmlApi.readFile(changedPath)
+          if (changedPath !== pathRef.current || raw === diskTextRef.current) return
+          // uncommitted style pokes are edits too, even though the text still equals the saved text
+          const dirtyNow =
+            textRef.current !== savedTextRef.current ||
+            Object.keys(pendingStylesRef.current).length > 0 ||
+            savingRef.current
+          if (dirtyNow) {
+            diskTextRef.current = raw
+            setDiskNotice('changed')
+            awaitingUser = true
+            return
+          }
+          reloadFromDisk(raw)
+        } catch (err) {
+          console.error('[html] reload after external change failed:', err)
+        } finally {
+          if (!awaitingUser) window.htmlApi.ackFileChangedOnDisk()
+        }
+      })()
+    })
     const offExport = window.htmlApi.onExportRequest((format) => void runExport(format))
     // Shell menu Print / ⌘P. The menu owns the accelerator, so this subscription
     // is the only route the keystroke takes; without it ⌘P did nothing at all.
@@ -1592,6 +1740,7 @@ export default function App() {
       )
     })
     const onKeyDown = (event: KeyboardEvent) => {
+<<<<<<< ours
       const command = htmlWindowCommand(event, inTextField(event.target))
       if (!command) return
       event.preventDefault()
@@ -1632,6 +1781,43 @@ export default function App() {
         case 'redo':
           editorRef.current?.[command]()
           return
+=======
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return
+      const key = event.key.toLowerCase()
+      if (key === 's') {
+        event.preventDefault()
+        void doSave(event.shiftKey ? 'saveAs' : 'save')
+      } else if (key === '\\') {
+        event.preventDefault()
+        cycleView()
+      } else if (key === 'f' && !event.shiftKey) {
+        event.preventDefault()
+        openFind(false)
+      } else if (key === 'h' && !event.shiftKey) {
+        // Word's replace shortcut: Ctrl+H on Windows/Linux, Control+H on macOS —
+        // its ⌘H belongs to the system Hide role, so the menu keeps that key
+        event.preventDefault()
+        openFind(true)
+      } else if (key === '=' || key === '+') {
+        event.preventDefault()
+        zoomIn()
+      } else if (key === '-' || key === '_') {
+        event.preventDefault()
+        zoomOut()
+      } else if (key === '0') {
+        event.preventDefault()
+        setZoom(100)
+      } else if (key === 'b' || key === 'i') {
+        if (inTextField(event.target)) return
+        event.preventDefault()
+        wrapSelectionRef.current(key === 'b' ? 'strong' : 'em')
+      } else if (key === 'z' || (key === 'y' && !event.shiftKey)) {
+        // CodeMirror and form fields keep their own history
+        if (inTextField(event.target)) return
+        event.preventDefault()
+        if (key === 'z' && !event.shiftKey) editorRef.current?.undo()
+        else editorRef.current?.redo()
+>>>>>>> theirs
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
@@ -1640,12 +1826,23 @@ export default function App() {
       offReadText()
       offClose()
       offRenamed()
+      offDisk()
       offExport()
       offPrint()
       offTheme()
       window.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [doSave, runExport, runPrint, cycleView, zoomIn, zoomOut, flushPending, openFind])
+  }, [
+    doSave,
+    runExport,
+    runPrint,
+    cycleView,
+    zoomIn,
+    zoomOut,
+    flushPending,
+    openFind,
+    reloadFromDisk,
+  ])
 
   // pinch / ctrl+wheel over the stage chrome around the frame; wheel inside the frame arrives as gx:zoom
   useEffect(() => {
@@ -1735,6 +1932,7 @@ export default function App() {
     getSnapshot: () => ({ text: textRef.current }),
     restoreSnapshot: (snapshot) => replaceAll(snapshot.text, false),
     onRunDone: (mutated) => {
+<<<<<<< ours
       // AI wrote into a never-saved document: the panel asks before anything is saved, offering
       // the page's own title or first heading ('' = none, the dialog starts with its usual
       // untitled name). The name never comes from the user's request.
@@ -1745,6 +1943,14 @@ export default function App() {
         window.htmlApi.setProvisionalTitle(name)
       }
       return name
+=======
+      // AI wrote into a never-saved document: save it silently under the page's own title,
+      // falling back to the name of the request that started it
+      if (!mutated || pathRef.current) return
+      const text = textRef.current
+      const name = localFileName(text, provisionalNameRef.current)
+      if (name) void doSave('save', name)
+>>>>>>> theirs
     },
     // the Save click on that offer: the normal first-save dialog, pre-filled with the name
     onSaveOffer: (name) => void doSave('save', name || undefined),
@@ -1833,10 +2039,14 @@ export default function App() {
         dirty={dirty}
         onSave={() => void doSave('save')}
         onSaveAs={() => void doSave('saveAs')}
+<<<<<<< ours
         onExport={
           platform() === 'web' && cap('exportHtml') ? () => void runExport('html') : undefined
         }
         exportDisabled={status !== 'ready'}
+=======
+        onNameWithAi={() => void nameWithAi()}
+>>>>>>> theirs
         onFind={() => openFind(false)}
         canUndo={historyState.undo}
         canRedo={historyState.redo}
@@ -1874,6 +2084,7 @@ export default function App() {
       />
 
       <div className="app-main">
+<<<<<<< ours
         {aiEnabled && (
           <div
             className={`ai-dock${aiOpen ? '' : ' collapsed'}${
@@ -1909,7 +2120,49 @@ export default function App() {
             />
           </div>
         )}
+=======
+        <div
+          className={`ai-dock${aiOpen ? '' : ' collapsed'}${
+            !aiSidebarEnabled && !aiOpen ? ' ai-dock-off' : ''
+          }`}
+        >
+          {!aiOpen && aiSidebarEnabled && (
+            <button
+              className="ai-rail"
+              data-tip={t('aiOpenAssistant')}
+              aria-label={t('aiOpenAssistant')}
+              onClick={() => setAiOpen(true)}
+            >
+              <GensparkMark size={18} />
+            </button>
+          )}
+          {/* stays mounted while collapsed: an in-flight run, its snapshots and the loop context survive */}
+          <AiPanel
+            deps={aiDeps}
+            filePath={path}
+            preset={aiPreset}
+            editQueue={editQueue}
+            onQueueEditInstruction={queueUpdate}
+            onQueueRemove={queueRemove}
+            onQueueClear={() => setEditQueue([])}
+            onQueueFocus={queueFocus}
+            onQueueConsume={queueConsume}
+            onCollapse={() => setAiOpen(false)}
+          />
+        </div>
+>>>>>>> theirs
         <div className="app-content">
+          {diskNotice && (
+            <div className="disk-notice" role="status">
+              <span>{t(diskNotice === 'changed' ? 'diskChangedMsg' : 'diskConflictMsg')}</span>
+              <button type="button" onClick={() => void reloadNow()}>
+                {t('diskReload')}
+              </button>
+              <button type="button" onClick={diskNotice === 'changed' ? keepMine : overwriteNow}>
+                {t(diskNotice === 'changed' ? 'diskKeepMine' : 'diskOverwrite')}
+              </button>
+            </div>
+          )}
           {findTarget && (
             <FindPanel
               target={findTarget}
@@ -2040,9 +2293,13 @@ export default function App() {
                 onChange={onEditorChange}
                 onCursor={onCursor}
                 onBeforeReplace={flushPending}
+<<<<<<< ours
                 // withholding means "the model does not read this", and the model lives behind
                 // `ai`: with the key off (web frame) the source pane keeps Chromium's own menu
                 onRedact={aiEnabled && canEdit && !uniwork.readOnly ? onRedactSelection : undefined}
+=======
+                onRedact={onRedactSelection}
+>>>>>>> theirs
               />
             </div>
           </div>

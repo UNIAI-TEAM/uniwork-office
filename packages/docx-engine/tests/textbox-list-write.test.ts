@@ -111,6 +111,7 @@ describe('patchTextboxParas indentLeft', () => {
     const out = patchTextboxParas(xml, { byIndex: [[{ runs: [], align: null }]] })
     expect(out).toContain('<w:ind w:left="720"/>')
   })
+<<<<<<< ours
 
   it('injects numPr and indentLeft on a textless shape gaining its first text', () => {
     const shape =
@@ -134,4 +135,6 @@ describe('patchTextboxParas indentLeft', () => {
       '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="3"/></w:numPr><w:ind w:left="720" w:leftChars="0"/><w:jc w:val="center"/></w:pPr>',
     )
   })
+=======
+>>>>>>> theirs
 })

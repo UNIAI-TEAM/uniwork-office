@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { closeSync, fsyncSync, openSync, readFileSync, writeFileSync } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 
 import JSZip from 'jszip'
 import { assertZipInflatesWithinLimits } from '@genoffice/zip-gate'
@@ -1063,8 +1063,11 @@ export async function planCellEditsToXlsx(
     pkg.add(addition.path, cloneXml)
   }
 
+  // Formula caches can be refreshed on a sheet the user did not edit (a
+  // cross-sheet dependent), so those worksheets must be loaded too.
   const sheetNames = new Set([
     ...edits.map((edit) => edit.sheetName),
+    ...formulaValues.map((sheet) => sheet.sheetName),
     ...bulkConstantFills.map((fill) => fill.sheetName),
     ...structuralOps.map((sheet) => sheet.sheetName),
     ...filterStates.map((state) => state.sheetName),
@@ -1245,7 +1248,10 @@ export async function planCellEditsToXlsx(
           sheetPlan?.renames ?? [],
           sheetPlan?.removals ?? [],
           structuralOps,
+<<<<<<< ours
           sheetPlan?.additions ?? [],
+=======
+>>>>>>> theirs
         )
   if (rekeyed !== null) await applyRedactionPart(pkg, touchedEntries, rekeyed)
 
@@ -2143,7 +2149,7 @@ export async function syncFileBestEffort(path: string): Promise<void> {
 }
 
 export async function writeXlsxAtomically(path: string, buffer: Buffer): Promise<void> {
-  const temporaryPath = join(dirname(path), `.${crypto.randomUUID()}.tmp.xlsx`)
+  const temporaryPath = join(dirname(path), `${basename(path)}.${crypto.randomUUID()}.tmp`)
   try {
     writeFileSync(temporaryPath, buffer, { flag: 'wx' })
     await syncFileBestEffort(temporaryPath)
@@ -2627,7 +2633,13 @@ function patchFormulaCachedValue(
   // no t (numeric default) otherwise; booleans use t="b" with 1/0. A null
   // result drops the cached value entirely.
   const numeric = typeof value === 'number' && Number.isFinite(value)
-  const stripped = attrs.replace(/\st="[^"]*"/g, '')
+  // Collapse the leftover whitespace too: group1's space before r= survives
+  // the strip, and re-splicing it per rewrite grew one blank per rewrite.
+  const stripped = attrs
+    .replace(/\st="[^"]*"/g, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(' ')
   let typeAttr = ''
   let valueXml = ''
   if (numeric) {
@@ -2644,7 +2656,7 @@ function patchFormulaCachedValue(
   }
   // Keep <f> (and any other children apart from the cached value) verbatim.
   const kept = body.replace(/<v\b[^>]*\/>|<v\b[^>]*>[\s\S]*?<\/v>/g, '')
-  const replacement = `<c r="${address}"${stripped}${typeAttr}>${kept}${valueXml}</c>`
+  const replacement = `<c r="${address}"${stripped ? ` ${stripped}` : ''}${typeAttr}>${kept}${valueXml}</c>`
   return worksheetXml.replace(cellPattern, () => replacement)
 }
 

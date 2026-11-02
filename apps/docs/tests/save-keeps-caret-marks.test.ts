@@ -1,4 +1,8 @@
+<<<<<<< ours
 import { describe, expect, it } from 'vitest'
+=======
+import { afterEach, describe, expect, it } from 'vitest'
+>>>>>>> theirs
 import { Editor } from '@tiptap/core'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { restoreMarksAfterDocRewrite } from '../src/renderer/file-actions'
@@ -11,7 +15,11 @@ import { serializeMarks } from '../src/renderer/editor/caret-marks'
  * storedMarks — the marks Tiptap applies to text typed *next*. A font the
  * user picked from the ribbon therefore survives only until the next autosave
  * tick (30s, or on window blur), after which new typing falls back to the
+<<<<<<< ours
  * paragraph default. #2004.
+=======
+ * paragraph default. genofficegenoffice#2004.
+>>>>>>> theirs
  */
 
 const para = (t: string) => ({
@@ -20,12 +28,30 @@ const para = (t: string) => ({
   content: [{ type: 'text', text: t }],
 })
 
+<<<<<<< ours
 function makeEditor(): Editor {
   return new Editor({
+=======
+/** Editors created during the current test; destroyed in afterEach so ProseMirror's
+ * DOMObserver timers can't fire after the JSDOM environment is torn down. */
+const liveEditors: Editor[] = []
+
+afterEach(() => {
+  for (const editor of liveEditors.splice(0)) editor.destroy()
+})
+
+function makeEditor(): Editor {
+  const editor = new Editor({
+>>>>>>> theirs
     element: document.createElement('div'),
     extensions: editorExtensions,
     content: { type: 'doc', content: [para('hello world')] },
   })
+<<<<<<< ours
+=======
+  liveEditors.push(editor)
+  return editor
+>>>>>>> theirs
 }
 
 /** the mark set Tiptap would apply to text typed at the caret right now */
@@ -93,6 +119,17 @@ describe('restoreMarksAfterDocRewrite', () => {
     expect(editor.state.storedMarks).not.toBeNull()
   })
 
+<<<<<<< ours
+=======
+  it('keeps an explicitly cleared caret cleared', () => {
+    const editor = makeEditor()
+    editor.chain().setTextSelection(1).setMark('bold').run()
+    rewriteLikeSave(editor)
+    expect(restoreMarksAfterDocRewrite(editor, '[]')).toBe(true)
+    expect(editor.state.storedMarks).toEqual([])
+  })
+
+>>>>>>> theirs
   it('is a no-op when there was nothing to restore', () => {
     const editor = makeEditor()
     expect(restoreMarksAfterDocRewrite(editor, null)).toBe(false)

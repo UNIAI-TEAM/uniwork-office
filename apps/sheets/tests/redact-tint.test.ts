@@ -1,4 +1,7 @@
+<<<<<<< ours
 import { CellValueType, type ICellData } from '@univerjs/core'
+=======
+>>>>>>> theirs
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -76,6 +79,7 @@ describe('painting a mark', () => {
     const luminance = (0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5)) / 255
     expect(luminance).toBeGreaterThan(0.75)
   })
+<<<<<<< ours
 
   it('preserves STRING cell type and leading zeros when setBackground coerces numeric strings to NUMBER', () => {
     // HFA-V4: Univer's SetRangeValuesMutation re-evaluates getCellType on
@@ -113,6 +117,8 @@ describe('painting a mark', () => {
     expect(cellB2).toMatchObject({ v: '13800138000', t: CellValueType.STRING })
     expect(cellB3).toMatchObject({ v: '0600136000', t: CellValueType.STRING })
   })
+=======
+>>>>>>> theirs
 })
 
 describe('building the mark', () => {
@@ -201,6 +207,7 @@ describe('clearing a mark', () => {
     restoreCellFill(runtime as never, 'sh1', range as never, null, 'wb')
     expect(state.painted).toEqual([])
   })
+<<<<<<< ours
 
   it('preserves STRING cell type and leading zeros when restoring or clearing the fill', () => {
     const cell: ICellData = { v: '0600136000', t: CellValueType.STRING }
@@ -229,4 +236,6 @@ describe('clearing a mark', () => {
     restoreCellFill(runtime as never, 'sh1', range as never, '#FFF2CC', 'wb')
     expect(cell).toMatchObject({ v: '0600136000', t: CellValueType.STRING })
   })
+=======
+>>>>>>> theirs
 })

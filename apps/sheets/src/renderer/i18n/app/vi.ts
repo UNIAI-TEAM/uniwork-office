@@ -4,6 +4,7 @@ export const vi = {
   // ── Withholding cells from the model ──
   redactMenuLabel: 'Ẩn phần đã chọn khỏi AI',
   redactDialogDesc:
+<<<<<<< ours
     'Nội dung đã chọn vẫn còn trong tài liệu và tệp; mô hình chỉ thấy nhãn thay thế bên dưới. Đặt tên để mô hình biết nó đại diện cho điều gì.',
   redactDialogScope:
     'Điều này chỉ áp dụng cho AI trong ứng dụng này. CLI, các công cụ MCP và bản xuất chạy nền đều đọc thẳng tệp, nên chúng vẫn thấy những từ này.',
@@ -11,6 +12,15 @@ export const vi = {
   redactCancel: 'Hủy',
   redactInsert: 'Ẩn',
   redactEnable: 'Nhấp chuột phải vào phần đã chọn để ẩn khỏi AI.',
+=======
+    'Nội dung đã chọn vẫn còn trong tài liệu và tệp; mô hình chỉ thấy placeholder bên dưới. Đặt tên để mô hình biết nó đại diện cho điều gì.',
+  redactDialogScope:
+    'Điều này chỉ áp dụng cho AI trong ứng dụng này. CLI, các công cụ MCP và bản xuất không có cửa sổ đều đọc thẳng tệp, nên chúng vẫn thấy những từ này.',
+  redactDialogPlaceholder: 'Tên placeholder, ví dụ: số điện thoại khách hàng',
+  redactCancel: 'Hủy',
+  redactInsert: 'Ẩn',
+  redactEnable: 'Nhấp chuột phải vào phần đã chọn để ẩn khỏi mô hình.',
+>>>>>>> theirs
   redactNeedsSavedRow: 'Hàng này chưa có trong tệp. Hãy lưu trước, rồi ẩn ô.',
   redactRecoveredFromNames:
     'Ứng dụng khác đã ghi lại tệp này và làm mất bản ghi về những ô đang ẩn. Các ô bị ẩn đã được khôi phục từ các tên trong sổ làm việc; lưu sẽ khôi phục lại toàn bộ bản ghi.',
@@ -328,7 +338,9 @@ export const vi = {
   appFullLoadStart: 'Tải toàn bộ',
   appFullLoadRunning: 'Đang tải toàn bộ sổ làm việc — sắp xếp và lọc sẽ mở khóa khi hoàn tất…',
   appFullLoadTooLarge:
-    'Sổ làm việc này quá lớn để tải toàn bộ vào bộ nhớ; sắp xếp và lọc không khả dụng cho tệp này.',
+    'Sổ làm việc này quá lớn để tải toàn bộ vào bộ nhớ; sắp xếp và di chuyển vùng không khả dụng cho tệp này. Bộ lọc chạy trực tiếp trên tệp.',
+  appLargeFilterLoading: 'Đang đọc cột lọc từ tệp…',
+  appLargeFilterApplying: 'Đang áp dụng bộ lọc trên tệp…',
   appSortValueModeFormulas:
     'Vùng này chứa công thức không được tính trực tiếp trong sổ làm việc lớn này — sắp xếp hoặc di chuyển sẽ lưu chúng thành giá trị thuần. Hãy chọn vùng không có công thức.',
   appSortRangeTooLarge:
@@ -385,6 +397,9 @@ export const vi = {
   appTableNameUsed: 'Tên bảng "{name}" đã được sử dụng trong phiên này.',
   appTableNameInFile: 'Tên bảng "{name}" đã được một bảng trong tệp sử dụng.',
   appTableOverlapsSession: 'Vùng chọn chồng chéo với bảng "{name}" được tạo trong phiên này.',
+  appTableOverlapsFile: 'Vùng chọn chồng chéo với bảng "{name}" trong tệp.',
+  appTableAlreadyInTable:
+    'Vùng chọn đã nằm trong bảng "{name}" — hãy đổi kiểu trong Thiết kế bảng.',
   appTablesNeedFile: 'Trước tiên hãy mở tệp XLSX — các bảng sẽ được ghi vào tệp.',
   appTableSelectRange: 'Trước tiên hãy chọn vùng dữ liệu — hàng đầu tiên là tiêu đề.',
   appTableCreated: 'Đã tạo bảng — lưu bằng {saveKeys}.',
@@ -466,6 +481,7 @@ export const vi = {
   appGridlinesHidden: 'Đã ẩn đường lưới.',
   appGridlinesShown: 'Đã hiển thị đường lưới.',
   appShowingFormulas: 'Đang hiển thị công thức — chuyển đổi lại để hiển thị giá trị.',
+  appShowingFormulasActive: 'Đang hiển thị công thức',
   appShowingValues: 'Đang hiển thị giá trị đã tính toán.',
   appTraceNoFormula: 'Dò ô tiền nhiệm: ô hiện hoạt không có công thức.',
   appTraceNoRefs: 'Dò ô tiền nhiệm: công thức này không có tham chiếu ô nào.',
@@ -701,6 +717,7 @@ export const vi = {
   appExportPdfTitle: 'Xuất dưới dạng PDF',
   appSaveTitle: 'Lưu',
   appSaveAs: 'Lưu dưới dạng',
+  aiNameFile: 'Đặt tên bằng AI…',
   appUndo: 'Hoàn tác',
   appRedo: 'Làm lại',
   appUnsavedEditOne: '● {count} chỉnh sửa chưa lưu',
@@ -732,7 +749,6 @@ export const vi = {
   appLinkPlaceholder: 'https://example.com hoặc Sheet1!A1',
   appRemoveLink: 'Xóa liên kết',
   appNotAvailableYet: 'Chưa khả dụng',
-  appComingSoon: 'Sắp ra mắt',
   appGroupChartLayouts: 'Bố cục biểu đồ',
   appAddChartElement: 'Thêm thành phần biểu đồ',
   appAddChartElementTitle: 'Tiêu đề, nhãn dữ liệu, chú giải',
@@ -1166,6 +1182,8 @@ export const vi = {
   appRefreshAll: 'Làm mới tất cả',
   appWorkbookNoPivot: 'Không có bảng PivotTable nào trong sổ làm việc này.',
   appRefreshAllTitle: 'Làm mới mọi bảng PivotTable',
+  appQueriesConnections: 'Truy vấn & Kết nối',
+  appQueriesConnectionsTitle: 'Liệt kê các truy vấn và kết nối dữ liệu của sổ làm việc',
   appErrorCheckingDetail: 'Quét trang tính để tìm các giá trị lỗi',
   appErrorsFound: '{count} lỗi — tại {cell}: {value}',
   appCheckingErrors: 'Đang quét toàn bộ trang tính để tìm lỗi…',
@@ -1200,6 +1218,7 @@ export const vi = {
   appGroupForecast: 'Dự báo',
   appWhatIfAnalysis: 'Phân tích What-If',
   appGoalSeek: 'Tìm kiếm mục tiêu (Goal Seek)',
+  appDataTable: 'Bảng dữ liệu',
   appWhatIfTitle: 'Giải tìm đầu vào cho một giá trị mục tiêu',
   appGoalSeekNeedsFormula: 'Ô đặt phải chứa một công thức.',
   appGoalSeekByCellNotNumber: 'Ô thay đổi phải chứa một số thuần túy hoặc để trống.',
@@ -1297,12 +1316,15 @@ export const vi = {
   appPasswordUpdating: 'Đang cập nhật…',
   appUpdatePassword: 'Cập nhật mật khẩu',
   appWorkbookNotPasswordProtected: 'Sổ làm việc này không được bảo vệ bằng mật khẩu mở.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Sổ làm việc có mật khẩu không thể lưu vào tài liệu UniWork. Hãy dùng Lưu dưới dạng để giữ bản mã hóa trên máy này.',
   appPasswordChangeUniwork: 'Không thể đổi mật khẩu của tài liệu UniWork tại đây.',
   appPasswordChangeReadOnly: 'Sổ làm việc này chỉ để xem nên không thể đổi mật khẩu.',
   appEncryptedWrongPassword: 'Mật khẩu không đúng. Hãy thử lại.',
   appPasswordChangeRestored: 'Hãy lưu sổ làm việc đã khôi phục trước, rồi mới đổi mật khẩu.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Cho phép chỉnh sửa các vùng',
   appGroupClipboard: 'Bảng nhớ tạm',
   appPaste: 'Dán',
@@ -1563,6 +1585,7 @@ export const vi = {
   appVisualFlipV: 'Lật dọc',
   appVisualFlipH: 'Lật ngang',
   appCtxPasteVisual: 'Dán ảnh hoặc hình',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Chưa thể mở sổ làm việc này trên web',
   appWebEngineBody:
@@ -1590,15 +1613,23 @@ export const vi = {
   appWebSavedReopenFailed:
     'Các thay đổi của bạn đã được lưu vào UniWork, nhưng không thể mở lại sổ làm việc tại đây. Hãy tải lại trình soạn thảo để tiếp tục.',
   appDataTable: 'Bảng dữ liệu',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Chính tả',
   appSpellBtnDetail: 'Kiểm tra văn bản trang tính (F7)',
   appSpellToggle: 'Kiểm tra chính tả',
   appSpellToggleTip:
+<<<<<<< ours
     'Bật kiểm tra chính tả (F7 và nút trong thẻ Xem lại); khi tắt, hộp nhận xét không còn hiện gạch chân sóng',
   appSpellOn: 'Đã bật kiểm tra chính tả.',
   appSpellOff: 'Kiểm tra chính tả đang tắt. Bật trong Xem lại ▸ Soát lỗi.',
+=======
+    'Bật kiểm tra chính tả (F7 và nút Review); khi tắt, hộp nhận xét không còn hiện gạch chân sóng',
+  appSpellOn: 'Đã bật kiểm tra chính tả.',
+  appSpellOff: 'Kiểm tra chính tả đang tắt. Bật trong Review ▸ Kiểm tra.',
+>>>>>>> theirs
   appSpellRecheck: 'Kiểm tra lại',
   appSpellNone: 'Không tìm thấy lỗi chính tả đáng ngờ.',
   appSpellFindings: '{count} lỗi đáng ngờ. Bấm một hàng để đi tới.',

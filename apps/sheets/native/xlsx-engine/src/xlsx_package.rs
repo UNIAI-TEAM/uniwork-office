@@ -121,7 +121,11 @@ pub(crate) fn write_package(
             add_binary(&mut writer, name, bytes, options)?;
         }
     }
+<<<<<<< ours
     writer.finish()?.sync_all()?;
+=======
+    crate::archive::sync_best_effort(&writer.finish()?)?;
+>>>>>>> theirs
     Ok(())
 }
 

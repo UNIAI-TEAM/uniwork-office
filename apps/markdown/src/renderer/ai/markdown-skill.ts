@@ -69,7 +69,11 @@ const AGENT_SYSTEM_PROMPT = [
   '- The root is the document title (or the focus topic when the user named one — also pass it as `focus`); its children are the main sections/headings, then key concepts, 2-5 per node, 2-4 levels deep;',
   "- Labels are short phrases (2-8 words) in the document's own language and wording, taken from its headings and key sentences — never invent topics the document does not cover;",
   "- Cite each node's source with `block` (a block index from the current block list); omit it for nodes that span several blocks. Only cite indexes that exist;",
+<<<<<<< ours
   '- generate_mindmap does not modify the document. After it returns, reply with one short sentence (e.g. that the map is ready and branches can be expanded).',
+=======
+  "- generate_mindmap does not modify the document. After it returns, reply with one short sentence (e.g. that the map is ready and branches can be expanded). If the user wants the map inside the document, point at the card's insert button — it writes the map in as an editable mermaid diagram.",
+>>>>>>> theirs
   '',
   '## Conversation',
   '- Answer questions about the document directly, without editing it.',
@@ -137,6 +141,7 @@ export function createMarkdownSkill(
     id: 'markdown',
     // live: the predicates are re-read before every model request
     get systemPrompt() {
+<<<<<<< ours
       const editor = getEditor()
       const labels = editor ? redactLabelsOf(editor.getJSON() as never) : []
       // only when the open document actually withholds something, so a
@@ -149,6 +154,18 @@ export function createMarkdownSkill(
           ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
           : AGENT_SYSTEM_PROMPT) + (writerRoute() ? '' : WRITER_OFF_NOTE)
       return (hostOffers('insert_image') ? prompt : prompt + IMAGE_FETCH_OFF_NOTE) + redact
+=======
+      const base =
+        imageGenAvailable?.() === false
+          ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
+          : AGENT_SYSTEM_PROMPT
+      // only when the open document actually withholds something, so a
+      // document without spans pays nothing and the model is not told to
+      // look for markers that are not there
+      const editor = getEditor()
+      const labels = editor ? redactLabelsOf(editor.getJSON() as never) : []
+      return labels.length > 0 ? `${base}\n\n${placeholderInstruction(labels)}` : base
+>>>>>>> theirs
     },
     get tools() {
       if (isReadOnly?.()) return withAsk(AGENT_TOOLS, true)

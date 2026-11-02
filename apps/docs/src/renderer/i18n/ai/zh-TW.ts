@@ -109,6 +109,11 @@ export const zhTW = {
   aiTrackOnTitle:
     '追蹤修訂已開啟:AI 內容變更標記為修訂(插入加底線/刪除加刪除線),可在校閱中接受或拒絕',
   aiTrackOffTitle: '追蹤修訂已關閉:AI 變更直接生效(仍可透過版本快照還原)',
+  aiRevisionBarTitle: '修訂',
+  aiRevisionCount: '共 {count} 處修改',
+  aiRevisionRejectAll: '全部拒絕',
+  aiRevisionAcceptAll: '全部接受',
+  aiRevisionPara: '第 {n} 段',
   aiTurnLimit: '（已達單次要求的工具呼叫輪數上限，以上是基於已完成步驟的回答，可能不完整。）',
   aiStopped: '(已停止)',
   aiNoReply: 'AI 沒有回傳內容。',
@@ -118,12 +123,16 @@ export const zhTW = {
   aiTooManyImages: '圖片最多隨訊息傳送 {max} 張,多餘的已忽略',
   aiUnknownError: '未知錯誤',
   aiTimeoutError: 'AI 請求逾時：網路長時間無回應，已停止。請檢查網路後重試',
+  aiRegionError: '該模型的廠商不向目前地區提供服務，請換一個模型或切換網路',
   aiOverloadedError: 'AI 服務目前繁忙，請稍後重試',
   aiNetworkError: '網路有問題，無法連接 AI 服務。請檢查網路後重試',
   aiSumReadAttachment: '讀取附件',
   aiSumImageAttachment: '圖片附件 {name}',
   aiSumRead: '讀取 {name}',
   aiSumReadAttachmentName: '讀取附件 {name}',
+  aiSumSkillsList: '列出已裝技能',
+  aiSumSkillRead: '讀取技能 {name}',
+  aiSumRunCli: '已執行 {args}',
   aiSumWebSearch: '網路搜尋',
   aiSumWebSearchDone: '搜尋「{query}」({count} 筆)',
   aiSumImageSearch: '圖片搜尋',
@@ -185,6 +194,7 @@ export const zhTW = {
   aiCmdImages: '已更新 {count} 張圖片',
   aiCmdToc: '已插入目錄({count} 個項目)',
   aiCmdSkipped: '(略過 {count} 個受保護區塊)',
+<<<<<<< ours
   aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
   aiClarifyTitle: '繼續之前先確認幾個問題',
   aiClarifyDecide: '幫我決定',
@@ -198,6 +208,8 @@ export const zhTW = {
   aiClarifySubmit: '繼續',
   aiSumClarify: '已回答釐清問題',
   aiSumClarifySkipped: '已略過釐清問題',
+=======
+>>>>>>> theirs
   aiStarterMindMap: '為這份文件產生心智圖',
   aiMindMapBtn: 'AI 心智圖',
   aiMindMapPrompt: '為這份文件產生心智圖,依文件的章節結構組織主要主題與關鍵概念',
@@ -207,7 +219,18 @@ export const zhTW = {
   aiMindMapAskPrompt: '介紹一下文件中關於「{label}」的內容',
   aiMindMapJump: '跳至對應段落',
   aiMindMapExport: '匯出 PNG',
+<<<<<<< ours
   aiMindMapReset: '重設檢視',
   aiMindMapExpand: '展開分支',
   aiMindMapCollapse: '收合分支',
+=======
+  aiMindMapExportSvg: '匯出 SVG',
+  aiMindMapInsert: '插入文件',
+  aiMindMapReset: '重設檢視',
+  aiMindMapExpand: '展開分支',
+  aiMindMapCollapse: '收合分支',
+  aiMindMapToggleLayout: '切換版面',
+  aiMindMapLayoutTopDown: '切換為由上而下版面',
+  aiMindMapLayoutLeftRight: '切換為左右分欄版面',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

@@ -45,7 +45,11 @@ export interface ClosedTabEntry {
 }
 
 export interface RecentlyClosedTracker {
+<<<<<<< ours
   push(closed: { kind?: TabKind | 'help'; filePath?: string }): void
+=======
+  push(closed: { kind?: TabKind; filePath?: string }): void
+>>>>>>> theirs
   reopenNext(
     openDocument: (filePath: string) => boolean,
     fileExists?: (filePath: string) => boolean,

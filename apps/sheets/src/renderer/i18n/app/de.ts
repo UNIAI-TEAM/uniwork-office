@@ -10,7 +10,11 @@ export const de = {
   redactDialogPlaceholder: 'Name des Platzhalters, z. B. Telefonnummer des Kunden',
   redactCancel: 'Abbrechen',
   redactInsert: 'Verbergen',
+<<<<<<< ours
   redactEnable: 'Rechtsklick auf eine Auswahl, um sie vor der KI zu verbergen.',
+=======
+  redactEnable: 'Rechtsklick auf eine Auswahl, um sie vor dem Modell zu verbergen.',
+>>>>>>> theirs
   redactNeedsSavedRow:
     'Diese Zeile ist noch nicht in der Datei. Bitte zuerst speichern und dann die Zelle ausblenden.',
   redactRecoveredFromNames:
@@ -355,7 +359,9 @@ export const de = {
   appFullLoadRunning:
     'Die gesamte Arbeitsmappe wird geladen — Sortieren und Filtern sind danach verfügbar…',
   appFullLoadTooLarge:
-    'Diese Arbeitsmappe ist zu groß, um vollständig geladen zu werden; Sortieren und Filtern sind für diese Datei nicht verfügbar.',
+    'Diese Arbeitsmappe ist zu groß, um vollständig geladen zu werden; Sortieren und Verschieben von Bereichen sind für diese Datei nicht verfügbar. Das Filtern läuft direkt auf der Datei.',
+  appLargeFilterLoading: 'Filterspalte wird aus der Datei gelesen …',
+  appLargeFilterApplying: 'Filter wird auf die Datei angewendet …',
   appSortValueModeFormulas:
     'Dieser Bereich enthält Formeln, die in dieser großen Arbeitsmappe nicht live berechnet werden — Sortieren oder Verschieben würde sie als reine Werte speichern. Wählen Sie einen Bereich ohne Formeln.',
   appSortRangeTooLarge:
@@ -426,6 +432,9 @@ export const de = {
     'Der Tabellenname "{name}" wird bereits von einer Tabelle in der Datei verwendet.',
   appTableOverlapsSession:
     'Der Bereich überschneidet sich mit der in dieser Sitzung erstellten Tabelle „{name}“.',
+  appTableOverlapsFile: 'Der Bereich überschneidet sich mit der Tabelle „{name}“ in der Datei.',
+  appTableAlreadyInTable:
+    'Die Auswahl liegt bereits in der Tabelle „{name}“ – ändern Sie den Stil unter Tabellenentwurf.',
   appTablesNeedFile:
     'Öffnen Sie zuerst eine XLSX-Datei — Tabellen werden in die Datei geschrieben.',
   appTableSelectRange:
@@ -516,6 +525,7 @@ export const de = {
   appGridlinesHidden: 'Gitternetzlinien ausgeblendet.',
   appGridlinesShown: 'Gitternetzlinien eingeblendet.',
   appShowingFormulas: 'Formeln werden angezeigt — erneut umschalten für Werte.',
+  appShowingFormulasActive: 'Formeln angezeigt',
   appShowingValues: 'Berechnete Werte werden angezeigt.',
   appTraceNoFormula: 'Spur zum Vorgänger: Die aktive Zelle hat keine Formel.',
   appTraceNoRefs: 'Spur zum Vorgänger: Diese Formel hat keine Zellbezüge.',
@@ -768,6 +778,7 @@ export const de = {
   appExportPdfTitle: 'Als PDF exportieren',
   appSaveTitle: 'Speichern',
   appSaveAs: 'Speichern unter',
+  aiNameFile: 'Mit KI benennen…',
   appUndo: 'Rückgängig',
   appRedo: 'Wiederholen',
   appUnsavedEditOne: '● {count} ungespeicherte Bearbeitung',
@@ -799,7 +810,6 @@ export const de = {
   appLinkPlaceholder: 'https://example.com oder Sheet1!A1',
   appRemoveLink: 'Link entfernen',
   appNotAvailableYet: 'Noch nicht verfügbar',
-  appComingSoon: 'Demnächst verfügbar',
   appGroupChartLayouts: 'Diagrammlayouts',
   appAddChartElement: 'Diagrammelement hinzufügen',
   appAddChartElementTitle: 'Titel, Datenbeschriftungen, Legende',
@@ -1234,6 +1244,8 @@ export const de = {
   appRefreshAll: 'Alle aktualisieren',
   appWorkbookNoPivot: 'Keine Pivot-Tabellen in dieser Arbeitsmappe.',
   appRefreshAllTitle: 'Alle Pivot-Tabellen aktualisieren',
+  appQueriesConnections: 'Abfragen und Verbindungen',
+  appQueriesConnectionsTitle: 'Abfragen und Datenverbindungen der Arbeitsmappe anzeigen',
   appErrorCheckingDetail: 'Blatt auf Fehlerwerte prüfen',
   appErrorsFound: '{count} Fehler — bei {cell}: {value}',
   appCheckingErrors: 'Das ganze Blatt wird auf Fehler gescannt…',
@@ -1268,6 +1280,7 @@ export const de = {
   appGroupForecast: 'Prognose',
   appWhatIfAnalysis: 'Was-wäre-wenn-Analyse',
   appGoalSeek: 'Zielwertsuche',
+  appDataTable: 'Datentabelle',
   appWhatIfTitle: 'Eingabe für einen Zielwert bestimmen',
   appGoalSeekNeedsFormula: 'Die Zielzelle muss eine Formel enthalten.',
   appGoalSeekByCellNotNumber: 'Die veränderbare Zelle muss eine Zahl enthalten oder leer sein.',
@@ -1366,6 +1379,7 @@ export const de = {
   appUpdatePassword: 'Kennwort aktualisieren',
   appWorkbookNotPasswordProtected:
     'Diese Arbeitsmappe ist nicht durch ein Öffnungskennwort geschützt.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Eine kennwortgeschützte Arbeitsmappe kann nicht in einem UniWork-Dokument gespeichert werden. Mit „Speichern unter“ behalten Sie eine verschlüsselte Kopie auf diesem Computer.',
   appPasswordChangeUniwork: 'Das Kennwort eines UniWork-Dokuments kann hier nicht geändert werden.',
@@ -1374,6 +1388,8 @@ export const de = {
   appEncryptedWrongPassword: 'Das Kennwort ist falsch. Versuchen Sie es erneut.',
   appPasswordChangeRestored:
     'Speichern Sie zuerst die wiederhergestellte Arbeitsmappe und ändern Sie dann ihr Kennwort.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Bereiche zur Bearbeitung freigeben',
   appGroupClipboard: 'Zwischenablage',
   appPaste: 'Einfügen',
@@ -1641,6 +1657,7 @@ export const de = {
   appVisualFlipV: 'Vertikal spiegeln',
   appVisualFlipH: 'Horizontal spiegeln',
   appCtxPasteVisual: 'Bild oder Form einfügen',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Diese Arbeitsmappe kann noch nicht im Web geöffnet werden',
   appWebEngineBody:
@@ -1669,16 +1686,25 @@ export const de = {
   appWebSavedReopenFailed:
     'Ihre Änderungen wurden in UniWork gespeichert, aber die Arbeitsmappe konnte hier nicht erneut geöffnet werden. Laden Sie den Editor neu, um weiterzuarbeiten.',
   appDataTable: 'Datentabelle',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Rechtschreibung',
   appSpellBtnDetail: 'Blatttext prüfen (F7)',
   appSpellToggle: 'Rechtschreibung prüfen',
   appSpellToggleTip:
+<<<<<<< ours
     'Aktiviert die Rechtschreibprüfung (F7 und die Überprüfen-Schaltfläche); ausgeschaltet zeigen Kommentarfelder keine Wellenlinien mehr',
   appSpellOn: 'Rechtschreibprüfung eingeschaltet.',
   appSpellOff:
     'Die Rechtschreibprüfung ist aus. Aktivieren Sie sie unter Überprüfen ▸ Rechtschreibung.',
+=======
+    'Aktiviert die Rechtschreibprüfung (F7 und die Review-Schaltfläche); ausgeschaltet zeigen Kommentarfelder keine Wellenlinien mehr',
+  appSpellOn: 'Rechtschreibprüfung eingeschaltet.',
+  appSpellOff:
+    'Die Rechtschreibprüfung ist aus. Aktivieren Sie sie unter Review ▸ Korrekturhilfen.',
+>>>>>>> theirs
   appSpellRecheck: 'Erneut prüfen',
   appSpellNone: 'Keine verdächtigen Rechtschreibfehler gefunden.',
   appSpellFindings:

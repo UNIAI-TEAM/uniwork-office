@@ -318,6 +318,7 @@ describe('the paths that repeat the document to the model', () => {
     expect(String(resolved.target?.excerpt ?? '')).not.toContain(SECRET)
     expect(String(resolved.target?.excerpt ?? '')).toContain('{{client phone}}')
   })
+<<<<<<< ours
 
   it('a tracked-deleted block preview in document context carries the marker, not the words', () => {
     const author = { author: 'Carol', date: '2026-03-01T10:00:00Z' }
@@ -356,6 +357,8 @@ describe('the paths that repeat the document to the model', () => {
     expect(context).toContain('{{client phone}}')
     expect(context).not.toContain(SECRET)
   })
+=======
+>>>>>>> theirs
 })
 
 describe('the echo a replacement sends back', () => {

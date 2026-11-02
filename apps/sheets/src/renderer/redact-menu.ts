@@ -25,7 +25,10 @@ import {
 } from '@univerjs/ui'
 
 import type { UniverRuntime } from './univer-state'
+<<<<<<< ours
 import { cap } from './capabilities'
+=======
+>>>>>>> theirs
 
 export const HIDE_SELECTION_COMMAND_ID = 'genoffice.sheets.command.hide-selection-from-ai'
 
@@ -43,7 +46,10 @@ export function installRedactMenu(
   runtime: UniverRuntime,
   onRequest: (selection: SelectionRequest) => void,
 ) {
+<<<<<<< ours
   if (!cap('ai')) return toDisposable(() => {})
+=======
+>>>>>>> theirs
   const injector = runtime.univer.__getInjector()
   const commandService = injector.get(ICommandService)
 
@@ -51,7 +57,10 @@ export function installRedactMenu(
     id: HIDE_SELECTION_COMMAND_ID,
     type: CommandType.COMMAND,
     handler: () => {
+<<<<<<< ours
       if (!cap('ai')) return false
+=======
+>>>>>>> theirs
       const workbook = runtime.univerAPI.getActiveWorkbook()
       const worksheet = workbook?.getActiveSheet()
       // No active range means the click landed outside the grid (a header, the

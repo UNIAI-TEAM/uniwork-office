@@ -72,10 +72,15 @@ interface Props {
   dirty: boolean
   onSave: () => void
   onSaveAs: () => void
+<<<<<<< ours
   /** absent = no Export HTML entry (desktop: the shell File menu owns it; web frame: the entry) */
   onExport?: () => void
   /** the document is not ready (a view-only copy can still be exported: that only reads it) */
   exportDisabled?: boolean
+=======
+  /** Ask the model for a name, then open Save As with it prefilled */
+  onNameWithAi: () => void
+>>>>>>> theirs
   onFind: () => void
   canUndo: boolean
   canRedo: boolean
@@ -298,9 +303,47 @@ export function Ribbon(p: Props) {
         <button
           type="button"
           className="qa-btn"
+<<<<<<< ours
           data-tip={withHtmlHint(t('undo'), 'undo')}
           aria-label={htmlPlainLabel(t('undo'))}
           aria-keyshortcuts={htmlAria('undo') || undefined}
+=======
+          data-tip={t('save')}
+          aria-label={t('save')}
+          disabled={off || !p.dirty}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={p.onSave}
+        >
+          <IconSave size={16} />
+        </button>
+        <button
+          type="button"
+          className="qa-btn qa-save-as"
+          data-tip={t('saveAs')}
+          aria-label={t('saveAs')}
+          disabled={off}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={p.onSaveAs}
+        >
+          {t('saveAs')}
+        </button>
+        <button
+          type="button"
+          className="qa-btn qa-name-with-ai"
+          data-tip={t('aiNameFile')}
+          aria-label={t('aiNameFile')}
+          disabled={off}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={p.onNameWithAi}
+        >
+          {t('aiNameFile')}
+        </button>
+        <button
+          type="button"
+          className="qa-btn"
+          data-tip={t('undo')}
+          aria-label={t('undo')}
+>>>>>>> theirs
           disabled={off || !p.canUndo}
           onMouseDown={(e) => e.preventDefault()}
           onClick={p.onUndo}

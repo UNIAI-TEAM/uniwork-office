@@ -20,13 +20,18 @@ export interface IpcStreamChunk {
   requestId: string
   /** 'ping' = wire-level keepalive; re-arms the silence watchdog and carries no payload;
    * 'reasoning' = model thinking delta (text carries it) */
+<<<<<<< ours
   type:
     'delta' | 'reasoning' | 'tool-call' | 'usage' | 'done' | 'error' | 'ping' | 'notice' | 'reset'
+=======
+  type: 'delta' | 'reasoning' | 'tool-call' | 'usage' | 'done' | 'error' | 'ping'
+>>>>>>> theirs
   text?: string
   toolCall?: AgentToolCall
   /** 'notice' only: the non-fatal turn notice (UniWork AI) */
   notice?: AgentStreamNotice
   error?: string
+<<<<<<< ours
   /** machine-readable error cause; maps to the localized timeout/network/overloaded message */
   errorCode?: 'timeout' | 'network' | 'overloaded'
   /** a UniWork AI failure: the server's `code` decides the message, never the text or errorCode */
@@ -37,6 +42,12 @@ export interface IpcStreamChunk {
   stopReason?: string
   /** the server's run id of this turn (UniWork AI `X-UniWork-AI-Run`), on the chunk after it is known */
   runId?: string
+=======
+  /** machine-readable error cause; maps to the localized timeout/credits/network/overloaded/region message */
+  errorCode?: 'timeout' | 'credits' | 'network' | 'overloaded' | 'region'
+  /** normalized stop reason on 'done' ('max_tokens' = cut off by the token limit) */
+  stopReason?: string
+>>>>>>> theirs
   /** tokens the provider billed for this turn, carried on 'usage' (always sent before 'done') */
   usage?: AgentTokenUsage
 }
@@ -84,6 +95,7 @@ export interface IpcTransportOptions<S> {
   networkErrorText?(): string
   /** localized message for capacity/rate-limit failures (errorCode 'overloaded') */
   overloadedErrorText?(): string
+<<<<<<< ours
   /**
    * localized message + its S9 key for a UniWork AI failure, chosen by the server's `code` (never
    * by the error text); undefined falls back to the chunk's own text. `retryAfterSec` is the
@@ -100,6 +112,10 @@ export interface IpcTransportOptions<S> {
 /** the narrow slice of the preload's window.uniworkAiRun bridge used here (agent-core imports no Electron types) */
 interface AiRunWindowBridge {
   reportAiRun?(report: { state: 'running' | 'idle'; runId?: string }): void
+=======
+  /** localized message when the vendor refuses the request origin (errorCode 'region') */
+  regionErrorText?(): string
+>>>>>>> theirs
 }
 
 /**
@@ -167,6 +183,7 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): IpcTrans
         } else if (chunk.type === 'tool-call') {
           armSilence()
           if (chunk.toolCall) cb.onToolCall(chunk.toolCall)
+<<<<<<< ours
         } else if (chunk.type === 'notice') {
           // a wait or a restart is traffic too: the watchdog stays armed through a Retry-After wait
           armSilence()
@@ -174,6 +191,8 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): IpcTrans
         } else if (chunk.type === 'reset') {
           armSilence()
           cb.onTurnReset?.()
+=======
+>>>>>>> theirs
         } else if (chunk.type === 'usage') {
           armSilence()
           if (chunk.usage) cb.onUsage?.(chunk.usage)
@@ -196,8 +215,14 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): IpcTrans
                   ? (options.networkErrorText?.() ?? chunk.error ?? options.unknownErrorText())
                   : chunk.errorCode === 'overloaded'
                     ? (options.overloadedErrorText?.() ?? chunk.error ?? options.unknownErrorText())
+<<<<<<< ours
                     : (chunk.error ?? options.unknownErrorText()),
             uniwork?.errorKey,
+=======
+                    : chunk.errorCode === 'region'
+                      ? (options.regionErrorText?.() ?? chunk.error ?? options.unknownErrorText())
+                      : (chunk.error ?? options.unknownErrorText()),
+>>>>>>> theirs
           )
         } else {
           // A chunk kind this build predates must not kill the run; traffic proves it is alive.

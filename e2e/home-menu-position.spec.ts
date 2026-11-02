@@ -8,7 +8,11 @@ import { launchShell, closeAndSaveVideo } from './helpers'
  * Row menus (the ⋯ button on folder rows) are position:fixed and anchor via
  * inline top/right computed from getBoundingClientRect against the layout
  * viewport. On scaled Linux desktops window.innerWidth can disagree with that
+<<<<<<< ours
  * viewport and pushed the menus past the window's left edge (#1946); these
+=======
+ * viewport and pushed the menus past the window's left edge (genoffice#1946); these
+>>>>>>> theirs
  * assertions pin the menu next to its button and inside the window on every
  * platform.
  */
@@ -71,4 +75,42 @@ test.describe('home row menu position', () => {
       await closeAndSaveVideo(launched, 'home-menu-position')
     }
   })
+<<<<<<< ours
+=======
+
+  test('the tree right-click menu opens to the right of the pointer and inside the window', async () => {
+    const launched = await launchShell({
+      onboardingSeen: true,
+      settings: { defaultSaveDir: root },
+      videoDir: 'home-menu-position',
+    })
+    const { page } = launched
+    try {
+      const row = page.locator('.folder-panel .tree .tree-row', {
+        has: page.locator('.tree-name', { hasText: 'Clients' }),
+      })
+      await expect(row).toBeVisible()
+      const box = (await row.boundingBox())!
+      const pointer = { x: box.x + 24, y: box.y + box.height / 2 }
+      await page.mouse.click(pointer.x, pointer.y, { button: 'right' })
+      const menu = page.locator('.folder-menu')
+      await expect(menu).toBeVisible()
+      const m = await page.evaluate(() => {
+        const r = document.querySelector('.folder-menu')!.getBoundingClientRect()
+        return {
+          left: r.left,
+          right: r.right,
+          top: r.top,
+          w: document.documentElement.clientWidth,
+        }
+      })
+      // never cut off at the left edge, and it starts at the pointer instead of ending there
+      expect(m.left).toBeGreaterThanOrEqual(0)
+      expect(m.right).toBeLessThanOrEqual(m.w)
+      expect(Math.abs(m.left - (pointer.x + 2))).toBeLessThanOrEqual(2)
+    } finally {
+      await closeAndSaveVideo(launched, 'home-menu-position')
+    }
+  })
+>>>>>>> theirs
 })

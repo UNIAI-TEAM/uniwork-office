@@ -104,6 +104,7 @@ describe('isModalOpen', () => {
   })
 })
 
+<<<<<<< ours
 describe('Windows / Linux desktop', () => {
   it('routes the Excel chords of each row', () => {
     expectRoutes(GRID, [
@@ -172,6 +173,91 @@ describe('Windows / Linux desktop', () => {
       ['Alt+Cmd+0', keyEvent('Digit0', metaAlt)],
       ['Shift+Cmd+F', keyEvent('KeyF', metaShift)],
     ])
+=======
+describe('resolveGlobalShortcut routing', () => {
+  it('maps Excel chords onto ribbon commands with Ctrl or Cmd', () => {
+    const cases: Array<[GlobalShortcutKeyEvent, GlobalShortcutGuards, GlobalShortcutAction]> = [
+      [keyEvent('Digit1', ctrl), GRID, FORMAT_CELLS],
+      [keyEvent('Digit1', meta), MAC, FORMAT_CELLS],
+      [keyEvent('KeyG', ctrl), GRID, GO_TO],
+      [keyEvent('F5'), GRID, GO_TO],
+      [keyEvent('F7'), GRID, cmd('spell-check')],
+      [keyEvent('Backquote', ctrl), GRID, cmd('toggle-show-formulas')],
+      [keyEvent('KeyK', meta), MAC, cmd('link-open')],
+      [keyEvent('KeyM', metaShift), MAC, cmd('comment-new')],
+      [keyEvent('F2', ctrlShift), GRID, cmd('comment-new')],
+      [keyEvent('F2', shift), GRID, cmd('note-open')],
+      [keyEvent('KeyE', ctrl), GRID, cmd('flash-fill')],
+      [keyEvent('F2', shift), GRID, cmd('note-open')],
+      [keyEvent('F3', shift), GRID, cmd('insert-function-open')],
+      [keyEvent('F3', ctrl), GRID, cmd('name-manager-open')],
+      [keyEvent('F11', shift), GRID, cmd('insert-sheet')],
+      [keyEvent('KeyV', ctrlShift), GRID, cmd('paste-special:value')],
+      [keyEvent('KeyV', { ctrlKey: true, altKey: true }), GRID, cmd('paste-special-open')],
+      [keyEvent('KeyV', { metaKey: true, ctrlKey: true }), MAC, cmd('paste-special-open')],
+      [keyEvent('BracketLeft', ctrl), GRID, cmd('trace-precedents')],
+      [keyEvent('BracketRight', meta), MAC, cmd('trace-dependents')],
+      [keyEvent('ArrowRight', altShift), GRID, cmd('outline-group:auto')],
+      [keyEvent('ArrowLeft', altShift), GRID, cmd('outline-ungroup:auto')],
+      [keyEvent('Period', ctrlShift), GRID, cmd('font-size-step:1')],
+      [keyEvent('Comma', metaShift), MAC, cmd('font-size-step:-1')],
+      [keyEvent('KeyU', ctrlShift), GRID, cmd('formula-bar-toggle')],
+      [keyEvent('Digit5', ctrl), GRID, cmd('strike')],
+      [keyEvent('Equal', alt), GRID, cmd('autofn:SUM')],
+      [keyEvent('Semicolon', ctrl), GRID, cmd('insert-now:date')],
+      [keyEvent('Semicolon', ctrlShift), GRID, cmd('insert-now:time')],
+      [keyEvent('F9'), GRID, cmd('calculate-now')],
+      [keyEvent('F9', shift), GRID, cmd('calculate-sheet')],
+      [keyEvent('PageDown'), GRID, cmd('page-row:1')],
+      [keyEvent('PageUp'), GRID, cmd('page-row:-1')],
+      [keyEvent('PageDown', alt), GRID, cmd('page-col:1')],
+      [keyEvent('KeyY', ctrl), GRID, cmd('redo-or-repeat')],
+      [keyEvent('KeyZ', ctrlShift), GRID, cmd('redo')],
+      [keyEvent('KeyZ', metaShift), MAC, cmd('redo')],
+      [keyEvent('Quote', ctrl), GRID, cmd('copy-above:formula')],
+      [keyEvent('Quote', metaShift), MAC, cmd('copy-above:value')],
+      [keyEvent('ArrowDown', alt), GRID, cmd('dv-dropdown-open')],
+      [keyEvent('Backspace', ctrl), GRID, cmd('scroll-to-active')],
+      [keyEvent('Backspace', ctrl), MAC, cmd('scroll-to-active')],
+    ]
+    for (const [event, guards, action] of cases) {
+      expect(resolveGlobalShortcut(event, guards), event.code).toEqual(action)
+    }
+  })
+
+  it('requires the exact modifier set', () => {
+    // Ctrl+Shift+1 is Excel's number-format chord (excel-format-shortcuts): pick an unbound one
+    expect(resolveGlobalShortcut(keyEvent('KeyG', ctrlShift), GRID)).toBeNull()
+    expect(resolveGlobalShortcut(keyEvent('KeyV', ctrl), GRID)).toBeNull()
+    // Cmd+Ctrl+V is Excel for Mac only
+    expect(
+      resolveGlobalShortcut(keyEvent('KeyV', { metaKey: true, ctrlKey: true }), GRID),
+    ).toBeNull()
+    expect(resolveGlobalShortcut(keyEvent('F11'), GRID)).toBeNull()
+    expect(resolveGlobalShortcut(keyEvent('ArrowRight', alt), GRID)).toBeNull()
+    // F7 is the plain Excel Spelling key; Shift+F7 must stay unbound
+    expect(resolveGlobalShortcut(keyEvent('F7', shift), GRID)).toBeNull()
+    expect(
+      resolveGlobalShortcut(keyEvent('Equal', { altKey: true, metaKey: true }), MAC),
+    ).toBeNull()
+  })
+
+  it('keeps Cmd+Backspace (mac clear) away from scroll-to-active', () => {
+    expect(resolveGlobalShortcut(keyEvent('Backspace', meta), MAC)).toBeNull()
+  })
+
+  it('binds the Excel-for-Mac Cmd variant of the filter on mac only', () => {
+    expect(resolveGlobalShortcut(keyEvent('KeyF', metaShift), MAC)).toEqual(cmd('filter-toggle'))
+    expect(resolveGlobalShortcut(keyEvent('KeyF', ctrlShift), GRID)).toBeNull()
+    expect(resolveGlobalShortcut(keyEvent('KeyF', ctrlShift), MAC)).toBeNull()
+>>>>>>> theirs
+  })
+
+  it('binds AutoSum cross-platform; the filter Ctrl/⌘+Shift+L chord belongs to Univer', () => {
+    expect(resolveGlobalShortcut(keyEvent('KeyL', ctrlShift), GRID)).toBeNull()
+    expect(resolveGlobalShortcut(keyEvent('KeyL', metaShift), MAC)).toBeNull()
+    expect(resolveGlobalShortcut(keyEvent('KeyT', ctrlShift), GRID)).toEqual(cmd('autofn:SUM'))
+    expect(resolveGlobalShortcut(keyEvent('KeyT', metaShift), MAC)).toEqual(cmd('autofn:SUM'))
   })
 
   it('leaves unrelated keys to the rest of the app', () => {
@@ -434,5 +520,14 @@ describe('guards', () => {
     expect(resolveGlobalShortcut(keyEvent('Period', { ...ctrlShift, repeat: true }), GRID)).toEqual(
       cmd('font-size-step:1'),
     )
+  })
+
+  it('keep the mac-only border chords off Windows and Linux', () => {
+    const macBorder = keyEvent('Digit0', { metaKey: true, altKey: true })
+    expect(resolveGlobalShortcut(macBorder, MAC)).toEqual({
+      kind: 'command',
+      command: 'border:outer',
+    })
+    expect(resolveGlobalShortcut(macBorder, GRID)).toBeNull()
   })
 })

@@ -71,7 +71,10 @@ export function IntegrationsPane({
   const [notice, setNotice] = useState<{
     agentId?: AgentId
     legacy?: boolean
+<<<<<<< ours
     alert?: boolean
+=======
+>>>>>>> theirs
     text: string
   } | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
@@ -171,6 +174,7 @@ export function IntegrationsPane({
     setBusy(true)
     try {
       const res = await api()!.sweepLegacySkillCopies()
+<<<<<<< ours
       const failedCount = res.failed?.length ?? 0
       focusLegacyNoticeRef.current = res.kept.length === 0 && failedCount === 0
       setNotice({
@@ -190,6 +194,15 @@ export function IntegrationsPane({
             ? t('intgLegacyFailedNoSharedCopy')
             : t('intgLegacyFailed'),
       })
+=======
+      setNotice({
+        legacy: true,
+        text: t('intgLegacyCleaned', { n: res.removed.length, k: res.kept.length }),
+      })
+      await refresh()
+    } catch (err) {
+      setNotice({ legacy: true, text: t('intgLegacyFailed', { msg: String(err) }) })
+>>>>>>> theirs
     } finally {
       setBusy(false)
     }
@@ -371,7 +384,11 @@ export function IntegrationsPane({
                   <ul className="set-intg-legacy">
                     {legacy.map((c) => (
                       <li key={c.path} className="set-intg-legacy-item">
+<<<<<<< ours
                         {c.label} — <span dir="ltr">{c.path}</span>
+=======
+                        {c.label} — {c.path}
+>>>>>>> theirs
                       </li>
                     ))}
                   </ul>
@@ -383,6 +400,7 @@ export function IntegrationsPane({
                 </button>
               </div>
             </div>
+<<<<<<< ours
           </div>
         )}
 
@@ -394,6 +412,9 @@ export function IntegrationsPane({
             tabIndex={-1}
           >
             {notice.text}
+=======
+            {notice?.legacy && <div className="set-field-desc set-intg-notice">{notice.text}</div>}
+>>>>>>> theirs
           </div>
         )}
 

@@ -11,16 +11,23 @@ export interface AiSkillsLabels {
   noSkills: string
   /** list body when the search matches nothing */
   noMatch: string
+<<<<<<< ours
   /** bottom row: jump to Settings › Skills */
+=======
+  /** bottom row: jump to Settings › Integrations */
+>>>>>>> theirs
   manage: string
   back: string
   removeTitle: string
   /** read-only chip row on a sent bubble */
   attachedTitle: string
+<<<<<<< ours
   /** shown in the menu when 3 skills are already selected */
   maxSkillsHint: string
   /** shown above the composer when attached skills + prompt exceed UniWork AI's 8,000-rune limit */
   uniworkTooLongNotice: string
+=======
+>>>>>>> theirs
 }
 
 export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
@@ -35,9 +42,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: '返回',
     removeTitle: '移除技能',
     attachedTitle: '本条消息附带的技能',
+<<<<<<< ours
     maxSkillsHint: '每条消息最多附加 3 个技能',
     uniworkTooLongNotice:
       '附带的技能对于 UniWork AI 来说过长（超过 8,000 个字符）。请移除一个技能。',
+=======
+>>>>>>> theirs
   },
   en: {
     addTitle: 'Add',
@@ -50,9 +60,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Back',
     removeTitle: 'Remove skill',
     attachedTitle: 'Skills attached to this message',
+<<<<<<< ours
     maxSkillsHint: 'Up to 3 skills per message',
     uniworkTooLongNotice:
       'The attached skills are too long for UniWork AI (over 8,000 characters). Remove a skill.',
+=======
+>>>>>>> theirs
   },
   ja: {
     addTitle: '追加',
@@ -65,9 +78,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: '戻る',
     removeTitle: 'スキルを外す',
     attachedTitle: 'このメッセージに添付したスキル',
+<<<<<<< ours
     maxSkillsHint: '1件のメッセージに最大3つのスキルを添付できます',
     uniworkTooLongNotice:
       '添付されたスキルが UniWork AI の上限（8,000文字）を超えています。スキルを外してください。',
+=======
+>>>>>>> theirs
   },
   ko: {
     addTitle: '추가',
@@ -80,8 +96,11 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: '뒤로',
     removeTitle: '스킬 제거',
     attachedTitle: '이 메시지에 첨부된 스킬',
+<<<<<<< ours
     maxSkillsHint: '메시지당 최대 3개의 스킬을 첨부할 수 있습니다',
     uniworkTooLongNotice: '첨부된 스킬이 UniWork AI 한도(8,000자)를 초과합니다. 스킬을 제거하세요.',
+=======
+>>>>>>> theirs
   },
   fr: {
     addTitle: 'Ajouter',
@@ -94,9 +113,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Retour',
     removeTitle: 'Retirer la compétence',
     attachedTitle: 'Compétences jointes à ce message',
+<<<<<<< ours
     maxSkillsHint: 'Jusqu’à 3 compétences par message',
     uniworkTooLongNotice:
       'Les compétences jointes sont trop longues pour UniWork AI (plus de 8 000 caractères). Retirez une compétence.',
+=======
+>>>>>>> theirs
   },
   de: {
     addTitle: 'Hinzufügen',
@@ -109,9 +131,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Zurück',
     removeTitle: 'Skill entfernen',
     attachedTitle: 'An diese Nachricht angehängte Skills',
+<<<<<<< ours
     maxSkillsHint: 'Bis zu 3 Skills pro Nachricht',
     uniworkTooLongNotice:
       'Die angehängten Skills sind für UniWork AI zu lang (über 8.000 Zeichen). Entfernen Sie einen Skill.',
+=======
+>>>>>>> theirs
   },
   es: {
     addTitle: 'Añadir',
@@ -124,9 +149,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Atrás',
     removeTitle: 'Quitar habilidad',
     attachedTitle: 'Habilidades adjuntas a este mensaje',
+<<<<<<< ours
     maxSkillsHint: 'Hasta 3 habilidades por mensaje',
     uniworkTooLongNotice:
       'Las habilidades adjuntas son demasiado largas para UniWork AI (más de 8.000 caracteres). Quite una habilidad.',
+=======
+>>>>>>> theirs
   },
   th: {
     addTitle: 'เพิ่ม',
@@ -139,9 +167,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'ย้อนกลับ',
     removeTitle: 'นำทักษะออก',
     attachedTitle: 'ทักษะที่แนบกับข้อความนี้',
+<<<<<<< ours
     maxSkillsHint: 'แนบได้สูงสุด 3 ทักษะต่อข้อความ',
     uniworkTooLongNotice:
       'ทักษะที่แนบมามีความยาวเกินขีดจำกัดของ UniWork AI (เกิน 8,000 อักขระ) โปรดนำทักษะออก',
+=======
+>>>>>>> theirs
   },
   id: {
     addTitle: 'Tambah',
@@ -154,9 +185,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Kembali',
     removeTitle: 'Hapus keterampilan',
     attachedTitle: 'Keterampilan yang dilampirkan pada pesan ini',
+<<<<<<< ours
     maxSkillsHint: 'Maksimal 3 keterampilan per pesan',
     uniworkTooLongNotice:
       'Keterampilan yang dilampirkan terlalu panjang untuk UniWork AI (lebih dari 8.000 karakter). Hapus satu keterampilan.',
+=======
+>>>>>>> theirs
   },
   ru: {
     addTitle: 'Добавить',
@@ -169,9 +203,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Назад',
     removeTitle: 'Убрать навык',
     attachedTitle: 'Навыки, приложенные к этому сообщению',
+<<<<<<< ours
     maxSkillsHint: 'Не более 3 навыков на сообщение',
     uniworkTooLongNotice:
       'Приложенные навыки слишком велики для UniWork AI (более 8 000 символов). Уберите навык.',
+=======
+>>>>>>> theirs
   },
   ar: {
     addTitle: 'إضافة',
@@ -184,9 +221,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'رجوع',
     removeTitle: 'إزالة المهارة',
     attachedTitle: 'المهارات المرفقة بهذه الرسالة',
+<<<<<<< ours
     maxSkillsHint: 'ما يصل إلى 3 مهارات لكل رسالة',
     uniworkTooLongNotice:
       'المهارات المرفقة طويلة جدًا بالنسبة إلى UniWork AI (أكثر من 8000 حرف). أزل مهارة.',
+=======
+>>>>>>> theirs
   },
   pt: {
     addTitle: 'Adicionar',
@@ -199,9 +239,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Voltar',
     removeTitle: 'Remover habilidade',
     attachedTitle: 'Habilidades anexadas a esta mensagem',
+<<<<<<< ours
     maxSkillsHint: 'Até 3 habilidades por mensagem',
     uniworkTooLongNotice:
       'As habilidades anexadas são longas demais para o UniWork AI (mais de 8.000 caracteres). Remova uma habilidade.',
+=======
+>>>>>>> theirs
   },
   it: {
     addTitle: 'Aggiungi',
@@ -214,9 +257,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Indietro',
     removeTitle: 'Rimuovi competenza',
     attachedTitle: 'Competenze allegate a questo messaggio',
+<<<<<<< ours
     maxSkillsHint: 'Fino a 3 competenze per messaggio',
     uniworkTooLongNotice:
       'Le competenze allegate sono troppo lunghe per UniWork AI (oltre 8.000 caratteri). Rimuovi una competenza.',
+=======
+>>>>>>> theirs
   },
   pl: {
     addTitle: 'Dodaj',
@@ -229,9 +275,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Wstecz',
     removeTitle: 'Usuń umiejętność',
     attachedTitle: 'Umiejętności dołączone do tej wiadomości',
+<<<<<<< ours
     maxSkillsHint: 'Maksymalnie 3 umiejętności na wiadomość',
     uniworkTooLongNotice:
       'Dołączone umiejętności są za długie dla UniWork AI (ponad 8000 znaków). Usuń umiejętność.',
+=======
+>>>>>>> theirs
   },
   cs: {
     addTitle: 'Přidat',
@@ -244,9 +293,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Zpět',
     removeTitle: 'Odebrat dovednost',
     attachedTitle: 'Dovednosti připojené k této zprávě',
+<<<<<<< ours
     maxSkillsHint: 'Nejvýše 3 dovednosti na zprávu',
     uniworkTooLongNotice:
       'Připojené dovednosti jsou pro UniWork AI příliš dlouhé (přes 8 000 znaků). Odeberte dovednost.',
+=======
+>>>>>>> theirs
   },
   nl: {
     addTitle: 'Toevoegen',
@@ -259,9 +311,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Terug',
     removeTitle: 'Vaardigheid verwijderen',
     attachedTitle: 'Vaardigheden bij dit bericht',
+<<<<<<< ours
     maxSkillsHint: 'Maximaal 3 vaardigheden per bericht',
     uniworkTooLongNotice:
       'De bijgevoegde vaardigheden zijn te lang voor UniWork AI (meer dan 8.000 tekens). Verwijder een vaardigheid.',
+=======
+>>>>>>> theirs
   },
   ms: {
     addTitle: 'Tambah',
@@ -274,9 +329,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Kembali',
     removeTitle: 'Buang kemahiran',
     attachedTitle: 'Kemahiran yang dilampirkan pada mesej ini',
+<<<<<<< ours
     maxSkillsHint: 'Sehingga 3 kemahiran setiap mesej',
     uniworkTooLongNotice:
       'Kemahiran yang dilampirkan terlalu panjang untuk UniWork AI (melebihi 8,000 aksara). Buang satu kemahiran.',
+=======
+>>>>>>> theirs
   },
   he: {
     addTitle: 'הוספה',
@@ -289,9 +347,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'חזרה',
     removeTitle: 'הסרת מיומנות',
     attachedTitle: 'מיומנויות שצורפו להודעה זו',
+<<<<<<< ours
     maxSkillsHint: 'עד 3 מיומנויות להודעה',
     uniworkTooLongNotice:
       'המיומנויות המצורפות ארוכות מדי עבור UniWork AI (מעל 8,000 תווים). הסר מיומנות.',
+=======
+>>>>>>> theirs
   },
   hi: {
     addTitle: 'जोड़ें',
@@ -304,9 +365,12 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'वापस',
     removeTitle: 'कौशल हटाएँ',
     attachedTitle: 'इस संदेश के साथ जुड़े कौशल',
+<<<<<<< ours
     maxSkillsHint: 'प्रति संदेश अधिकतम 3 कौशल',
     uniworkTooLongNotice:
       'जुड़े हुए कौशल UniWork AI के लिए बहुत लंबे हैं (8,000 वर्णों से अधिक)। कोई कौशल हटाएँ।',
+=======
+>>>>>>> theirs
   },
   'zh-TW': {
     addTitle: '新增',
@@ -319,8 +383,11 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: '返回',
     removeTitle: '移除技能',
     attachedTitle: '此訊息附帶的技能',
+<<<<<<< ours
     maxSkillsHint: '每則訊息最多附加 3 個技能',
     uniworkTooLongNotice: '附帶的技能對 UniWork AI 而言過長（超過 8,000 個字元）。請移除一個技能。',
+=======
+>>>>>>> theirs
   },
   vi: {
     addTitle: 'Thêm',
@@ -333,8 +400,23 @@ export const AI_SKILLS_LABELS: Record<Lang, AiSkillsLabels> = {
     back: 'Quay lại',
     removeTitle: 'Gỡ kỹ năng',
     attachedTitle: 'Kỹ năng đính kèm tin nhắn này',
+<<<<<<< ours
     maxSkillsHint: 'Tối đa 3 kỹ năng mỗi tin nhắn',
     uniworkTooLongNotice:
       'Kỹ năng đính kèm quá dài đối với UniWork AI (hơn 8.000 ký tự). Hãy gỡ bớt một kỹ năng.',
+=======
+  },
+  tr: {
+    addTitle: 'Ekle',
+    addFile: 'Dosya ekle',
+    skills: 'Beceriler',
+    searchPlaceholder: 'Beceri ara',
+    noSkills: 'Henüz beceri yüklenmedi',
+    noMatch: 'Eşleşen beceri yok',
+    manage: 'Becerileri yönet',
+    back: 'Geri',
+    removeTitle: 'Beceriyi kaldır',
+    attachedTitle: 'Bu iletiye eklenen beceriler',
+>>>>>>> theirs
   },
 }

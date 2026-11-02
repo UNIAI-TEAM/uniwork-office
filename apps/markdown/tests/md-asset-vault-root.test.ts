@@ -2,7 +2,11 @@ import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+<<<<<<< ours
 import { resolveSafeVaultImagePath, vaultRootServesPictures } from '../src/main/asset-lifecycle'
+=======
+import { resolveSafeVaultImagePath } from '../src/main/asset-lifecycle'
+>>>>>>> theirs
 
 /** symlinkSync needs privilege on Windows (developer mode); a machine without it skips those cases */
 const canSymlink = (() => {
@@ -92,6 +96,7 @@ describe('resolveSafeVaultImagePath (md-asset serve gate widened to the vault ro
     },
   )
 })
+<<<<<<< ours
 
 describe('vaultRootServesPictures (local documents only)', () => {
   const bound = new Set(['/work/cloud-copy.md'])
@@ -107,3 +112,5 @@ describe('vaultRootServesPictures (local documents only)', () => {
     expect(vaultRootServesPictures(new Set(['/work/cloud-copy.md']), isBound)).toBe(false)
   })
 })
+=======
+>>>>>>> theirs

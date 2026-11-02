@@ -35,6 +35,10 @@ import type {
   WorkbookRecalcRequest,
   WorkbookRecalcResult,
   WorkbookRedactionsResult,
+<<<<<<< ours
+=======
+  WorkbookQueriesResult,
+>>>>>>> theirs
   WorkbookRichRun,
   WorkbookSaveRequest,
   WorkbookSaveResult,
@@ -42,6 +46,7 @@ import type {
   WebSearchResult,
   ImageSearchResponse,
   GenerateImageResult,
+  UserSkillEntry,
 } from '../shared/desktop-api'
 import {
   HEADER_FOOTER_PICTURE_POSITION,
@@ -64,6 +69,7 @@ import { parseWorksheetComment } from './worksheet-comments'
 
 const desktopApi: DesktopApi = {
   getLanguage: () => ipcRenderer.invoke('app:get-language'),
+  openSourcePath: (path: string) => ipcRenderer.invoke('home:open-path', path),
   onLanguageChanged(handler) {
     const listener = (
       _event: Electron.IpcRendererEvent,
@@ -305,6 +311,27 @@ const desktopApi: DesktopApi = {
     })
     return parseWorkbookRedactionsResult(result)
   },
+<<<<<<< ours
+=======
+  async readWorkbookQueries(request) {
+    if (!isRecord(request) || !isUuid(request.sessionId)) {
+      throw new Error('Invalid queries request.')
+    }
+    const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.readWorkbookQueries, {
+      sessionId: request.sessionId,
+    })
+    // structural check; the main process zod-validates the full shape
+    if (!Array.isArray(result) || result.length > 1_000) {
+      throw new Error('Invalid queries response.')
+    }
+    for (const query of result) {
+      if (!isRecord(query) || typeof query.name !== 'string' || typeof query.kind !== 'string') {
+        throw new Error('Invalid queries response.')
+      }
+    }
+    return result as WorkbookQueriesResult
+  },
+>>>>>>> theirs
   async saveWorkbookEdits(request) {
     const validatedRequest = parseSaveRequest(request)
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.saveWorkbook, validatedRequest)
@@ -560,6 +587,7 @@ const desktopApi: DesktopApi = {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.userDisplayName, sessionId)
     return typeof result === 'string' ? result : ''
   },
+<<<<<<< ours
   onCommentAuthorChanged(handler) {
     const listener = () => handler()
     ipcRenderer.on('uniwork:comment-author-changed', listener)
@@ -599,6 +627,14 @@ const desktopApi: DesktopApi = {
   },
   async uniworkReadOnlySave(path?: string) {
     await ipcRenderer.invoke(IPC_CHANNELS.uniworkReadOnlySave, path)
+=======
+  onUserDisplayNameChanged(handler) {
+    const listener = (_event: Electron.IpcRendererEvent, name: unknown) => {
+      if (typeof name === 'string') handler(name)
+    }
+    ipcRenderer.on('app:author-name-changed', listener)
+    return () => ipcRenderer.removeListener('app:author-name-changed', listener)
+>>>>>>> theirs
   },
   async getAiSettings() {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.aiGetSettings)
@@ -616,6 +652,25 @@ const desktopApi: DesktopApi = {
   async openAiModelSettings() {
     await ipcRenderer.invoke(IPC_CHANNELS.aiOpenModelSettings)
   },
+<<<<<<< ours
+=======
+  async openSkillsSettings() {
+    await ipcRenderer.invoke('ai:open-skills-settings')
+  },
+  skillsList() {
+    return ipcRenderer.invoke('ai:skills-list') as Promise<UserSkillEntry[]>
+  },
+  skillText(name: string) {
+    return ipcRenderer.invoke('ai:skill-text', name) as Promise<string>
+  },
+  async aiChat(request) {
+    const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.aiChat, request)
+    if (!isRecord(result) || typeof result.ok !== 'boolean') {
+      throw new Error('Invalid AI chat response.')
+    }
+    return result as unknown as AiChatResponse
+  },
+>>>>>>> theirs
   async aiStream(request) {
     await ipcRenderer.invoke(IPC_CHANNELS.aiStream, request)
   },
@@ -846,7 +901,40 @@ function parseAttachmentAddResult(input: unknown): AttachmentAddResult {
   return { accepted, rejected: input.rejected as string[] }
 }
 
+/**
+ * Model file naming: the transport half of `suggestFileName`.
+ *
+ * Inlined rather than imported — a preload entry must stay a single-file bundle,
+ * or the sandbox drops every global it exposed. The one `ai:` channel is
+ * registered app-wide by the shell rather than by this app, the same arrangement
+ * the `project:*` bridge below already depends on.
+ *
+ * `content` crosses this bridge verbatim and the main process cannot see what
+ * this editor withheld, so what the caller hands over is exactly what the model
+ * sees. A caller that passed raw document text would undo its own redactions.
+ *
+ * The global is `aiNamingApi`, not `aiOffice`: `aiOffice` is the shell's home
+ * API, and a partial one in an editor window would shadow it there.
+ */
+const aiNamingApi = {
+  suggestFileName: (input: { content: string }) =>
+    ipcRenderer.invoke('ai:suggest-file-name', input),
+}
+
 contextBridge.exposeInMainWorld('desktopApi', desktopApi)
+contextBridge.exposeInMainWorld('aiNamingApi', aiNamingApi)
+
+// The frame's own spell engine (Chromium Hunspell / the OS dictionary): the
+// same checker docs' squiggles run on, batch-driven over sheet cell texts so
+// nothing leaves the machine for the F7 spelling dialog. webFrame consults
+// it only while the webContents' spellcheck is on — the Review ▸ Proofing
+// preference gates the dialog, and comment-box squiggles share the switch.
+contextBridge.exposeInMainWorld('nativeSpell', {
+  isWordMisspelled: (word: unknown): boolean =>
+    typeof word === 'string' ? webFrame.isWordMisspelled(word) : false,
+  getWordSuggestions: (word: unknown): string[] =>
+    typeof word === 'string' ? webFrame.getWordSuggestions(word) : [],
+})
 
 // The frame's own spell engine (Chromium Hunspell / the OS dictionary): the
 // same checker docs' squiggles run on, batch-driven over sheet cell texts so
@@ -865,6 +953,8 @@ const projectApi: ProjectApi = {
   appendChat: (args) => ipcRenderer.invoke('project:appendChat', args),
   loadChat: (args) => ipcRenderer.invoke('project:loadChat', args),
   rebindChat: (args) => ipcRenderer.invoke('project:rebindChat', args),
+  listChats: (args) => ipcRenderer.invoke('project:listChats', args),
+  deleteChat: (args) => ipcRenderer.invoke('project:deleteChat', args),
 }
 contextBridge.exposeInMainWorld('projectApi', projectApi)
 
@@ -1116,6 +1206,12 @@ function parseWorkbookFile(input: unknown): WorkbookFile {
       ...(isPositiveInteger(sheet.sourceXmlBytes) ? { sourceXmlBytes: sheet.sourceXmlBytes } : {}),
       ...(isNonnegativeInteger(sheet.storedCellCount)
         ? { storedCellCount: sheet.storedCellCount }
+        : {}),
+      ...(isNonnegativeInteger(sheet.valueCellCount)
+        ? { valueCellCount: sheet.valueCellCount }
+        : {}),
+      ...(isNonnegativeInteger(sheet.valueRowCount) && isNonnegativeInteger(sheet.valueColumnCount)
+        ? { valueRowCount: sheet.valueRowCount, valueColumnCount: sheet.valueColumnCount }
         : {}),
       columnWidths,
       // Degrade instead of rejecting the workbook: 0 / malformed defaults

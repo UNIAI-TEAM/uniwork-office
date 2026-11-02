@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { normalizeCustomProfile } from '@genoffice/ai-provider/browser'
 
 import {
   HEADER_FOOTER_PICTURE_POSITION,
@@ -98,6 +99,10 @@ const worksheetMetadataSchema = z
     /// Cells with a value, formula or style (rowCount x columnCount is only
     /// the bounding box). Optional for compatibility with an older sidecar.
     storedCellCount: z.number().int().nonnegative().optional(),
+    /// Stored cells with a value or formula, and the box they span.
+    valueCellCount: z.number().int().nonnegative().optional(),
+    valueRowCount: z.number().int().nonnegative().optional(),
+    valueColumnCount: z.number().int().nonnegative().optional(),
     columnWidths: z.array(
       z
         .object({
@@ -2105,6 +2110,7 @@ export const workbookSaveRequestSchema = z
     /// Background save (AutoSave, AI-run autosave): an unsaved new workbook
     /// then writes its backing file in place instead of asking where to save.
     quiet: z.boolean().optional(),
+<<<<<<< ours
     /// Who asked: 'user' (Save, menu, shortcut, close guard) or 'auto'
     /// (AutoSave timer, AI-run autosave). Absent = saved exactly as before.
     origin: z.enum(['user', 'auto']).optional(),
@@ -2115,6 +2121,13 @@ export const workbookSaveRequestSchema = z
     /// save: write the backing file in place (no Save As) and report it as the
     /// user's Save. Only an unsaved-new session honours it.
     inPlace: z.boolean().optional(),
+=======
+    /// Name offered by the Save As dialog in place of the file's own. A stem
+    /// the model proposed for a document the reader named by hand: it prefills
+    /// the dialog rather than replacing it, so the reader still chooses where
+    /// the file goes, and cancelling still cancels.
+    defaultName: z.string().min(1).max(1024).optional(),
+>>>>>>> theirs
     /// CSV session in-place save: the active sheet serialized as CSV text.
     /// Written back to the session's original .csv after the xlsx save.
     csvContent: z.string().max(MAX_CSV_EXPORT_CHARS).optional(),
@@ -2434,6 +2447,38 @@ export const workbookPivotRequestSchema = z
   })
   .strict()
 
+<<<<<<< ours
+=======
+export const workbookQueriesRequestSchema = z
+  .object({
+    sessionId: z.string().uuid(),
+  })
+  .strict()
+
+/** Data › Queries & Connections (read-only): one entry per connection in xl/connections.xml */
+export const workbookQueriesResultSchema = z
+  .array(
+    z
+      .object({
+        name: z.string().max(1_000),
+        kind: z.enum(['powerQuery', 'web', 'text', 'database', 'other']),
+        source: z.string().max(4_000).optional(),
+        description: z.string().max(4_000).optional(),
+        destination: z
+          .object({
+            sheet: z.string().max(1_000),
+            table: z.string().max(1_000).optional(),
+            range: z.string().max(100),
+            rows: z.number().int().min(0),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict(),
+  )
+  .max(1_000)
+
+>>>>>>> theirs
 export const workbookRedactionsRequestSchema = z
   .object({
     sessionId: z.string().uuid(),
@@ -2630,11 +2675,57 @@ export type WorkbookRangeResult = z.infer<typeof workbookRangeResultSchema>
 /// The sheet's saved print settings as parsed from the file.
 export type WorkbookPagePrintSettings = NonNullable<WorkbookRangeResult['pageSetup']>
 export type WorkbookRecalcRequest = z.infer<typeof workbookRecalcRequestSchema>
+
+export const externalLinksRequestSchema = z.object({ path: z.string().min(1) }).strict()
+export type ExternalLinksRequest = z.infer<typeof externalLinksRequestSchema>
+
+export const externalLinkStatusSchema = z
+  .object({
+    index: z.number().int().positive(),
+    rawTarget: z.string(),
+    source: z.string().nullable(),
+    reachable: z.boolean(),
+    sheetNames: z.array(z.string()),
+  })
+  .strict()
+export type ExternalLinkStatus = z.infer<typeof externalLinkStatusSchema>
+
+export const externalLinksResultSchema = z
+  .object({ links: z.array(externalLinkStatusSchema) })
+  .strict()
+export type ExternalLinksResult = z.infer<typeof externalLinksResultSchema>
+
+// One external-formula cell of an update report. `row` and `column` are
+// 0-based in the report; IronCalc, which computed the value, addresses the
+// same cells 1-based.
+export const externalLinkCellSchema = z
+  .object({
+    sheet: z.string(),
+    row: z.number().int().nonnegative(),
+    column: z.number().int().nonnegative(),
+    formatted: z.string(),
+    number: z.number().nullable().optional(),
+    formula: z.string(),
+  })
+  .strict()
+
+export const externalLinksUpdateResultSchema = z
+  .object({
+    links: z.array(externalLinkStatusSchema),
+    cells: z.array(externalLinkCellSchema),
+  })
+  .strict()
+export type ExternalLinksUpdateResult = z.infer<typeof externalLinksUpdateResultSchema>
 export type WorkbookRecalcResult = z.infer<typeof workbookRecalcResultSchema>
 export type WorkbookMediaRequest = z.infer<typeof workbookMediaRequestSchema>
 export type WorkbookMediaResult = z.infer<typeof workbookMediaResultSchema>
 export type WorkbookPivotRequest = z.infer<typeof workbookPivotRequestSchema>
 export type WorkbookPivotDefinition = z.infer<typeof workbookPivotDefinitionSchema>
+<<<<<<< ours
+=======
+export type WorkbookQueriesRequest = z.infer<typeof workbookQueriesRequestSchema>
+export type WorkbookQueriesResult = z.infer<typeof workbookQueriesResultSchema>
+>>>>>>> theirs
 export type WorkbookRedactionsRequest = z.infer<typeof workbookRedactionsRequestSchema>
 export type WorkbookRedactionsResult = z.infer<typeof workbookRedactionsResultSchema>
 export type LocalImageRequest = z.infer<typeof localImageRequestSchema>
@@ -2653,12 +2744,99 @@ export type WorkbookConditionalRule = z.infer<typeof conditionalRuleSchema>
 
 // ---- AI settings + stream: canonical types live in @genoffice/ai-provider,
 // shared with apps/docs. Validated here like every other renderer→main request in
+<<<<<<< ours
 // this file. UniWork AI is the only provider: no key, no model, no provider slots. ----
+=======
+// this file; the validated shape is cast to AiSettings at the main-process call
+// site, which has every known provider key once merged through
+// resolveAiSettings/defaultAiSettings. ----
+
+const aiCustomCompatSchema = z
+  .object({
+    omitTemperature: z.boolean().optional(),
+    echoReasoning: z.boolean().optional(),
+    vision: z.boolean().optional(),
+    useMaxCompletionTokens: z.boolean().optional(),
+  })
+  .strict()
+
+const aiCustomModelProfileSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    alias: z.string().optional(),
+    name: z.string().optional(),
+    ...aiCustomCompatSchema.shape,
+    maxTokens: z.number().int().positive().optional(),
+    contextWindow: z.number().int().positive().optional(),
+  })
+  .strict()
+
+// Keep IPC fields explicit, then use the canonical normalizer for header
+// legality and profile size bounds, just like the other apps' settings gate.
+const aiCustomProfileSchema = z
+  .object({
+    api: z.enum(['openai-compatible', 'anthropic', 'gemini']).optional(),
+    apiKeyEnv: z.string().optional(),
+    headers: z.record(z.string(), z.string()).optional(),
+    idleTimeoutMs: z.number().int().positive().optional(),
+    compat: aiCustomCompatSchema.optional(),
+    bodyExtras: z.record(z.string(), z.unknown()).optional(),
+    modelProfiles: z.array(aiCustomModelProfileSchema).optional(),
+    probedProfiles: z.array(aiCustomModelProfileSchema).optional(),
+  })
+  .strict()
+
+const aiProviderConfigSchema = z
+  .object({
+    apiKey: z.string(),
+    model: z.string(),
+    baseUrl: z.string().optional(),
+    cliPath: z.string().optional(),
+    profile: aiCustomProfileSchema.transform(normalizeCustomProfile).optional(),
+  })
+  .strict()
+
+const aiMediaProviderConfigSchema = z
+  .object({
+    apiKey: z.string(),
+    baseUrl: z.string().optional(),
+    imageModel: z.string(),
+    analysisModel: z.string(),
+  })
+  .strict()
+>>>>>>> theirs
+
+const aiCustomEndpointSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    baseUrl: z.string(),
+    apiKey: z.string(),
+    model: z.string(),
+    models: z.array(z.string()).optional(),
+    ...aiCustomProfileSchema.shape,
+  })
+  .strict()
+  .transform(({ id, name, baseUrl, apiKey, model, models, ...profile }) => ({
+    id,
+    name,
+    baseUrl,
+    apiKey,
+    model,
+    ...(models !== undefined ? { models } : {}),
+    ...normalizeCustomProfile(profile),
+  }))
 
 export const aiSettingsInputSchema = z
   .object({
     provider: z.string().min(1),
+<<<<<<< ours
     providers: z.object({}).strict(),
+=======
+    providers: z.record(z.string(), aiProviderConfigSchema),
+    customEndpoints: z.array(aiCustomEndpointSchema).optional(),
+    customEndpoint: z.string().optional(),
+>>>>>>> theirs
     gskToolsEnabled: z.boolean().optional(),
   })
   .strict()
@@ -2975,10 +3153,15 @@ export interface McpCommandResult {
 }
 
 export interface DesktopApi {
+<<<<<<< ours
   /** Web frame only (UNI-1865): the renderer reports that the opened workbook finished
    *  mounting, so the passive lag detector's settle stamp starts at first paint. Absent
    *  on desktop. */
   noteDocumentMounted?(): void
+=======
+  /** open any shell-routed document path (an AI answer's filenav citation) */
+  openSourcePath(path: string): Promise<void>
+>>>>>>> theirs
   /** current UI language (persisted by the shell in app-settings.json) */
   getLanguage(): Promise<'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar'>
   /** language switched from the shell home page */
@@ -3042,6 +3225,11 @@ export interface DesktopApi {
    * see `workbookRedactionsResultSchema`.
    */
   readWorkbookRedactions(request: WorkbookRedactionsRequest): Promise<WorkbookRedactionsResult>
+<<<<<<< ours
+=======
+  /** Data › Queries & Connections: the workbook's connections and where each loads (read-only) */
+  readWorkbookQueries(request: WorkbookQueriesRequest): Promise<WorkbookQueriesResult>
+>>>>>>> theirs
   readLocalImage(request: LocalImageRequest): Promise<LocalImageResult>
   captureScreenSources(): Promise<ScreenSourcesResult>
   /// null when the source vanished between listing and capture.
@@ -3116,6 +3304,7 @@ export interface DesktopApi {
   consumeHeadlessExport(): Promise<string | null>
   /// Headless export mode: report the export outcome so the main process can quit.
   headlessExportDone(result: { ok: boolean; error?: string }): void
+<<<<<<< ours
   /// G8-02 author written into new threaded comments: the signed-in UniWork
   /// display name for a bound workbook, else the neutral constant "User"
   /// (never the OS account name). `sessionId` names the open workbook session
@@ -3135,12 +3324,27 @@ export interface DesktopApi {
   onUniworkStateChanged?(cb: (path: string, newPath?: string) => void): () => void
   /// EL-1(b) fix6: explicit Save on a read-only bound workbook asks main to explain
   uniworkReadOnlySave?(path?: string): Promise<void>
+=======
+  /// Author name for threaded comments (Settings → General, falling back to the OS account).
+  getUserDisplayName(): Promise<string>
+  onUserDisplayNameChanged(handler: (name: string) => void): () => void
+>>>>>>> theirs
   getAiSettings(): Promise<AiSettings>
   setAiSettings(settings: AiSettings): Promise<void>
   /// ai-settings.json was rewritten by any renderer; re-read it
   onAiSettingsChanged(handler: () => void): () => void
   /// shell only: switch to Home and open Settings › Account, UniWork AI sign-in (rejects in standalone)
   openAiModelSettings(): Promise<void>
+<<<<<<< ours
+=======
+  /// shell only: switch to Home and open Settings › Integrations (the skills list)
+  openSkillsSettings(): Promise<void>
+  /// the skills installed into GenOffice's own folder
+  skillsList(): Promise<UserSkillEntry[]>
+  /// one installed skill's body, by name; the main process resolves the path
+  skillText(name: string): Promise<string>
+  aiChat(request: AiChatRequest): Promise<AiChatResponse>
+>>>>>>> theirs
   /// start a streaming AI call; deltas arrive via onAiStream with the same requestId
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>
@@ -3207,4 +3411,10 @@ export interface ImageSearchResponse {
 export interface GenerateImageResult {
   url?: string
   error?: string
+}
+
+export interface UserSkillEntry {
+  name: string
+  description: string
+  relevant: boolean
 }

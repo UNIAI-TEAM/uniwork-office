@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+<<<<<<< ours
 import {
   chmodSync,
   existsSync,
@@ -8,6 +9,9 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
+=======
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+>>>>>>> theirs
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { run, tempDir } from './helpers'
@@ -257,6 +261,7 @@ describe('genoffice skill', () => {
     // without the shared copy the old one is all the tool has
     expect(existsSync(m.legacyPath)).toBe(true)
   })
+<<<<<<< ours
 
   it('reports partial cleanup and persists completed removals when a second legacy removal fails (R1-06)', async () => {
     const m = fakeLegacyMachine()
@@ -376,4 +381,6 @@ describe('genoffice skill', () => {
     expect(keptWarning.message).toContain('is behind a symlink; left in place')
     expect(keptWarning.message).not.toContain('edited by hand')
   })
+=======
+>>>>>>> theirs
 })

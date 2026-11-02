@@ -34,7 +34,11 @@ export interface RibbonFormatState {
   /** Split Table needs a row above the caret's */
   canSplitTable: boolean
   imageSelected: boolean
+<<<<<<< ours
   /** the selected picture is a run picture (in line or floating) */
+=======
+  /** the selected picture is an inline run picture (table / header cell): Size only */
+>>>>>>> theirs
   inlinePicture: boolean
   imageDataUrl: string | null
   imageWrap: string | null

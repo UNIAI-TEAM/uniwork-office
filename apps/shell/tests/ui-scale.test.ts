@@ -56,6 +56,7 @@ describe('stepUiScale', () => {
     expect(stepUiScale(UI_SCALE_MIN, -1)).toBe(UI_SCALE_MIN)
   })
 
+<<<<<<< ours
   it('starts from the next preset when the stored value is not one', () => {
     // `readUiScale` clamps the range but does not snap to a preset, so a user
     // who typed `1.05` into the JSON really does get 1.05 here. Stepping has to
@@ -65,6 +66,15 @@ describe('stepUiScale', () => {
     expect(stepUiScale(1.05, -1)).toBe(1)
     // The top half, where an exact-match implementation would coincidentally
     // agree — pinned so both halves are stated, not just the one that bit.
+=======
+  it('snaps to the nearest preset in the step direction when the stored value is not one', () => {
+    // `readUiScale` clamps the range but does not snap to a preset, so a user
+    // who typed `1.05` into the JSON really does get 1.05 here. Zooming in
+    // lands on the first preset above it, zooming out on the first below.
+    expect(stepUiScale(1.05, 1)).toBe(1.1)
+    expect(stepUiScale(1.05, -1)).toBe(1)
+    expect(stepUiScale(1.2, 1)).toBe(1.25)
+>>>>>>> theirs
     expect(stepUiScale(1.3, 1)).toBe(1.5)
     expect(stepUiScale(1.3, -1)).toBe(1.25)
   })

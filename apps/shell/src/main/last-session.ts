@@ -1,5 +1,6 @@
 import { statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
+<<<<<<< ours
 import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
 import { describeExtraRoot } from './folder-roots'
 import { isInsideRoot } from './folder-tree'
@@ -9,6 +10,13 @@ import { isInsideRoot } from './folder-tree'
  * Off by default; when on, the shell window's file tabs and detached editor
  * windows are stored in app-settings.json as it closes and reopened at the
  * next launch.
+=======
+
+/**
+ * Reopen the documents of the previous session at launch (genoffice#2162).
+ * Off by default; when on, the shell window's file tabs are stored in
+ * app-settings.json as it closes and reopened at the next launch.
+>>>>>>> theirs
  */
 export const RESTORE_LAST_SESSION_KEY = 'restoreLastSession'
 export const LAST_SESSION_DOCUMENTS_KEY = 'lastSessionDocuments'
@@ -16,6 +24,7 @@ export const LAST_SESSION_DOCUMENTS_KEY = 'lastSessionDocuments'
 /** a hand-edited settings file must not open hundreds of tabs at launch */
 const MAX_RESTORED_DOCUMENTS = 50
 
+<<<<<<< ours
 export interface LastSessionFilterDeps {
   /** path lies inside the UniWork working-copy store (reopening as a plain file would bypass the bound open flow and edit lock) */
   inUniworkStore?: (path: string) => boolean
@@ -39,10 +48,13 @@ export function createLastSessionFilterDeps(env: LastSessionFilterEnv): LastSess
   }
 }
 
+=======
+>>>>>>> theirs
 export function restoreLastSessionEnabled(settings: Record<string, unknown>): boolean {
   return settings[RESTORE_LAST_SESSION_KEY] === true
 }
 
+<<<<<<< ours
 /**
  * Filter paths eligible for session persistence and restoration:
  * - absolute string paths only, deduplicated in order, capped at 50
@@ -70,6 +82,16 @@ export function readLastSessionDocuments(
   return filterLastSessionDocuments(settings[LAST_SESSION_DOCUMENTS_KEY], deps)
 }
 
+=======
+/** the saved tab paths, once each, absolute only, in tab order */
+export function readLastSessionDocuments(settings: Record<string, unknown>): string[] {
+  const raw = settings[LAST_SESSION_DOCUMENTS_KEY]
+  if (!Array.isArray(raw)) return []
+  const paths = raw.filter((p): p is string => typeof p === 'string' && isAbsolute(p))
+  return [...new Set(paths)].slice(0, MAX_RESTORED_DOCUMENTS)
+}
+
+>>>>>>> theirs
 function isFile(path: string): boolean {
   try {
     return statSync(path).isFile()
@@ -87,14 +109,21 @@ export function launchPathsWithLastSession(
   settings: Record<string, unknown>,
   launchPaths: readonly string[],
   exists: (path: string) => boolean = isFile,
+<<<<<<< ours
   deps: LastSessionFilterDeps = {},
 ): string[] {
   if (!restoreLastSessionEnabled(settings)) return [...launchPaths]
   const restored = readLastSessionDocuments(settings, deps).filter(
+=======
+): string[] {
+  if (!restoreLastSessionEnabled(settings)) return [...launchPaths]
+  const restored = readLastSessionDocuments(settings).filter(
+>>>>>>> theirs
     (p) => !launchPaths.includes(p) && exists(p),
   )
   return [...restored, ...launchPaths]
 }
+<<<<<<< ours
 
 export interface LaunchSequenceDeps {
   targets: readonly string[]
@@ -177,3 +206,5 @@ export function createSessionSnapshotRecorder(
     },
   }
 }
+=======
+>>>>>>> theirs

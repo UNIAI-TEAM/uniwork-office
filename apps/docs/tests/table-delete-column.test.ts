@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
+<<<<<<< ours
 import { parseDocx, saveDocx } from '@genoffice/docx-engine'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
 import { blocksToPmDoc, pmDocToSavePlan, type PmNode } from '../src/renderer/editor/convert'
+=======
+>>>>>>> theirs
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { deleteTableColumn, selectTablePart } from '../src/renderer/editor/table-ops'
 
@@ -188,6 +191,7 @@ describe('table delete column keeps the width grid', () => {
     // [30, 50] renormalized (37.5, 62.5)
     expect(pctRounded(editor)).toEqual([38, 63])
   })
+<<<<<<< ours
 
   it('keeps saved w:tblW in step with the grid (dxa) when the table width is fixed (DOCS-V23)', async () => {
     const bodyXml =
@@ -221,4 +225,6 @@ describe('table delete column keeps the width grid', () => {
     const reparsed = await parseDocx(await saveDocx(parsed, plan.saveBlocks))
     expect(reparsed.blocks[0].table?.colWidthsTwips).toEqual([1500, 3000, 1995])
   })
+=======
+>>>>>>> theirs
 })

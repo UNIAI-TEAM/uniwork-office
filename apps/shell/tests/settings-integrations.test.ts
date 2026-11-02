@@ -197,6 +197,7 @@ describe('Settings → Integrations', () => {
     expect(host.textContent).toContain('assistant picks one')
   })
 
+<<<<<<< ours
   it('shows the copies the shared row replaced, removes them, keeps the outcome visible and focused, and handles kept/failure/busy states (R1-08, R1-10)', async () => {
     const codexCopy = {
       agent: 'codex' as const,
@@ -349,10 +350,25 @@ describe('Settings → Integrations', () => {
     status.legacy = [codexCopy, copilotCopy, cursorCopy, geminiCopy]
 
     let call = 0
+=======
+  it('shows the copies the shared row replaced and removes them on request', async () => {
+    const status = baseStatus()
+    status.legacy = [
+      {
+        agent: 'codex',
+        label: 'Codex',
+        skillsDir: '/home/u/.codex/skills',
+        path: '/home/u/.codex/skills/genoffice/SKILL.md',
+        ours: true,
+      },
+    ]
+    let swept = 0
+>>>>>>> theirs
     await openIntegrations({
       status: async () => status,
       copyText: async () => {},
       sweepLegacySkillCopies: async () => {
+<<<<<<< ours
         call += 1
         if (call === 1) {
           status.legacy = [{ ...geminiCopy, ours: false, reason: 'error' }]
@@ -415,6 +431,26 @@ describe('Settings → Integrations', () => {
       command: 'uniwork-office-cli',
       args: ['mcp'],
     })
+=======
+        swept += 1
+        return { removed: status.legacy, kept: [] }
+      },
+    })
+    const legacyRow = host.querySelector('.set-intg-row[data-agent="legacy"]')
+    expect(legacyRow).toBeTruthy()
+    expect(legacyRow!.textContent).toContain('/home/u/.codex/skills/genoffice/SKILL.md')
+    await click(buttonWithText('Remove old copies', legacyRow!))
+    expect(swept).toBe(1)
+  })
+
+  it('names the bare command once genoffice is on the PATH and runs the app as Node on Windows', () => {
+    expect(
+      mcpLaunch({
+        status: 'present',
+        launcherDir: '/Applications/GenOffice.app/Contents/Resources/cli',
+      }),
+    ).toEqual({ command: 'genoffice', args: ['mcp'] })
+>>>>>>> theirs
     const winDir = 'C:\\Users\\Jane Doe\\AppData\\Local\\Programs\\GenOffice\\resources\\cli'
     const win = {
       command: `${winDir}\\..\\..\\UniWork Office.exe`,

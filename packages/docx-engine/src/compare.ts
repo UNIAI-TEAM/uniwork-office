@@ -99,7 +99,11 @@ interface Token {
 const PAIR_THRESHOLD = 0.6
 
 /** the author recorded when the caller names none */
+<<<<<<< ours
 export const DEFAULT_COMPARE_AUTHOR = 'UniWork Office'
+=======
+export const DEFAULT_COMPARE_AUTHOR = 'GenOffice'
+>>>>>>> theirs
 
 /**
  * Build the redline: the revised document with the differences marked as

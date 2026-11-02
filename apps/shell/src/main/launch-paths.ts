@@ -6,8 +6,16 @@ import { existsSync } from 'node:fs'
 export const LAUNCHABLE_EXTS = [
   'docx',
   'doc',
+<<<<<<< ours
   'odt',
   'ott',
+=======
+  'dot',
+  'odt',
+  'ott',
+  'hwpx',
+  'hwp',
+>>>>>>> theirs
   'xlsx',
   'xlsm',
   'xls',
@@ -16,7 +24,10 @@ export const LAUNCHABLE_EXTS = [
   'ods',
   'ots',
   'pptx',
+<<<<<<< ours
   'ppt',
+=======
+>>>>>>> theirs
   'odp',
   'otp',
   'pdf',
@@ -29,7 +40,11 @@ export const LAUNCHABLE_EXTS = [
 ] as const
 
 const SUPPORTED_LAUNCH_RE = new RegExp(`\\.(${LAUNCHABLE_EXTS.join('|')})$`, 'i')
+<<<<<<< ours
 const UNSUPPORTED_LAUNCH_RE = /\.(rtf|pps|xlsb|pages|key|numbers)$/i
+=======
+const UNSUPPORTED_LAUNCH_RE = /\.(rtf|ppt|pps|xlsb|pages|key|numbers)$/i
+>>>>>>> theirs
 
 interface LaunchPayload {
   launchPaths?: unknown

@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { applyDataTable } from '../src/renderer/data-table'
 import { setManualCalculation } from '../src/renderer/calc-options'
 import { setModuleLang } from '../src/renderer/i18n/locale'
+<<<<<<< ours
 import { undoSuppression, type UniverRuntime } from '../src/renderer/univer-state'
+=======
+import type { UniverRuntime } from '../src/renderer/univer-state'
+>>>>>>> theirs
 
 beforeEach(() => {
   // Stable error-message assertions; zh is the authored source, en the mirror.
@@ -33,6 +37,7 @@ function makeRuntime(
   const key = (row: number, column: number) => `${row}:${column}`
   const writes: string[] = []
   const events: string[] = []
+<<<<<<< ours
   // Undo entries the patched Univer undo service would keep, in push order.
   // A batched undo item replays them in that order (LocalUndoRedoService
   // appends each pushed item's undoMutations), so the last entry per cell wins.
@@ -42,6 +47,8 @@ function makeRuntime(
     const previous = cells.get(at)
     undoEntries.push(() => (previous === undefined ? cells.delete(at) : cells.set(at, previous)))
   }
+=======
+>>>>>>> theirs
   let calcEnds = 0
   let forcedCalcs = 0
   const listeners = new Set<() => void>()
@@ -64,7 +71,10 @@ function makeRuntime(
         : (cells.get(key(row, column)) ?? null),
     setValue: (value: number | string | boolean | ICellDataLike) => {
       writes.push(`set ${key(row, column)} ${JSON.stringify(value)}`)
+<<<<<<< ours
       rememberForUndo(key(row, column))
+=======
+>>>>>>> theirs
       if (typeof value === 'object' && value !== null) {
         if (value.v === null || value.v === undefined) cells.delete(key(row, column))
         else cells.set(key(row, column), value.v)
@@ -76,7 +86,10 @@ function makeRuntime(
       matrix.forEach((rowValues, rowIndex) => {
         rowValues.forEach((data, columnIndex) => {
           const at = key(row + rowIndex, column + columnIndex)
+<<<<<<< ours
           rememberForUndo(at)
+=======
+>>>>>>> theirs
           if (data.v === null || data.v === undefined) cells.delete(at)
           else cells.set(at, data.v)
         })
@@ -121,7 +134,10 @@ function makeRuntime(
     read,
     writes,
     events,
+<<<<<<< ours
     undoBatch: () => undoEntries.forEach((undo) => undo()),
+=======
+>>>>>>> theirs
     calcEnds: () => calcEnds,
     forcedCalcs: () => forcedCalcs,
   }
@@ -172,6 +188,7 @@ describe('applyDataTable: one-variable column table', () => {
     expect(fake.events.filter((event) => event === 'batch-begin')).toHaveLength(1)
   })
 
+<<<<<<< ours
   it('one undo clears the results and leaves the input at its original value', async () => {
     const fake = makeRuntime({ row: 3, column: 2 }, () => {
       const input = fake.read(0, 3)
@@ -198,6 +215,8 @@ describe('applyDataTable: one-variable column table', () => {
     expect(fake.read(6, 2)).toBeNull()
   })
 
+=======
+>>>>>>> theirs
   it('restores an originally empty input cell to empty', async () => {
     const fake = makeRuntime({ row: 3, column: 2 }, () => {
       const input = fake.read(0, 3)
@@ -299,6 +318,7 @@ describe('applyDataTable: two-variable grid', () => {
   })
 })
 
+<<<<<<< ours
 describe('applyDataTable: undo of a two-variable grid', () => {
   it('one undo restores both inputs and clears the grid', async () => {
     const fake = makeRuntime({ row: 3, column: 1 }, () => {
@@ -329,6 +349,8 @@ describe('applyDataTable: undo of a two-variable grid', () => {
   })
 })
 
+=======
+>>>>>>> theirs
 describe('applyDataTable: value handling', () => {
   it('writes formula error text as the cell value', async () => {
     const fake = makeRuntime({ row: 3, column: 2 }, () => {

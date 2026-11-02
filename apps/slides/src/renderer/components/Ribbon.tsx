@@ -127,6 +127,7 @@ import { RibbonInsertTab } from './RibbonInsertTab'
 import { RibbonTabScroller } from './RibbonTabScroller'
 import { ShapeGalleryContent } from './ShapeGalleryPopover'
 import { autoContextTabForElement, contextTabForElement, type ContextTab } from './context-tabs'
+<<<<<<< ours
 import { cap, isViewOnly, isWeb } from '../capabilities'
 import {
   shortcutPlatform,
@@ -136,6 +137,8 @@ import {
   slidesPlainLabel,
   slidesTipKbd,
 } from '../shortcuts'
+=======
+>>>>>>> theirs
 import { MODEL3D_VIEWS } from '../model3d/views'
 import {
   defaultNewSlideSize,
@@ -1160,10 +1163,12 @@ export function Ribbon({
   onUndo,
   onRedo,
   onSaveAs,
+  onNameWithAi,
   onExportPdf,
   onUseApp,
   onPrint,
   onExportImages,
+  onExportImagesJpg,
   onFormat,
   zoom,
   onZoom,
@@ -1449,8 +1454,12 @@ export function Ribbon({
     transparencyOpen ||
     lineSpacingOpen ||
     recordOpen ||
+<<<<<<< ours
     collapseOpen != null ||
     penFlyout != null
+=======
+    collapseOpen != null
+>>>>>>> theirs
 
   // Clicking elsewhere collapses every popup (the font color palette uses
   // onMouseDown without stealing focus, collapsing naturally when the edit
@@ -1475,6 +1484,7 @@ export function Ribbon({
   // Expanded/collapsed widths are cached per group so the required width is
   // computable in every state (before the first fold the collapsed width is
   // an estimate, corrected by measurement as soon as the group first folds).
+<<<<<<< ours
   const collapse = useRibbonCollapse(
     'ai-slides-ribbon-collapsed',
     {
@@ -1490,6 +1500,15 @@ export function Ribbon({
       platform: shortcutPlatform(),
     },
   )
+=======
+  const collapse = useRibbonCollapse('ai-slides-ribbon-collapsed', {
+    collapse: t('ribbonCollapse'),
+    expand: t('ribbonExpand'),
+    // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (docs parity, see #362)
+    compact: t('ribbonCompact'),
+    expandFull: t('ribbonExpand'),
+  })
+>>>>>>> theirs
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const inlineWidthsRef = useRef(new Map<string, number>())
   const collapsedWidthsRef = useRef(new Map<string, number>())
@@ -1839,6 +1858,7 @@ export function Ribbon({
               {t('ribbonTabFile')}
             </button>
             {fileOpen && (
+<<<<<<< ours
               <div className="file-menu" onMouseDown={(e) => e.stopPropagation()}>
                 {cap('open') && (
                   <button
@@ -1921,6 +1941,80 @@ export function Ribbon({
                     {t('ribbonFileExportImages')}
                   </button>
                 )}
+=======
+              <div className="file-menu">
+                <button
+                  onClick={() => {
+                    setFileOpen(false)
+                    onOpen()
+                  }}
+                >
+                  {t('ribbonFileOpen')} <span className="file-menu-key">Ctrl+O</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onSave()
+                  }}
+                >
+                  {t('ribbonFileSave')} <span className="file-menu-key">Ctrl+S</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onSaveAs()
+                  }}
+                >
+                  {t('ribbonFileSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onNameWithAi()
+                  }}
+                >
+                  {t('aiNameFile')}
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onExportPdf()
+                  }}
+                >
+                  {t('ribbonFileExportPdf')}
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onPrint()
+                  }}
+                >
+                  {t('ribbonFilePrint')} <span className="file-menu-key">Ctrl+P</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onExportImages()
+                  }}
+                >
+                  {t('ribbonFileExportImages')}
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onExportImagesJpg()
+                  }}
+                >
+                  {t('ribbonFileExportImagesJpg')}
+                </button>
+>>>>>>> theirs
               </div>
             )}
           </div>
@@ -2693,6 +2787,7 @@ export function Ribbon({
                 </span>
                 <span>{t('ribbonRehearse')}</span>
               </button>
+<<<<<<< ours
               {cap('slideRecord') && (
                 <div className="rb-drop-wrap">
                   <button
@@ -2704,6 +2799,99 @@ export function Ribbon({
                   >
                     <span className="rb-big-icon">
                       <IconRecord size={BIG} />
+=======
+              <div className="rb-drop-wrap">
+                <button
+                  className={`rb-big${recordOpen ? ' active' : ''}`}
+                  disabled={!hasDoc}
+                  onMouseDown={(e) => closeSiblingPanels(e, closePanels, 'record')}
+                  onClick={() => setRecordOpen((v) => !v)}
+                  data-tip={t('ribbonRecordTip')}
+                >
+                  <span className="rb-big-icon">
+                    <IconRecord size={BIG} />
+                  </span>
+                  <span>{t('ribbonRecord')}</span>
+                </button>
+                {recordOpen && (
+                  <div className="rb-drop rb-menu" onMouseDown={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => {
+                        setRecordOpen(false)
+                        onRecord(true)
+                      }}
+                    >
+                      <span className="rb-menu-glyph">
+                        <IconPlayFromStart size={20} />
+                      </span>
+                      {t('ribbonRecordFromBeginning')}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRecordOpen(false)
+                        onRecord(false)
+                      }}
+                    >
+                      <span className="rb-menu-glyph">
+                        <IconPlayCurrent size={20} />
+                      </span>
+                      {t('ribbonRecordFromCurrent')}
+                    </button>
+                    <div className="rb-menu-sep" />
+                    <button
+                      onClick={() => {
+                        setRecordOpen(false)
+                        onClearNarration(false)
+                      }}
+                    >
+                      {t('ribbonClearNarrationCurrent')}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRecordOpen(false)
+                        onClearNarration(true)
+                      }}
+                    >
+                      {t('ribbonClearNarrationAll')}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </Group>
+          </>
+        ) : tab === 'review' ? (
+          <>
+            <Group label={t('ribbonGroupProofing')}>
+              <button
+                className="rb-big"
+                disabled={!hasDoc}
+                data-tip={`${t('ribbonSpellCheckTip')} — ${t('ribbonAiCreditNote')}`}
+                onClick={() => {
+                  if (confirmAiRewrite()) onAiPreset(t('ribbonSpellCheckPrompt'))
+                }}
+              >
+                <span className="rb-big-icon">
+                  <span className="ai-feature-icon" aria-hidden="true">
+                    <img src={iconSpelling} width={22} height={22} alt="" />
+                  </span>
+                </span>
+                <span>{t('ribbonSpellCheck')}</span>
+              </button>
+              <div className="rb-drop-wrap">
+                <button
+                  className={`rb-big ${translateOpen ? 'active' : ''}`}
+                  disabled={!hasDoc}
+                  data-tip={`${t('ribbonTranslateTip')} — ${t('ribbonAiCreditNote')}`}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    closeSiblingPanels(e, closePanels, 'translate')
+                  }}
+                  onClick={() => setTranslateOpen((v) => !v)}
+                >
+                  <span className="rb-big-icon">
+                    <span className="ai-feature-icon" aria-hidden="true">
+                      <img src={iconTranslate} width={22} height={22} alt="" />
+>>>>>>> theirs
                     </span>
                     <span>{t('ribbonRecord')}</span>
                   </button>
@@ -3526,7 +3714,11 @@ export function Ribbon({
               </div>
             </Group>
           </>
+<<<<<<< ours
         ) : tab === 'model3dFormat' && cap('model3d') ? (
+=======
+        ) : tab === 'model3dFormat' ? (
+>>>>>>> theirs
           <Group label={t('ribbonModel3dViews')}>
             <button
               className="rb-big"

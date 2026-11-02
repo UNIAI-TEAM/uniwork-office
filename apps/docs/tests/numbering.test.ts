@@ -244,14 +244,14 @@ describe('computeListMarkers', () => {
       '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
       '<w:abstractNum w:abstractNumId="0">' +
       '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="(%1)"/>' +
-      '<w:pPr><w:ind w:left="564" w:hanging="328"/></w:pPr></w:lvl>' +
+      '<w:pPr><w:ind w:left="564" w:right="120" w:hanging="328"/></w:pPr></w:lvl>' +
       '</w:abstractNum>' +
       '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>' +
       '</w:numbering>'
     const numPr = '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'
     const li = (text: string) => `<w:p><w:pPr>${numPr}</w:pPr><w:r><w:t>${text}</w:t></w:r></w:p>`
     const host =
-      `<w:p><w:pPr>${numPr}<w:ind w:left="537" w:hanging="301"/></w:pPr>` +
+      `<w:p><w:pPr>${numPr}<w:ind w:left="537" w:right="200" w:hanging="301"/></w:pPr>` +
       '<w:r><w:pict><v:shape xmlns:v="urn:schemas-microsoft-com:vml" id="s1" type="#_x0000_t202" ' +
       'style="position:absolute;margin-left:300pt;margin-top:1pt;width:77pt;height:15pt">' +
       '<v:textbox><w:txbxContent><w:p><w:r><w:t>$918,600</w:t></w:r></w:p></w:txbxContent></v:textbox>' +
@@ -275,6 +275,10 @@ describe('computeListMarkers', () => {
     expect(stray?.classList.contains('doc-li-stray')).toBe(true)
     expect(stray?.style.getPropertyValue('--li-left')).toBe('26.85pt')
     expect(stray?.style.getPropertyValue('--li-hang')).toBe('15.05pt')
+    // the anchor paragraph's own w:ind right beats the level's end indent
+    expect(stray?.style.getPropertyValue('margin-right')).toBe('10pt')
+    expect(stray?.style.getPropertyValue('margin-inline-end')).toBe('')
+    expect(wrapper?.style.getPropertyValue('margin-inline-end')).toBe('')
     editor.destroy()
   })
 
@@ -457,8 +461,12 @@ describe('computeListMarkers', () => {
     expect(style).toContain("--li-marker-font: 'Symbol Bullet GO'")
     expect(style).not.toContain('--li-marker-scale')
     // Symbol's ascent tops the 12pt Calibri text: the bullet box carries Word's
-    // max-ascent + max-descent line (1.0054 + 0.2686 em) and sits on the bottom
-    expect(style).toContain('--li-marker-lh: calc(15.288pt * var(--doc-line-mult,1))')
+    // max-ascent + max-descent line (1.0054 + 0.2686 em) and sits on the bottom;
+    // a line multiple adds (m - 1) x the text face's single line, not m x the lift
+    // (Word: Arial 12 + Symbol 12 at line=360 is 21.5pt, TNR 12 at line=480 28.5pt)
+    expect(style).toContain(
+      '--li-marker-lh: calc(15.288pt + (var(--doc-line-mult,1) - 1) * var(--doc-line-factor,1.2) * 12pt)',
+    )
     expect(style).toContain('--li-marker-va: bottom')
     expect(style).toContain('--li-marker-size: 12pt')
     editor.destroy()
@@ -523,13 +531,17 @@ describe('computeListMarkers', () => {
     expect(items[0].getAttribute('data-marker')).toBe('▸')
     expect(tri).toContain("--li-marker-font: 'Segoe UI Symbol GO',")
     expect(tri).toContain('--li-marker-size: 11pt')
-    expect(tri).toContain('--li-marker-lh: calc(14.825pt * var(--doc-line-mult,1))')
+    expect(tri).toContain(
+      '--li-marker-lh: calc(14.825pt + (var(--doc-line-mult,1) - 1) * var(--doc-line-factor,1.2) * 11pt)',
+    )
     expect(tri).toContain('--li-marker-va: bottom')
     expect(dot).not.toContain('--li-marker-lh')
     expect(dot).not.toContain('Segoe')
     expect(seg).toContain('--li-marker-font: "Segoe UI Symbol"')
     expect(seg).not.toContain('--li-marker-lh: 0')
-    expect(seg).toContain('--li-marker-lh: calc(14.825pt * var(--doc-line-mult,1))')
+    expect(seg).toContain(
+      '--li-marker-lh: calc(14.825pt + (var(--doc-line-mult,1) - 1) * var(--doc-line-factor,1.2) * 11pt)',
+    )
     editor.destroy()
   })
 
@@ -983,6 +995,91 @@ describe('list marker decorations', () => {
     expect(style).toContain('--li-hang: 0pt')
     // 2 chars * 8px = 240 twips -> stop 720
     expect(style).toContain('--li-tab: 36pt')
+    destroy()
+  })
+
+  it('a level with only w:left keeps the Normal style firstLine: marker at the first-line position (Word)', async () => {
+    const styles = new Map<string, StyleInfo>([
+      [
+        'Normal',
+        {
+          styleId: 'Normal',
+          name: 'Normal',
+          type: 'paragraph',
+          isDefault: true,
+          display: { indentRightTwips: 142, indentFirstLineTwips: 700 },
+        },
+      ],
+    ])
+    const { el, destroy } = await renderLi(
+      '<w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/>' +
+        '<w:pPr><w:ind w:left="0"/></w:pPr>',
+      styles,
+    )
+    const style = el.getAttribute('style') ?? ''
+    expect(style).toContain('--li-left: 0pt')
+    expect(style).toContain('--li-hang: 0pt')
+    expect(style).toContain('text-indent: 35pt')
+    // marker 700..940 twips -> tab to the 1440 stop
+    expect(style).toContain('--li-tab: 37pt')
+    destroy()
+  })
+
+  it('a style hanging survives a level w:ind that declares only w:left', async () => {
+    const styles = new Map<string, StyleInfo>([
+      [
+        'Normal',
+        {
+          styleId: 'Normal',
+          name: 'Normal',
+          type: 'paragraph',
+          isDefault: true,
+          display: { indentLeftTwips: 0, indentFirstLineTwips: -400 },
+        },
+      ],
+    ])
+    const { el, destroy } = await renderLi(
+      '<w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/>' +
+        '<w:pPr><w:ind w:left="720"/></w:pPr>',
+      styles,
+    )
+    const style = el.getAttribute('style') ?? ''
+    expect(style).toContain('--li-left: 36pt')
+    expect(style).toContain('--li-hang: 20pt')
+    expect(style).not.toContain('text-indent')
+    destroy()
+  })
+
+  it('a level hanging beats the style firstLine; an oversized marker adds its extra ascent outside the line multiple', async () => {
+    const styles = new Map<string, StyleInfo>([
+      [
+        'Normal',
+        {
+          styleId: 'Normal',
+          name: 'Normal',
+          type: 'paragraph',
+          isDefault: true,
+          display: {
+            font: 'Times New Roman',
+            fontAscii: 'Times New Roman',
+            sizeHalfPoints: 24,
+            indentFirstLineTwips: 700,
+          },
+        },
+      ],
+    ])
+    const { el, destroy } = await renderLi(
+      '<w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/>' +
+        '<w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr><w:rPr><w:sz w:val="28"/></w:rPr>',
+      styles,
+    )
+    const style = el.getAttribute('style') ?? ''
+    expect(style).toContain('--li-hang: 18pt')
+    expect(style).not.toContain('text-indent')
+    // TNR 14pt number over 12pt text: (14 - 12) x (1.15 - 0.2163) = 1.867pt (Word +1.8)
+    expect(style).toContain(
+      '--li-marker-lh: calc(var(--doc-line-factor,1.2) * 12pt * var(--doc-line-mult,1) + 1.867pt)',
+    )
     destroy()
   })
 

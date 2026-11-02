@@ -1,4 +1,5 @@
 /** Slide Show > Record: cutting one recording into slides, and the WAV each slide gets. */
+<<<<<<< ours
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -20,6 +21,12 @@ afterEach(() => {
   }
 })
 
+=======
+import { describe, expect, it } from 'vitest'
+import { joinSpans, slideNarrations } from '../src/renderer/narration/segments'
+import { encodeWav } from '../src/renderer/narration/wav'
+
+>>>>>>> theirs
 describe('slideNarrations', () => {
   it('gives each slide the time spoken on it, revisits added in order', () => {
     const marks = [
@@ -92,6 +99,7 @@ describe('encodeWav', () => {
     ])
   })
 })
+<<<<<<< ours
 
 describe('RecordNarrationDialog', () => {
   it('exposes role="dialog", aria-modal="true", and aria-labelledby pointing at its heading', async () => {
@@ -160,3 +168,5 @@ describe('recordSavedStatusKey', () => {
     }
   })
 })
+=======
+>>>>>>> theirs

@@ -320,7 +320,7 @@ export interface Paragraph {
   alignSrc?: string
   /** Paragraph base direction (a:pPr rtl): true = RTL base, false = explicit LTR base, absent = inferred from the first strong character */
   rtl?: boolean
-  /** <a:pPr hangingPunct="0"> switches off East Asian hanging punctuation (a trailing closing mark may overhang the margin); absent = PowerPoint's default, on */
+  /** Effective East Asian hanging-punctuation switch (own pPr, else lstStyle/master level); absent = PowerPoint default, on */
   hangingPunct?: boolean
   /** <a:pPr latinLnBrk="1"> ("allow Latin text to wrap in the middle of a word"): Hangul words then break per syllable like CJK; absent = word wrap */
   latinLnBrk?: boolean
@@ -394,6 +394,9 @@ export interface Paragraph {
     indent?: boolean
     tabLst?: boolean
     defTabSz?: boolean
+    hangingPunct?: boolean
+    latinLnBrk?: boolean
+    eaLnBrk?: boolean
   }
 }
 
@@ -472,6 +475,15 @@ interface ElementBase {
   transform: Transform
   /** Editor dirty flag: when true, save must regenerate OOXML; otherwise originalXml passes through */
   dirty?: boolean
+  /**
+   * Text-moved flag: a traced paragraph/run landed at a different index than its
+   * source (reorder, split or insert), so the in-place run patch would inherit the
+   * attributes of the old run now sitting at that position. Set by setText and
+   * consumed by patchTextElementXml, which rebuilds the txBody instead; it stays
+   * set until the element is reparsed/materialized (a rebuild cannot clear it while
+   * the moved text still occupies a foreign position).
+   */
+  textMoved?: boolean
   /** Geometry dirty flag: when true, save patches <a:xfrm> in place (orthogonal to text patches) */
   dirtyTransform?: boolean
   /** Fill dirty flag: when true, save patches the spPr fill node in place */
@@ -716,6 +728,8 @@ export interface ChartElement extends ElementBase {
   type: 'chart'
   /** Parsed chart data model (see chart.ts) */
   chart: import('./chart').ChartModel
+  /** c:userShapes text/shape overlays, already in slide coordinates; render-only (never saved back) */
+  userShapes?: TextElement[]
 }
 
 export type SlideElement =

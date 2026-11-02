@@ -5,6 +5,7 @@
  * counters are recomputed on both sides.
  */
 import { describe, expect, it } from 'vitest'
+<<<<<<< ours
 import { Editor } from '@tiptap/core'
 import {
   blocksToPmDoc,
@@ -26,6 +27,10 @@ import {
 } from '../src/renderer/numbering-actions'
 import { parseDocx, saveDocx, type TextboxDisplay } from '@genoffice/docx-engine'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
+=======
+import { textboxParaSignature } from '../src/renderer/editor/convert'
+import type { TextboxDisplay } from '@genoffice/docx-engine'
+>>>>>>> theirs
 
 type Para = TextboxDisplay['paras'][number]
 
@@ -56,6 +61,7 @@ describe('textboxParaSignature indent', () => {
     )
   })
 })
+<<<<<<< ours
 
 function makeNumberingHarness(editor: Editor, parsed: DocState['parsed']) {
   let pending: PendingNumbering = EMPTY_PENDING_NUMBERING
@@ -314,3 +320,5 @@ describe('textbox list and indent save round-trip (DOCS-V21)', () => {
     editor.destroy()
   })
 })
+=======
+>>>>>>> theirs
