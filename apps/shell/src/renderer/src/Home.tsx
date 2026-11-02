@@ -17,7 +17,6 @@ import type {
   RecentEntry,
   FileSearchHit,
   FileSearchPage,
-  FileSearchRerank,
   UniworkDocSummary,
   UniworkResult,
   UniworkWorkspaceRef,
@@ -1097,12 +1096,10 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
 
 function SidebarFooter({
   onStatusChange,
-  onFileSearchSettingsChange,
   openRequest,
 }: {
   onStatusChange?: (status: AccountStatus | null) => void
-  onFileSearchSettingsChange?: () => void
-  /** a fresh object per request: the home list asks to open the modal on a given block */
+  /** a fresh object per request: the home list asks to open the modal on a given section */
   openRequest?: SettingsTarget | null
 }) {
   const { t } = useI18n()
@@ -1153,7 +1150,7 @@ function SidebarFooter({
   return (
     <div className="sidebar-footer">
       <div className="sidebar-dock">
-        <CreditWallet onOpenAiSettings={() => openSettings('aiModel')} />
+        <CreditWallet onOpenAiSettings={() => openSettings('account')} />
         <div className="sidebar-dock-me">
           <AccountEntry
             onStatusChange={onStatusChange}
@@ -1163,7 +1160,6 @@ function SidebarFooter({
             onCloseSettings={() => setSettingsOpen(false)}
             skillUpdate={skillUpdate}
             onSkillUpdateDue={setSkillUpdate}
-            onFileSearchSettingsChange={onFileSearchSettingsChange}
             target={target}
           />
           <button
@@ -1360,9 +1356,6 @@ export function Home() {
   // ── File search (names + indexed content); active while the box has text ──
   const [searchQuery, setSearchQuery] = useState('')
   const [searchPage, setSearchPage] = useState<FileSearchPage | null>(null)
-  const [rerank, setRerank] = useState<{ key: string; result: FileSearchRerank } | null>(null)
-  // bumped when the Jev settings change so the current results are judged again (or the order dropped)
-  const [rerankSettingsTick, setRerankSettingsTick] = useState(0)
   const [settingsRequest, setSettingsRequest] = useState<SettingsTarget | null>(null)
   useEffect(
     () =>
@@ -1820,25 +1813,6 @@ export function Home() {
     timer = window.setTimeout(run, 150)
     return () => window.clearTimeout(timer)
   }, [q, filter])
-
-  // Jev judges the top local hits once they settle; the main process answers null when reranking is off.
-  // The key changes only with the query, filter or candidate set, so index polls do not restart the timer.
-  const rerankKey =
-    q && searchPage && searchPage.hits.length >= 2
-      ? [q, filter, ...searchPage.hits.slice(0, 20).map((h) => h.path)].join('\n')
-      : ''
-  useEffect(() => {
-    if (!rerankKey) return
-    const key = rerankKey
-    const paths = key.split('\n').slice(2)
-    const timer = window.setTimeout(() => {
-      void window.aiOffice.rerankSearch({ q, paths }).then((result) => {
-        if (result) setRerank({ key, result })
-        else setRerank((cur) => (cur && cur.key === key ? null : cur))
-      })
-    }, 600)
-    return () => window.clearTimeout(timer)
-  }, [q, filter, rerankKey, rerankSettingsTick])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -3048,30 +3022,6 @@ export function Home() {
     searchInputRef.current?.focus()
   }
 
-  const renderSearchSettingsButton = () => (
-    <button
-      className="file-search-settings"
-      title={t('searchJevSettings')}
-      aria-label={t('searchJevSettings')}
-      onClick={() => setSettingsRequest({ section: 'aiMedia', block: 'rerank' })}
-    >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M12 20V4M12 4l-4 4M12 4l4 4" />
-        <path d="M3 12h6M3 16h5M3 20h4" />
-      </svg>
-    </button>
-  )
-
   const renderSearchBox = () => (
     <div className={`file-search${searchActive ? ' active' : ''}`}>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -3215,29 +3165,15 @@ export function Home() {
         )}
         {page && page.hits.length === 0 && !busy
           ? renderEmpty(t('searchNoResults', { q }))
-          : page && renderSearchHits(orderedSearchHits(page.hits))}
+          : page && renderSearchHits(page.hits)}
       </div>
     )
-  }
-
-  const rerankApplied = rerank && rerank.key === rerankKey ? rerank.result : null
-
-  /** judged hits in Jev's order, then the rest in local order */
-  const orderedSearchHits = (hits: readonly FileSearchHit[]): FileSearchHit[] => {
-    if (!rerankApplied) return [...hits]
-    const rank = new Map(rerankApplied.order.map((path, i) => [path, i]))
-    return [...hits].sort((a, b) => (rank.get(a.path) ?? Infinity) - (rank.get(b.path) ?? Infinity))
   }
 
   const renderSearchHeading = () => {
     const total = searchPage?.total ?? 0
     return (
       <div className="recents-heading">
-        {rerankApplied && (
-          <span className="search-rerank-badge" title={t('searchRerankedBy')}>
-            Jev
-          </span>
-        )}
         <span className="file-count">
           {t(total === 1 ? 'searchResultCountOne' : 'searchResultCount', { n: total })}
         </span>
@@ -3298,7 +3234,6 @@ export function Home() {
             )}
             <div className="file-search-group">
               {renderSearchBox()}
-              {renderSearchSettingsButton()}
             </div>
             {searchActive ? (
               renderSearchHeading()
@@ -3441,7 +3376,6 @@ export function Home() {
             )}
             <div className="file-search-group">
               {renderSearchBox()}
-              {renderSearchSettingsButton()}
             </div>
             {searchActive ? (
               renderSearchHeading()
@@ -3816,7 +3750,6 @@ export function Home() {
 
         <SidebarFooter
           onStatusChange={handleAccountStatus}
-          onFileSearchSettingsChange={() => setRerankSettingsTick((n) => n + 1)}
           openRequest={settingsRequest}
         />
       </aside>

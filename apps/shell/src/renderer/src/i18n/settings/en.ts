@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const en = {
   setClose: 'Close',
   setRetry: 'Try again',
-  setUnsavedTitle: 'Unsaved changes',
-  setUnsavedBody: 'Leave this page without saving? Your edits will be lost.',
-  setUnsavedKeep: 'Keep editing',
-  setUnsavedDiscard: 'Discard changes',
-  setAiSaveFailed: 'Couldn’t save: {error}',
-  setAiCreditLeft: 'Credits: {remain} left · used {used}',
-  setAiCreditUsedNoLimit: 'Credits used: {used} (no key limit)',
   setAiCreditRate: '1 USD of key balance = 1,000 AI credits',
   setGrpAppearance: 'Appearance',
   setGrpAiPanel: 'AI panel',

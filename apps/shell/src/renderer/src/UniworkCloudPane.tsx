@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import type { AiSettings } from '@genoffice/ai-provider'
 import type {
   UniworkCloudCredits,
   UniworkCloudState,
@@ -10,7 +11,7 @@ import type { StringKey, TFunc } from './locale'
 
 /**
  * UniWork cloud AI in Settings: the status/credits rows under the account
- * (signed in only) and the notice at the top of AI media. The status comes
+ * (signed in only) and the cloud tools switch. The status comes
  * from the shell main process (token-free); this file only renders it.
  */
 
@@ -21,56 +22,6 @@ export const CLOUD_STATE_KEYS: Record<Exclude<UniworkCloudState, 'signed-out'>, 
   'subscription-inactive': 'cloudStateInactive',
   'credits-exhausted': 'cloudStateExhausted',
   unavailable: 'cloudStateUnavailable',
-}
-
-export interface CloudNotice {
-  tone: 'info' | 'warn'
-  title: StringKey
-  body: StringKey
-  /** show the Sign in action */
-  signIn?: boolean
-}
-
-/**
- * The AI media notice for one cloud state. `toolsEnabled` is the AI model
- * switch: with it off a ready cloud is only available, not in use.
- */
-export function cloudNoticeFor(state: UniworkCloudState, toolsEnabled = true): CloudNotice {
-  switch (state) {
-    case 'signed-out':
-      return { tone: 'info', title: 'cloudTitle', body: 'cloudSignedOutBody', signIn: true }
-    case 'not-entitled':
-      return { tone: 'info', title: 'cloudStateNotEntitled', body: 'cloudNotEntitledBody' }
-    case 'subscription-inactive':
-      return { tone: 'warn', title: 'cloudStateInactive', body: 'cloudInactiveBody' }
-    case 'credits-exhausted':
-      return { tone: 'warn', title: 'cloudStateExhausted', body: 'cloudExhaustedBody' }
-    case 'unavailable':
-      // the product name leads: the body says what is unavailable
-      return { tone: 'warn', title: 'cloudTitle', body: 'cloudUnavailableBody' }
-    case 'ready':
-      return {
-        tone: 'info',
-        title: 'cloudTitle',
-        body: toolsEnabled ? 'cloudReadyBody' : 'cloudToolsOffBody',
-      }
-  }
-}
-
-/**
- * The verdict of the settings "Test connection" for the blocks that run on the
- * UniWork cloud: the status the server just answered, in the same short labels as
- * the Account rows. Only a server answer of "ready" passes: a signed-out session
- * or a status that could not be read says so instead of showing a green OK.
- */
-export function cloudTestVerdict(
-  status: UniworkCloudStatus | null,
-  t: TFunc,
-): { ok: boolean; error?: string } {
-  if (!status) return { ok: false, error: t('cloudStateUnavailable') }
-  if (status.state === 'ready') return { ok: true }
-  if (status.state === 'signed-out') return { ok: false, error: t('cloudStateSignedOut') }
-  return { ok: false, error: t(CLOUD_STATE_KEYS[status.state]) }
 }
 
 /** "remaining / limit left", "Unlimited", or null when the server sent no credits */
@@ -187,46 +138,55 @@ export function UniworkCloudAccountRows({ status }: { status: UniworkCloudStatus
   )
 }
 
-/** Settings → AI media: what the UniWork cloud does for this user right now */
-export function UniworkCloudNotice({
-  status,
-  onSignIn,
-  toolsEnabled = true,
-}: {
-  status: UniworkCloudStatus | null
-  onSignIn?: () => void
-  /** the AI model "Use UniWork cloud tools" switch */
-  toolsEnabled?: boolean
-}) {
-  const { t, dateLocale } = useI18n()
-  if (!status) return null
-  const notice = cloudNoticeFor(status.state, toolsEnabled)
-  const credits =
-    status.state === 'ready' || status.state === 'credits-exhausted'
-      ? creditsText(status.credits, t, dateLocale)
-      : null
+/**
+ * Settings → Account, while the org has cloud AI: the "Use UniWork cloud tools" switch.
+ * Off keeps web search, image and media tools out of UniWork AI turns (gskToolsEnabled in
+ * ai-settings.json; absent reads as on).
+ */
+export function UniworkCloudToolsSwitch() {
+  const { t } = useI18n()
+  const [settings, setSettings] = useState<AiSettings | null>(null)
+  useEffect(() => {
+    let alive = true
+    void window.aiOffice
+      .getAiSettings?.()
+      .then((stored) => {
+        if (alive) setSettings(stored)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+  const on = settings?.gskToolsEnabled !== false
+  const flip = () => {
+    if (!settings) return
+    const next = { ...settings, gskToolsEnabled: !on }
+    setSettings(next)
+    // a refused save re-reads what is actually stored
+    void window.aiOffice.setAiSettings(next).catch(() =>
+      window.aiOffice
+        .getAiSettings?.()
+        .then(setSettings)
+        .catch(() => undefined),
+    )
+  }
   return (
-    <div
-      className={`acct-notice cloud-notice ${notice.tone}`}
-      role={notice.tone === 'warn' ? 'alert' : 'status'}
-      data-cloud-state={status.state}
-    >
-      <div className="acct-notice-text">
-        <div className="acct-notice-title">{t(notice.title)}</div>
-        <div className="acct-notice-body">
-          {t(notice.body, { switch: t('cloudToolsToggle'), section: t('setSecAiModel') })}
+    <div className="set-field">
+      <div className="set-field-text">
+        <div className="set-field-stack">
+          <div className="set-field-label">{t('cloudToolsToggle')}</div>
+          <div className="set-field-desc">{t('cloudToolsToggleDesc')}</div>
         </div>
-        {credits && (
-          <div className="acct-notice-body cloud-notice-credits">
-            {t('cloudCredits')}: {credits}
-          </div>
-        )}
       </div>
-      {notice.signIn && onSignIn && (
-        <button type="button" className="set-btn primary cloud-notice-action" onClick={onSignIn}>
-          {t('acctSignIn')}
-        </button>
-      )}
+      <button
+        className="set-switch"
+        role="switch"
+        aria-checked={on}
+        aria-label={t('cloudToolsToggle')}
+        disabled={!settings}
+        onClick={flip}
+      />
     </div>
   )
 }

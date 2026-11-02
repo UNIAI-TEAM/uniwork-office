@@ -1,19 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
-import {
-  AI_PROVIDERS,
-  AI_SEARCH_PROVIDERS,
-  getProviderAdapter,
-  normalizeAiTestFailureKind,
-  normalizeUniworkCloudStatus,
-  setUniworkCloudStatus,
-  visibleMediaProviders,
-} from '@genoffice/ai-provider/browser'
-import type {
-  AiSettings,
-  CodexModelCatalog,
-  UniworkCloudStatus,
-} from '@genoffice/ai-provider/browser'
+import { normalizeUniworkCloudStatus, setUniworkCloudStatus } from '@genoffice/ai-provider/browser'
+import type { AiSettings, UniworkCloudStatus } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
@@ -31,7 +19,6 @@ import type {
   AccountLoginEvent,
   DeskDraft,
   DeskToolResult,
-  AiConnectionTestResult,
   AccountSetServerResult,
   AccountStatus,
   AttachmentAddResult,
@@ -51,8 +38,6 @@ import type {
   RenameResult,
   UiLanguage,
   FileSearchPage,
-  FileSearchRerank,
-  FileSearchSettings,
   UniworkArchiveImpact,
   UniworkConflictReply,
   UniworkConflictView,
@@ -658,38 +643,12 @@ function asUniworkConflictReply(raw: unknown): UniworkConflictReply {
   return { kind: 'closed' }
 }
 
-/** a connection test answer for the renderer: the failure kind only, never the provider's raw text (that stays in the main process log) */
-function testResultOf(raw: unknown): AiConnectionTestResult {
-  const r = (raw ?? {}) as { ok?: unknown; errorKind?: unknown }
-  return r.ok === true
-    ? { ok: true }
-    : { ok: false, errorKind: normalizeAiTestFailureKind(r.errorKind) }
-}
-
 const homeApi: HomeApi = {
   async recents(query) {
     return asRecentPage(await ipcRenderer.invoke(HOME_CHANNELS.recents, query))
   },
   async searchFiles(query) {
     return asSearchPage(await ipcRenderer.invoke(HOME_CHANNELS.searchFiles, query))
-  },
-  async rerankSearch(query) {
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.rerankSearch, query)
-    return result && typeof result === 'object' && Array.isArray((result as FileSearchRerank).order)
-      ? (result as FileSearchRerank)
-      : null
-  },
-  async getFileSearchSettings() {
-    return (await ipcRenderer.invoke(HOME_CHANNELS.getFileSearchSettings)) as FileSearchSettings
-  },
-  async setFileSearchSettings(patch) {
-    return (await ipcRenderer.invoke(
-      HOME_CHANNELS.setFileSearchSettings,
-      patch,
-    )) as FileSearchSettings
-  },
-  async testFileSearchRerank(input) {
-    return testResultOf(await ipcRenderer.invoke(HOME_CHANNELS.testFileSearchRerank, input))
   },
   async starred(query) {
     return asRecentPage(await ipcRenderer.invoke(HOME_CHANNELS.starred, query))
@@ -1177,39 +1136,6 @@ const homeApi: HomeApi = {
       Object.keys(sent).length > 0 ? sent : undefined,
     )
   },
-  getAiProviders() {
-    return AI_PROVIDERS.map((meta) => {
-      let defaultBaseUrl = ''
-      // genspark routes by model, uniwork rides the session adapter, custom has no default — all stay ''
-      if (
-        meta.id !== 'genspark' &&
-        meta.id !== 'uniwork' &&
-        !meta.needsBaseUrl &&
-        !meta.needsCliPath
-      ) {
-        defaultBaseUrl = getProviderAdapter(meta.id).resolveEndpoint({
-          apiKey: '',
-          model: meta.defaultModel,
-        }).baseUrl
-      }
-      return { ...meta, defaultBaseUrl }
-    })
-  },
-  async getCodexModels(cliPath) {
-    return (await ipcRenderer.invoke('ai:codex-models', cliPath)) as CodexModelCatalog
-  },
-  async getCustomModels(baseUrl, apiKey) {
-    return (await ipcRenderer.invoke('ai:custom-models', { baseUrl, apiKey })) as CodexModelCatalog
-  },
-  async testAiSettings(settings) {
-    return testResultOf(
-      await ipcRenderer.invoke('ai:settings-test', {
-        settings,
-        system: 'You are a connectivity test. Reply with the single word OK.',
-        user: 'ping',
-      }),
-    )
-  },
   async probeOpenRouterKey(apiKey) {
     return (await ipcRenderer.invoke(
       'ai:openrouter-key-status',
@@ -1269,18 +1195,6 @@ const homeApi: HomeApi = {
   },
   getPathForFile(file: File) {
     return webUtils.getPathForFile(file)
-  },
-  getAiMediaProviders() {
-    return visibleMediaProviders()
-  },
-  getAiSearchProviders() {
-    return AI_SEARCH_PROVIDERS
-  },
-  async testAiSearchSettings(input) {
-    return testResultOf(await ipcRenderer.invoke('ai:search-test', input))
-  },
-  async testAiMediaSettings(input) {
-    return testResultOf(await ipcRenderer.invoke('ai:media-test', input))
   },
   wb: {
     async loadAll() {
@@ -1920,8 +1834,7 @@ const homeApi: HomeApi = {
   },
 }
 
-// Mirror the cloud status into this preload's seam, so getAiMediaProviders()
-// lists the UniWork cloud entry only while the user is signed in + entitled.
+// Mirror the cloud status into this preload's seam (signed in + entitled).
 const mirrorCloudStatus = (status: unknown) =>
   setUniworkCloudStatus(normalizeUniworkCloudStatus(status) satisfies UniworkCloudStatus)
 ipcRenderer.on(HOME_CHANNELS.uniworkCloudStatusEvent, (_event, status: unknown) =>

@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const zhTW = {
   setClose: '關閉',
   setRetry: '再試一次',
-  setUnsavedTitle: '有尚未儲存的變更',
-  setUnsavedBody: '要離開此頁面而不儲存嗎？所做的編輯將會遺失。',
-  setUnsavedKeep: '繼續編輯',
-  setUnsavedDiscard: '捨棄變更',
-  setAiSaveFailed: '無法儲存：{error}',
-  setAiCreditLeft: '額度：剩餘 {remain} · 已用 {used}',
-  setAiCreditUsedNoLimit: '已用額度：{used}（金鑰無上限）',
   setAiCreditRate: '1 USD 金鑰餘額 = 1,000 AI 額度',
   setGrpAppearance: '外觀',
   setGrpAiPanel: 'AI 面板',

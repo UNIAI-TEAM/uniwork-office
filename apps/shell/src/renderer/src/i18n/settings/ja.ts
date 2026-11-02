@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const ja = {
   setClose: '閉じる',
   setRetry: '再試行',
-  setUnsavedTitle: '未保存の変更',
-  setUnsavedBody: '保存せずにこのページを離れますか？編集内容は失われます。',
-  setUnsavedKeep: '編集を続ける',
-  setUnsavedDiscard: '変更を破棄',
-  setAiSaveFailed: '保存できませんでした: {error}',
-  setAiCreditLeft: 'クレジット: 残り {remain} · 使用済み {used}',
-  setAiCreditUsedNoLimit: '使用済みクレジット: {used}（キーの上限なし）',
   setAiCreditRate: 'キー残高 1 USD = AI クレジット 1,000',
   setGrpAppearance: '外観',
   setGrpAiPanel: 'AI パネル',

@@ -24,7 +24,11 @@ export function readAppSettings(path: string): Record<string, unknown> {
  * file lives beside the destination so rename never crosses filesystems.
  */
 export function writeAppSettings(path: string, updates: Record<string, unknown>): void {
-  const settings = { ...readAppSettings(path), ...updates }
+  replaceAppSettings(path, { ...readAppSettings(path), ...updates })
+}
+
+/** Atomically replace the whole file (the one way to drop a key). */
+export function replaceAppSettings(path: string, settings: Record<string, unknown>): void {
   const tempPath = `${path}.${process.pid}.${randomUUID()}.tmp`
   try {
     writeFileSync(tempPath, JSON.stringify(settings, null, 2), {

@@ -91,7 +91,6 @@ describe('Home local file list shares the list formats, sort and columns (UNI-20
         total: 0,
         index: { pending: 0, scanning: false },
       })),
-      rerankSearch: vi.fn(async () => null),
       addFolderRoot: vi.fn(async () => null),
       removeFolderRoot: vi.fn(async () => {}),
       pickDefaultSaveDir: vi.fn(async () => null),

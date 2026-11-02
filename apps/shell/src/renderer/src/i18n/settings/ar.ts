@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const ar = {
   setClose: 'إغلاق',
   setRetry: 'إعادة المحاولة',
-  setUnsavedTitle: 'تغييرات غير محفوظة',
-  setUnsavedBody: 'هل تريد مغادرة هذه الصفحة دون حفظ؟ ستفقد تعديلاتك.',
-  setUnsavedKeep: 'متابعة التحرير',
-  setUnsavedDiscard: 'تجاهل التغييرات',
-  setAiSaveFailed: 'تعذّر الحفظ: {error}',
-  setAiCreditLeft: 'الأرصدة: المتبقي {remain} · المستخدم {used}',
-  setAiCreditUsedNoLimit: 'الأرصدة المستخدمة: {used} (المفتاح بلا حد)',
   setAiCreditRate: '1 USD من رصيد المفتاح = 1000 رصيد ذكاء اصطناعي',
   setGrpAppearance: 'العرض',
   setGrpAiPanel: 'لوحة الذكاء الاصطناعي',

@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const vi = {
   setClose: 'Đóng',
   setRetry: 'Thử lại',
-  setUnsavedTitle: 'Có thay đổi chưa lưu',
-  setUnsavedBody: 'Rời trang này mà không lưu? Các chỉnh sửa sẽ bị mất.',
-  setUnsavedKeep: 'Tiếp tục chỉnh sửa',
-  setUnsavedDiscard: 'Bỏ thay đổi',
-  setAiSaveFailed: 'Không lưu được: {error}',
-  setAiCreditLeft: 'Tín dụng: còn {remain} · đã dùng {used}',
-  setAiCreditUsedNoLimit: 'Tín dụng đã dùng: {used} (khóa không giới hạn)',
   setAiCreditRate: '1 USD số dư khóa = 1.000 tín dụng AI',
   setGrpAppearance: 'Hiển thị',
   setGrpAiPanel: 'Bảng AI',

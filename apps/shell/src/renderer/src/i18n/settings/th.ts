@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const th = {
   setClose: 'ปิด',
   setRetry: 'ลองอีกครั้ง',
-  setUnsavedTitle: 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก',
-  setUnsavedBody: 'ออกจากหน้านี้โดยไม่บันทึกไหม การแก้ไขของคุณจะหายไป',
-  setUnsavedKeep: 'แก้ไขต่อ',
-  setUnsavedDiscard: 'ละทิ้งการเปลี่ยนแปลง',
-  setAiSaveFailed: 'บันทึกไม่ได้: {error}',
-  setAiCreditLeft: 'เครดิต: เหลือ {remain} · ใช้ไป {used}',
-  setAiCreditUsedNoLimit: 'เครดิตที่ใช้ไป: {used} (คีย์ไม่จำกัด)',
   setAiCreditRate: 'ยอดคงเหลือของคีย์ 1 USD = เครดิต AI 1,000',
   setGrpAppearance: 'ลักษณะที่ปรากฏ',
   setGrpAiPanel: 'แผง AI',

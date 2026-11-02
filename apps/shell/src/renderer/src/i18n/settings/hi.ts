@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const hi = {
   setClose: 'बंद करें',
   setRetry: 'फिर से कोशिश करें',
-  setUnsavedTitle: 'बिना सहेजे गए बदलाव',
-  setUnsavedBody: 'सहेजे बिना यह पेज छोड़ें? आपके बदलाव खो जाएंगे।',
-  setUnsavedKeep: 'संपादन जारी रखें',
-  setUnsavedDiscard: 'बदलाव छोड़ें',
-  setAiSaveFailed: 'सहेजा नहीं जा सका: {error}',
-  setAiCreditLeft: 'क्रेडिट: {remain} शेष · {used} इस्तेमाल हुए',
-  setAiCreditUsedNoLimit: 'इस्तेमाल हुए क्रेडिट: {used} (कुंजी की कोई सीमा नहीं)',
   setAiCreditRate: 'कुंजी बैलेंस के 1 USD = 1,000 AI क्रेडिट',
   setGrpAppearance: 'दिखावट',
   setGrpAiPanel: 'AI पैनल',

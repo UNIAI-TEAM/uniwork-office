@@ -1,17 +1,9 @@
 import type {
   AiChatResponse,
-  AiMediaProviderConfig,
-  AiMediaProviderId,
-  AiMediaProviderMeta,
-  AiProviderMeta,
-  AiSearchProviderId,
-  AiSearchProviderMeta,
   AiSettings,
   AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
-  AiTestFailureKind,
-  CodexModelCatalog,
   OpenRouterKeyStatus,
   UniworkCloudStatus,
 } from '@genoffice/ai-provider'
@@ -1216,39 +1208,6 @@ export interface FileSearchHit extends RecentEntry {
   needles: string[]
 }
 
-/**
- * Endpoints the search reranker can judge against. The hosted Jev routes are
- * OpenRouter and TypeSafe's own API; Perplexity and Cloudflare host their own
- * decision models; Kev and Rizzo Flow are local /v1/systemone servers;
- * `custom` points at any other /v1/systemone-compatible server.
- */
-export type DecisionEndpoint =
-  'openrouter' | 'direct' | 'perplexity' | 'cloudflare' | 'kev' | 'rizzo' | 'custom'
-
-/** home search options persisted in app-settings.json under `fileSearch` */
-export interface FileSearchSettings {
-  /** send the top local hits to a decision model for reranking; default off */
-  rerank: boolean
-  endpoint: DecisionEndpoint
-  /** one API key per endpoint; local endpoints (kev/rizzo/custom) may stay empty */
-  keys: Record<DecisionEndpoint, string>
-  /** `custom` endpoint only: base URL of a /v1/systemone-compatible server */
-  customBaseUrl: string
-  /** `custom` endpoint only: model id the server expects */
-  customModel: string
-  /** `cloudflare` endpoint only: Workers AI account id */
-  cloudflareAccountId: string
-  /** `cloudflare` endpoint only: Workers AI model path, e.g. @cf/cloudflare/clef */
-  cloudflareModel: string
-}
-
-export interface FileSearchRerank {
-  /** paths in the decision model's order, most relevant first; paths not judged keep their local order after these */
-  order: string[]
-  /** calibrated 0–2 relevance per judged path */
-  scores: Record<string, number>
-}
-
 export interface FileSearchPage {
   hits: FileSearchHit[]
   total: number
@@ -1285,12 +1244,6 @@ export interface CliLinkState {
   /** shell line that adds the link's folder to the PATH when the shell does not search it */
   pathHint?: string
   manual?: string
-}
-
-/** Settings "Test connection" answer: a failure carries its kind, never the provider's raw text */
-export interface AiConnectionTestResult {
-  ok: boolean
-  errorKind?: AiTestFailureKind
 }
 
 /** Desk "In progress": an open tab with unsaved changes, or a crash copy newer than its recent file */
@@ -1341,12 +1294,6 @@ export interface HomeApi {
   recents(query?: RecentQuery): Promise<RecentPage>
   /** search indexed files by name, folder and content */
   searchFiles(query: FileSearchQuery): Promise<FileSearchPage>
-  /** decision-model order for the hits currently shown (≤ 20 paths); null when reranking is off or unavailable */
-  rerankSearch(query: { q: string; paths: string[] }): Promise<FileSearchRerank | null>
-  getFileSearchSettings(): Promise<FileSearchSettings>
-  setFileSearchSettings(patch: Partial<FileSearchSettings>): Promise<FileSearchSettings>
-  /** one two-document judgement against the (possibly unsaved) settings */
-  testFileSearchRerank(settings: FileSearchSettings): Promise<AiConnectionTestResult>
   /** starred files (independent of the recent list), newest first (paged) */
   starred(query?: RecentQuery): Promise<RecentPage>
   /** starred group names that currently have at least one file, in creation order */
@@ -1485,7 +1432,7 @@ export interface HomeApi {
   uniworkCloudRefresh?(): Promise<UniworkCloudStatus>
   /** cloud status pushes; returns an unsubscribe */
   onUniworkCloudStatus?(handler: (status: UniworkCloudStatus) => void): () => void
-  /** Editor AI “Open AI settings” → open a Settings section (e.g. aiModel); unsubscribe returned */
+  /** Editor AI “Open AI settings” → open a Settings section (e.g. account); unsubscribe returned */
   onOpenSettingsEvent?(handler: (section: string) => void): () => void
   /** app version (from package.json / electron app.getVersion) */
   getAppVersion(): Promise<string>
@@ -1561,14 +1508,6 @@ export interface HomeApi {
   ): Promise<void>
   /** ai-settings.json was rewritten by any renderer (composer model chip, another window) */
   onAiSettingsChanged(handler: () => void): () => void
-  /** provider catalog with each fixed endpoint's default base URL (empty for UniAI/custom) */
-  getAiProviders(): AiCatalogEntry[]
-  /** live Codex model catalog discovered through the current or overridden app-server */
-  getCodexModels(cliPath?: string): Promise<CodexModelCatalog>
-  /** live model list advertised by a user-hosted OpenAI-compatible endpoint; empty when it cannot answer */
-  getCustomModels(baseUrl: string, apiKey?: string): Promise<CodexModelCatalog>
-  /** one-shot round trip against the given (possibly unsaved) settings — the settings-UI connection test */
-  testAiSettings(settings: AiSettings): Promise<AiConnectionTestResult>
   /** OpenRouter Token Hub: GET /api/v1/key for the given (possibly unsaved) API key */
   probeOpenRouterKey(apiKey: string): Promise<OpenRouterKeyStatus>
   /** one-shot non-streaming chat using saved (or provided) AI settings — Workbench helpers */
@@ -1584,20 +1523,6 @@ export interface HomeApi {
   readAttachment(path: string, offset: number, maxChars: number): Promise<AttachmentReadResult>
   readAttachmentImage(path: string): Promise<AttachmentImageResult>
   getPathForFile(file: File): string
-  /** image generation / media analysis providers a picker may offer */
-  getAiMediaProviders(): AiMediaProviderMeta[]
-  /** credential check for a (possibly unsaved) media provider */
-  testAiMediaSettings(input: {
-    provider: AiMediaProviderId
-    config: AiMediaProviderConfig
-  }): Promise<AiConnectionTestResult>
-  /** web search provider catalog */
-  getAiSearchProviders(): AiSearchProviderMeta[]
-  /** one minimal query against the given key (the keyless auto entry needs none) */
-  testAiSearchSettings(input: {
-    provider: AiSearchProviderId
-    apiKey: string
-  }): Promise<AiConnectionTestResult>
   /** Local Workbench SQLite store (main-process source of truth) */
   wb: WorkbenchStoreApi
   /** UNI-2069: Ask UNI over the workspace's documents (shell main, device bearer); see askuni-api.ts */
@@ -1919,11 +1844,6 @@ export interface WorkbenchStoreApi {
     error?: string
     canceled?: boolean
   }>
-}
-
-export interface AiCatalogEntry extends AiProviderMeta {
-  /** default endpoint for fixed-endpoint providers ('' = model-dependent or user-supplied) */
-  defaultBaseUrl: string
 }
 
 export type AccountState =
@@ -2274,10 +2194,6 @@ export interface MoveResult {
 export const HOME_CHANNELS = {
   recents: 'home:recents',
   searchFiles: 'home:search-files',
-  rerankSearch: 'home:rerank-search',
-  getFileSearchSettings: 'home:get-file-search-settings',
-  setFileSearchSettings: 'home:set-file-search-settings',
-  testFileSearchRerank: 'home:test-file-search-rerank',
   starred: 'home:starred',
   statPaths: 'home:stat-paths',
   toggleStar: 'home:toggle-star',

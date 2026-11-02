@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const pt = {
   setClose: 'Fechar',
   setRetry: 'Tentar novamente',
-  setUnsavedTitle: 'Alterações não salvas',
-  setUnsavedBody: 'Sair desta página sem salvar? Suas edições serão perdidas.',
-  setUnsavedKeep: 'Continuar editando',
-  setUnsavedDiscard: 'Descartar alterações',
-  setAiSaveFailed: 'Não foi possível salvar: {error}',
-  setAiCreditLeft: 'Créditos: restam {remain} · usados {used}',
-  setAiCreditUsedNoLimit: 'Créditos usados: {used} (chave sem limite)',
   setAiCreditRate: '1 USD de saldo da chave = 1.000 créditos de IA',
   setGrpAppearance: 'Aparência',
   setGrpAiPanel: 'Painel de IA',

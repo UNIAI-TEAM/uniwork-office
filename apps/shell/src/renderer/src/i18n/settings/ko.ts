@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const ko = {
   setClose: '닫기',
   setRetry: '다시 시도',
-  setUnsavedTitle: '저장되지 않은 변경 사항',
-  setUnsavedBody: '저장하지 않고 이 페이지를 나갈까요? 편집한 내용이 사라집니다.',
-  setUnsavedKeep: '계속 편집',
-  setUnsavedDiscard: '변경 사항 버리기',
-  setAiSaveFailed: '저장하지 못했습니다: {error}',
-  setAiCreditLeft: '크레딧: {remain} 남음 · {used} 사용',
-  setAiCreditUsedNoLimit: '사용한 크레딧: {used}(키 한도 없음)',
   setAiCreditRate: '키 잔액 1 USD = AI 크레딧 1,000',
   setGrpAppearance: '모양',
   setGrpAiPanel: 'AI 패널',

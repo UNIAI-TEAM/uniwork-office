@@ -3,57 +3,6 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { strings } from '../src/renderer/src/strings'
 
-const OPENROUTER_KEYS = [
-  'setAiOpenRouterHubHint',
-  'setAiOpenRouterHubCheck',
-  'setAiOpenRouterHubChecking',
-  'setAiOpenRouterHubFail',
-  'setAiOpenRouterCredits',
-] as const
-
-describe('Settings > AI Model OpenRouter copy', () => {
-  it('shows no raw API endpoint in any locale', () => {
-    for (const [lang, table] of Object.entries(strings)) {
-      for (const key of OPENROUTER_KEYS) {
-        expect(table[key], `${lang}.${key}`).not.toMatch(/\/api\/|GET |https?:/)
-      }
-    }
-  })
-
-  it('is translated in every locale except English', () => {
-    for (const [lang, table] of Object.entries(strings)) {
-      if (lang === 'en') continue
-      for (const key of OPENROUTER_KEYS) {
-        expect(table[key], `${lang}.${key}`).not.toBe(strings.en[key])
-      }
-    }
-  })
-
-  it('has the Vietnamese row title, check and top-up labels', () => {
-    expect(strings.vi.setAiOpenRouterHub).toBe('Mức dùng của khóa')
-    expect(strings.vi.setAiOpenRouterHubCheck).toBe('Kiểm tra tín dụng')
-    expect(strings.vi.setAiOpenRouterCredits).toBe('Nạp thêm / quản lý')
-  })
-})
-
-describe('Settings > AI Model copy (en, vi)', () => {
-  it('names no internal provider or wallet product', () => {
-    for (const lang of ['en', 'vi'] as const) {
-      for (const key of [
-        'setAiGensparkHint',
-        'setAiOpenRouterHub',
-        'setAiOpenRouterHubHint',
-        'setAiOpenRouterHubCheck',
-        'setAiOpenRouterHubFail',
-      ] as const) {
-        expect(strings[lang][key], `${lang}.${key}`).not.toMatch(
-          /token hub|genspark|credit wallet/i,
-        )
-      }
-    }
-  })
-})
-
 describe('Settings > Integrations prose', () => {
   const PROSE_KEYS = [
     'intgStep2Note',

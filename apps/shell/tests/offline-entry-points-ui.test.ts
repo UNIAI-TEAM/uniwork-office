@@ -164,7 +164,6 @@ describe('Home recents "…" menu (UniWork rows)', () => {
           nextCursor: null,
         }),
       ),
-      rerankSearch: vi.fn(async () => null),
       addFolderRoot: vi.fn(async () => null),
       removeFolderRoot: vi.fn(async () => {}),
       pickDefaultSaveDir: vi.fn(async () => null),

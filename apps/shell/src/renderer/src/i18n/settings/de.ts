@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const de = {
   setClose: 'Schließen',
   setRetry: 'Erneut versuchen',
-  setUnsavedTitle: 'Nicht gespeicherte Änderungen',
-  setUnsavedBody: 'Seite ohne Speichern verlassen? Ihre Änderungen gehen verloren.',
-  setUnsavedKeep: 'Weiter bearbeiten',
-  setUnsavedDiscard: 'Änderungen verwerfen',
-  setAiSaveFailed: 'Speichern fehlgeschlagen: {error}',
-  setAiCreditLeft: 'Credits: {remain} übrig · {used} verbraucht',
-  setAiCreditUsedNoLimit: 'Verbrauchte Credits: {used} (kein Schlüssellimit)',
   setAiCreditRate: '1 USD Schlüsselguthaben = 1.000 KI-Credits',
   setGrpAppearance: 'Darstellung',
   setGrpAiPanel: 'KI-Bereich',

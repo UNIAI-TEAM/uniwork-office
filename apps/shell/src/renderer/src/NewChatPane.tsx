@@ -565,7 +565,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     id: 'open-ai-settings',
     label: openAiSettingsLabel(vi),
     kind: 'open_settings',
-    value: 'aiModel',
+    value: 'account',
   })
 
   const activationFailure = (

@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const nl = {
   setClose: 'Sluiten',
   setRetry: 'Opnieuw proberen',
-  setUnsavedTitle: 'Niet-opgeslagen wijzigingen',
-  setUnsavedBody: 'Deze pagina verlaten zonder op te slaan? Je wijzigingen gaan verloren.',
-  setUnsavedKeep: 'Verder bewerken',
-  setUnsavedDiscard: 'Wijzigingen verwerpen',
-  setAiSaveFailed: 'Kan niet opslaan: {error}',
-  setAiCreditLeft: 'Tegoed: nog {remain} · {used} gebruikt',
-  setAiCreditUsedNoLimit: 'Gebruikt tegoed: {used} (geen sleutellimiet)',
   setAiCreditRate: '1 USD sleutelsaldo = 1.000 AI-tegoeden',
   setGrpAppearance: 'Weergave',
   setGrpAiPanel: 'AI-paneel',

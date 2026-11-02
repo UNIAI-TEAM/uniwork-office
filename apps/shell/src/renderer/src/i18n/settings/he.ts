@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const he = {
   setClose: 'סגירה',
   setRetry: 'ניסיון חוזר',
-  setUnsavedTitle: 'שינויים שלא נשמרו',
-  setUnsavedBody: 'לצאת מהדף בלי לשמור? העריכות שלך יאבדו.',
-  setUnsavedKeep: 'להמשיך לערוך',
-  setUnsavedDiscard: 'ביטול השינויים',
-  setAiSaveFailed: 'לא ניתן לשמור: {error}',
-  setAiCreditLeft: 'קרדיטים: נותרו {remain} · נוצלו {used}',
-  setAiCreditUsedNoLimit: 'קרדיטים שנוצלו: {used} (ללא מגבלת מפתח)',
   setAiCreditRate: '1 USD ביתרת המפתח = 1,000 קרדיטי AI',
   setGrpAppearance: 'מראה',
   setGrpAiPanel: 'חלונית AI',

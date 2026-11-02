@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const cs = {
   setClose: 'Zavřít',
   setRetry: 'Zkusit znovu',
-  setUnsavedTitle: 'Neuložené změny',
-  setUnsavedBody: 'Opustit tuto stránku bez uložení? Provedené úpravy budou ztraceny.',
-  setUnsavedKeep: 'Pokračovat v úpravách',
-  setUnsavedDiscard: 'Zahodit změny',
-  setAiSaveFailed: 'Nepodařilo se uložit: {error}',
-  setAiCreditLeft: 'Kredity: zbývá {remain} · využito {used}',
-  setAiCreditUsedNoLimit: 'Využité kredity: {used} (klíč bez limitu)',
   setAiCreditRate: '1 USD zůstatku klíče = 1 000 kreditů AI',
   setGrpAppearance: 'Vzhled',
   setGrpAiPanel: 'Panel AI',

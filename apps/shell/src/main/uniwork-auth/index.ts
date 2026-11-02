@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import {
   app,
   BrowserWindow,
@@ -16,7 +17,6 @@ import {
   setUniworkCloudStatus,
   setUniworkCloudTransport,
   uniworkChatTransport,
-  uniworkCloudEnabled,
   uniworkConversations,
 } from '@genoffice/ai-provider'
 import { safeExternalUrl } from '@genoffice/electron-utils'
@@ -57,6 +57,7 @@ import {
 } from './ai-chat'
 import type { CapabilityRead } from '../uniwork-sync/capability/cache'
 import { AccountManager } from './manager'
+import { uniworkToolPolicy } from './tool-policy'
 import { TransportError, createUniworkTransport } from './transport'
 
 export {
@@ -421,8 +422,8 @@ export function startUniworkAiChat(deps: {
         },
       }),
     available: (scope, orgId) => availability.available(orgId, scope.format),
-    // cloud tools go out with a turn only while the org has office.ai_cloud
-    toolPolicy: () => ({ cloudTools: uniworkCloudEnabled() }),
+    // cloud tools go out with a turn only while the org has office.ai_cloud and the switch is on
+    toolPolicy: () => uniworkToolPolicy(join(app.getPath('userData'), 'ai-settings.json')),
   })
   aiStreams = streams
   // the provider entry (picker, Settings, selectedProvider) shows only while the

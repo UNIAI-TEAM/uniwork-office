@@ -353,8 +353,6 @@ import type {
   UiTheme,
   FileSearchPage,
   FileSearchQuery,
-  FileSearchRerank,
-  FileSearchSettings,
 } from '../shared/home-api'
 import { HOME_CHANNELS } from '../shared/home-api'
 import { UNIWORK_DOC_CHANNELS } from '../shared/home-api'
@@ -433,7 +431,6 @@ import {
 import extractWorkerPath from './file-index/extract-worker?modulePath'
 import { FileIndexer } from './file-index/indexer'
 import { FileIndexStore } from './file-index/store'
-import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './file-index/rerank'
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { isVersionRequest } from './version-flag'
 import { clearAiRun, isAiRunning, registerAiRunIpc } from './ai-run-registry'
@@ -462,6 +459,7 @@ import {
   SHELL_WINDOW_MIN_WIDTH,
 } from './window-bounds'
 import { installShellCloseGuard } from './window-close-guard'
+import { scrubFileSearchSetting } from './app-settings-scrub'
 import { openShellSettingsView } from './settings-view'
 import {
   beginEditLockWillQuit,
@@ -3745,11 +3743,6 @@ const folderWatchers = new Map<string, FolderWatcher>()
 
 let fileIndexStore: FileIndexStore | null = null
 let fileIndexer: FileIndexer | null = null
-let searchReranker: SearchReranker | null = null
-
-function readFileSearchSettings(): FileSearchSettings {
-  return normalizeFileSearchSettings(readAppSettings(APP_SETTINGS_PATH()).fileSearch)
-}
 
 /** the search index lives in userData and follows the save folder plus recents/starred */
 function ensureFileIndexer(): FileIndexer | null {
@@ -5096,6 +5089,12 @@ function registerHomeIpc(): void {
   // UniWork account (desktop PKCE sign-in): the manager in ./uniwork-auth owns
   // tokens and state; the renderer only gets AccountStatus pushes.
   configureUniworkAccount({ settingsPath: APP_SETTINGS_PATH })
+  // the decision-model file search is gone; drop the provider keys it left in app-settings.json
+  try {
+    scrubFileSearchSetting(APP_SETTINGS_PATH())
+  } catch (err) {
+    console.warn('[app-settings] could not drop the old file-search keys:', err)
+  }
   registerAccountIpc(
     guardedIpc,
     () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null),
@@ -5254,47 +5253,6 @@ function registerHomeIpc(): void {
       total: Math.max(hits.length, result.total - (result.hits.length - hits.length)),
       index: indexer.progress(),
     }
-  })
-
-  guardedIpc.handle(
-    HOME_CHANNELS.rerankSearch,
-    async (_event, raw: unknown): Promise<FileSearchRerank | null> => {
-      const settings = readFileSearchSettings()
-      if (!settings.rerank) return null
-      const query = (raw && typeof raw === 'object' ? raw : {}) as { q?: unknown; paths?: unknown }
-      const q = typeof query.q === 'string' ? query.q.trim().slice(0, 200) : ''
-      const paths = Array.isArray(query.paths)
-        ? query.paths.filter((p): p is string => typeof p === 'string').slice(0, 20)
-        : []
-      if (!q || paths.length < 2 || !ensureFileIndexer() || !fileIndexStore) return null
-      searchReranker ??= new SearchReranker(fileIndexStore)
-      return searchReranker.rerank(q, paths, settings)
-    },
-  )
-
-  guardedIpc.handle(HOME_CHANNELS.getFileSearchSettings, (): FileSearchSettings =>
-    readFileSearchSettings(),
-  )
-
-  guardedIpc.handle(
-    HOME_CHANNELS.setFileSearchSettings,
-    (_event, patch: unknown): FileSearchSettings => {
-      const current = readFileSearchSettings()
-      const p = (patch && typeof patch === 'object' ? patch : {}) as Partial<FileSearchSettings>
-      const next = normalizeFileSearchSettings({
-        ...current,
-        ...p,
-        keys: { ...current.keys, ...(p.keys ?? {}) },
-      })
-      writeAppSetting(APP_SETTINGS_PATH(), 'fileSearch', next)
-      return next
-    },
-  )
-
-  guardedIpc.handle(HOME_CHANNELS.testFileSearchRerank, async (_event, input: unknown) => {
-    const result = await probeDecision(normalizeFileSearchSettings(input))
-    if (!result.ok) console.warn('[file-index] rerank test failed:', result.error)
-    return result
   })
 
   // Starred files sort by mtime, which requires stat-ing them all first; they

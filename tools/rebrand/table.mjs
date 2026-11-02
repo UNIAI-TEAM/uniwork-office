@@ -171,7 +171,9 @@ function onboardingCopy(text) {
 
 /**
  * Shell string keys of features UniWork Office does not ship: the GitHub star prompt / About row /
- * welcome card, the GenTeam credits offer and the Google Analytics usage-statistics consent.
+ * welcome card, the GenTeam credits offer, the Google Analytics usage-statistics consent, and the
+ * own-key AI settings (the AI Model / AI Media panes: provider, key, base URL, Codex, test buttons,
+ * the decision-model file-search rerank; UniWork AI is the only AI path).
  * (And setCliLinkDone, the upstream 'genoffice is available at {path}' line: Settings > General now
  * shows setCliLinkReady, with no product name and no local path.)
  * No UI references them any more; an upstream sync brings them back in every locale block, and
@@ -192,6 +194,56 @@ export const DROPPED_SHELL_STRING_KEYS = [
   'onbCredits',
   'onbJoinGenTeam',
   'setCliLinkDone',
+  'setAiApiKey',
+  'setAiBaseUrl',
+  'setAiBaseUrlHint',
+  'setAiByokNote',
+  'setAiCapAnalysis',
+  'setAiCapFileSearch',
+  'setAiCapImage',
+  'setAiCapSearch',
+  'setAiCapVideo',
+  'setAiCodexAutoPlaceholder',
+  'setAiCodexHint',
+  'setAiCodexPath',
+  'setAiCodexPathHint',
+  'setAiGensparkHint',
+  'setAiKeyHint',
+  'setAiMaxTokens',
+  'setAiMaxTokensDesc',
+  'setAiModelId',
+  'setAiOpenRouterCredits',
+  'setAiOpenRouterHub',
+  'setAiOpenRouterHubCheck',
+  'setAiOpenRouterHubChecking',
+  'setAiOpenRouterHubFail',
+  'setAiOpenRouterHubHint',
+  'setAiProvider',
+  'setAiSave',
+  'setAiSaved',
+  'setAiSearchAuto',
+  'setAiSearchAutoHint',
+  'setAiSearchParallelHint',
+  'setAiSearchSerperHint',
+  'setAiSearchSerplyHint',
+  'setAiSearchTavilyHint',
+  'setAiSharedKeyHint',
+  'setAiTest',
+  'setAiTestFail',
+  'setAiTestOk',
+  'setAiTesting',
+  'setSearchRerank',
+  'setSearchRerankAccount',
+  'setSearchRerankCustomModel',
+  'setSearchRerankCustomUrl',
+  'setSearchRerankDesc',
+  'setSearchRerankEndpoint',
+  'setSecAiMedia',
+  'setSecAiModel',
+  'setAiImageModel',
+  'setAiAnalysisModel',
+  'searchJevSettings',
+  'searchRerankedBy',
 ]
 
 /**

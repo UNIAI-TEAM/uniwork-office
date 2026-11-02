@@ -108,7 +108,6 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
         total: 0,
         index: { pending: 0, scanning: false },
       })),
-      rerankSearch: vi.fn(async () => null),
       addFolderRoot: vi.fn(async () => null),
       removeFolderRoot: vi.fn(async () => {}),
       pickDefaultSaveDir: vi.fn(async () => null),

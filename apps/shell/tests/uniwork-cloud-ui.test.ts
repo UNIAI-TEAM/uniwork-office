@@ -12,11 +12,9 @@ import { LocaleProvider } from '../src/renderer/src/locale'
 import type { Lang } from '../src/renderer/src/locale'
 import {
   UniworkCloudAccountRows,
-  UniworkCloudNotice,
   useUniworkCloudStatus,
 } from '../src/renderer/src/UniworkCloudPane'
 import { cloudStrings } from '../src/renderer/src/i18n/strings-cloud'
-import { accountStrings } from '../src/renderer/src/i18n/strings-account'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -80,96 +78,6 @@ function render(lang: Lang, node: ReturnType<typeof createElement>) {
     root.render(createElement(LocaleProvider, { initial: lang, key: lang }, node))
   })
 }
-
-describe('AI media cloud notice', () => {
-  it.each([
-    ['signed-out', 'cloudSignedOutBody'],
-    ['not-entitled', 'cloudNotEntitledBody'],
-    ['credits-exhausted', 'cloudExhaustedBody'],
-    ['unavailable', 'cloudUnavailableBody'],
-    ['ready', 'cloudReadyBody'],
-  ] as const)('%s shows its explanation in en and vi', (state, bodyKey) => {
-    for (const lang of ['en', 'vi'] as const) {
-      render(
-        lang,
-        createElement(UniworkCloudNotice, { status: statusOf(state), onSignIn: () => undefined }),
-      )
-      const text = host.textContent ?? ''
-      expect(text).toContain(cloudStrings[lang][bodyKey])
-      expect(host.querySelector('[data-cloud-state]')?.getAttribute('data-cloud-state')).toBe(state)
-      expect(text).not.toMatch(/genspark|github|\bgit\b|UNI-\d/i)
-    }
-  })
-
-  it('signed out offers Sign in (the account entry action); other states do not', () => {
-    const onSignIn = vi.fn()
-    render('en', createElement(UniworkCloudNotice, { status: statusOf('signed-out'), onSignIn }))
-    const button = host.querySelector('button')!
-    expect(button.textContent).toBe(accountStrings.en.acctSignIn)
-    act(() => button.click())
-    expect(onSignIn).toHaveBeenCalledTimes(1)
-    render('en', createElement(UniworkCloudNotice, { status: statusOf('not-entitled'), onSignIn }))
-    expect(host.querySelector('button')).toBeNull()
-  })
-
-  it('out of credits is an alert and shows 0 left', () => {
-    render('en', createElement(UniworkCloudNotice, { status: statusOf('credits-exhausted') }))
-    expect(host.querySelector('[role="alert"]')).not.toBeNull()
-    expect(host.textContent).toContain(cloudStrings.en.cloudStateExhausted)
-    expect(host.textContent).toContain('0 / 50,000 left')
-  })
-})
-
-describe('AI media cloud notice: billing, switch and unavailable (M2, m2, N2)', () => {
-  const inactive = statusOf('subscription-inactive', { enabled: false })
-
-  it('an inactive subscription is a warning that says so, not "not in your plan"', () => {
-    for (const lang of ['en', 'vi'] as const) {
-      render(lang, createElement(UniworkCloudNotice, { status: inactive }))
-      const text = host.textContent ?? ''
-      expect(host.querySelector('[role="alert"]')).not.toBeNull()
-      expect(text).toContain(cloudStrings[lang].cloudStateInactive)
-      expect(text).toContain(cloudStrings[lang].cloudInactiveBody)
-      expect(text).not.toContain(cloudStrings[lang].cloudNotEntitledBody)
-      expect(text).not.toContain('AI credits:')
-    }
-  })
-
-  it('ready with the cloud switch off says the tools are paused and where to turn them on', () => {
-    for (const lang of ['en', 'vi'] as const) {
-      render(
-        lang,
-        createElement(UniworkCloudNotice, { status: statusOf('ready'), toolsEnabled: false }),
-      )
-      const text = host.textContent ?? ''
-      expect(text).not.toContain(cloudStrings[lang].cloudReadyBody)
-      // placeholders are filled with the switch name and the AI model section, never left raw
-      expect(text).toContain(cloudStrings[lang].cloudToolsToggle)
-      expect(text).not.toMatch(/{switch}|{section}/)
-    }
-    render(
-      'en',
-      createElement(UniworkCloudNotice, { status: statusOf('ready'), toolsEnabled: true }),
-    )
-    expect(host.textContent).toContain(cloudStrings.en.cloudReadyBody)
-  })
-
-  it('an out-of-credits cloud keeps its alert whatever the switch says', () => {
-    render(
-      'en',
-      createElement(UniworkCloudNotice, {
-        status: statusOf('credits-exhausted'),
-        toolsEnabled: false,
-      }),
-    )
-    expect(host.textContent).toContain(cloudStrings.en.cloudExhaustedBody)
-  })
-
-  it('unavailable leads with the product name, not a bare "Unavailable"', () => {
-    render('en', createElement(UniworkCloudNotice, { status: statusOf('unavailable') }))
-    expect(host.querySelector('.acct-notice-title')?.textContent).toBe(cloudStrings.en.cloudTitle)
-  })
-})
 
 describe('Account cloud rows', () => {
   it('inactive subscription shows its state without a credits row', () => {

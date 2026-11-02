@@ -2,13 +2,6 @@
 export const zh = {
   setClose: '关闭',
   setRetry: '重试',
-  setUnsavedTitle: '有未保存的更改',
-  setUnsavedBody: '不保存就离开此页面？所做的修改将会丢失。',
-  setUnsavedKeep: '继续编辑',
-  setUnsavedDiscard: '放弃更改',
-  setAiSaveFailed: '无法保存：{error}',
-  setAiCreditLeft: '额度：剩余 {remain} · 已用 {used}',
-  setAiCreditUsedNoLimit: '已用额度：{used}（密钥无上限）',
   setAiCreditRate: '1 美元密钥余额 = 1,000 AI 额度',
   setGrpAppearance: '外观',
   setGrpAiPanel: 'AI 面板',

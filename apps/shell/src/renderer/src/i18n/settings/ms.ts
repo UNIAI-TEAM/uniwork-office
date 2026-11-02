@@ -3,13 +3,6 @@ import type { zh } from './zh'
 export const ms = {
   setClose: 'Tutup',
   setRetry: 'Cuba lagi',
-  setUnsavedTitle: 'Perubahan belum disimpan',
-  setUnsavedBody: 'Tinggalkan halaman ini tanpa menyimpan? Suntingan anda akan hilang.',
-  setUnsavedKeep: 'Teruskan menyunting',
-  setUnsavedDiscard: 'Buang perubahan',
-  setAiSaveFailed: 'Tidak dapat menyimpan: {error}',
-  setAiCreditLeft: 'Kredit: baki {remain} · digunakan {used}',
-  setAiCreditUsedNoLimit: 'Kredit digunakan: {used} (tiada had kunci)',
   setAiCreditRate: '1 USD baki kunci = 1,000 kredit AI',
   setGrpAppearance: 'Penampilan',
   setGrpAiPanel: 'Panel AI',
