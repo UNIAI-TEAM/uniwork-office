@@ -871,18 +871,6 @@ body.vib .home {
   padding-bottom: 20px;
 }
 
-/* six groups fit one row at full width; narrower, an even 3 + 3 grid instead of a 5 + 1 orphan */
-@container (max-width: 700px) {
-  .new-chat-groups {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .new-chat-group-btn {
-    justify-content: center;
-  }
-}
-
 .new-chat-continue {
   width: 100%;
   max-width: var(--new-chat-col);
@@ -1291,7 +1279,6 @@ body.vib .home {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  
   .new-chat-msg {
     animation: none;
   }
