@@ -201,7 +201,10 @@ test.describe('markdown editor', () => {
       await summarizeBtn.click()
 
       await expect(editorPage.locator('.copilot')).toBeVisible()
-      // the preset lands as a sent user message (the model reply itself needs credentials)
+      // every turn runs on UniWork AI: before its disclosure is acknowledged the preset waits in
+      // the composer; after it, Send lands it as a user message (the reply itself needs sign-in)
+      await editorPage.locator('.copilot .ai-uniwork-disclosure-ack').click()
+      await editorPage.locator('.copilot textarea').press('Enter')
       await expect(editorPage.locator('.ai-msg-user')).toContainText(/Summarize/)
       await editorPage.screenshot({ path: screenshotPath('markdown-ai-preset') })
     } finally {
