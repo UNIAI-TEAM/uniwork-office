@@ -12,19 +12,16 @@ import {
   type UniworkCloudTransport,
 } from '@genoffice/ai-provider'
 import {
-  gskAnalyzeLoadedMedia,
   gskAnalyzeMedia,
   gskGenerateImage,
   gskImageSearch,
   gskLoginInfo,
   gskSlideGenerate,
-  gskTranscribe,
   gskWebSearch,
   hasGskAuth,
 } from '../src/gsk'
-import { generateImageTool, analyzeMediaTool, MEDIA_NOT_CONFIGURED_ERROR } from '../src/media-tools'
-import { searchOptionsFromSettings } from '../src/search-tools'
-import { defaultAiSettings } from '@genoffice/ai-provider'
+import { generateImageTool, analyzeMediaTool } from '../src/media-tools'
+import { imageSearchTool, webSearchTool } from '../src/search-tools'
 
 const READY: UniworkCloudStatus = {
   state: 'ready',
@@ -90,7 +87,6 @@ describe('UniWork cloud tools, signed out', () => {
       gskImageSearch('q'),
       gskGenerateImage({ prompt: 'p' }),
       gskAnalyzeMedia({ mediaUrls: ['https://x.example/a.png'], requirements: 'r' }),
-      gskTranscribe({ audioUrls: ['https://x.example/a.mp3'] }),
     ]) {
       const error = await call.catch((e) => e)
       expect(error).toBeInstanceOf(UniworkCloudError)
@@ -103,11 +99,11 @@ describe('UniWork cloud tools, signed out', () => {
   it('not entitled and unavailable tools reject with their own codes', async () => {
     setUniworkCloudStatus({ ...UNIWORK_CLOUD_SIGNED_OUT, state: 'not-entitled' })
     expect((await gskWebSearch('q').catch((e) => e)).code).toBe('entitlement_required')
-    setUniworkCloudStatus({ ...READY, tools: { ...READY.tools, transcribe: false } })
+    setUniworkCloudStatus({ ...READY, tools: { ...READY.tools, image_search: false } })
     setUniworkCloudTransport(fakeTransport())
-    const error = await gskTranscribe({ audioUrls: ['data:audio/wav;base64,AAAA'] }).catch((e) => e)
+    const error = await gskImageSearch('q').catch((e) => e)
     expect(error.code).toBe('cloud_unavailable')
-    expect(hasGskAuth('transcribe')).toBe(false)
+    expect(hasGskAuth('image_search')).toBe(false)
     expect(hasGskAuth('web_search')).toBe(true)
   })
 
@@ -198,7 +194,7 @@ describe('UniWork cloud tools, signed in + entitled', () => {
     expect(transport.analyzeMedia).not.toHaveBeenCalled()
   })
 
-  it('analyze media and transcribe send bytes (one transcription per clip)', async () => {
+  it('analyze media sends bytes', async () => {
     setUniworkCloudStatus(READY)
     const transport = fakeTransport()
     setUniworkCloudTransport(transport)
@@ -212,13 +208,6 @@ describe('UniWork cloud tools, signed in + entitled', () => {
       requirements: 'what is it',
       media: [{ mime: 'image/png', dataBase64: 'AAAA' }],
     })
-    expect(
-      await gskTranscribe({
-        audioUrls: ['data:audio/wav;base64,AAAA', 'data:audio/wav;base64,BBBB'],
-        prompt: 'names',
-      }),
-    ).toBe('hello\n\nhello')
-    expect(transport.transcribe).toHaveBeenCalledTimes(2)
   })
 
   it('a 402 surfaces as the out-of-credits message', async () => {
@@ -232,10 +221,19 @@ describe('UniWork cloud tools, signed in + entitled', () => {
   })
 })
 
-describe('media tools and search options route to the cloud only while it is on', () => {
+describe('the cloud tools answer for the editors, and only the cloud', () => {
   const SETTINGS = '/nonexistent/ai-settings.json'
+  const OFF = 'Cloud tools are turned off. Turn them on under Settings (Account).'
+  const SIGNED_OUT = new UniworkCloudError('signed_out').message
 
-  it('no BYOK + cloud on: generate_image and analyze_media use the cloud', async () => {
+  function settingsFile(content: unknown): string {
+    const dir = mkdtempSync(join(tmpdir(), 'cloud-settings-'))
+    const path = join(dir, 'ai-settings.json')
+    writeFileSync(path, JSON.stringify(content))
+    return path
+  }
+
+  it('cloud on: generate_image and analyze_media use the cloud', async () => {
     setUniworkCloudStatus(READY)
     setUniworkCloudTransport(fakeTransport())
     const image = await generateImageTool(SETTINGS, { prompt: 'icon' })
@@ -248,29 +246,87 @@ describe('media tools and search options route to the cloud only while it is on'
     ).toEqual({ text: 'a cat' })
   })
 
-  it('no BYOK + cloud off: still "not configured"', async () => {
-    expect(await generateImageTool(SETTINGS, { prompt: 'icon' })).toEqual({
-      error: MEDIA_NOT_CONFIGURED_ERROR,
+  it('cloud on: web and image search answer from the cloud', async () => {
+    setUniworkCloudStatus(READY)
+    setUniworkCloudTransport(fakeTransport())
+    expect(await webSearchTool(SETTINGS, 'q')).toEqual({
+      results: [{ title: 'T', url: 'https://a.example/p', snippet: 'S' }],
+      answer: 'A',
+      method: 'gsk',
     })
+    const images = await imageSearchTool(SETTINGS, 'q')
+    expect(images.method).toBe('gsk')
+    expect(images.images.map((i) => i.imageUrl)).toEqual(['https://a.example/i.png'])
+  })
+
+  it('signed out: every tool answers with the sign-in sentence and nothing is called', async () => {
+    const transport = fakeTransport()
+    setUniworkCloudTransport(transport)
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    try {
+      expect(await webSearchTool(SETTINGS, 'q')).toMatchObject({
+        method: 'error',
+        error: SIGNED_OUT,
+      })
+      expect(await imageSearchTool(SETTINGS, 'q')).toMatchObject({
+        method: 'error',
+        error: SIGNED_OUT,
+      })
+      expect(await generateImageTool(SETTINGS, { prompt: 'icon' })).toEqual({ error: SIGNED_OUT })
+      expect(
+        await analyzeMediaTool(SETTINGS, {
+          mediaUrls: ['data:image/png;base64,AAAA'],
+          requirements: 'r',
+        }),
+      ).toEqual({ error: SIGNED_OUT })
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(transport.search).not.toHaveBeenCalled()
+      expect(transport.generateImage).not.toHaveBeenCalled()
+      expect(transport.analyzeMedia).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('the cloud-tools switch off: every tool says so, even while signed in', async () => {
+    setUniworkCloudStatus(READY)
+    const transport = fakeTransport()
+    setUniworkCloudTransport(transport)
+    const off = settingsFile({ provider: 'uniwork', providers: {}, gskToolsEnabled: false })
+    expect(await webSearchTool(off, 'q')).toMatchObject({ method: 'error', error: OFF })
+    expect(await imageSearchTool(off, 'q')).toMatchObject({ method: 'error', error: OFF })
+    expect(await generateImageTool(off, { prompt: 'icon' })).toEqual({ error: OFF })
+    expect(
+      await analyzeMediaTool(off, { mediaUrls: ['data:image/png;base64,AAAA'], requirements: 'r' }),
+    ).toEqual({ error: OFF })
+    expect(
+      await generateImageTool(off, { prompt: 'icon' }, { notLoggedInError: 'localized' }),
+    ).toEqual({ error: 'localized' })
+    expect(transport.search).not.toHaveBeenCalled()
+    expect(transport.generateImage).not.toHaveBeenCalled()
   })
 
   it('a tool error from the cloud comes back as the tool error text', async () => {
     setUniworkCloudStatus(READY)
     const transport = fakeTransport()
     transport.generateImage.mockRejectedValueOnce(new UniworkCloudError('cloud_unavailable', 503))
+    transport.search.mockRejectedValueOnce(new UniworkCloudError('rate_limited', 429))
     setUniworkCloudTransport(transport)
-    const r = await generateImageTool(SETTINGS, { prompt: 'icon' })
-    expect(r.error).toMatch(/unavailable/)
+    expect((await generateImageTool(SETTINGS, { prompt: 'icon' })).error).toMatch(/unavailable/)
+    const search = await webSearchTool(SETTINGS, 'q')
+    expect(search.method).toBe('error')
+    expect(search.error).toMatch(/Too many/)
   })
 
-  it('auto search tries the cloud only while it is on and the toggle allows it', () => {
-    const settings = defaultAiSettings()
-    expect(searchOptionsFromSettings(settings)).toEqual({ useGsk: false })
-    setUniworkCloudStatus(READY)
-    expect(searchOptionsFromSettings(settings)).toEqual({ useGsk: true })
-    expect(searchOptionsFromSettings({ ...settings, gskToolsEnabled: false })).toEqual({
-      useGsk: false,
-    })
+  it("no error sentence points at a provider of the user's own", () => {
+    for (const code of [
+      'entitlement_required',
+      'subscription_inactive',
+      'no_access',
+      'credits_exhausted',
+    ] as const) {
+      expect(new UniworkCloudError(code).message).not.toMatch(/own provider|AI Media/)
+    }
   })
 })
 
@@ -297,12 +353,8 @@ describe('cloud media reads fail closed without media roots', () => {
       await expect(
         gskAnalyzeMedia({ mediaUrls: [SECRET], requirements: 'r' }, undefined, media),
       ).rejects.toThrow(/Local files can only be sent/)
-      await expect(gskTranscribe({ audioUrls: [SECRET] }, undefined, media)).rejects.toThrow(
-        /Local files can only be sent/,
-      )
       expect(transport.generateImage).not.toHaveBeenCalled()
       expect(transport.analyzeMedia).not.toHaveBeenCalled()
-      expect(transport.transcribe).not.toHaveBeenCalled()
     },
   )
 
@@ -328,50 +380,6 @@ describe('cloud media reads fail closed without media roots', () => {
       mediaRoots: [dir],
     })
     expect(transport.generateImage).toHaveBeenCalledTimes(1)
-  })
-
-  it('a mixed batch (video to the cloud, images to BYOK) refuses local paths without roots', async () => {
-    const transport = ready()
-    const dir = mkdtempSync(join(tmpdir(), 'cloud-mixed-'))
-    const settingsPath = join(dir, 'ai-settings.json')
-    writeFileSync(
-      settingsPath,
-      JSON.stringify({
-        ...defaultAiSettings(),
-        media: {
-          ...defaultAiSettings().media,
-          analysisProvider: 'openai',
-          providers: {
-            ...defaultAiSettings().media!.providers,
-            openai: { apiKey: 'sk-test', imageModel: '', analysisModel: '' },
-          },
-        },
-      }),
-    )
-    const clip = join(dir, 'clip.mp4')
-    writeFileSync(clip, Buffer.from([0, 0, 0, 0]))
-    const refused = await analyzeMediaTool(settingsPath, { mediaUrls: [clip], requirements: 'r' })
-    expect(refused.error).toMatch(/Local files can only be sent/)
-    const ok = await analyzeMediaTool(
-      settingsPath,
-      { mediaUrls: [clip], requirements: 'r' },
-      { mediaRoots: [dir] },
-    )
-    expect(ok).toEqual({ text: 'a cat' })
-    expect(transport.analyzeMedia).toHaveBeenCalledTimes(1)
-    expect(transport.analyzeMedia.mock.calls[0]![0].media).toEqual([
-      { mime: 'video/mp4', dataBase64: Buffer.from([0, 0, 0, 0]).toString('base64') },
-    ])
-  })
-
-  it('already-loaded media is capped like loaded-by-URL media', async () => {
-    const transport = ready()
-    const blob = { bytes: new Uint8Array(4), mime: 'image/png' }
-    await expect(
-      gskAnalyzeLoadedMedia({ requirements: 'r', media: Array(5).fill(blob) }),
-    ).rejects.toThrow(/Too many/)
-    expect(transport.analyzeMedia).not.toHaveBeenCalled()
-    await expect(gskAnalyzeLoadedMedia({ requirements: 'r', media: [blob] })).resolves.toBe('a cat')
   })
 })
 

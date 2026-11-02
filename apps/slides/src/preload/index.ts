@@ -461,7 +461,6 @@ const api: SlidesApi = {
     referenceImageUrls?: string[]
     aspectRatio?: string
     imageSize?: string
-    transparentBackground?: boolean
   }) => ipcRenderer.invoke('ai:generate-image', op),
   analyzeMedia: (op: { mediaUrls: string[]; requirements: string }) =>
     ipcRenderer.invoke('ai:analyze-media', op),

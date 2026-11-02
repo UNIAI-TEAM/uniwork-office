@@ -401,7 +401,7 @@ const TOOLS: AgentToolDef[] = [
   {
     name: 'generate_image',
     description:
-      'AI image generation/editing. Text-to-image, or pass referenceImageUrls for image editing; returns an image URL. NEW imagery: insert with insert_web_image. Editing an EXISTING slide picture (background removal/upscaling/etc.): swap it in place with replace_image — do not insert a duplicate. Use for custom illustrations/icons/backgrounds, style-consistent imagery; for real photos/screenshots still use image_search. NEVER use it to recreate an image the user attached (logo, photo) — embed the original with insert_web_image / replace_image and url=attachment://<file name>. Icons/logos/cutouts that must sit on slide content need transparentBackground:true — asking for a transparent background in the prompt does NOT work (models paint a fake gray checkerboard into the pixels).',
+      'AI image generation/editing. Text-to-image, or pass referenceImageUrls for image editing; returns an image URL. NEW imagery: insert with insert_web_image. Editing an EXISTING slide picture (background removal/upscaling/etc.): swap it in place with replace_image — do not insert a duplicate. Use for custom illustrations/icons/backgrounds, style-consistent imagery; for real photos/screenshots still use image_search. NEVER use it to recreate an image the user attached (logo, photo) — embed the original with insert_web_image / replace_image and url=attachment://<file name>. Generated images always have an opaque background: asking for a transparent background in the prompt does NOT work (models paint a fake gray checkerboard into the pixels), so place icons/logos on a matching color block instead.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -423,11 +423,6 @@ const TOOLS: AgentToolDef[] = [
         aspectRatio: {
           type: 'string',
           description: 'Aspect ratio: 1:1|4:3|16:9|9:16|3:4|2:3|3:2|auto',
-        },
-        transparentBackground: {
-          type: 'boolean',
-          description:
-            'Set true when the result must have a real transparent background (icons, logos, cutouts placed over slide content). The app strips the background automatically after generation; never rely on the prompt for transparency.',
         },
       },
       required: ['prompt'],
@@ -1657,7 +1652,6 @@ async function executeTool(
         model: call.input.model ? String(call.input.model) : undefined,
         referenceImageUrls: refs,
         aspectRatio: call.input.aspectRatio ? String(call.input.aspectRatio) : undefined,
-        transparentBackground: call.input.transparentBackground === true,
       })
       if (!r.url) return fail(t('aiFailGenImage'), r.error ?? 'Generation failed')
       access.imageUrls?.register(r.url, 'generate_image')

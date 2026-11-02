@@ -4011,7 +4011,7 @@ export function registerSheetsAiIpc(): void {
     entry.aiStreams.get(z.string().min(1).parse(requestId))?.abort()
   })
 
-  // Shared search tools (content + images): Serper with DuckDuckGo fallback
+  // Shared search tools (content + images): UniWork cloud tools
   // (same source as slides/docs)
   ipcMain.handle('ai:web-search', async (_event, query: unknown, maxResults?: unknown) => {
     try {

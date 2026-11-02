@@ -1841,16 +1841,15 @@ export interface SlidesApi {
     ext?: string
     keepSrcRect?: boolean
   }) => Promise<RenderSlide | null>
-  /** AI image generation/editing through the configured media provider, returns the image URL */
+  /** AI image generation/editing through the UniWork cloud tools, returns the image URL */
   generateImage: (op: {
     prompt: string
     model?: string
     referenceImageUrls?: string[]
     aspectRatio?: string
     imageSize?: string
-    transparentBackground?: boolean
   }) => Promise<{ url?: string; error?: string }>
-  /** media analysis through the configured media provider: image/audio/video understanding, returns analysis text */
+  /** media analysis through the UniWork cloud tools: image/audio/video understanding, returns analysis text */
   analyzeMedia: (op: {
     mediaUrls: string[]
     requirements: string

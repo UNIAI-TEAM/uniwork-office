@@ -192,7 +192,14 @@ describe('mcp server', () => {
     expect(props.ops?.type).toBe('array')
     expect(apply.annotations?.readOnlyHint).toBe(false)
     expect(apply.annotations?.openWorldHint).toBe(false)
-    expect(tools.find((t) => t.name === 'search')!.annotations?.openWorldHint).toBe(true)
+    // nothing the CLI exposes sends data to a cloud provider: no search, image or media tool
+    for (const name of ['search', 'image', 'media']) {
+      expect(
+        tools.find((t) => t.name === name),
+        name,
+      ).toBeUndefined()
+    }
+    expect(tools.some((t) => t.annotations?.openWorldHint === true)).toBe(false)
     expect(tools.find((t) => t.name === 'docs_read')!.annotations?.readOnlyHint).toBe(true)
     expect(tools.find((t) => t.name === 'pdf_read')!.annotations?.readOnlyHint).toBe(true)
   })

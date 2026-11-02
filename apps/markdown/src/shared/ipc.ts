@@ -559,7 +559,7 @@ export interface MarkdownApi {
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>
   onAiStream(handler: (chunk: AiStreamChunk) => void): () => void
-  /** Main-process web search (Serper/DuckDuckGo via the shared ai:web-search handler) */
+  /** Main-process web search (UniWork cloud tool via the shared ai:web-search handler) */
   webSearch(query: string, maxResults?: number): Promise<WebSearchResult>
   /** Main-process image search (shared ai:image-search handler) */
   imageSearch(query: string, maxResults?: number): Promise<ImageSearchResult>

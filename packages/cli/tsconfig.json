@@ -19,7 +19,6 @@
       "@genoffice/font-metrics": ["../font-metrics/src/index.ts"],
       "@genoffice/electron-utils": ["../electron-utils/src/index.ts"],
       "@genoffice/electron-utils/*": ["../electron-utils/src/*"],
-      "@genoffice/ai-search": ["../ai-search/src/index.ts"],
       "@genoffice/ai-provider": ["../ai-provider/src/index.ts"],
       "@genoffice/ai-provider/browser": ["../ai-provider/src/browser.ts"],
       "@genoffice/i18n": ["../i18n/src/index.ts"],

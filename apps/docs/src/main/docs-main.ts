@@ -4026,7 +4026,7 @@ export function registerAiIpc(): void {
     activeAiStreams.get(requestId)?.abort()
   })
 
-  // shared search tools (content + images): Serper with DuckDuckGo fallback (same source as slides/sheets)
+  // shared search tools (content + images): UniWork cloud tools (same source as slides/sheets)
   ipcMain.handle('ai:web-search', async (_event, query: string, maxResults?: number) => {
     try {
       return await webSearchTool(
@@ -4050,8 +4050,8 @@ export function registerAiIpc(): void {
     }
   })
 
-  // media understanding (pictures in the document, attachments, local files): BYOK media
-  // provider when one is configured, otherwise the UniWork cloud route (signed in + entitled).
+  // media understanding (pictures in the document, attachments, local files): UniWork cloud
+  // route (signed in + entitled, cloud tools on).
   // docs-prefixed: slides registers its own ai:analyze-media in the same shell process.
   ipcMain.handle(
     'docs:analyze-media',

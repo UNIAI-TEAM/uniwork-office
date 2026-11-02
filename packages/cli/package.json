@@ -22,9 +22,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@genoffice/ai-provider": "*",
-    "@genoffice/ai-search": "*",
     "@genoffice/docx-engine": "*",
+    "@genoffice/electron-utils": "*",
     "@genoffice/odf2ooxml": "*",
     "@genoffice/pdf2docx": "*",
     "@genoffice/pipelines": "*",
@@ -38,7 +37,6 @@
     "jszip": "^3.10.1",
     "numfmt": "^3.2.6",
     "pngjs": "^7.0.0",
-    "undici": "^6.29.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -3211,7 +3211,7 @@ export interface DesktopApi {
   /// UniWork cloud sign-in state (signed in to UniWork + plan includes cloud AI);
   /// withEmail also returns the email
   aiGskStatus(withEmail?: boolean): Promise<GenSparkAccountStatus>
-  /// Web search (main-process Serper/DuckDuckGo, shared with docs/slides)
+  /// Web search (main-process UniWork cloud tool, shared with docs/slides)
   webSearch(query: string, maxResults?: number): Promise<WebSearchResult>
   /// Image search (same shared main-process channel as docs/slides)
   imageSearch(query: string, maxResults?: number): Promise<ImageSearchResponse>

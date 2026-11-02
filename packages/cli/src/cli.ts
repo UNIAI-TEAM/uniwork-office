@@ -8,10 +8,7 @@ import { convertCommand } from './commands/convert'
 import { docsCommand } from './commands/docs'
 import { createCommand } from './commands/create'
 import { guideCommand } from './commands/guide'
-import { imageCommand } from './commands/image'
-import { mediaCommand } from './commands/media'
 import { mergeCommand } from './commands/merge'
-import { searchCommand } from './commands/search'
 import { selectionCommand } from './commands/selection'
 import { infoCommand } from './commands/info'
 import { installCommand } from './commands/install'
@@ -62,9 +59,6 @@ export function defaultRegistry(): CommandRegistry {
     .register(pdfCommand)
     .register(renderCommand)
     .register(guideCommand)
-    .register(searchCommand)
-    .register(imageCommand)
-    .register(mediaCommand)
     .register(openCommand)
     .register(selectionCommand)
     .register(capabilitiesCommand)

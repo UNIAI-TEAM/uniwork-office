@@ -145,7 +145,7 @@ export function registerAiIpc(): void {
   // nothing streams here, so there is nothing to cancel; the channel stays answered
   ipcMain.handle('ai:stream-cancel', () => undefined)
 
-  // Search tools (content + images), Serper with DuckDuckGo fallback
+  // Search tools (content + images), UniWork cloud tools
   ipcMain.handle('ai:web-search', async (_event, query: string, maxResults?: number) => {
     try {
       return await webSearchTool(
@@ -183,7 +183,7 @@ export function registerSlidesOnlyAiIpc(): void {
     appendRunFailure(entry)
   })
 
-  // AI image generation / media analysis through the configured media provider; errors when none is set up.
+  // AI image generation / media analysis through the UniWork cloud tools; answers with the sign-in or switch-off sentence when unavailable.
   ipcMain.handle(
     'ai:generate-image',
     async (
@@ -194,7 +194,6 @@ export function registerSlidesOnlyAiIpc(): void {
         referenceImageUrls?: string[]
         aspectRatio?: string
         imageSize?: string
-        transparentBackground?: boolean
       },
     ) => {
       return generateImageTool(
@@ -207,7 +206,6 @@ export function registerSlidesOnlyAiIpc(): void {
             : undefined,
           aspectRatio: op.aspectRatio ? String(op.aspectRatio) : undefined,
           imageSize: op.imageSize ? String(op.imageSize) : undefined,
-          transparentBackground: op.transparentBackground === true,
         },
         {
           notLoggedInError: tm('errMediaNotConfigured'),

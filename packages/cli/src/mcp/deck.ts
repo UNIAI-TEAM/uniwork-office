@@ -59,7 +59,7 @@ export const DECK_TOOLS: DeckTool[] = [
   {
     name: 'deck_start',
     description:
-      'Stage 1 of a staged deck, for a longer or design-sensitive presentation a person will present (a short deck of up to about 5 slides with concrete content is one create_pptx call instead): write the style sheet and the outline, check the outline, and get the design and spec guides plus the configured cloud capabilities back in one call. Call once per deck, before any deck_page. Fix every outline error it reports (call again with the corrected outline) before writing pages. The result lists the pages to write, one deck_page call each.',
+      'Stage 1 of a staged deck, for a longer or design-sensitive presentation a person will present (a short deck of up to about 5 slides with concrete content is one create_pptx call instead): write the style sheet and the outline, check the outline, and get the design and spec guides back in one call. Call once per deck, before any deck_page. Fix every outline error it reports (call again with the corrected outline) before writing pages. The result lists the pages to write, one deck_page call each.',
     shape: {
       dir: DIR,
       style: z
@@ -78,10 +78,9 @@ export const DECK_TOOLS: DeckTool[] = [
       writeFileSync(join(dir, 'outline.json'), JSON.stringify(args.outline, null, 2))
       const check = await runJson(['slides', 'check', join(dir, 'outline.json')], ctx)
       if (check.error) return check
-      const [design, spec, caps] = await Promise.all([
+      const [design, spec] = await Promise.all([
         runJson(['guide', 'slides', 'design'], ctx),
         runJson(['guide', 'slides', 'spec'], ctx),
-        runJson(['capabilities'], ctx),
       ])
       const pages = outlinePages(dir)
       return {
@@ -92,7 +91,6 @@ export const DECK_TOOLS: DeckTool[] = [
             deck: dir,
             pages: pages.map((title, index) => ({ index, title, file: pageFile(dir, index) })),
             guides: { design: design.ok?.summary ?? null, spec: spec.ok?.summary ?? null },
-            capabilities: caps.ok?.detail ?? caps.error?.message ?? null,
             next: `write page 0 ("${pages[0] ?? ''}") with deck_page; one page per call, in order, re-reading style.md's palette and the page's outline entry each time`,
           },
         },

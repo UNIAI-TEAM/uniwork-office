@@ -470,36 +470,7 @@ export const TOOLS: ToolSpec[] = [
     command: 'capabilities',
     readOnly: true,
     description:
-      'Which cloud features are configured in UniWork Office: web search, image search, image generation, media understanding. Check once before planning photos or live facts; everything else runs locally.',
-  },
-  {
-    name: 'search',
-    command: 'search',
-    openWorld: true,
-    readOnly: true,
-    description:
-      'Web search, or image search with images=true, through the provider configured in UniWork Office (the query leaves the machine). Image results carry imageUrl, width and height for addPicture / insert_image.',
-    positionals: [{ key: 'query', description: 'the search query' }],
-    options: ['images', 'max'],
-  },
-  {
-    name: 'image',
-    command: 'image',
-    openWorld: true,
-    description:
-      'Generate an image from a prompt with the provider configured in UniWork Office and save it; the result names the real format. ref images steer edits (background removal, upscale).',
-    positionals: [{ key: 'prompt', description: 'what to draw' }],
-    options: ['out', 'aspect', 'size', 'ref', 'model', 'force'],
-  },
-  {
-    name: 'media',
-    command: 'media',
-    openWorld: true,
-    readOnly: true,
-    description:
-      'Describe or extract from an image, audio or video file (or URL) with the configured provider; the file leaves the machine.',
-    positionals: [{ key: 'source', description: 'path or URL of the media' }],
-    options: ['ask'],
+      'Whether the UniWork Office app is installed (needed only by open). Everything else runs locally.',
   },
   {
     name: 'open',

@@ -302,9 +302,8 @@ genoffice open sales.xlsx                          # hand the result to the edit
 넘어가기 전에 매 단계를 검사했습니다:
 
 ```bash
-genoffice capabilities --json                        # which cloud tools GenOffice has configured
+genoffice capabilities --json                        # whether the app is installed
 genoffice guide slides design                        # the deck workflow and layout library
-genoffice image "the eight planets in a row …" --aspect 16:9 --out deck/assets/cover.jpg
 genoffice slides check deck/outline.json --json      # 8 pages, no findings
 genoffice slides check deck/pages/01.json --json     # builds one slide, audits overflow and overlap
 …                                                    # one page file per slide, fixed until each check is clean

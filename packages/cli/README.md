@@ -37,10 +37,7 @@ genoffice convert report.docx --to html               # the Word editor's standa
 genoffice convert page.html --to docx                 # html2docx, same as the HTML app's Export as Word
 genoffice convert report.docx --to md                 # GFM via the markdown editor's serializer
 genoffice convert book.xlsx --to csv [--sheet Data]   # one sheet, cell text as displayed, UTF-8 BOM, CRLF
-genoffice capabilities --json                        # which cloud features UniWork Office has configured (no network call)
-genoffice search "electron headless export" [--images] [--max 6] --json
-genoffice image "isometric office, soft light" --aspect 16:9 --out hero.png
-genoffice media photo.jpg --ask "What text is in this picture?" --json
+genoffice capabilities --json                        # whether the UniWork Office app is installed
 genoffice docs read report.docx [--range 0-9] [--html] [--full] [--comments] [--revisions] [--header-footer] [--properties] --json   # blocks (--full: whole text), comment threads, tracked changes, header/footer text, document properties
 genoffice docs apply report.docx --ops ops.json [--dry-run]           # apply_ops entries + insert_content / replace_blocks / insert_image / insert_chart / edit_chart / set_header_footer / reply_comment / resolve_comment / set_properties (document metadata) / wrap_content_control / unwrap_content_control
 genoffice docs check report.docx --json                               # fields without results, broken bookmark references, stale TOC, missing images, empty charts/headings, heading level skips, placeholder text, pending revisions, open comments; exit 0
@@ -197,7 +194,7 @@ Independently of the PATH, every launch of the packaged app writes the launcher 
 - `src/registry.ts` — `CommandDef` table (`name`, `usage`, `run`), the single
   place future entry points (in-app AI, MCP) dispatch through.
 - `src/commands/` — `info`, `convert`, `create`, `render`, `slides`, `sheet`, `docs`,
-  `guide`, `open`, `capabilities`, `search`, `image`, `media`, `install-cli`.
+  `guide`, `open`, `capabilities`, `install-cli`.
 - `src/dom.ts` — the jsdom bootstrap the Word/Markdown paths need.
 - `src/formats/` — thin adapters over `@genoffice/pdf2docx`, the xlsx sidecar
   and the sheets CSV importer.
@@ -224,19 +221,11 @@ Independently of the PATH, every launch of the packaged app writes the launcher 
   `~/.genoffice/cli-audit.jsonl`, rotated at 2 MB. `GENOFFICE_AUDIT_LOG=<path>`
   redirects it, `GENOFFICE_AUDIT_LOG=off` disables it.
 
-## Cloud commands
+## No cloud commands
 
-`search`, `image` and `media` reuse the editors' provider routing. Search uses
-the selected Serper / Serply / Tavily / Parallel provider when its key is configured;
-otherwise the keyless `auto` default runs Parallel's free, rate-limited Search MCP,
-then DuckDuckGo. Parallel
-and Tavily provide web search only. Image generation and media analysis use
-the corresponding provider chosen in the app's AI settings
-(`UniWork Office/ai-settings.json` in the platform config directory, override with
-`GENOFFICE_AI_SETTINGS`). `HTTPS_PROXY` / `HTTP_PROXY` / `ALL_PROXY` are honoured.
-Search results, image bytes and analysis text come back in the JSON `detail`;
-`image` also writes the file. These are the only commands that send data off
-the machine.
+Every command runs on this machine: nothing here sends a file, a prompt or a
+query off it. Web and image search, image generation and media analysis are
+available only inside the UniWork Office app, through UniWork cloud tools.
 
 ## Build and run in a checkout
 
