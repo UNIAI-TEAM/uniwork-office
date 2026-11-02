@@ -48,7 +48,7 @@ GenOffice는 macOS, Windows, Linux에서 사용할 수 있는 무료 오픈소�
 - **로컬 우선으로 설계되었습니다.** 파일은 사용자의 기기에서 열리고,
   편집되고, 저장되고, 변환됩니다. PDF → Word / Excel / PowerPoint,
   Markdown → Word, HTML → Word 변환 모두 기기 내에서 실행됩니다. 오직
-  AI 호출만 사용자가 선택한 공급자로 전송됩니다.
+  AI 호출만 UniWork AI로 전송됩니다.
 - **스크립트로 다룰 수 있고, 에이전트가 바로 쓸 수 있습니다.** 앱에는
   `genoffice` 명령줄과 Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot,
   OpenCode, Windsurf용 스킬이 함께 제공되어, 코딩 에이전트가 창 하나 열지
@@ -304,10 +304,10 @@ GenOffice나 PowerPoint에서 열립니다.
 어시스턴트를 위한 방법입니다. 연결 방법은 두 가지이며, 둘 다 **설정 → 연동 →
 MCP**에 바로 복사할 수 있는 코드 조각으로 안내되어 있습니다:
 
-| 방법                          | 설명                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A · `genoffice mcp`**(권장) | 어시스턴트가 직접 실행하는 stdio 서버로, GenOffice가 열려 있을 필요가 없습니다. 명령마다 도구가 하나씩 있습니다(`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `search`, `image`, `media`, `open`). 여기에 단계별 덱 흐름 `deck_start` → `deck_page` → `deck_build` → `deck_replace`가 더해집니다. Ops, 스펙, Markdown이 모두 인라인으로 전달되므로 파일 시스템이 없는 클라이언트도 문제없이 동작합니다. |
-| **B · 로컬 HTTP 서버**        | GenOffice 앱 내부에서 `http://127.0.0.1:3093/mcp`(Streamable HTTP, 레거시 SSE 지원)로 실행됩니다. 이 도구들은 눈에 보이는 Word 편집기 탭을 움직입니다: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`이며, 문서가 만들어지는 과정을 직접 지켜볼 수 있습니다. 기본값은 꺼짐이며, 같은 설정 화면에서 켤 수 있습니다.                                                                                                                                                       |
+| 방법                          | 설명                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A · `genoffice mcp`**(권장) | 어시스턴트가 직접 실행하는 stdio 서버로, GenOffice가 열려 있을 필요가 없습니다. 명령마다 도구가 하나씩 있습니다(`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `open`). 여기에 단계별 덱 흐름 `deck_start` → `deck_page` → `deck_build` → `deck_replace`가 더해집니다. Ops, 스펙, Markdown이 모두 인라인으로 전달되므로 파일 시스템이 없는 클라이언트도 문제없이 동작합니다. |
+| **B · 로컬 HTTP 서버**        | GenOffice 앱 내부에서 `http://127.0.0.1:3093/mcp`(Streamable HTTP, 레거시 SSE 지원)로 실행됩니다. 이 도구들은 눈에 보이는 Word 편집기 탭을 움직입니다: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`이며, 문서가 만들어지는 과정을 직접 지켜볼 수 있습니다. 기본값은 꺼짐이며, 같은 설정 화면에서 켤 수 있습니다.                                                                                                                           |
 
 ```bash
 # Claude Code
@@ -324,30 +324,8 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 화면에서 실제 설치 경로를 확인할 수 있습니다). 이 서버는 자체 워크플로
 안내를 담고 있고, 작업 레퍼런스를 `genoffice://guide/*` 리소스로 노출하므로
 별도의 스킬이 필요 없습니다. 스킬과 MCP 서버는 함께 존재할 수 있으며,
-어시스턴트가 둘 중 하나를 선택해 사용합니다. 클라우드 기능(`search`,
-`image`, `media`)은 여전히 GenOffice에 설정된 공급자를 거치며, 그 밖의
-모든 기능은 로컬에서 동작하고, `GENOFFICE_ALLOWED_ROOTS`가 모든 도구를
+어시스턴트가 둘 중 하나를 선택해 사용합니다. `GENOFFICE_ALLOWED_ROOTS`가 모든 도구를
 지정한 폴더로 제한합니다.
-
-위의 데모에 나온 재생에너지 덱은, `genoffice` MCP 서버만 연결한 Claude
-Code에서 프롬프트 하나가 프로토콜 수준에서 어떻게 보이는지를 보여줍니다:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-서른여덟 번의 호출, 약 13분, 그리고 어시스턴트는 터미널을 한 번도 건드리지 않았습니다: 도표, 사진, 가이드, 검사, 렌더링 결과가 모두 MCP 도구 결과로 오갔습니다. 기기를 벗어난 것은 `search`와 `media`뿐이며, GenOffice에 설정된 제공업체로 전달되었습니다.
 
 <a id="download"></a>
 

@@ -48,7 +48,7 @@ hace el cambio y te muestra exactamente qué tocó.
 - **Local por diseño.** Los archivos se abren, editan, guardan y convierten
   en tu equipo. PDF → Word / Excel / PowerPoint, Markdown → Word y HTML →
   Word se ejecutan todos en el dispositivo. Solo las llamadas de IA salen de
-  tu equipo, hacia el proveedor que elijas.
+  tu equipo, hacia UniWork AI.
 - **Automatizable y listo para agentes.** La app incluye una línea de comandos
   `genoffice` y un skill para Claude Code, Codex, Cursor, Gemini CLI, GitHub
   Copilot, OpenCode y Windsurf, de modo que un agente de programación puede
@@ -315,10 +315,10 @@ que no pueden ejecutar una terminal o a los que prefieras no dársela. Hay
 dos formas de conectarse, ambas con fragmentos listos para copiar en
 **Ajustes → Integraciones → MCP**:
 
-| Vía                                   | Qué es                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A · `genoffice mcp`** (recomendado) | Un servidor stdio que el propio asistente inicia; GenOffice no necesita estar abierto. Una herramienta por comando (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `search`, `image`, `media`, `open`) más el flujo de presentación por etapas `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Las operaciones, especificaciones y el Markdown se pasan en línea, así que un cliente sin sistema de archivos también funciona. |
-| **B · Servidor HTTP local**           | Se ejecuta dentro de la app GenOffice en `http://127.0.0.1:3093/mcp` (Streamable HTTP, con SSE heredado). Sus herramientas manejan una pestaña de editor de Word visible: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, y ves cómo el documento va tomando forma. Desactivado por defecto; actívalo en el mismo panel de ajustes.                                                                                                                                                                        |
+| Vía                                   | Qué es                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A · `genoffice mcp`** (recomendado) | Un servidor stdio que el propio asistente inicia; GenOffice no necesita estar abierto. Una herramienta por comando (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `open`) más el flujo de presentación por etapas `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Las operaciones, especificaciones y el Markdown se pasan en línea, así que un cliente sin sistema de archivos también funciona. |
+| **B · Servidor HTTP local**           | Se ejecuta dentro de la app GenOffice en `http://127.0.0.1:3093/mcp` (Streamable HTTP, con SSE heredado). Sus herramientas manejan una pestaña de editor de Word visible: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, y ves cómo el documento va tomando forma. Desactivado por defecto; actívalo en el mismo panel de ajustes.                                                                                                                                            |
 
 ```bash
 # Claude Code
@@ -336,35 +336,8 @@ ajustes imprime la ruta exacta de tu instalación). El servidor lleva sus
 propias instrucciones de flujo de trabajo y expone las referencias de
 operaciones como recursos `genoffice://guide/*`, así que no hace falta
 ningún skill; el skill y el servidor MCP pueden coexistir y el asistente
-elige uno. Las funciones en la nube (`search`, `image`, `media`) siguen
-pasando por el proveedor configurado en GenOffice; todo lo demás se ejecuta
-localmente, y `GENOFFICE_ALLOWED_ROOTS` limita cada herramienta a las
+elige uno. `GENOFFICE_ALLOWED_ROOTS` limita cada herramienta a las
 carpetas que indiques.
-
-La presentación sobre energías renovables de la demo de arriba es lo que
-parece, desde el lado del protocolo, un solo prompt en Claude Code con solo
-el servidor MCP de `genoffice` conectado:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-Treinta y ocho llamadas, unos trece minutos, y el asistente nunca tocó una
-terminal: las figuras, las fotos, las guías, las comprobaciones y las
-renderizaciones viajaron todas como resultados de herramientas MCP. Solo
-`search` y `media` salieron de la máquina, hacia el proveedor configurado
-en GenOffice.
 
 <a id="download"></a>
 

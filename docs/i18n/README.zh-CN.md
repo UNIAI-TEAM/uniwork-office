@@ -44,7 +44,7 @@ PDF、Markdown 和 HTML，并在每份文档旁边配备一个 AI 智能体 —�
   仍然可以随意编辑。
 - **本地优先的设计。** 文件的打开、编辑、保存和转换都在你的电脑上完成。
   PDF → Word / Excel / PowerPoint、Markdown → Word、HTML → Word 全部在本机运行。
-  只有 AI 调用会发送到你选择的服务商。
+  只有 AI 调用会发送到 UniWork AI。
 - **可脚本化，随时可供智能体调用。** 应用自带 `genoffice` 命令行和一份面向
   Claude Code、Codex、Cursor、Gemini CLI、GitHub Copilot、OpenCode 和 Windsurf
   的 agent skill，让编程智能体无需打开任何窗口，就能在你的电脑上创建、转换、
@@ -288,10 +288,10 @@ genoffice open deck/solar-system.pptx
 的形式提供，供那些无法运行终端、或者你不想给它终端权限的助手使用。接入方式
 有两种，**设置 → 集成 → MCP** 中都提供了可直接复制的代码片段：
 
-| 方式                            | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A · `genoffice mcp`**（推荐） | 一个由助手自行启动的 stdio 服务器，GenOffice 无需处于打开状态。每条命令对应一个工具（`info`、`convert`、`create_docx`、`create_xlsx`、`create_pptx`、`create_pdf`、`docs_read` / `docs_apply` / `docs_check`、`sheet_*`、`slides_*`、`render`、`guide`、`search`、`image`、`media`、`open`），再加上分阶段的幻灯片构建流程 `deck_start` → `deck_page` → `deck_build` → `deck_replace`。Ops、spec 和 Markdown 都以内联方式传入，因此没有文件系统的客户端同样可以正常工作。 |
-| **B · 本地 HTTP 服务器**        | 运行在 GenOffice 应用内部，地址为 `http://127.0.0.1:3093/mcp`（Streamable HTTP，兼容旧版 SSE）。它的工具驱动一个可见的 Word 编辑器标签页：`create_session`、`insert_content`、`replace_blocks`、`apply_ops`、`read_document`、`save_session`，你可以实时看着文档成形。默认关闭；在同一个设置面板中开启。                                                                                                                                                                  |
+| 方式                            | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A · `genoffice mcp`**（推荐） | 一个由助手自行启动的 stdio 服务器，GenOffice 无需处于打开状态。每条命令对应一个工具（`info`、`convert`、`create_docx`、`create_xlsx`、`create_pptx`、`create_pdf`、`docs_read` / `docs_apply` / `docs_check`、`sheet_*`、`slides_*`、`render`、`guide`、`open`），再加上分阶段的幻灯片构建流程 `deck_start` → `deck_page` → `deck_build` → `deck_replace`。Ops、spec 和 Markdown 都以内联方式传入，因此没有文件系统的客户端同样可以正常工作。 |
+| **B · 本地 HTTP 服务器**        | 运行在 GenOffice 应用内部，地址为 `http://127.0.0.1:3093/mcp`（Streamable HTTP，兼容旧版 SSE）。它的工具驱动一个可见的 Word 编辑器标签页：`create_session`、`insert_content`、`replace_blocks`、`apply_ops`、`read_document`、`save_session`，你可以实时看着文档成形。默认关闭；在同一个设置面板中开启。                                                                                                                                      |
 
 ```bash
 # Claude Code
@@ -307,29 +307,7 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 `/Applications/GenOffice.app/Contents/Resources/cli/genoffice`；设置面板会
 打印出你本机安装的确切路径）。这个服务器自带工作流说明，并把操作参考文档以
 `genoffice://guide/*` 资源的形式暴露出来，因此不需要额外的 skill；skill 和
-MCP 服务器可以共存，由助手自行选择使用哪一个。云端能力（`search`、`image`、
-`media`）仍然经由 GenOffice 中配置的服务商完成；其余一切都在本机运行，
-`GENOFFICE_ALLOWED_ROOTS` 会把每个工具都限制在你列出的文件夹之内。
-
-上方演示中的可再生能源演示文稿，就是仅接入 `genoffice` MCP 服务器时，
-Claude Code 里一句提示词从协议层面呈现出的样子：
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-三十八次调用，大约十三分钟，助手全程没有碰过终端：图表、照片、指南、检查和渲染结果都是作为 MCP 工具结果传递的。只有 `search` 和 `media` 离开过本机，发往 GenOffice 中配置的服务商。
+MCP 服务器可以共存，由助手自行选择使用哪一个。`GENOFFICE_ALLOWED_ROOTS` 会把每个工具都限制在你列出的文件夹之内。
 
 <a id="download"></a>
 

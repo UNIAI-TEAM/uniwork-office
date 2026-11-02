@@ -50,7 +50,7 @@ kepada anda dengan tepat apa yang disentuhnya.
 - **Setempat mengikut reka bentuk.** Fail dibuka, disunting, disimpan dan
   ditukar terus pada mesin anda. PDF → Word / Excel / PowerPoint, Markdown →
   Word dan HTML → Word semuanya berjalan di peranti sendiri. Hanya panggilan
-  AI yang keluar dari mesin, kepada pembekal pilihan anda.
+  AI yang keluar dari mesin, kepada UniWork AI.
 - **Boleh dijalankan melalui skrip dan sedia untuk agen.** Aplikasi ini
   disertakan dengan baris arahan `genoffice` dan skill untuk Claude Code,
   Codex, Cursor, Gemini CLI, GitHub Copilot, OpenCode dan Windsurf, jadi agen
@@ -313,10 +313,10 @@ untuk pembantu yang tidak boleh menjalankan terminal, atau yang anda lebih
 suka tidak diberi satu. Terdapat dua cara untuk masuk, kedua-duanya
 ditunjukkan dengan cebisan sedia salin dalam **Tetapan → Integrasi → MCP**:
 
-| Cara                                | Apa dia                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A · `genoffice mcp`** (disyorkan) | Pelayan stdio yang pembantu mulakan sendiri; GenOffice tidak perlu dibuka. Satu alat bagi setiap arahan (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `search`, `image`, `media`, `open`) ditambah aliran deck berperingkat `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Ops, spesifikasi dan Markdown dihantar terus dalam argumen, jadi klien tanpa sistem fail tetap berfungsi. |
-| **B · Pelayan HTTP tempatan**       | Berjalan di dalam aplikasi GenOffice pada `http://127.0.0.1:3093/mcp` (Streamable HTTP, dengan SSE lama). Alatnya memandu tab editor Word yang kelihatan: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, dan anda melihat dokumen itu terbentuk. Dimatikan secara lalai; hidupkan pada panel tetapan yang sama.                                                                                                                                                    |
+| Cara                                | Apa dia                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A · `genoffice mcp`** (disyorkan) | Pelayan stdio yang pembantu mulakan sendiri; GenOffice tidak perlu dibuka. Satu alat bagi setiap arahan (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `open`) ditambah aliran deck berperingkat `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Ops, spesifikasi dan Markdown dihantar terus dalam argumen, jadi klien tanpa sistem fail tetap berfungsi. |
+| **B · Pelayan HTTP tempatan**       | Berjalan di dalam aplikasi GenOffice pada `http://127.0.0.1:3093/mcp` (Streamable HTTP, dengan SSE lama). Alatnya memandu tab editor Word yang kelihatan: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, dan anda melihat dokumen itu terbentuk. Dimatikan secara lalai; hidupkan pada panel tetapan yang sama.                                                                                                                        |
 
 ```bash
 # Claude Code
@@ -333,35 +333,8 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 tetapan memaparkan laluan tepat untuk pemasangan anda). Pelayan ini membawa
 arahan aliran kerjanya sendiri dan mendedahkan rujukan operasi sebagai
 sumber `genoffice://guide/*`, jadi tiada skill diperlukan; skill dan
-pelayan MCP boleh wujud bersama dan pembantu memilih salah satu. Ciri awan
-(`search`, `image`, `media`) masih melalui pembekal yang ditetapkan dalam
-GenOffice; selebihnya berjalan secara tempatan, dan
-`GENOFFICE_ALLOWED_ROOTS` mengehadkan setiap alat kepada folder yang anda
+pelayan MCP boleh wujud bersama dan pembantu memilih salah satu. `GENOFFICE_ALLOWED_ROOTS` mengehadkan setiap alat kepada folder yang anda
 senaraikan.
-
-Deck tenaga boleh diperbaharui dalam demo di atas ialah gambaran, dari sudut
-protokol, satu gesaan dalam Claude Code yang hanya menyambungkan pelayan
-MCP `genoffice`:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-Tiga puluh lapan panggilan, kira-kira tiga belas minit, dan pembantu itu
-langsung tidak menyentuh shell: rajah, foto, semua panduan, semakan dan
-render bergerak sebagai hasil panggilan alat MCP. Hanya `search` dan `media`
-meninggalkan mesin, kepada pembekal yang dikonfigurasikan dalam GenOffice.
 
 <a id="download"></a>
 

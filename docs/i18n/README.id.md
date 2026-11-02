@@ -49,7 +49,7 @@ perubahan, dan menunjukkan dengan tepat bagian mana yang diubah.
 - **Lokal secara desain.** File dibuka, diedit, disimpan, dan dikonversi di
   perangkat Anda sendiri. Konversi PDF → Word / Excel / PowerPoint, Markdown →
   Word, dan HTML → Word semuanya berjalan on-device. Hanya panggilan AI yang
-  meninggalkan perangkat, menuju penyedia yang Anda pilih.
+  meninggalkan perangkat, menuju UniWork AI.
 - **Dapat dijalankan lewat skrip dan siap untuk agen.** Aplikasi ini
   menyertakan baris perintah `genoffice` dan sebuah skill untuk Claude Code,
   Codex, Cursor, Gemini CLI, GitHub Copilot, OpenCode, dan Windsurf, sehingga
@@ -311,10 +311,10 @@ untuk asisten yang tidak bisa menjalankan terminal, atau yang tidak ingin
 Anda beri akses terminal. Ada dua cara masuk, keduanya ditampilkan dengan
 cuplikan siap salin di **Pengaturan → Integrasi → MCP**:
 
-| Cara                                 | Apa itu                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A · `genoffice mcp`** (disarankan) | Server stdio yang dijalankan sendiri oleh asisten; GenOffice tidak perlu terbuka. Satu alat per perintah (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `search`, `image`, `media`, `open`) plus alur deck bertahap `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Ops, spesifikasi, dan Markdown dikirim inline, jadi client tanpa sistem file pun tetap bisa jalan. |
-| **B · Server HTTP lokal**            | Berjalan di dalam aplikasi GenOffice pada `http://127.0.0.1:3093/mcp` (Streamable HTTP, dengan SSE lama). Alatnya menjalankan tab editor Word yang terlihat: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, dan Anda menyaksikan dokumen terbentuk. Mati secara default; nyalakan di panel pengaturan yang sama.                                                                                                                                   |
+| Cara                                 | Apa itu                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A · `genoffice mcp`** (disarankan) | Server stdio yang dijalankan sendiri oleh asisten; GenOffice tidak perlu terbuka. Satu alat per perintah (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `open`) plus alur deck bertahap `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Ops, spesifikasi, dan Markdown dikirim inline, jadi client tanpa sistem file pun tetap bisa jalan. |
+| **B · Server HTTP lokal**            | Berjalan di dalam aplikasi GenOffice pada `http://127.0.0.1:3093/mcp` (Streamable HTTP, dengan SSE lama). Alatnya menjalankan tab editor Word yang terlihat: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, dan Anda menyaksikan dokumen terbentuk. Mati secara default; nyalakan di panel pengaturan yang sama.                                                                                                       |
 
 ```bash
 # Claude Code
@@ -331,34 +331,8 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 pengaturan menampilkan path persis untuk instalasi Anda). Server ini
 membawa instruksi alur kerjanya sendiri dan mengekspos referensi op sebagai
 resource `genoffice://guide/*`, jadi skill tidak diperlukan; skill dan
-server MCP bisa berdampingan dan asisten memilih salah satunya. Fitur cloud
-(`search`, `image`, `media`) tetap lewat provider yang dikonfigurasi di
-GenOffice; sisanya berjalan lokal, dan `GENOFFICE_ALLOWED_ROOTS` membatasi
+server MCP bisa berdampingan dan asisten memilih salah satunya. `GENOFFICE_ALLOWED_ROOTS` membatasi
 setiap alat hanya ke folder yang Anda daftarkan.
-
-Deck energi terbarukan dalam demo di atas adalah gambaran, dari sisi
-protokol, satu prompt di Claude Code yang hanya menyambungkan server MCP
-`genoffice`:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-Tiga puluh delapan panggilan, sekitar tiga belas menit, dan asisten sama
-sekali tidak menyentuh shell: figur, foto, semua panduan, pemeriksaan, dan
-render berjalan sebagai hasil panggilan alat MCP. Hanya `search` dan `media`
-yang keluar dari mesin, ke penyedia yang dikonfigurasi di GenOffice.
 
 <a id="download"></a>
 

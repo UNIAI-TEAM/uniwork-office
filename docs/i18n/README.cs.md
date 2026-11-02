@@ -48,7 +48,7 @@ provede požadovanou úpravu a přesně vám ukáže, čeho se dotkl.
 - **Lokální už z principu.** Soubory se otevírají, upravují, ukládají
   i převádějí přímo na vašem počítači. PDF → Word / Excel / PowerPoint
   a Markdown → Word i HTML → Word běží celé na zařízení. Zařízení opouštějí
-  jen volání AI, a to k poskytovateli, kterého si sami vyberete.
+  jen volání AI, a to do UniWork AI.
 - **Skriptovatelný a připravený pro agenty.** Aplikace obsahuje příkazový
   řádek `genoffice` a skill pro Claude Code, Codex, Cursor, Gemini CLI,
   GitHub Copilot, OpenCode a Windsurf, takže kódovací agent může na vašem
@@ -307,10 +307,10 @@ pro asistenty, kteří neumí spustit terminál nebo kterým byste ho raději
 nedávali. Vedou k tomu dvě cesty, obě ukázané s připravenými fragmenty ke
 zkopírování v **Nastavení → Integrace → MCP**:
 
-| Cesta                                | Co to je                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **A · `genoffice mcp`** (doporučeno) | stdio server, který si asistent spustí sám; GenOffice nemusí být otevřené. Jeden nástroj na příkaz (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `search`, `image`, `media`, `open`) plus fázovaný postup sestavování prezentace `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Operace, specifikace a Markdown se předávají přímo v argumentech, takže funguje i klient bez souborového systému. |
-| **B · Lokální HTTP server**          | Běží uvnitř aplikace GenOffice na `http://127.0.0.1:3093/mcp` (Streamable HTTP, se starším SSE). Jeho nástroje ovládají viditelnou záložku editoru Word: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session` — a vy sledujete, jak dokument vzniká. Ve výchozím stavu vypnutý; zapíná se ve stejném panelu nastavení.                                                                                                                                                                 |
+| Cesta                                | Co to je                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A · `genoffice mcp`** (doporučeno) | stdio server, který si asistent spustí sám; GenOffice nemusí být otevřené. Jeden nástroj na příkaz (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `open`) plus fázovaný postup sestavování prezentace `deck_start` → `deck_page` → `deck_build` → `deck_replace`. Operace, specifikace a Markdown se předávají přímo v argumentech, takže funguje i klient bez souborového systému. |
+| **B · Lokální HTTP server**          | Běží uvnitř aplikace GenOffice na `http://127.0.0.1:3093/mcp` (Streamable HTTP, se starším SSE). Jeho nástroje ovládají viditelnou záložku editoru Word: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session` — a vy sledujete, jak dokument vzniká. Ve výchozím stavu vypnutý; zapíná se ve stejném panelu nastavení.                                                                                                                                     |
 
 ```bash
 # Claude Code
@@ -327,34 +327,8 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 nastavení vypíše přesnou cestu pro vaši instalaci). Server nese vlastní
 instrukce k pracovnímu postupu a zpřístupňuje referenční příručky k operacím
 jako zdroje `genoffice://guide/*`, takže skill není potřeba; skill a MCP
-server mohou koexistovat a asistent si jeden z nich vybere. Cloudové funkce
-(`search`, `image`, `media`) stále jdou přes poskytovatele nastaveného v
-GenOffice; všechno ostatní běží lokálně a `GENOFFICE_ALLOWED_ROOTS` omezuje
+server mohou koexistovat a asistent si jeden z nich vybere. `GENOFFICE_ALLOWED_ROOTS` omezuje
 každý nástroj na složky, které uvedete.
-
-Prezentace o obnovitelné energii z dema výše je to, jak jeden prompt v
-Claude Code s připojeným pouze MCP serverem `genoffice` vypadá ze strany
-protokolu:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-Osmatřicet volání, zhruba třináct minut, a asistent se ani jednou nedotkl
-shellu: obrázky, fotografie, průvodci, kontroly i rendery cestovaly jako
-výsledky volání MCP nástrojů. Pouze `search` a `media` opustily počítač, k
-poskytovateli nastavenému v GenOffice.
 
 <a id="download"></a>
 

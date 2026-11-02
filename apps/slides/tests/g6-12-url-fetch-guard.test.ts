@@ -275,9 +275,11 @@ describe('analyze_media (ai:analyze-media)', () => {
     setUniworkCloudTransport({ analyzeMedia } as never)
   })
   afterEach(() => {
-    expect(analyzeMedia).not.toHaveBeenCalled()
+    // reset first: a failing check below must not leave the cloud signed in for later tests
+    const sent = analyzeMedia.mock.calls.length
     setUniworkCloudStatus(UNIWORK_CLOUD_SIGNED_OUT)
     setUniworkCloudTransport(null)
+    expect(sent, 'a refused reference reached the UniWork cloud').toBe(0)
   })
 
   it.each(BLOCKED.filter((u) => u.startsWith('http')))(

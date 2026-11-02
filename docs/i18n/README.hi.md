@@ -36,7 +36,7 @@ GenOffice, macOS, Windows और Linux के लिए Microsoft Office का 
 
 - **असली फ़ॉर्मैट, बाइट-प्रिज़र्विंग।** सिर्फ़ वही हिस्सा दोबारा लिखा जाता है जिसे आप एडिट करते हैं। फ़ाइल का बाकी हिस्सा बाइट-दर-बाइट वैसा ही रहता है, इसलिए डॉक्यूमेंट Word, Excel और PowerPoint में पहले जैसे ही काम करते रहते हैं।
 - **AI जिसे आप रिव्यू कर सकते हैं।** एडिट्स ट्रैक्ड चेंजेस और डिफ़ के रूप में आते हैं, जिन्हें एक क्लिक में रोलबैक किया जा सकता है। स्प्रेडशीट में पेस्ट किए गए नंबर नहीं, बल्कि लाइव फ़ॉर्मूला मिलते हैं। डेक और पेज कैनवस पर जनरेट होते हैं और पूरी तरह एडिटेबल बने रहते हैं।
-- **डिज़ाइन से ही लोकल।** फ़ाइलें आपकी मशीन पर ही खुलती, एडिट होती, सेव होती और कन्वर्ट होती हैं। PDF → Word / Excel / PowerPoint, Markdown → Word और HTML → Word — यह सभी कन्वर्शन ऑन-डिवाइस होते हैं। मशीन से बाहर सिर्फ़ AI कॉल्स जाती हैं, और वह भी आपके चुने हुए प्रोवाइडर तक।
+- **डिज़ाइन से ही लोकल।** फ़ाइलें आपकी मशीन पर ही खुलती, एडिट होती, सेव होती और कन्वर्ट होती हैं। PDF → Word / Excel / PowerPoint, Markdown → Word और HTML → Word — यह सभी कन्वर्शन ऑन-डिवाइस होते हैं। मशीन से बाहर सिर्फ़ AI कॉल्स जाती हैं, और वह भी UniWork AI तक।
 - **स्क्रिप्ट करने योग्य और एजेंट के लिए तैयार।** ऐप के साथ एक `genoffice` कमांड लाइन और Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, OpenCode और Windsurf के लिए एक skill आती है, ताकि कोई कोडिंग एजेंट बिना कोई विंडो खोले आपकी मशीन पर असली Office फ़ाइलें बना, कन्वर्ट, पढ़ और एडिट कर सके।
 
 **पाएँ:** [macOS](https://github.com/genspark-ai/genoffice/releases/latest) (Apple Silicon और Intel) ·
@@ -281,10 +281,10 @@ genoffice open deck/solar-system.pptx
 जिन्हें आप टर्मिनल नहीं देना चाहते। इसमें आने के दो तरीके हैं, दोनों
 **सेटिंग्स → इंटीग्रेशन → MCP** में कॉपी-रेडी स्निपेट्स के साथ दिखाए गए हैं:
 
-| तरीका                                | क्या है                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A · `genoffice mcp`** (सुझाया गया) | एक stdio सर्वर जिसे असिस्टेंट खुद शुरू करता है; GenOffice का खुला होना ज़रूरी नहीं। हर कमांड के लिए एक टूल (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `search`, `image`, `media`, `open`) है, साथ ही चरणबद्ध डेक फ़्लो `deck_start` → `deck_page` → `deck_build` → `deck_replace`। Ops, spec और Markdown सब इनलाइन पास होते हैं, इसलिए बिना फ़ाइल सिस्टम वाला क्लाइंट भी काम करता है। |
-| **B · लोकल HTTP सर्वर**              | GenOffice ऐप के भीतर `http://127.0.0.1:3093/mcp` पर चलता है (Streamable HTTP, लेगेसी SSE के साथ)। इसके टूल्स एक दिखने वाले Word एडिटर टैब को चलाते हैं: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, और आप डॉक्यूमेंट को आकार लेते देख सकते हैं। डिफ़ॉल्ट रूप से बंद; उसी सेटिंग्स पैनल में चालू करें।                                                                                                                                                  |
+| तरीका                                | क्या है                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A · `genoffice mcp`** (सुझाया गया) | एक stdio सर्वर जिसे असिस्टेंट खुद शुरू करता है; GenOffice का खुला होना ज़रूरी नहीं। हर कमांड के लिए एक टूल (`info`, `convert`, `create_docx`, `create_xlsx`, `create_pptx`, `create_pdf`, `docs_read` / `docs_apply` / `docs_check`, `sheet_*`, `slides_*`, `render`, `guide`, `open`) है, साथ ही चरणबद्ध डेक फ़्लो `deck_start` → `deck_page` → `deck_build` → `deck_replace`। Ops, spec और Markdown सब इनलाइन पास होते हैं, इसलिए बिना फ़ाइल सिस्टम वाला क्लाइंट भी काम करता है। |
+| **B · लोकल HTTP सर्वर**              | GenOffice ऐप के भीतर `http://127.0.0.1:3093/mcp` पर चलता है (Streamable HTTP, लेगेसी SSE के साथ)। इसके टूल्स एक दिखने वाले Word एडिटर टैब को चलाते हैं: `create_session`, `insert_content`, `replace_blocks`, `apply_ops`, `read_document`, `save_session`, और आप डॉक्यूमेंट को आकार लेते देख सकते हैं। डिफ़ॉल्ट रूप से बंद; उसी सेटिंग्स पैनल में चालू करें।                                                                                                                      |
 
 ```bash
 # Claude Code
@@ -301,31 +301,8 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 पैनल आपकी इंस्टॉल की सटीक path दिखाता है)। सर्वर अपने साथ अपनी वर्कफ़्लो
 इंस्ट्रक्शंस लेकर आता है और ऑप रेफ़रेंस को `genoffice://guide/*` resources
 के रूप में एक्सपोज़ करता है, इसलिए किसी skill की ज़रूरत नहीं; skill और
-MCP सर्वर साथ रह सकते हैं और असिस्टेंट खुद एक चुन लेता है। क्लाउड फ़ीचर्स
-(`search`, `image`, `media`) अब भी GenOffice में कॉन्फ़िगर किए गए प्रोवाइडर
-से होकर जाते हैं; बाक़ी सब कुछ लोकल चलता है, और `GENOFFICE_ALLOWED_ROOTS`
+MCP सर्वर साथ रह सकते हैं और असिस्टेंट खुद एक चुन लेता है। `GENOFFICE_ALLOWED_ROOTS`
 हर टूल को आपके बताए फ़ोल्डर्स तक सीमित रखता है।
-
-ऊपर दिए गए डेमो का रिन्यूएबल एनर्जी डेक यही है कि सिर्फ़ `genoffice` MCP
-सर्वर अटैच किए हुए Claude Code में एक प्रॉम्प्ट प्रोटोकॉल की तरफ़ से कैसा
-दिखता है:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-अड़तीस कॉल्स, लगभग तेरह मिनट, और असिस्टेंट ने कभी टर्मिनल को छुआ तक नहीं: आँकड़े, तस्वीरें, गाइड्स, चेक्स और रेंडर्स सब MCP टूल रिज़ल्ट्स के रूप में आए-गए। मशीन से बाहर सिर्फ़ `search` और `media` गए, GenOffice में सेट किए गए प्रोवाइडर तक।
 
 <a id="download"></a>
 

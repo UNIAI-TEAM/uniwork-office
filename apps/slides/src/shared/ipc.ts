@@ -1781,7 +1781,7 @@ export interface SlidesApi {
   setAiSettings: (settings: AiSettings) => Promise<void>
   /** ai-settings.json was rewritten by any renderer; re-read it */
   onAiSettingsChanged: (handler: () => void) => () => void
-  /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */
+  /** shell only: switch to Home and open Settings › Account, UniWork AI sign-in (rejects in standalone) */
   openAiModelSettings: () => Promise<void>
   aiStream: (request: AiStreamRequest) => Promise<void>
   aiStreamCancel: (requestId: string) => Promise<void>

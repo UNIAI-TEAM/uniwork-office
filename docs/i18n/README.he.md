@@ -46,8 +46,7 @@ Windows ו-Linux. היא פותחת ושומרת קבצי `.docx`,‏ `.xlsx` ו
   מודבקים. מצגות ועמודים נוצרים ישירות על הקנבס ונשארים ניתנים לעריכה מלאה.
 - **מקומי מטבעו.** פתיחה, עריכה, שמירה והמרה של קבצים מתבצעות על המחשב שלכם.
   ההמרות PDF → Word / Excel / PowerPoint,‏ Markdown → Word ו-HTML → Word —
-  כולן רצות באופן מקומי במכשיר. רק קריאות ה-AI עוזבות את המכשיר, אל הספק
-  שבחרתם.
+  כולן רצות באופן מקומי במכשיר. רק קריאות ה-AI עוזבות את המכשיר, אל UniWork AI.
 - **ניתן לסקריפטים ומוכן לסוכנים.** האפליקציה מגיעה עם שורת פקודה `genoffice`
   ועם skill עבור Claude Code,‏ Codex,‏ Cursor,‏ Gemini CLI,‏ GitHub Copilot,‏
   OpenCode ו-Windsurf, כך שסוכן קוד יכול ליצור, להמיר, לקרוא ולערוך קבצי
@@ -298,10 +297,10 @@ genoffice open deck/solar-system.pptx
 שתי דרכים להתחבר, שתיהן מוצגות עם קטעי קוד מוכנים להעתקה ב-**הגדרות →
 שילובים → MCP**:
 
-| דרך                              | מה זה                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **A ·‏ `genoffice mcp`** (מומלץ) | שרת stdio שהעוזר מפעיל בעצמו; אין צורך ש-GenOffice יהיה פתוח. כלי אחד לכל פקודה (`info`,‏ `convert`,‏ `create_docx`,‏ `create_xlsx`,‏ `create_pptx`,‏ `create_pdf`,‏ `docs_read` / `docs_apply` / `docs_check`,‏ `sheet_*`,‏ `slides_*`,‏ `render`,‏ `guide`,‏ `search`,‏ `image`,‏ `media`,‏ `open`) ובנוסף תהליך המצגת המדורג `deck_start` → `deck_page` → `deck_build` → `deck_replace`. פעולות, מפרטים ו-Markdown מועברים ישירות בקריאה, כך שגם לקוח בלי מערכת קבצים עובד. |
-| **B · שרת HTTP מקומי**           | רץ בתוך אפליקציית GenOffice בכתובת `http://127.0.0.1:3093/mcp` (Streamable HTTP, עם SSE ישן לתאימות). הכלים שלו מפעילים לשונית עורך Word גלויה: `create_session`,‏ `insert_content`,‏ `replace_blocks`,‏ `apply_ops`,‏ `read_document`,‏ `save_session`, ואתם צופים במסמך מקבל צורה. כבוי כברירת מחדל; הפעילו אותו באותה חלונית הגדרות.                                                                                                                                        |
+| דרך                              | מה זה                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A ·‏ `genoffice mcp`** (מומלץ) | שרת stdio שהעוזר מפעיל בעצמו; אין צורך ש-GenOffice יהיה פתוח. כלי אחד לכל פקודה (`info`,‏ `convert`,‏ `create_docx`,‏ `create_xlsx`,‏ `create_pptx`,‏ `create_pdf`,‏ `docs_read` / `docs_apply` / `docs_check`,‏ `sheet_*`,‏ `slides_*`,‏ `render`,‏ `guide`,‏ `open`) ובנוסף תהליך המצגת המדורג `deck_start` → `deck_page` → `deck_build` → `deck_replace`. פעולות, מפרטים ו-Markdown מועברים ישירות בקריאה, כך שגם לקוח בלי מערכת קבצים עובד. |
+| **B · שרת HTTP מקומי**           | רץ בתוך אפליקציית GenOffice בכתובת `http://127.0.0.1:3093/mcp` (Streamable HTTP, עם SSE ישן לתאימות). הכלים שלו מפעילים לשונית עורך Word גלויה: `create_session`,‏ `insert_content`,‏ `replace_blocks`,‏ `apply_ops`,‏ `read_document`,‏ `save_session`, ואתם צופים במסמך מקבל צורה. כבוי כברירת מחדל; הפעילו אותו באותה חלונית הגדרות.                                                                                                         |
 
 ```bash
 # Claude Code
@@ -318,31 +317,8 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 ההגדרות מציגה את הנתיב המדויק להתקנה שלכם). השרת נושא הוראות תהליך עבודה
 משלו וחושף את מדריכי הפעולות כמשאבי `genoffice://guide/*`, כך שאין צורך
 ב-skill; ה-skill ושרת ה-MCP יכולים להתקיים זה לצד זה, והעוזר בוחר אחד
-מהם. יכולות הענן (`search`,‏ `image`,‏ `media`) עדיין עוברות דרך הספק
-שהוגדר ב-GenOffice; כל השאר רץ מקומית, ו-`GENOFFICE_ALLOWED_ROOTS` מגביל
+מהם. `GENOFFICE_ALLOWED_ROOTS` מגביל
 כל כלי לתיקיות שציינתם.
-
-מצגת האנרגיה המתחדשת בהדגמה למעלה היא איך שנראה פרומפט אחד ב-Claude Code
-עם שרת ה-MCP של `genoffice` בלבד מחובר, מצד הפרוטוקול:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-שלושים ושמונה קריאות, כשלוש עשרה דקות, והעוזר מעולם לא נגע בטרמינל: האיורים,
-התמונות, כל המדריכים, הבדיקות והרינדורים עברו כתוצאות של קריאות לכלי MCP. רק
-`search` ו-`media` יצאו מהמכונה, אל הספק המוגדר ב-GenOffice.
 
 <a id="download"></a>
 

@@ -65,6 +65,8 @@ authoritative list):
   `protocols/anthropic.ts`, `protocols/gemini.ts`, `protocols/gemini-schema.ts`, `protocols/openai-compatible.ts` (its SSE
   reader lives on as `protocols/openai-sse.ts`; port reader fixes by hand)
 - `packages/ai-search/src/parallel-mcp.ts` and the Serper, Serply, Tavily, Parallel and DuckDuckGo search tests
+- `packages/ai-search/src/genoffice-auth.ts` and its test (the Genspark cloud sign-in, deleted earlier with UNI-2289;
+  the UniWork cloud tools replace it)
 - `packages/cli/src/cloud.ts`, `packages/cli/src/commands/image.ts`, `media.ts`, `search.ts`
 - `packages/ui/src/ai-model-picker-options.ts`
 - `apps/shell/src/renderer/src/`: `CreditWallet.tsx`, `credit-wallet.ts`, `ai-usage-ledger.ts`, `my-ai-*.ts`,

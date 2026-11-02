@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
+import { ONBOARDING_COPY } from './onboarding-copy.mjs'
 import { globToRegExp, rebrand } from './rebrand.mjs'
 
 const FIXTURE = {
@@ -256,6 +257,38 @@ test('first-run welcome copy is re-applied per locale and survives a merge', () 
     )
     assert.match(text, /^ {4}onbSkip: 'Skip',$/m)
     assert.ok(!/GO-1|Work Graph|this phase|runtime/.test(text))
+  })
+})
+
+test('the first-run AI line offers the UniWork account only, after a merge too (UNI-2309)', () => {
+  // the en / vi wording before UNI-2309, which an upstream merge or an old copy can bring back
+  const ownKey = /own AI provider key|provider key|own key|khóa AI của riêng|khóa riêng|hay khóa/i
+  for (const locale of ['en', 'vi']) {
+    for (const [key, value] of Object.entries(ONBOARDING_COPY[locale])) {
+      assert.ok(!ownKey.test(value), `${locale}.${key}: ${value}`)
+    }
+  }
+  const merged = [
+    'export const strings = {',
+    '  en: {',
+    '    onbBody2:',
+    "      'Draft, rewrite and explain right inside your documents. Use your UniWork account or your own AI provider key.',",
+    '    onbNote3:',
+    "      'AI is optional. Your documents are edited on your computer; no account or key is needed to open or save files.',",
+    '  },',
+    '  vi: {',
+    '    onbBody2:',
+    "      'Soạn thảo, viết lại và giải thích ngay trong tài liệu của bạn. Dùng tài khoản UniWork hoặc khóa AI của riêng bạn.',",
+    '  },',
+    '}',
+    '',
+  ].join('\n')
+  withFiles({ 'apps/shell/src/renderer/src/strings.ts': merged }, (get) => {
+    const text = get('apps/shell/src/renderer/src/strings.ts')
+    assert.ok(!ownKey.test(text), text)
+    assert.match(text, /AI runs with your UniWork account\./)
+    assert.match(text, /AI chạy bằng tài khoản UniWork của bạn\./)
+    assert.match(text, /no account is needed to open or save files\./)
   })
 })
 

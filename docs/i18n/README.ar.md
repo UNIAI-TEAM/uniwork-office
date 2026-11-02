@@ -48,7 +48,7 @@ GenOffice بديل مجاني ومفتوح المصدر لـ Microsoft Office ع
 - **محلي بالتصميم.** تُفتح الملفات وتُحرَّر وتُحفَظ وتُحوَّل على جهازك مباشرة.
   جميع عمليات التحويل — PDF إلى Word / Excel / PowerPoint، وMarkdown إلى Word،
   وHTML إلى Word — تعمل على الجهاز نفسه. لا يغادر جهازك شيء سوى طلبات الذكاء
-  الاصطناعي، وتُرسَل فقط إلى مزوّد الخدمة الذي تختاره.
+  الاصطناعي، وتُرسَل إلى UniWork AI.
 - **قابل للبرمجة وجاهز للوكلاء.** يأتي التطبيق مع سطر أوامر `genoffice` ومهارة
   لكل من Claude Code وCodex وCursor وGemini CLI وGitHub Copilot وOpenCode
   وWindsurf، ليتمكّن وكيل البرمجة من إنشاء ملفات Office حقيقية وتحويلها
@@ -300,10 +300,10 @@ genoffice open deck/solar-system.pptx
 طريقتان للدخول، وكلتاهما موضَّحتان بمقتطفات جاهزة للنسخ في **الإعدادات →
 التكاملات → MCP**:
 
-| الطريقة                            | ما هي                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A · `genoffice mcp`** (موصى بها) | خادم stdio يشغّله المساعد بنفسه؛ لا حاجة لفتح GenOffice. أداة واحدة لكل أمر (`info`، `convert`، `create_docx`، `create_xlsx`، `create_pptx`، `create_pdf`، `docs_read` / `docs_apply` / `docs_check`، `sheet_*`، `slides_*`، `render`، `guide`، `search`، `image`، `media`، `open`) بالإضافة إلى تدفّق العرض المرحلي `deck_start` → `deck_page` → `deck_build` → `deck_replace`. تُمرَّر العمليات والمواصفات وMarkdown مباشرة ضمن الطلب، لذا يعمل حتى العميل بلا نظام ملفات. |
-| **B · خادم HTTP محلي**             | يعمل داخل تطبيق GenOffice على `http://127.0.0.1:3093/mcp` (Streamable HTTP، مع دعم SSE القديم). تُشغِّل أدواته تبويب محرِّر Word المرئي: `create_session`، `insert_content`، `replace_blocks`، `apply_ops`، `read_document`، `save_session`، وتشاهد المستند وهو يتشكّل. مُعطَّل افتراضيًا؛ فعِّله من لوحة الإعدادات نفسها.                                                                                                                                                   |
+| الطريقة                            | ما هي                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A · `genoffice mcp`** (موصى بها) | خادم stdio يشغّله المساعد بنفسه؛ لا حاجة لفتح GenOffice. أداة واحدة لكل أمر (`info`، `convert`، `create_docx`، `create_xlsx`، `create_pptx`، `create_pdf`، `docs_read` / `docs_apply` / `docs_check`، `sheet_*`، `slides_*`، `render`، `guide`، `open`) بالإضافة إلى تدفّق العرض المرحلي `deck_start` → `deck_page` → `deck_build` → `deck_replace`. تُمرَّر العمليات والمواصفات وMarkdown مباشرة ضمن الطلب، لذا يعمل حتى العميل بلا نظام ملفات. |
+| **B · خادم HTTP محلي**             | يعمل داخل تطبيق GenOffice على `http://127.0.0.1:3093/mcp` (Streamable HTTP، مع دعم SSE القديم). تُشغِّل أدواته تبويب محرِّر Word المرئي: `create_session`، `insert_content`، `replace_blocks`، `apply_ops`، `read_document`، `save_session`، وتشاهد المستند وهو يتشكّل. مُعطَّل افتراضيًا؛ فعِّله من لوحة الإعدادات نفسها.                                                                                                                       |
 
 ```bash
 # Claude Code
@@ -319,33 +319,8 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 `/Applications/GenOffice.app/Contents/Resources/cli/genoffice`؛ تعرض لوحة
 الإعدادات المسار الدقيق لتثبيتك). يحمل الخادم تعليمات سير عمله الخاصة
 ويعرض مراجع العمليات كموارد `genoffice://guide/*`، لذا لا حاجة لأي مهارة؛
-يمكن للمهارة وخادم MCP التعايش معًا، ويختار المساعد أحدهما. الميزات
-السحابية (`search`، `image`، `media`) لا تزال تمرّ عبر المزوِّد المُعدّ في
-GenOffice؛ أما كل شيء آخر فيعمل محليًا، ويحصر `GENOFFICE_ALLOWED_ROOTS` كل
+يمكن للمهارة وخادم MCP التعايش معًا، ويختار المساعد أحدهما. يحصر `GENOFFICE_ALLOWED_ROOTS` كل
 أداة ضمن المجلدات التي تحدّدها.
-
-عرض الطاقة المتجدّدة في العرض التوضيحي أعلاه هو ما يبدو عليه توجيه واحد في
-Claude Code، مع تفعيل خادم MCP الخاص بـ `genoffice` فقط، من جهة البروتوكول:
-
-```text
-capabilities · guide(slides, spec) · guide(slides, design)
-search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
-search(query, images) ×7 · media(url, ask) ×7
-                                         → candidate photos, each one checked to be a real photograph
-deck_start(dir, style, outline)          → outline checked: 8 pages to write
-deck_page(dir, 0, page) … deck_page(dir, 7, page)
-                                         → each page checked against the outline and the palette; one page sent again
-deck_build(dir, out)                     → renewables-2026.pptx, no image failures
-slides_audit(file) · slides_render(file, out)
-                                         → no layout findings; 8 PNGs come back as image content
-deck_replace(dir, n, page) ×3 · slides_render(file, out)
-                                         → three pages fixed after looking at the renders
-```
-
-ثمانية وثلاثون استدعاءً، في نحو ثلاث عشرة دقيقة، دون أن يلمس المساعد أي طرفية:
-الرسوم البيانية والصور وكل الأدلة والفحوصات والعروض المصيَّرة انتقلت كنتائج
-لاستدعاءات أدوات MCP. غادر الجهاز فقط `search` و`media`، إلى المزوّد المهيَّأ
-في GenOffice.
 
 <a id="download"></a>
 

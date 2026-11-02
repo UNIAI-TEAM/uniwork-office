@@ -70,7 +70,7 @@ export const REBRAND_TESTS = ['brand-scan.test.mjs', 'rebrand.test.mjs', 'sync-u
 
 /**
  * Upstream files the fork deleted with the own-key AI (UNI-2309: AI runs only on UniWork AI,
- * UniWork ADR 0051), and their tests. Always left out of the patch, on top of --exclude, so an
+ * UniWork ADR 0051) or with the Genspark cloud sign-in before it (UNI-2289), and their tests. Always left out of the patch, on top of --exclude, so an
  * upstream edit to one is listed under "Left out by --exclude" instead of failing to apply.
  * Only files that came from upstream belong here; see docs/upstream/UPSTREAM_SYNC.md.
  */
@@ -119,6 +119,9 @@ export const DROPPED_UPSTREAM_PATHS = [
   'packages/ai-search/tests/search.test.ts',
   'packages/ai-search/tests/serply.test.ts',
   'packages/ai-search/tests/usable-images.test.ts',
+  // the Genspark cloud sign-in, replaced by the UniWork cloud tools (UNI-2289, 52a0be4eb)
+  'packages/ai-search/src/genoffice-auth.ts',
+  'packages/ai-search/tests/genoffice-auth.test.ts',
   // the genoffice image, media and search commands
   'packages/cli/src/cloud.ts',
   'packages/cli/src/commands/image.ts',
