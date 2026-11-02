@@ -296,7 +296,8 @@ describe('generate_deck local page generation (cloud/gsk unavailable)', () => {
     expect(getPages()).toBe(3)
     expect(localPageCalls.sort((a, b) => a - b)).toEqual([1, 2, 3])
     expect(res.output).toContain('3/3')
-    expect(res.output).toContain('locally')
+    expect(res.output).toContain('Cloud page generation was unavailable')
+    expect(res.output).toContain('generated page by page with UniWork AI instead')
   })
 
   it('pages that fail both pipelines during a cloud→local switch still get the retry round', async () => {

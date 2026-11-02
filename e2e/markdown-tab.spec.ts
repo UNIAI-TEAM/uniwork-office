@@ -3,6 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, expect } from '@playwright/test'
 import { launchShell, closeAndSaveVideo, waitForPageWithUrl, screenshotPath } from './helpers'
+import {
+  signInFromComposerNote,
+  startUniworkAiStub,
+  uniworkAiEnv,
+} from './fixtures/uniwork-ai-ready'
 
 test.describe('markdown editor', () => {
   test('newly opened long Markdown starts at the title', async () => {
@@ -184,10 +189,12 @@ test.describe('markdown editor', () => {
     const mdPath = join(dir, 'summary.md')
     await writeFile(mdPath, '# Topic\n\nSome content worth summarizing.\n')
 
+    const stub = await startUniworkAiStub()
     const launched = await launchShell({
       onboardingSeen: true,
       videoDir: 'markdown-ai-preset',
       openFile: mdPath,
+      env: uniworkAiEnv(stub),
     })
     const { app } = launched
     try {
@@ -202,13 +209,17 @@ test.describe('markdown editor', () => {
 
       await expect(editorPage.locator('.copilot')).toBeVisible()
       // every turn runs on UniWork AI: before its disclosure is acknowledged the preset waits in
-      // the composer; after it, Send lands it as a user message (the reply itself needs sign-in)
+      // the composer; signed out, the composer note keeps it there too. Signed in to an
+      // organization with UniWork AI, Send lands it as a user message (the reply is not stubbed)
       await editorPage.locator('.copilot .ai-uniwork-disclosure-ack').click()
+      await expect(editorPage.locator('.copilot textarea')).toHaveValue(/Summarize/)
+      await signInFromComposerNote(launched, editorPage, stub)
       await editorPage.locator('.copilot textarea').press('Enter')
       await expect(editorPage.locator('.ai-msg-user')).toContainText(/Summarize/)
       await editorPage.screenshot({ path: screenshotPath('markdown-ai-preset') })
     } finally {
       await closeAndSaveVideo(launched, 'markdown-ai-preset')
+      await stub.close()
     }
   })
 

@@ -3,6 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, expect } from '@playwright/test'
 import { launchShell, closeAndSaveVideo, waitForPageWithUrl, screenshotPath } from './helpers'
+import {
+  signInFromComposerNote,
+  startUniworkAiStub,
+  uniworkAiEnv,
+} from './fixtures/uniwork-ai-ready'
 
 test.describe('html editor', () => {
   test('AI HTML quick card opens an html editor tab in preview view with a ribbon', async () => {
@@ -196,10 +201,12 @@ test.describe('html editor', () => {
     const htmlPath = join(dir, 'ai.html')
     await writeFile(htmlPath, '<html><body><h1>Topic</h1><p>Body.</p></body></html>\n')
 
+    const stub = await startUniworkAiStub()
     const launched = await launchShell({
       onboardingSeen: true,
       videoDir: 'html-ai-panel',
       openFile: htmlPath,
+      env: uniworkAiEnv(stub),
     })
     const { app } = launched
     try {
@@ -239,10 +246,12 @@ test.describe('html editor', () => {
         1,
       )
       await composer.fill('Rename the heading to Summary')
-      // every turn runs on UniWork AI: its disclosure is acknowledged once before the first send
+      // every turn runs on UniWork AI: its disclosure is acknowledged before the first send, and
+      // Send waits for a session whose organization offers UniWork AI
       await editorPage.locator('.copilot .ai-uniwork-disclosure-ack').click()
+      await signInFromComposerNote(launched, editorPage, stub)
       await composer.press('Enter')
-      // the instruction lands as a sent user message (the model reply itself needs credentials)
+      // the instruction lands as a sent user message (the model reply is not stubbed)
       await expect(editorPage.locator('.ai-msg-user')).toContainText('Rename the heading')
       await expect(editorPage.locator('.ai-msg-user .ai-msg-attachments img')).toHaveCount(1)
       await expect(editorPage.locator('.copilot .ai-attachments')).toHaveCount(0)
@@ -270,6 +279,7 @@ test.describe('html editor', () => {
       await expect.poll(instructionText).toMatch(/Summarize/)
     } finally {
       await closeAndSaveVideo(launched, 'html-ai-panel')
+      await stub.close()
     }
   })
 
