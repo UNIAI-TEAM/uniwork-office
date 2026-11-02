@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -73,6 +73,11 @@ vi.mock('../src/main/shaped-metrics', () => ({
 }))
 
 import { addPicture, createBlankPptx, openPptx } from '@genoffice/pptx-engine'
+import {
+  UNIWORK_CLOUD_SIGNED_OUT,
+  setUniworkCloudStatus,
+  setUniworkCloudTransport,
+} from '@genoffice/ai-provider'
 import { MAX_REMOTE_IMAGE_BYTES } from '@genoffice/electron-utils'
 import { registerSlidesIpc } from '../src/main/slides-main'
 import { sessions, type Session } from '../src/main/session-state'
@@ -248,21 +253,31 @@ describe('generate_deck / regenerate_slide page pipeline (slides:local-page-gene
 })
 
 describe('analyze_media (ai:analyze-media)', () => {
+  const analyzeMedia = vi.fn(async () => ({ text: 'a picture' }))
   beforeEach(() => {
-    // a BYOK media provider, so the references are loaded locally (the guarded path)
-    const userData = join(env.dir, 'userData')
-    mkdirSync(userData, { recursive: true })
-    writeFileSync(
-      join(userData, 'ai-settings.json'),
-      JSON.stringify({
-        provider: 'gemini',
-        providers: { gemini: { apiKey: 'k', model: 'test-model' } },
-        media: {
-          provider: 'gemini',
-          providers: { gemini: { apiKey: 'k', analysisModel: 'm', imageModel: 'i' } },
-        },
-      }),
-    )
+    // signed in to UniWork with the cloud tools on: the references are loaded locally (the
+    // guarded path) before anything is sent to the UniWork cloud
+    analyzeMedia.mockClear()
+    setUniworkCloudStatus({
+      state: 'ready',
+      enabled: true,
+      tools: {
+        web_search: true,
+        image_search: true,
+        image_generate: true,
+        media_analyze: true,
+        transcribe: true,
+      },
+      credits: null,
+      email: 'lan@example.com',
+      planName: 'Pro',
+    })
+    setUniworkCloudTransport({ analyzeMedia } as never)
+  })
+  afterEach(() => {
+    expect(analyzeMedia).not.toHaveBeenCalled()
+    setUniworkCloudStatus(UNIWORK_CLOUD_SIGNED_OUT)
+    setUniworkCloudTransport(null)
   })
 
   it.each(BLOCKED.filter((u) => u.startsWith('http')))(
