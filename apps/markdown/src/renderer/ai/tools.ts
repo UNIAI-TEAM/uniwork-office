@@ -322,8 +322,8 @@ export const AGENT_TOOLS: AgentToolDef[] = [
 
 // ── executor ──
 
-/** write_document's refusal where no writer reaches the UniWork AI writer route */
-export const WRITER_UNAVAILABLE = 'document writing is not available here'
+/** write_document's refusal when the panel hands the skill no writer */
+const WRITER_UNAVAILABLE = 'document writing is not available here'
 
 function fail(output: string, summary: string): ToolExecution {
   return { output, isError: true, summary }

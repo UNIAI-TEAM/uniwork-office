@@ -711,20 +711,15 @@ export function AiPanel({
           () =>
             cap('imageGeneration') &&
             imageGenerationAvailable(settingsRef.current, gskLoggedInRef.current),
-          // the one-shot writer needs the UniWork AI writer route: the web frame only (UNI-2309)
-          () =>
-            platform() === 'web'
-              ? {
-                  write: (spec, onProgress, signal) =>
-                    runDocWriterRef.current(spec, onProgress, signal),
-                }
-              : undefined,
+          // the one-shot writer runs on the UniWork AI writer route, web and desktop (UNI-2326)
+          () => ({
+            write: (spec, onProgress, signal) => runDocWriterRef.current(spec, onProgress, signal),
+          }),
           () => readOnlyRef.current,
           () => askClarification,
           // an image URL the AI inserts must come from this run's image_search / generate_image
           createImageUrlRegistry({ enforce: () => true }),
           rememberRunPicture,
-          () => platform() === 'web',
         ),
         createSearchSkill(),
       ]),

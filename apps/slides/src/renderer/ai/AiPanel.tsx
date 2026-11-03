@@ -1001,8 +1001,6 @@ export function AiPanel({
       readOnly: () => readOnlyRef.current,
       // every turn runs on UniWork AI
       uniworkAi: () => true,
-      // only the web frame reaches the UniWork AI writer route; the desktop refuses writer calls
-      uniworkWriterRoute: () => platform() === 'web',
       imageUrls: createImageUrlRegistry({
         enforce: () => true,
         attachments: () =>
