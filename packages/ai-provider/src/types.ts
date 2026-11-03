@@ -41,7 +41,7 @@ export interface AiStreamRequest {
   maxTokens?: number
   /**
    * not an agent turn: the loop's context summary or a one-shot writer. UniWork AI refuses both,
-   * except a one-shot that names its `writer`, which the web frame sends to the writer route
+   * except a one-shot that names its `writer`, which goes to the writer route (web and desktop)
    */
   purpose?: AgentRequestPurpose
   /** the one-shot as a UniWork AI writer (kind + input) */
