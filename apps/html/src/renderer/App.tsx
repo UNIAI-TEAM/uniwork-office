@@ -538,7 +538,7 @@ export default function App() {
 
   const onEditorChange = useCallback(
     (next: string) => {
-      editorRef.current?.clearHighlights()
+      // a hand edit keeps the AI wash: it maps through the change and goes with the user's Save
       commitText(next, true)
     },
     [commitText],
@@ -1407,6 +1407,8 @@ export default function App() {
           })
           savedTextRef.current = adopted.savedText
           setSavedText(adopted.savedText)
+          // the AI wash goes with a user Save; an autosave is not the user accepting the change
+          if (origin !== 'auto') editorRef.current?.clearHighlights()
           const saved = adopted.liveText === adopted.savedText
           setSaveState(saved ? 'saved' : 'idle')
           if (!saved) window.htmlApi.setDirty(true)
