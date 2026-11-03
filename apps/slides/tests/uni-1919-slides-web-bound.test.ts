@@ -126,7 +126,7 @@ afterEach(() => {
 /** the UniWork AI selection; every turn runs on UniWork AI, whatever a legacy file names (UNI-2309) */
 const uniworkSettings: AiSettings = { ...settings, provider: 'uniwork' }
 
-/** tools a UniWork AI turn never sees (signed policy; slides-skill UNIWORK_AI_HIDDEN_TOOLS) */
+/** tools a UniWork AI turn sees only on the desktop (slides-skill UNIWORK_AI_HIDDEN_TOOLS, ADR 0054) */
 const UNIWORK_AI_HIDDEN = ['insert_web_image', 'replace_image', 'save_style_template']
 
 /** deck generation runs under UniWork AI, its pages via the writer route (UNI-2276, UNI-2326) */
@@ -186,13 +186,13 @@ describe('the deck tools of a UniWork AI turn, web frame and desktop', () => {
     for (const n of UNIWORK_AI_HIDDEN) expect(legacy, n).not.toContain(n)
   })
 
-  it('a desktop UniWork AI turn is offered the deck tools too (UNI-2326)', async () => {
+  it('a desktop UniWork AI turn is offered the deck and picture tools (UNI-2326, ADR 0054)', async () => {
     installSlidesApi(undefined)
     render({ settings: uniworkSettings })
     expect(access().uniworkAi?.()).toBe(true)
     const skill = createSlidesSkill(access())
     const names = skill.tools.map((t) => t.name)
-    for (const n of UNIWORK_AI_HIDDEN) expect(names, n).not.toContain(n)
+    for (const n of UNIWORK_AI_HIDDEN) expect(names, n).toContain(n)
     for (const n of UNIWORK_AI_DECK_TOOLS) expect(names, n).toContain(n)
     expect(skill.systemPrompt).not.toContain('generate_deck is unavailable')
   })

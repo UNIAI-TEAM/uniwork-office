@@ -143,11 +143,16 @@ export interface DeckAccess {
   /** live predicate: the turn runs on UniWork AI; read before every model request */
   uniworkAi?(): boolean
   /**
-   * image URLs this run's image_search / generate_image returned, reset at every run. Recording only:
-   * UniWork AI turns are not offered insert_web_image / replace_image at all, so no slides tool
-   * consults it for a refusal.
+   * image URLs this run's image_search / generate_image returned, reset at every run.
+   * insert_web_image / replace_image refuse any other URL while it enforces (UniWork AI turns).
    */
   imageUrls?: ImageUrlRegistry
+  /**
+   * live predicate: the host can fetch an image URL into the deck and keep style templates (the
+   * desktop app). Absent or false under UniWork AI: insert_web_image, replace_image and
+   * save_style_template are not offered (the web frame has no such host calls).
+   */
+  pictureTools?(): boolean
   /**
    * Cloud single-page generation (gsk slide_generate), used by generate_deck's self-driven
    * pipeline: given the unified style + this page's brief/layout/images, the cloud service
@@ -1085,17 +1090,24 @@ function hiddenMediaTools(access: DeckAccess): Set<string> {
   return hidden
 }
 
+/** a UniWork AI turn on a host without the picture tools (the web frame) */
+function picturesOff(access: DeckAccess): boolean {
+  return access.uniworkAi?.() === true && access.pictureTools?.() !== true
+}
+
 /** every tool withheld this request: media tools, plus the UniWork AI set */
 function hiddenTools(access: DeckAccess): Set<string> {
   const hidden = hiddenMediaTools(access)
-  if (access.uniworkAi?.()) for (const n of UNIWORK_AI_HIDDEN_TOOLS) hidden.add(n)
+  if (picturesOff(access)) for (const n of UNIWORK_AI_HIDDEN_TOOLS) hidden.add(n)
   return hidden
 }
 
 /**
- * tools a UniWork AI turn never gets (signed policy; mirrored in the server table
- * officeUniworkModulesV1). generate_deck and regenerate_slide write their pages through the
- * writer route (slides.page), on the web frame and the desktop alike (UNI-2326).
+ * tools a UniWork AI turn gets only where the host has them (pictureTools, the desktop app; ADR 0054
+ * of the UniWork repo replaces the G6-09a policy that hid them on every UniWork AI turn). The two
+ * image tools take only a URL this run's image_search / generate_image returned or a chat
+ * attachment (imageUrls). generate_deck and regenerate_slide write their pages through the writer
+ * route (slides.page), on the web frame and the desktop alike (UNI-2326).
  */
 const UNIWORK_AI_HIDDEN_TOOLS: readonly string[] = [
   'insert_web_image',
@@ -1105,11 +1117,11 @@ const UNIWORK_AI_HIDDEN_TOOLS: readonly string[] = [
 
 const UNIWORK_TOOLS_OFF_NOTE = `\n\nNote: ${UNIWORK_AI_HIDDEN_TOOLS.join(', ')} are not available here. Do not call or promise those tools.`
 
-function mediaToolsOffNote(hidden: Set<string>, uniworkAi: boolean): string {
+function mediaToolsOffNote(hidden: Set<string>, noPictures: boolean): string {
   if (hidden.size === 0) return ''
   const plural = hidden.size > 1
-  // insert_web_image is one of the tools UniWork AI turns hide, so it cannot be the fallback there
-  const fallback = uniworkAi ? 'image_search' : 'image_search + insert_web_image'
+  // where the picture tools are hidden, insert_web_image cannot be the fallback
+  const fallback = noPictures ? 'image_search' : 'image_search + insert_web_image'
 
   return `\n\nNote: ${[...hidden].join(' and ')} ${plural ? 'are' : 'is'} currently unavailable (signed out of UniWork, or the UniWork cloud tools are off). Do not call or promise ${plural ? 'them' : 'it'}; for imagery use ${fallback} instead.`
 }
@@ -1157,8 +1169,8 @@ export function createSlidesSkill(access: DeckAccess): AgentSkill {
       const redact = labels.length > 0 ? `\n\n${placeholderInstruction(labels)}` : ''
       return (
         systemPrompt +
-        mediaToolsOffNote(hiddenMediaTools(access), access.uniworkAi?.() === true) +
-        (access.uniworkAi?.() ? UNIWORK_TOOLS_OFF_NOTE : '') +
+        mediaToolsOffNote(hiddenMediaTools(access), picturesOff(access)) +
+        (picturesOff(access) ? UNIWORK_TOOLS_OFF_NOTE : '') +
         (access.readOnly?.() ? VIEW_ONLY_NOTE : '') +
         redact
       )
@@ -1678,6 +1690,8 @@ async function executeTool(
       } else {
         // file:// = a generated image in the local store (the main process only resolves its own files)
         if (!/^(https?|file):\/\//.test(url)) return fail(t('aiFailInsertImage'), 'Invalid url')
+        const refusal = access.imageUrls?.check(url)
+        if (refusal) return fail(t('aiFailInsertImage'), refusal)
         payload = { url }
       }
       const r = await window.slidesApi.insertImageUrl({
@@ -1730,6 +1744,8 @@ async function executeTool(
         payload = { base64: resolved.base64, ext: resolved.ext }
       } else {
         if (!/^(https?|file):\/\//.test(url)) return fail(t(failKey), 'Invalid url')
+        const refusal = access.imageUrls?.check(url)
+        if (refusal) return fail(t(failKey), refusal)
         payload = { url }
       }
       const updated = await window.slidesApi.replacePictureUrl({
