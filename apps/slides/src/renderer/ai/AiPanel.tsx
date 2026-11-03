@@ -1001,6 +1001,8 @@ export function AiPanel({
       readOnly: () => readOnlyRef.current,
       // every turn runs on UniWork AI
       uniworkAi: () => true,
+      // the web frame cannot fetch an image URL into the deck or keep style templates
+      pictureTools: () => platform() !== 'web',
       imageUrls: createImageUrlRegistry({
         enforce: () => true,
         attachments: () =>
