@@ -8,7 +8,7 @@ import {
 } from '@genoffice/ui'
 import { findShortcut } from '@genoffice/shortcuts'
 import { useI18n } from '../i18n/locale'
-import { cap, platform } from '../capabilities'
+import { cap } from '../capabilities'
 import { htmlAria, htmlPlainLabel, htmlSurface, withHtmlHint } from '../shortcuts'
 import { useRibbonFit } from './ribbon-fit'
 import type { StringKey } from '../i18n/locale'
@@ -245,8 +245,6 @@ export function Ribbon(p: Props) {
   const off = notReady || !!p.readOnly
   // read-only AI (open the panel, summarize) stays available on a view-only copy; the editing presets do not
   const viewOnlyTip = p.readOnly ? t('aiViewOnlyNotice') : undefined
-  // Restyle and Theme ask for plan_page, which only the web frame's UniWork AI writer route serves
-  const pagePlanPresets = platform() === 'web'
   // a view-only copy can still be searched (the find panel itself stays read-only)
   const findOff = notReady
   const insertOff = off || !p.canInsert
@@ -392,62 +390,58 @@ export function Ribbon(p: Props) {
                   </span>
                   <span>AI</span>
                 </button>
-                {pagePlanPresets && (
+                <button
+                  type="button"
+                  className="rb-big ai-entry"
+                  data-tip={viewOnlyTip ?? t('aiRestyleBtn')}
+                  disabled={off}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => p.onAiPreset(t('aiRestylePrompt'))}
+                >
+                  <span className="rb-big-icon">
+                    <span className="ai-feature-icon" aria-hidden="true">
+                      <IconWand size={24} />
+                    </span>
+                  </span>
+                  <span>{t('aiRestyleBtn')}</span>
+                </button>
+                <div className="rb-menu-wrap" ref={themeRef}>
                   <button
                     type="button"
-                    className="rb-big ai-entry"
-                    data-tip={viewOnlyTip ?? t('aiRestyleBtn')}
+                    className={`rb-big ai-entry${themeOpen ? ' active' : ''}`}
+                    data-tip={viewOnlyTip ?? t('aiThemeBtn')}
+                    aria-haspopup="menu"
+                    aria-expanded={themeOpen}
                     disabled={off}
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => p.onAiPreset(t('aiRestylePrompt'))}
+                    onClick={() => setThemeOpen((v) => !v)}
                   >
                     <span className="rb-big-icon">
                       <span className="ai-feature-icon" aria-hidden="true">
-                        <IconWand size={24} />
+                        <IconPalette size={24} />
                       </span>
                     </span>
-                    <span>{t('aiRestyleBtn')}</span>
+                    <span>{t('aiThemeBtn')}</span>
                   </button>
-                )}
-                {pagePlanPresets && (
-                  <div className="rb-menu-wrap" ref={themeRef}>
-                    <button
-                      type="button"
-                      className={`rb-big ai-entry${themeOpen ? ' active' : ''}`}
-                      data-tip={viewOnlyTip ?? t('aiThemeBtn')}
-                      aria-haspopup="menu"
-                      aria-expanded={themeOpen}
-                      disabled={off}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => setThemeOpen((v) => !v)}
-                    >
-                      <span className="rb-big-icon">
-                        <span className="ai-feature-icon" aria-hidden="true">
-                          <IconPalette size={24} />
-                        </span>
-                      </span>
-                      <span>{t('aiThemeBtn')}</span>
-                    </button>
-                    {themeOpen && (
-                      <div className="rb-menu" role="menu">
-                        {THEME_DIRECTIONS.map((key) => (
-                          <button
-                            key={key}
-                            type="button"
-                            role="menuitem"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => {
-                              setThemeOpen(false)
-                              p.onAiPreset(t('aiThemePrompt', { direction: t(key) }))
-                            }}
-                          >
-                            {t(key)}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                  {themeOpen && (
+                    <div className="rb-menu" role="menu">
+                      {THEME_DIRECTIONS.map((key) => (
+                        <button
+                          key={key}
+                          type="button"
+                          role="menuitem"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setThemeOpen(false)
+                            p.onAiPreset(t('aiThemePrompt', { direction: t(key) }))
+                          }}
+                        >
+                          {t(key)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="rb-big ai-entry"

@@ -97,7 +97,7 @@ describe('ribbon without a host AI grant', () => {
   })
 })
 
-describe('ribbon presets that ask for plan_page (UNI-2309)', () => {
+describe('ribbon presets that ask for plan_page (UNI-2326)', () => {
   // no LocaleProvider here: the ribbon speaks the module default, zh
   const zh = strings.zh
   const labels = (box: HTMLElement) =>
@@ -105,18 +105,14 @@ describe('ribbon presets that ask for plan_page (UNI-2309)', () => {
       b.textContent?.trim(),
     )
 
-  it('the desktop has no Restyle or Theme: only the web frame reaches the page planner', () => {
-    const shown = labels(renderRibbon({ showAi: true }))
-    expect(shown).not.toContain(zh.aiRestyleBtn)
-    expect(shown).not.toContain(zh.aiThemeBtn)
-    expect(shown).toContain(zh.aiSummarizeBtn)
-  })
-
-  it('the web frame keeps both', () => {
-    vi.stubGlobal('htmlApi', { capabilities: { platform: 'web' } })
-    resetForTest()
-    const shown = labels(renderRibbon({ showAi: true }))
-    expect(shown).toContain(zh.aiRestyleBtn)
-    expect(shown).toContain(zh.aiThemeBtn)
+  it('the desktop and the web frame both show Restyle and Theme: both reach the page planner', () => {
+    for (const web of [false, true]) {
+      if (web) vi.stubGlobal('htmlApi', { capabilities: { platform: 'web' } })
+      resetForTest()
+      const shown = labels(renderRibbon({ showAi: true }))
+      expect(shown, `web: ${web}`).toContain(zh.aiRestyleBtn)
+      expect(shown, `web: ${web}`).toContain(zh.aiThemeBtn)
+      expect(shown, `web: ${web}`).toContain(zh.aiSummarizeBtn)
+    }
   })
 })

@@ -25,12 +25,15 @@ test.describe('html editor', () => {
       const editorPage = await waitForPageWithUrl(app, '://html/')
       await expect(editorPage.locator('.ribbon-body')).toBeVisible()
       await expect(editorPage.locator('.preview-frame')).toBeVisible()
-      // blank document: the desktop has no whole-page writer (UNI-2309), so the AI panel offers
-      // no design / write intent cards, only its starters
+      // blank document: the AI panel offers the design / write intent cards and swaps its starters
       const copilot = editorPage.locator('.copilot')
       if (!(await copilot.isVisible())) await editorPage.locator('.ai-rail').click()
-      await expect(copilot.locator('.ai-starter').first()).toBeVisible()
-      await expect(copilot.getByRole('radio')).toHaveCount(0)
+      const cards = copilot.getByRole('radio')
+      await expect(cards).toHaveCount(2)
+      await expect(cards.first()).toHaveAttribute('aria-checked', 'true')
+      await cards.nth(1).click()
+      await expect(cards.nth(1)).toHaveAttribute('aria-checked', 'true')
+      await expect(copilot.locator('.ai-starter').first()).toHaveText(/Write an article/)
       // preview-only by default; the source pane stays mounted but hidden
       await expect(editorPage.locator('.pane-source')).toBeHidden()
       await editorPage.locator('.rb-view', { hasText: /Source/ }).click()
@@ -263,15 +266,20 @@ test.describe('html editor', () => {
       await toggle.click()
       await expect(editorPage.locator('.ai-msg-user')).toContainText('Rename the heading')
 
-      // page-wide AI entries: Theme and Restyle need the whole-page writer, which only the web
-      // frame has (UNI-2309), so the desktop ribbon leaves them out; Summarize sends the
-      // instruction (or parks it in the composer while a run is still busy)
-      await expect(
-        editorPage.locator('.ribbon').getByRole('button', { name: /^(Theme|Restyle)$/ }),
-      ).toHaveCount(0)
+      // page-wide AI entries: Theme opens a direction menu, a pick sends the instruction
+      // (or parks it in the composer while a run is still busy); Summarize sends right away
+      await editorPage
+        .locator('.ribbon')
+        .getByRole('button', { name: /^Theme$/ })
+        .click()
+      const themeMenu = editorPage.locator('.rb-menu')
+      await expect(themeMenu.getByRole('menuitem')).toHaveCount(5)
+      await themeMenu.getByRole('menuitem', { name: /Minimal/ }).click()
+      await expect(themeMenu).toBeHidden()
       const instructionText = async () =>
         (await editorPage.locator('.ai-msg-user').last().textContent()) +
         (await editorPage.locator('.copilot textarea').inputValue())
+      await expect.poll(instructionText).toMatch(/Minimal/)
       await editorPage
         .locator('.ribbon')
         .getByRole('button', { name: /^AI Summarize$/ })

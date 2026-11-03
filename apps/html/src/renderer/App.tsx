@@ -28,7 +28,6 @@ import {
   type HtmlShortcutCommand,
 } from './shortcuts'
 import { LinkPopover } from './components/LinkPopover'
-import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import { keyHintAfterName } from '@genoffice/shortcuts'
 import { useNarrowFrame } from './narrow-frame'
 import { parseDocText, serializeDocText, type Envelope } from './document/envelope'
@@ -1729,8 +1728,6 @@ export default function App() {
         return applyOps(ops, false)
       },
       replaceAll: (html) => replaceAll(html, true),
-      // the adapter bound feeds the AI through the shared rule: a web frame reads as bound
-      uniworkBound: () => uniworkBoundForAi(uniworkRef.current.bound, platform()),
     },
     getSnapshot: () => ({ text: textRef.current }),
     restoreSnapshot: (snapshot) => replaceAll(snapshot.text, false),
