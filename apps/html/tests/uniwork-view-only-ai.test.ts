@@ -113,21 +113,8 @@ describe('view-only skill (UniWork copy the user may only read)', () => {
   })
 })
 
-function renderRibbon({
-  web = false,
-  ...extra
-}: {
-  uniworkBound?: boolean
-  readOnly?: boolean
-  autoSave?: boolean
-  /** the web frame: Restyle and Theme show only there (UNI-2309) */
-  web?: boolean
-}) {
+function renderRibbon(extra: { uniworkBound?: boolean; readOnly?: boolean; autoSave?: boolean }) {
   stubHtmlApi()
-  if (web)
-    (window as unknown as { htmlApi: Record<string, unknown> }).htmlApi.capabilities = {
-      platform: 'web',
-    }
   resetForTest()
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -183,7 +170,7 @@ describe('Ribbon AI buttons on a view-only copy', () => {
   const label = (b: HTMLButtonElement) => b.textContent?.trim()
 
   it('keeps summarize and turns the editing presets off with the reason as tooltip', () => {
-    const buttons = aiButtons(renderRibbon({ uniworkBound: true, readOnly: true, web: true }))
+    const buttons = aiButtons(renderRibbon({ uniworkBound: true, readOnly: true }))
     const summarize = buttons.find((b) => label(b) === strings.en.aiSummarizeBtn)!
     expect(summarize.disabled).toBe(false)
     const editing = buttons.filter((b) => b !== summarize)
@@ -195,8 +182,7 @@ describe('Ribbon AI buttons on a view-only copy', () => {
   })
 
   it('leaves every preset on for an editable copy', () => {
-    for (const b of aiButtons(renderRibbon({ uniworkBound: true, web: true })))
-      expect(b.disabled).toBe(false)
+    for (const b of aiButtons(renderRibbon({ uniworkBound: true }))) expect(b.disabled).toBe(false)
   })
 })
 

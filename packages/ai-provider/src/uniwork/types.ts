@@ -106,6 +106,11 @@ export interface UniworkChatRequest {
  */
 export interface UniworkChatTransport {
   post(request: UniworkChatRequest): Promise<Response>
+  /**
+   * The same POST on the scope's writer route (`.../ai/uniwork/write`, body `{kind, lang, input}`),
+   * for a one-shot writer inside the open run. Absent: this host has no writer route here.
+   */
+  write?(request: UniworkChatRequest): Promise<Response>
 }
 
 /** which tools may go out with a turn (the module editor tools; cloud tools only with office.ai_cloud) */

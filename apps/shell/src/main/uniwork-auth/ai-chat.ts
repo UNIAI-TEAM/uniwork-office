@@ -4,7 +4,9 @@ import {
   UNIWORK_RUN_HEADER,
   UniworkError,
   aiStreamErrorFields,
+  isAiNetworkError,
   streamUniwork,
+  streamUniworkWriter,
   type AiStreamChunk,
   type AiStreamRequest,
   type StreamCallbacks,
@@ -29,7 +31,8 @@ import { TransportError, type FetchLike } from './transport'
  * - the chat transport the adapter posts through: the document route for a
  *   tab showing a document bound to UniWork, the organization route (+
  *   `module`) for a local file; the device bearer is added here per call and
- *   never leaves main;
+ *   never leaves main. A one-shot writer goes to the same scope's writer
+ *   route (R3 document, R1 organization), inside the turn's run;
  * - the sender webContents -> scope resolver (OQ-P2);
  * - when UniWork AI is offered (EXPERIENCE › S7, desktop);
  * - the `ai:stream` runner for the provider: pings through a Retry-After
@@ -38,7 +41,7 @@ import { TransportError, type FetchLike } from './transport'
  */
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
-const CHAT_ROUTE = '/ai/uniwork/chat/completions'
+const ROUTES = { chat: '/ai/uniwork/chat/completions', write: '/ai/uniwork/write' } as const
 
 // ── Transport ───────────────────────────────────────────────────────
 
@@ -52,17 +55,21 @@ export interface UniworkAiChatTransportDeps {
   online?(): boolean
 }
 
-/** the façade URL of a desktop scope; throws for the web frame route or an id that is not one */
-export function uniworkAiChatUrl(profile: DeploymentProfile, scope: UniworkScope): string {
+/** the façade URL of a desktop scope (chat or writer route); throws for the web frame route or an id that is not one */
+export function uniworkAiChatUrl(
+  profile: DeploymentProfile,
+  scope: UniworkScope,
+  route: keyof typeof ROUTES = 'chat',
+): string {
   const origin = new URL(profile.apiOrigin)
   if (!isAllowedOrigin(origin, profile.channel)) throw new Error('uniwork ai: origin refused')
   switch (scope.kind) {
     case 'document':
       if (!ID.test(scope.documentId)) throw new Error('uniwork ai: invalid document id')
-      return `${origin.origin}/api/v1/documents/${encodeURIComponent(scope.documentId)}${CHAT_ROUTE}`
+      return `${origin.origin}/api/v1/documents/${encodeURIComponent(scope.documentId)}${ROUTES[route]}`
     case 'org':
       if (!ID.test(scope.orgId)) throw new Error('uniwork ai: invalid organization id')
-      return `${origin.origin}/api/v1/orgs/${encodeURIComponent(scope.orgId)}${CHAT_ROUTE}`
+      return `${origin.origin}/api/v1/orgs/${encodeURIComponent(scope.orgId)}${ROUTES[route]}`
     default:
       // the frame route belongs to the web host (frame token), never to the desktop
       throw new Error('uniwork ai: no desktop route for this scope')
@@ -78,21 +85,23 @@ function sessionEnded(): Response {
 }
 
 /**
- * One POST per adapter request. Every answer the server gives resolves as the
- * raw Response (the adapter branches on status, `code` and the id headers);
- * a 401 first gets the account's one refresh + resend, and a 401 that
- * survives it, or no session at all, resolves as a 401. A rejection means the
- * request got no answer (offline, aborted) or the scope has no route here.
+ * One POST per adapter request (chat) or writer call (write). Every answer the
+ * server gives resolves as the raw Response (the adapter branches on status,
+ * `code` and the id headers); a 401 first gets the account's one refresh +
+ * resend, and a 401 that survives it, or no session at all, resolves as a 401.
+ * A rejection means the request got no answer (offline, aborted) or the scope
+ * has no route here.
  */
 export function createUniworkAiChatTransport(
   deps: UniworkAiChatTransportDeps,
-): UniworkChatTransport {
+): Required<UniworkChatTransport> {
   const fetchImpl: FetchLike = deps.fetch ?? ((input, init) => fetch(input, init))
-  return {
-    async post(request: UniworkChatRequest): Promise<Response> {
+  const send =
+    (route: keyof typeof ROUTES) =>
+    async (request: UniworkChatRequest): Promise<Response> => {
       const profile = deps.profile()
       if (!profile) return sessionEnded()
-      const url = uniworkAiChatUrl(profile, request.scope)
+      const url = uniworkAiChatUrl(profile, request.scope, route)
       // auth is this transport's alone: a header from the request never replaces it
       const headers: Record<string, string> = {}
       for (const [name, value] of Object.entries(request.headers)) {
@@ -130,8 +139,8 @@ export function createUniworkAiChatTransport(
         }
         throw error
       }
-    },
-  }
+    }
+  return { post: send('chat'), write: send('write') }
 }
 
 // ── Scope (OQ-P2) ───────────────────────────────────────────────────
@@ -338,6 +347,8 @@ function failureOf(error: unknown): UniworkFailure {
       }
     }
   }
+  // a writer call whose connection broke (the chat adapter already names this one itself)
+  if (isAiNetworkError(error)) return { code: 'disconnected' }
   if (error && typeof error === 'object') {
     const { code, retryAfterSec } = error as { code?: unknown; retryAfterSec?: unknown }
     if (typeof code === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(code)) {
@@ -369,9 +380,11 @@ export function createUniworkAiStreams(deps: UniworkAiStreamDeps): UniworkAiStre
         uniworkCode: failure.code,
         ...pick(failure),
       })
-    // the loop's context summary and the one-shot writers are not the user's question: the server
+    // a one-shot that names its writer runs on the writer route, inside the turn that called it
+    const writer = request.purpose === 'one-shot' ? request.writer : undefined
+    // the loop's context summary and the other one-shots are not the user's question: the server
     // keeps the conversation, so they never go out (the loop then folds old turns mechanically)
-    if (request.purpose) {
+    if (request.purpose && !writer) {
       fail({ code: 'unsupported' })
       return
     }
@@ -422,6 +435,23 @@ export function createUniworkAiStreams(deps: UniworkAiStreamDeps): UniworkAiStre
         return
       }
       if (controller.signal.aborted) throw new Error('aborted')
+      if (writer) {
+        const write = transport.write
+        // a transport without the writer route sends nothing, as a turn without an open run
+        if (!write) throw new UniworkError('unsupported')
+        const written = await streamUniworkWriter(
+          {
+            post: (body, headers, signal) =>
+              write({ scope: resolved.scope, headers, body, signal }),
+            lang: getUiLang(),
+            signal: controller.signal,
+          },
+          { sessionId: request.sessionId, writer },
+          { onDelta: (text) => send({ type: 'delta', text }), onActivity: ping },
+        )
+        send({ type: 'done', ...(written.stopReason ? { stopReason: written.stopReason } : {}) })
+        return
+      }
       let stopReason: string | undefined
       // the renderer's aiRun names the turn by the server's run id as soon as an answer carries it
       let reportedRunId: string | undefined

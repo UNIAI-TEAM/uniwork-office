@@ -1043,14 +1043,10 @@ export function AiPanel({
           () => commentsAccessRef.current,
           () => hfAccessRef.current,
           () => imageGenerationAvailable(settingsRef.current, gskLoggedInRef.current),
-          // the one-shot writer needs the UniWork AI writer route: the web frame only (UNI-2309)
-          () =>
-            isWebFrame()
-              ? {
-                  write: (spec, onProgress, signal) =>
-                    runDocWriterRef.current(spec, onProgress, signal),
-                }
-              : undefined,
+          // the one-shot writer runs on the UniWork AI writer route, web and desktop (UNI-2326)
+          () => ({
+            write: (spec, onProgress, signal) => runDocWriterRef.current(spec, onProgress, signal),
+          }),
           () => pageSetupAccessRef.current,
           () => docExtrasRef.current,
           () => notesAccessRef.current,
@@ -1069,7 +1065,6 @@ export function AiPanel({
                 .filter((a) => ATTACHMENT_IMAGE_EXTS.has(a.ext))
                 .map((a) => a.path),
           }),
-          () => isWebFrame(),
         ),
         createFilesSkill(availableAttachments),
       ]),

@@ -126,13 +126,10 @@ afterEach(() => {
 /** the UniWork AI selection; every turn runs on UniWork AI, whatever a legacy file names (UNI-2309) */
 const uniworkSettings: AiSettings = { ...settings, provider: 'uniwork' }
 
-/** tools a web-frame UniWork AI turn never sees (signed policy; slides-skill UNIWORK_AI_HIDDEN_TOOLS) */
+/** tools a UniWork AI turn never sees (signed policy; slides-skill UNIWORK_AI_HIDDEN_TOOLS) */
 const UNIWORK_AI_HIDDEN = ['insert_web_image', 'replace_image', 'save_style_template']
 
-/**
- * deck generation runs under UniWork AI in the web frame (UNI-2276: pages via the writer route);
- * the desktop refuses writer calls and keeps it hidden
- */
+/** deck generation runs under UniWork AI, its pages via the writer route (UNI-2276, UNI-2326) */
 const UNIWORK_AI_DECK_TOOLS = ['generate_deck', 'regenerate_slide']
 
 const deckCall: AgentToolCall = {
@@ -189,15 +186,15 @@ describe('the deck tools of a UniWork AI turn, web frame and desktop', () => {
     for (const n of UNIWORK_AI_HIDDEN) expect(legacy, n).not.toContain(n)
   })
 
-  it('a desktop UniWork AI turn keeps the deck tools hidden and the "unavailable" sentence', async () => {
+  it('a desktop UniWork AI turn is offered the deck tools too (UNI-2326)', async () => {
     installSlidesApi(undefined)
     render({ settings: uniworkSettings })
     expect(access().uniworkAi?.()).toBe(true)
     const skill = createSlidesSkill(access())
     const names = skill.tools.map((t) => t.name)
-    for (const n of [...UNIWORK_AI_HIDDEN, ...UNIWORK_AI_DECK_TOOLS])
-      expect(names, n).not.toContain(n)
-    expect(skill.systemPrompt).toContain('generate_deck is unavailable')
+    for (const n of UNIWORK_AI_HIDDEN) expect(names, n).not.toContain(n)
+    for (const n of UNIWORK_AI_DECK_TOOLS) expect(names, n).toContain(n)
+    expect(skill.systemPrompt).not.toContain('generate_deck is unavailable')
   })
 
   it('a web deck runs a forced generate_deck and lands its pages', async () => {
@@ -209,13 +206,13 @@ describe('the deck tools of a UniWork AI turn, web frame and desktop', () => {
     expect(getPages()).toBe(2)
   })
 
-  it('a desktop deck has no deck writer (UNI-2309): a forced generate_deck is refused', async () => {
+  it('a desktop deck runs a forced generate_deck and lands its pages (UNI-2326)', async () => {
     installSlidesApi(undefined)
     render({})
     const { run, getPages } = deckRun(access())
     const res = (await createSlidesSkill(run).executeTool(deckCall)) as { isError?: boolean }
-    expect(res.isError).toBe(true)
-    expect(getPages()).toBe(0)
+    expect(res.isError).toBeFalsy()
+    expect(getPages()).toBe(2)
   })
 })
 

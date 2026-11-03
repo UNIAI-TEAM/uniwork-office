@@ -769,8 +769,8 @@ export interface ToolExecution {
   display?: ToolDisplay
 }
 
-/** write_document's refusal where no writer reaches the UniWork AI writer route */
-export const WRITER_UNAVAILABLE = 'document writing is not available here'
+/** write_document's refusal when the panel hands the skill no writer */
+const WRITER_UNAVAILABLE = 'document writing is not available here'
 
 const fail = (summary: string, output: string): ToolExecution => ({
   output,

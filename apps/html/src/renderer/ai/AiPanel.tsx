@@ -819,9 +819,6 @@ export function AiPanel({
             resolveAttachmentSrc: (ref) => resolveAttachmentSrc(ref),
             listAttachmentNames: () => availableAttachments().map((a) => a.name),
             getEditFence: () => fenceRef.current,
-            uniworkBound: () => depsRef.current.access.uniworkBound?.() ?? false,
-            // the page and document writers need the UniWork AI writer route: the web frame only
-            uniworkWriterRoute: () => platform() === 'web',
           },
           () => readOnlyRef.current,
         ),
@@ -830,8 +827,6 @@ export function AiPanel({
         createIntentSkill(
           () => intentRef.current,
           () => isDocEmpty(depsRef.current.access.getText()),
-          // the WRITE directive points at write_document: not where the page has no writer
-          () => depsRef.current.access.uniworkBound?.() === true || platform() !== 'web',
         ),
       ]),
       captureSnapshot: () => depsRef.current.getSnapshot(),
@@ -1404,9 +1399,6 @@ export function AiPanel({
   }, [open, uniworkGate])
 
   const docEmpty = chat.length === 0 && isDocEmpty(deps.access.getText())
-  // a bound page, or a host without the UniWork AI writer route (the desktop), has no whole-page
-  // writer, so the blank-page intent choice is gone: design is the only path
-  const intentBound = deps.access.uniworkBound?.() === true || platform() !== 'web'
 
   const lastEntry = chat.at(-1)
   const panelLiveAnnouncement =
@@ -1521,7 +1513,7 @@ export function AiPanel({
               <div className="ai-chat-empty-title">
                 {t(
                   docEmpty
-                    ? intent === 'write' && !intentBound
+                    ? intent === 'write'
                       ? 'aiEmptyWriteTitle'
                       : 'aiEmptyTitle'
                     : 'aiEmptyDocTitle',
@@ -1530,7 +1522,7 @@ export function AiPanel({
               <div className="ai-chat-empty-body">
                 {t(
                   docEmpty
-                    ? intent === 'write' && !intentBound
+                    ? intent === 'write'
                       ? 'aiEmptyWriteBody'
                       : 'aiEmptyBody'
                     : 'aiEmptyDocBody',
@@ -1538,7 +1530,7 @@ export function AiPanel({
               </div>
               <div className="ai-starter-list">
                 {(docEmpty
-                  ? intent === 'write' && !intentBound
+                  ? intent === 'write'
                     ? WRITE_STARTERS
                     : GENERATE_STARTERS
                   : EDIT_STARTERS
@@ -1886,7 +1878,7 @@ export function AiPanel({
           className="ai-composer"
           style={activeClarify || activeBrief || activePartial ? { display: 'none' } : undefined}
         >
-          {chat.length === 0 && docEmpty && !readOnly && !intentBound && (
+          {chat.length === 0 && docEmpty && !readOnly && (
             <div className="ai-intent-bar">
               <div className="ai-intent-label">{t('aiIntentLabel')}</div>
               <div className="ai-intent-cards" role="radiogroup" aria-label={t('aiIntentLabel')}>

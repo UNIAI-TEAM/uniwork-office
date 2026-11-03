@@ -143,12 +143,6 @@ export interface DeckAccess {
   /** live predicate: the turn runs on UniWork AI; read before every model request */
   uniworkAi?(): boolean
   /**
-   * the host reaches the UniWork AI writer route (the web frame), so a UniWork AI turn can write
-   * pages: generate_deck and regenerate_slide are offered. Absent/false (the desktop, which
-   * refuses writer calls) keeps them hidden under UniWork AI.
-   */
-  uniworkWriterRoute?(): boolean
-  /**
    * image URLs this run's image_search / generate_image returned, reset at every run. Recording only:
    * UniWork AI turns are not offered insert_web_image / replace_image at all, so no slides tool
    * consults it for a refusal.
@@ -1094,34 +1088,22 @@ function hiddenMediaTools(access: DeckAccess): Set<string> {
 /** every tool withheld this request: media tools, plus the UniWork AI set */
 function hiddenTools(access: DeckAccess): Set<string> {
   const hidden = hiddenMediaTools(access)
-  if (access.uniworkAi?.()) for (const n of uniworkHiddenTools(access)) hidden.add(n)
+  if (access.uniworkAi?.()) for (const n of UNIWORK_AI_HIDDEN_TOOLS) hidden.add(n)
   return hidden
 }
 
-/** tools a UniWork AI turn never gets (signed policy; mirrored in the server table officeUniworkModulesV1) */
+/**
+ * tools a UniWork AI turn never gets (signed policy; mirrored in the server table
+ * officeUniworkModulesV1). generate_deck and regenerate_slide write their pages through the
+ * writer route (slides.page), on the web frame and the desktop alike (UNI-2326).
+ */
 const UNIWORK_AI_HIDDEN_TOOLS: readonly string[] = [
   'insert_web_image',
   'replace_image',
-  'regenerate_slide',
   'save_style_template',
-  'generate_deck',
 ]
 
-/** offered back where the host reaches the writer route (the web frame: pages via slides.page) */
-const WRITER_ROUTE_TOOLS: ReadonlySet<string> = new Set(['regenerate_slide', 'generate_deck'])
-
-function uniworkHiddenTools(access: DeckAccess): readonly string[] {
-  return access.uniworkWriterRoute?.()
-    ? UNIWORK_AI_HIDDEN_TOOLS.filter((n) => !WRITER_ROUTE_TOOLS.has(n))
-    : UNIWORK_AI_HIDDEN_TOOLS
-}
-
-function uniworkToolsOffNote(access: DeckAccess): string {
-  const noDeck = access.uniworkWriterRoute?.()
-    ? ''
-    : ' generate_deck is unavailable: do not create a new deck; edit the open one with apply_ops and execute_slide_script.'
-  return `\n\nNote: ${uniworkHiddenTools(access).join(', ')} are not available here.${noDeck} Do not call or promise those tools.`
-}
+const UNIWORK_TOOLS_OFF_NOTE = `\n\nNote: ${UNIWORK_AI_HIDDEN_TOOLS.join(', ')} are not available here. Do not call or promise those tools.`
 
 function mediaToolsOffNote(hidden: Set<string>, uniworkAi: boolean): string {
   if (hidden.size === 0) return ''
@@ -1176,7 +1158,7 @@ export function createSlidesSkill(access: DeckAccess): AgentSkill {
       return (
         systemPrompt +
         mediaToolsOffNote(hiddenMediaTools(access), access.uniworkAi?.() === true) +
-        (access.uniworkAi?.() ? uniworkToolsOffNote(access) : '') +
+        (access.uniworkAi?.() ? UNIWORK_TOOLS_OFF_NOTE : '') +
         (access.readOnly?.() ? VIEW_ONLY_NOTE : '') +
         redact
       )

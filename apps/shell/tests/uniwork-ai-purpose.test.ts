@@ -12,11 +12,12 @@ import { defaultAiSettings, streamUniwork } from '@genoffice/ai-provider'
 import { createUniworkAiStreams, type UniworkAiStreamDeps } from '../src/main/uniwork-auth/ai-chat'
 
 /**
- * G05BE-2: the loop's context-summary call and the one-shot writers
+ * G05BE-2: the loop's context-summary call and a one-shot without a writer
  * (streamText) are not agent turns. UniWork AI keeps the conversation on the
  * server and takes only the user's question, so the runner answers them with
  * `unsupported` before any request; the loop then folds old turns into its
- * mechanical digest.
+ * mechanical digest. A one-shot that names its writer goes to the writer route
+ * (uniwork-ai-writer.test.ts).
  */
 
 const DOC = '01J8X4DOC0N1P2Q3R4S5T6U7'

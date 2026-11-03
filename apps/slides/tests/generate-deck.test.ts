@@ -24,7 +24,7 @@ function makeAccess(opts?: {
   searchImagesMulti?: number
   planImageQueries?: string[]
   styleTemplates?: Record<string, { topic: string; styleSkill: string; createdAt: string }>
-  /** the turn runs on UniWork AI in the web frame (DeckAccess.uniworkAi + uniworkWriterRoute) */
+  /** the turn runs on UniWork AI (DeckAccess.uniworkAi) */
   uniworkAi?: boolean
   /** pageIndex -> the code of a final writer refusal the local writer answers for that page */
   refuse?: Record<number, string>
@@ -50,7 +50,7 @@ function makeAccess(opts?: {
       : {}),
   }
   const access: DeckAccess = {
-    ...(opts?.uniworkAi ? { uniworkAi: () => true, uniworkWriterRoute: () => true } : {}),
+    ...(opts?.uniworkAi ? { uniworkAi: () => true } : {}),
     getSlides: () => [] as RenderSlide[],
     getCurrent: () => 0,
     getSelectedIds: () => [],
