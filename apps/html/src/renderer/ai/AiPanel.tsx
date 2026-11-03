@@ -924,7 +924,7 @@ export function AiPanel({
             tools: last.tools?.filter((tl) => !tl.running),
           }))
           persistMessage('assistant', final, runToolsRef.current)
-          depsRef.current.clearHighlights()
+          // the AI wash stays past the run (G6-09); the next run or a user Save clears it
           // an offer only for an unsaved page the run changed: one card, replacing any older one
           const offer = depsRef.current.onRunDone(runMutatedRef.current)
           setSaveOffer(typeof offer === 'string' ? { name: offer } : null)
@@ -1108,6 +1108,8 @@ export function AiPanel({
     const fence = sendFence(fenceSids)
     fenceRef.current = fence
     runMutatedRef.current = false
+    // a new run starts its own wash: the previous run's marks go
+    depsRef.current.clearHighlights()
     setSaveOffer(null)
     runToolsRef.current = []
     runUsageRef.current = undefined

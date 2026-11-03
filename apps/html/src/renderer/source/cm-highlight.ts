@@ -1,7 +1,10 @@
 import { StateEffect, StateField, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view'
 
-/** transient wash over ranges the AI just wrote; mapped through later edits, cleared on demand */
+/**
+ * wash over ranges the AI wrote; mapped through later edits. It outlives its run (G6-09): the app
+ * clears it on a user Save (an autosave keeps it) and when the next run starts
+ */
 export const addAiRanges = StateEffect.define<Array<[number, number]>>({
   map: (ranges, change) => ranges.map(([a, b]) => [change.mapPos(a), change.mapPos(b, 1)]),
 })
