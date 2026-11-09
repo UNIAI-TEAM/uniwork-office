@@ -687,9 +687,9 @@ export const BUNDLED_FONTS = new Set([
   'GenOffice Poppins',
   'GenOffice DM Sans',
   'GenOffice Tamil',
-  'GenOffice Cordia',
-  'GenOffice Sarabun',
-  'GenOffice Bengali',
+  'UniWork Office Cordia',
+  'UniWork Office Sarabun',
+  'UniWork Office Bengali',
   'GenOffice Fullwidth TC',
   'GenOffice Songti SC',
   'GenOffice Songti TC',
@@ -789,7 +789,7 @@ export function unloadedBundledPrimary(chain: string): string | null {
  * while layout later resolves the loaded alias (0.69/0.25em) as primary.
  */
 function isWebFace(family: string): boolean {
-  return isBundledFont(family) || / GO$/.test(family) || /^GenOffice /.test(family)
+  return isBundledFont(family) || / GO$/.test(family) || /^UniWork Office /.test(family)
 }
 
 /** bundled web face a chain resolves to before any installed family or generic */
@@ -1256,8 +1256,8 @@ export function cssFontFamily(font: string): string {
   // (tools/build-thai-font.py) lead. On Windows the declared name resolves first.
   if (THAI_FONT_RE.test(font.normalize('NFKC').toLowerCase())) {
     const face = /^th sarabunpsk$/i.test(font.normalize('NFKC'))
-      ? 'GenOffice Sarabun'
-      : 'GenOffice Cordia'
+      ? 'UniWork Office Sarabun'
+      : 'UniWork Office Cordia'
     return `${cssChain(font, face, 'Thonburi')},sans-serif`
   }
   const byFace = standInFontFamily(font) ?? substituteFontFamily(font)

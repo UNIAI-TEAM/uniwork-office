@@ -1,6 +1,6 @@
 # Bir kodlama aracısını bağlama
 
-GenOffice, Model Context Protocol'ü konuşur; böylece bir kodlama aracısı belgelerinizi uygulamanın kullandığı motorlarla okuyabilir, yazabilir ve işleyebilir. Aracı bir dosya biçimini tahmin etmez: yazılı işlem şemalarını, yürütücünün doğrulama yaptığı tanımların aynısından alır.
+UniWork Office, Model Context Protocol'ü konuşur; böylece bir kodlama aracısı belgelerinizi uygulamanın kullandığı motorlarla okuyabilir, yazabilir ve işleyebilir. Aracı bir dosya biçimini tahmin etmez: yazılı işlem şemalarını, yürütücünün doğrulama yaptığı tanımların aynısından alır.
 
 ## Uygulamadan kaydetme
 
@@ -14,7 +14,7 @@ Bunu yapacağınız yer **Ayarlar ▸ Tümleştirmeler**'dir. Bölmenin iki yar�
 
 - “~/Downloads/report.md dosyasını Word belgesine dönüştür”
 - “3. çeyrek sonuçlarımız hakkında 6 slaytlık bir sunu hazırla”
-- “budget.xlsx dosyasını PDF’e dönüştür ve GenOffice’te aç”
+- “budget.xlsx dosyasını PDF’e dönüştür ve UniWork Office’te aç”
 
 ## Komut satırından kaydetme
 
@@ -76,7 +76,7 @@ GENOFFICE_MCP_COMPACT_SCHEMAS=1 genoffice mcp
 
 ## Uygulamada ulaşabildikleri
 
-Sunucu diskteki dosyalarla sınırlı değildir. GenOffice çalışırken aracı pencere üzerinden de çalışabilir:
+Sunucu diskteki dosyalarla sınırlı değildir. UniWork Office çalışırken aracı pencere üzerinden de çalışabilir:
 
 - **`open_in_genoffice`** bir dosyayı sekmede açar ve odaklar.
 - **`open_documents`** açık olan her belgeyi listeler — kimlik, tür, yol ve kaydedilmemiş değişiklik olup olmadığı — sonra birinin canlı içeriğini okur, yerinde kaydeder ya da siz atmasını istemedikçe önce kaydederek kapatır.

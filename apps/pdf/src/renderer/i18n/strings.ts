@@ -2027,7 +2027,7 @@ export const strings = {
     aiNetworkError:
       'Ağ sorunu: AI hizmetine ulaşılamadı. Bağlantınızı kontrol edip yeniden deneyin',
     aiCreditsExhausted:
-      'Genspark krediniz bitti. Yüklemek için genspark.ai/pricing adresini ziyaret edin, sonra yeniden deneyin',
+      'UniWork krediniz bitti. Yüklemek için uniworkos.com/pricing adresini ziyaret edin, sonra yeniden deneyin',
     aiToolReadPages: '{start}-{end}. sayfaları oku',
     aiToolSearch: '"{query}" ara ({count} eşleşme)',
     aiToolGoto: '{page}. sayfaya git',
@@ -2266,7 +2266,7 @@ export const strings = {
     removeStamp: 'Bu filigranı / üst bilgiyi / alt bilgiyi seçmek için tıklayın',
     props: 'Özellikler',
     propsTitle: 'Belge özellikleri',
-    ribbonAiAssistant: 'Genspark',
+    ribbonAiAssistant: 'AI',
     ribbonAiAssistantTip: 'AI asistanını aç',
     propTitle: 'Başlık',
     propAuthor: 'Yazar',

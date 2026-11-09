@@ -23,7 +23,7 @@ Claro / Escuro / Seguir o Sistema. O modo Seguir o Sistema acompanha a aparênci
 - **Posição da barra lateral de IA** (esquerda ou direita), **Tamanho do texto do painel de IA** e **Verificação ortográfica no chat de IA**.
 - **Abrir o painel de IA em novos documentos** — desativado, um novo documento começa com o painel recolhido, a um clique de distância.
 - **Salvar automaticamente todos os documentos** ativa a gravação automática por padrão em todos os editores; continua a poder desativá-la para uma janela.
-- **Local de salvamento** com o botão **Alterar** e **App padrão para documentos do Office** para reservar .docx / .xlsx / .pptx ao GenOffice.
+- **Local de salvamento** com o botão **Alterar** e **App padrão para documentos do Office** para reservar .docx / .xlsx / .pptx ao UniWork Office.
 
 ## Mídia e busca de IA
 
@@ -39,17 +39,17 @@ Não são interruptores — cada capacidade escolhe o fornecedor que a serve, e 
 
 ## Associações de aplicativos padrão
 
-As Configurações podem registrar o GenOffice como o aplicativo que abre arquivos .docx / .xlsx / .pptx / .pdf e semelhantes (registro de aplicativo padrão no sistema; confirme quando for solicitado).
+As Configurações podem registrar o UniWork Office como o aplicativo que abre arquivos .docx / .xlsx / .pptx / .pdf e semelhantes (registro de aplicativo padrão no sistema; confirme quando for solicitado).
 
 ## Avisos de software de terceiros e atualizações
 
 - Ajuda ▸ Avisos de software de terceiros: o inventário completo das licenças de código aberto que acompanha o aplicativo.
-- Ajuda ▸ Procurar atualizações…: inicia uma verificação manual; e se houver uma versão mais recente, o GenOffice propõe a instalação.
+- Ajuda ▸ Procurar atualizações…: inicia uma verificação manual; e se houver uma versão mais recente, o UniWork Office propõe a instalação.
 
-## Entrar na Genspark
+## Entrar na UniWork
 
-- O acesso (nas Configurações ou na lista de projetos na nuvem) usa um fluxo de **código de dispositivo**: o GenOffice mostra um código e abre o início de sessão no navegador; e a partir daí o processo prossegue sozinho.
-- O início de sessão serve apenas para: a lista de projetos na nuvem e os modelos hospedados da Genspark. Sem ele, todas as funcionalidades locais e os modelos personalizados continuam a funcionar.
+- O acesso (nas Configurações ou na lista de projetos na nuvem) usa um fluxo de **código de dispositivo**: o UniWork Office mostra um código e abre o início de sessão no navegador; e a partir daí o processo prossegue sozinho.
+- O início de sessão serve apenas para: a lista de projetos na nuvem e os modelos hospedados da UniWork. Sem ele, todas as funcionalidades locais e os modelos personalizados continuam a funcionar.
 - Terminar sessão é um clique nas Configurações.
 
 ## Integração MCP (para usuários avançados / clientes de IA)

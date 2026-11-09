@@ -61,7 +61,7 @@ const STATIC_FORM_FILLS_KEY = PDFName.of('GenOfficeStaticFormFills')
 const DEFAULT_PDF_AUTHOR = 'UniWork Office'
 =======
 /** /T of a new annotation when the request names no author */
-const DEFAULT_ANNOT_AUTHOR = 'GenOffice'
+const DEFAULT_ANNOT_AUTHOR = 'UniWork Office'
 >>>>>>> theirs
 
 const rectsIntersect = (a: readonly number[], b: readonly number[]): boolean =>

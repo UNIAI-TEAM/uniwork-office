@@ -621,8 +621,8 @@ if (!app.isPackaged) {
     // moves once — it sits on the same volume as appData, so the rename is
     // atomic, and a concurrent dev instance keeps its open file handles.
     const appData = app.getPath('appData')
-    const devDir = join(appData, 'GenOffice-Dev')
-    const oldDevDir = join(appData, 'GenOffice Dev')
+    const devDir = join(appData, 'UniWork Office-Dev')
+    const oldDevDir = join(appData, 'UniWork Office Dev')
     let userData = devDir
 >>>>>>> theirs
     if (existsSync(oldDevDir) && !existsSync(devDir)) {
@@ -4873,7 +4873,7 @@ function createShellWindow(): void {
     title: 'UniWork Office',
     ...(icon ? { icon } : {}),
 =======
-    title: 'GenOffice',
+    title: 'UniWork Office',
     // Paint the theme's surface before the renderer's first frame so the window
     // does not flash white in dark mode. nativeTheme.themeSource is already set
     // from the saved theme in app.whenReady, before this window is created.

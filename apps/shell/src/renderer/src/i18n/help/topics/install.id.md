@@ -1,4 +1,4 @@
-# Memasang GenOffice
+# Memasang UniWork Office
 
 Setiap build dipublikasikan di [halaman Rilis](https://github.com/genspark-ai/genoffice/releases/latest). Semuanya berasal dari `main`; installer untuk macOS dan Windows sudah ditandatangani.
 
@@ -18,11 +18,11 @@ Versi lama tetap ada di halaman Rilis.
 
 ## Di macOS
 
-Buka `.dmg` lalu seret **GenOffice** ke Applications. Pada build Intel, peluncuran pertama meminta Anda mengonfirmasi pembukaan: klik kanan aplikasinya di Applications ▸ Buka. Itu Gatekeeper bertemu citra disk yang tampak tidak ditandatangani, bukan unduhan yang rusak.
+Buka `.dmg` lalu seret **UniWork Office** ke Applications. Pada build Intel, peluncuran pertama meminta Anda mengonfirmasi pembukaan: klik kanan aplikasinya di Applications ▸ Buka. Itu Gatekeeper bertemu citra disk yang tampak tidak ditandatangani, bukan unduhan yang rusak.
 
 ## Di Windows
 
-Jalankan installer `.exe`. Ia menaruh GenOffice di menu Start dan mendaftarkan `.docx`, `.xlsx`, `.pptx`, `.pdf` dan sejenisnya sehingga klik ganda pada berkas langsung membukanya.
+Jalankan installer `.exe`. Ia menaruh UniWork Office di menu Start dan mendaftarkan `.docx`, `.xlsx`, `.pptx`, `.pdf` dan sejenisnya sehingga klik ganda pada berkas langsung membukanya.
 
 ## Di Linux
 

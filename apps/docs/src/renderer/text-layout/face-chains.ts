@@ -476,7 +476,7 @@ export const FACE_CHAIN_RULES: ChainRule[] = [
   {
     id: 'nirmala',
     when: (_f, _h, nfkc) => /nirmala/i.test(nfkc),
-    chain: () => [['GenOffice Bengali', 'Kohinoor Bangla', 'Bangla Sangam MN'], 'sans-serif'],
+    chain: () => [['UniWork Office Bengali', 'Kohinoor Bangla', 'Bangla Sangam MN'], 'sans-serif'],
   },
   // Tamil: Latha renders through the bundled Latha-metric face; Vijaya and missing Tamil names lay out as Vijaya on Word for Mac (probe 2026-09-30), whose advances InaiMathi matches within 1 %
   {

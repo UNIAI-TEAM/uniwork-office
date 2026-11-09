@@ -466,7 +466,7 @@ function ensureThirdPartyNotices() {
 // NSIS makes every declared ProgId the extension's default opener; for the
 // office types that is the point, for plain text/JSON and the legacy Word
 // 97-2003 .doc/.dot it would hijack the system editor, so Windows leaves those
-// out (mac/Linux still declare them for Open With). GenOffice opens .doc/.dot
+// out (mac/Linux still declare them for Open With). UniWork Office opens .doc/.dot
 // through its own Open dialog on every platform.
 const WIN_OPEN_WITH_ONLY_EXTS = new Set(['txt', 'json', 'doc', 'dot'])
 const FILE_ASSOCIATIONS = [
@@ -479,7 +479,7 @@ const FILE_ASSOCIATIONS = [
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   },
   {
-    // import-only: opens as a converted .docx copy, GenOffice never writes .doc
+    // import-only: opens as a converted .docx copy, UniWork Office never writes .doc
     ext: 'doc',
     name: 'Word 97-2003 Document',
     role: 'Editor',
@@ -540,7 +540,7 @@ const FILE_ASSOCIATIONS = [
     mimeType: 'text/tab-separated-values',
   },
   {
-    // import-only: opens as a converted .xlsx copy, GenOffice never writes ODF
+    // import-only: opens as a converted .xlsx copy, UniWork Office never writes ODF
     ext: 'ods',
     name: 'OpenDocument Spreadsheet',
     role: 'Editor',
@@ -555,7 +555,7 @@ const FILE_ASSOCIATIONS = [
     mimeType: 'application/vnd.oasis.opendocument.spreadsheet-template',
   },
   {
-    // import-only: opens as a converted .docx copy, GenOffice never writes ODF
+    // import-only: opens as a converted .docx copy, UniWork Office never writes ODF
     ext: 'odt',
     name: 'OpenDocument Text',
     role: 'Editor',
@@ -570,7 +570,7 @@ const FILE_ASSOCIATIONS = [
     mimeType: 'application/vnd.oasis.opendocument.text-template',
   },
   {
-    // import-only: opens as a converted .docx copy, GenOffice never writes HWPX
+    // import-only: opens as a converted .docx copy, UniWork Office never writes HWPX
     ext: 'hwpx',
     name: 'Hancom HWPX Document',
     role: 'Editor',
@@ -586,7 +586,7 @@ const FILE_ASSOCIATIONS = [
     mimeType: 'application/x-hwp',
   },
   {
-    // import-only: opens as a converted .pptx copy, GenOffice never writes ODF
+    // import-only: opens as a converted .pptx copy, UniWork Office never writes ODF
     ext: 'odp',
     name: 'OpenDocument Presentation',
     role: 'Editor',
@@ -1075,7 +1075,7 @@ const config = {
 <<<<<<< ours
         'UniWork Office records your narration when you record a slide show.',
 =======
-        'GenOffice records your narration when you record a slide show.',
+        'UniWork Office records your narration when you record a slide show.',
 >>>>>>> theirs
     },
     notarize: true,
@@ -1132,7 +1132,7 @@ const config = {
     // release builds rename all of them (release block at the end).
 =======
     // openSUSE). Default artifact names are kept on purpose —
-    // GenOffice-<v>.AppImage / genoffice_<v>_amd64.deb — because the public
+    // UniWork Office-<v>.AppImage / genoffice_<v>_amd64.deb — because the public
     // README download links and the already-published linux-v0.5.149 release
     // use them. The arm64 targets reuse the ${arch}-templated deb/rpm names
     // (genoffice_<v>_arm64.deb).

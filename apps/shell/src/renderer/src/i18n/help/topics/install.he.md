@@ -1,4 +1,4 @@
-# התקנת GenOffice
+# התקנת UniWork Office
 
 כל גרסה מתפרסמת ב[עמוד ההפצות](https://github.com/genspark-ai/genoffice/releases/latest). כולן מגיעות מ-`main`; ומתקיני macOS ו-Windows חתומים.
 
@@ -18,11 +18,11 @@
 
 ## ב-macOS
 
-פתחו את ה-`.dmg` וגררו את **GenOffice** אל Applications. בגרסת Intel ההפעלה הראשונה מבקשת אישור לפתיחה: לחצו לחיצה ימנית על האפליקציה ב-Applications ▸ פתיחה. זה Gatekeeper מול דיסק-אימג' שנראה לא חתום, לא הורדה פגומה.
+פתחו את ה-`.dmg` וגררו את **UniWork Office** אל Applications. בגרסת Intel ההפעלה הראשונה מבקשת אישור לפתיחה: לחצו לחיצה ימנית על האפליקציה ב-Applications ▸ פתיחה. זה Gatekeeper מול דיסק-אימג' שנראה לא חתום, לא הורדה פגומה.
 
 ## ב-Windows
 
-הפעילו את מתקין ה-`.exe`. הוא מוסיף את GenOffice לתפריט ההתחלה ורושם `.docx`, `.xlsx`, `.pptx`, `.pdf` ודומים, כך שלחיצה כפולה על קובץ פותחת אותו.
+הפעילו את מתקין ה-`.exe`. הוא מוסיף את UniWork Office לתפריט ההתחלה ורושם `.docx`, `.xlsx`, `.pptx`, `.pdf` ודומים, כך שלחיצה כפולה על קובץ פותחת אותו.
 
 ## ב-Linux
 

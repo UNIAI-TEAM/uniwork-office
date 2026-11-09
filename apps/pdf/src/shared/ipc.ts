@@ -801,7 +801,7 @@ export interface SavePdfRequest {
   decryption?: { userPassword: string }
   markups: MarkupInput[]
   /** Author (/T) of the markups and drawings this save adds; a note keeps its own
-      author when it has one. Omitted → 'GenOffice' */
+      author when it has one. Omitted → 'UniWork Office' */
   annotationAuthor?: string
   /** Saved markup annotations to remove (applied before every other stage) */
   annotDeletes?: AnnotDeleteInput[]

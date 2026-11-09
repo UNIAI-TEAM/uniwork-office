@@ -134,7 +134,7 @@ export class TabManager {
 <<<<<<< ours
     { id: HOME_ID, kind: 'home', view: null, title: 'UniWork Office' },
 =======
-    { id: HOME_ID, kind: 'home', view: null, title: 'GenOffice', lastActiveAt: Date.now() },
+    { id: HOME_ID, kind: 'home', view: null, title: 'UniWork Office', lastActiveAt: Date.now() },
 >>>>>>> theirs
   ]
   private activeId: string = HOME_ID
@@ -685,7 +685,7 @@ export class TabManager {
       id,
       kind: 'help',
       view,
-      title: this.untitled('help', 'GenOffice Help'),
+      title: this.untitled('help', 'UniWork Office Help'),
       lastActiveAt: Date.now(),
     })
     this.activateTab(id)

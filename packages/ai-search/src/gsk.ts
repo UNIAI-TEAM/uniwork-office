@@ -284,7 +284,7 @@ function runGskOnce(
   signal?: AbortSignal,
 ): Promise<unknown> {
   // With no injected key the CLI would independently load its shared login.
-  if (!key) return Promise.reject(new GskAuthError('Sign in to GenOffice to use Genspark'))
+  if (!key) return Promise.reject(new GskAuthError('Sign in to UniWork Office to use UniWork'))
   // inject the resolved key so the CLI bills the same identity as our direct HTTP calls
   return new Promise((resolve, reject) => {
     execFile(
