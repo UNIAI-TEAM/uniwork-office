@@ -12,6 +12,7 @@ import type { FoundSkill, RecommendedSkill } from '../../shared/found-skill'
 
 const api = () => window.aiOfficeIntegrations
 
+<<<<<<< ours
 const ERROR_REASON_KEYS: Record<string, StringKey> = {
   'dir-unreadable': 'intgSkillsErrDirUnreadable',
   'dir-symlink': 'intgSkillsErrDirSymlink',
@@ -48,6 +49,8 @@ const failureReason = (e: unknown, t: TFunc): string => {
   return t(key, { max: detail, name: detail })
 }
 
+=======
+>>>>>>> theirs
 type Notice = { kind: 'done' | 'removed'; name: string } | { kind: 'failed'; reason: string }
 
 export function FoundSkills({ t }: { t: TFunc }) {
@@ -55,7 +58,11 @@ export function FoundSkills({ t }: { t: TFunc }) {
   const [recommended, setRecommended] = useState<RecommendedSkill[]>([])
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
+<<<<<<< ours
   const [tab, setTab] = useState<Category | null>(null)
+=======
+  const [tab, setTab] = useState<Category | 'all' | null>(null)
+>>>>>>> theirs
   const [section, setSection] = useState<Section | null>(null)
 
   const load = useCallback(async () => {
@@ -89,6 +96,7 @@ export function FoundSkills({ t }: { t: TFunc }) {
       setNotice({ kind: 'done', name: skill.name })
       await load()
     } catch (e) {
+<<<<<<< ours
       setNotice({
         kind: 'failed',
         reason: (e instanceof Error ? e.message : String(e)).replace(
@@ -96,6 +104,9 @@ export function FoundSkills({ t }: { t: TFunc }) {
           '',
         ),
       })
+=======
+      setNotice({ kind: 'failed', reason: e instanceof Error ? e.message : String(e) })
+>>>>>>> theirs
     } finally {
       setBusy(false)
     }
@@ -109,6 +120,7 @@ export function FoundSkills({ t }: { t: TFunc }) {
       setNotice({ kind: 'removed', name: skill.name })
       await load()
     } catch (e) {
+<<<<<<< ours
       setNotice({
         kind: 'failed',
         reason: (e instanceof Error ? e.message : String(e)).replace(
@@ -116,6 +128,9 @@ export function FoundSkills({ t }: { t: TFunc }) {
           '',
         ),
       })
+=======
+      setNotice({ kind: 'failed', reason: e instanceof Error ? e.message : String(e) })
+>>>>>>> theirs
     } finally {
       setBusy(false)
     }
@@ -129,7 +144,14 @@ export function FoundSkills({ t }: { t: TFunc }) {
   if (!skills) return null
 
   const categories = CATEGORY_ORDER.filter((c) => recommended.some((s) => categoryOf(s) === c))
+<<<<<<< ours
   const current = tab && categories.includes(tab) ? tab : categories[0]
+=======
+  // 'all' sits ahead of the real categories and is the landing view: the point
+  // of the catalog is to browse everything, not to guess a category first
+  const current: Category | 'all' =
+    tab === 'all' || (tab !== null && categories.includes(tab)) ? (tab as Category | 'all') : 'all'
+>>>>>>> theirs
   const shown: Section = section ?? 'mine'
   const sectionTab = (s: Section, label: string) => (
     <button
@@ -196,7 +218,11 @@ export function FoundSkills({ t }: { t: TFunc }) {
           }
         >
           {notice.kind === 'failed'
+<<<<<<< ours
             ? t('intgSkillsImportFailed', { reason: failureReason(notice.reason, t) })
+=======
+            ? t('intgSkillsImportFailed', { reason: notice.reason })
+>>>>>>> theirs
             : notice.kind === 'done'
               ? t('intgSkillsImportDone', { name: notice.name })
               : t('intgSkillsRemoved', { name: notice.name })}
@@ -227,7 +253,11 @@ export function FoundSkills({ t }: { t: TFunc }) {
       {shown === 'recommended' && categories.length > 0 && (
         <div className="set-intg-list">
           <div className="set-intg-tabs" role="tablist" aria-label={t('intgSkillsRecommended')}>
+<<<<<<< ours
             {categories.map((c) => (
+=======
+            {(['all', ...categories] as const).map((c) => (
+>>>>>>> theirs
               <button
                 key={c}
                 type="button"
@@ -236,11 +266,16 @@ export function FoundSkills({ t }: { t: TFunc }) {
                 className={c === current ? 'set-intg-tab active' : 'set-intg-tab'}
                 onClick={() => setTab(c)}
               >
+<<<<<<< ours
                 {t(CATEGORY_LABELS[c])}
+=======
+                {c === 'all' ? t('intgSkillsCatAll') : t(CATEGORY_LABELS[c])}
+>>>>>>> theirs
               </button>
             ))}
           </div>
           <div role="tabpanel">
+<<<<<<< ours
             {recommended
               .filter((s) => categoryOf(s) === current)
               .map((skill) => (
@@ -265,6 +300,31 @@ export function FoundSkills({ t }: { t: TFunc }) {
                   }
                 />
               ))}
+=======
+            {(current === 'all'
+              ? recommended
+              : recommended.filter((s) => categoryOf(s) === current)
+            ).map((skill) => (
+              <SkillRow
+                key={skill.path}
+                t={t}
+                skill={skill}
+                action={
+                  skill.state === 'installed' ? (
+                    <span className="set-intg-state">{t('intgSkillsInstalledTag')}</span>
+                  ) : (
+                    <button
+                      className="set-btn"
+                      disabled={busy}
+                      onClick={() => void doInstall(skill)}
+                    >
+                      {skill.state === 'outdated' ? t('intgSkillsUpdate') : t('intgSkillsInstall')}
+                    </button>
+                  )
+                }
+              />
+            ))}
+>>>>>>> theirs
           </div>
         </div>
       )}

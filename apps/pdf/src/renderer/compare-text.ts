@@ -128,11 +128,15 @@ export function compareDocuments(left: PageText[], right: PageText[]): CompareRe
     const na = normalizePageText(a.text)
     const nb = normalizePageText(b.text)
     if (na.length > MAX_DIFF_LINES || nb.length > MAX_DIFF_LINES) {
+<<<<<<< ours
       // Past the cap the quadratic LCS is skipped, but identity still is
       // not: a linear join compare separates an identical page from a
       // changed one, so a document with huge pages compared against a copy
       // of itself does not report phantom diffs wholesale.
       const identical = na.length === nb.length && na.join('\n') === nb.join('\n')
+=======
+      const identical = na.length === nb.length && na.every((line, k) => line === nb[k])
+>>>>>>> theirs
       if (identical) {
         pages.push({ pageIndex: i, added: [], removed: [], addedCount: 0, removedCount: 0 })
       } else {
@@ -161,6 +165,7 @@ export function compareDocuments(left: PageText[], right: PageText[]): CompareRe
     equal: pages.every((p) => p.addedCount === 0 && p.removedCount === 0),
   }
 }
+<<<<<<< ours
 
 /** The fixed reasons the main process gives for a document it cannot read for Compare. The
     renderer shows a translated sentence instead of the internal English string. */
@@ -170,3 +175,5 @@ const UNREADABLE_REASONS = new Set([
 ])
 
 export const isCompareUnreadable = (reason: string): boolean => UNREADABLE_REASONS.has(reason)
+=======
+>>>>>>> theirs

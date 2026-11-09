@@ -100,6 +100,7 @@ describe('patchShapeStyles no-op', () => {
     expect(patchShapeStyles(SHAPE, [{}])).toBe(SHAPE)
     expect(patchShapeStyles(SHAPE, [null, undefined])).toBe(SHAPE)
   })
+<<<<<<< ours
 
   it('patches rotation, outline width, fill, and border on a text-less shape and keeps an untouched one byte-identical', () => {
     const textless = buildShapeParagraphXml({
@@ -136,6 +137,8 @@ describe('patchShapeStyles no-op', () => {
     expect(out).toContain('<a:xfrm rot="5400000">')
     expect(out).toContain('<a:ln w="19050">')
   })
+=======
+>>>>>>> theirs
 })
 
 describe('rotation and outline width round-trip through the parser', () => {

@@ -16,6 +16,7 @@ import {
   listProperties,
   listTableStyles,
   listRevisions,
+  countRevisionsElsewhere,
   listStyles,
   openDocument,
   saveDocument,
@@ -80,13 +81,22 @@ export const docsCommand: CommandDef = {
     },
     {
       name: 'properties',
+<<<<<<< ours
       description: 'read: the document properties of the file (core, app, custom)',
+=======
+      description:
+        'read: the document properties of the file (core, app, custom and customTypes — the vt type each custom value is stored as)',
+>>>>>>> theirs
     },
     {
       name: 'ops',
       value: 'file',
       description:
+<<<<<<< ours
         'apply: JSON array of ops (apply_ops entries, plus insert_content / replace_blocks with an html field, insert_image / insert_picture / insert_text_box, insert_chart / edit_chart, set_header_footer, set_page_setup / insert_section_break, set_watermark, define_style, add_comment / reply_comment / resolve_comment / delete_comment, accept_changes / reject_changes, insert_footnote / insert_endnote / delete_note, wrap_content_control / unwrap_content_control); "-" reads stdin. See `genoffice guide docs`.',
+=======
+        'apply: JSON array of ops (apply_ops entries, plus insert_content / replace_blocks with an html field, insert_image / insert_picture / insert_text_box, insert_chart / edit_chart, set_header_footer, set_page_setup / insert_section_break, set_watermark, define_style, add_comment / reply_comment / resolve_comment / delete_comment, accept_changes / reject_changes, insert_footnote / insert_endnote / delete_note, wrap_content_control / unwrap_content_control, remove_parts (strip customXml / web-extension package parts for metadata scrubs)); "-" reads stdin. See `genoffice guide docs`.',
+>>>>>>> theirs
     },
     {
       name: 'track',
@@ -97,7 +107,11 @@ export const docsCommand: CommandDef = {
       name: 'author',
       value: 'name',
       description:
+<<<<<<< ours
         'apply --track / compare: author of the tracked changes (compare default: UniWork Office)',
+=======
+        'apply --track / compare: author of the tracked changes (compare default: GenOffice)',
+>>>>>>> theirs
     },
     {
       name: 'date',
@@ -128,7 +142,11 @@ export const docsCommand: CommandDef = {
     {
       name: 'force',
       description:
+<<<<<<< ours
         'apply / compare: overwrite an existing --out file, or write while UniWork Office has the file open',
+=======
+        'apply / compare: overwrite an existing --out file, or write while GenOffice has the file open',
+>>>>>>> theirs
     },
   ],
   async run(args, ctx) {
@@ -202,7 +220,15 @@ async function read(
       detail.html = blockRangeHtml(doc, s, e)
     }
     if (flagBool(args, 'comments')) detail.comments = listComments(doc)
-    if (flagBool(args, 'revisions')) detail.revisions = listRevisions(doc)
+    if (flagBool(args, 'revisions')) {
+      detail.revisions = listRevisions(doc)
+      const elsewhere = await countRevisionsElsewhere(doc)
+      if (elsewhere)
+        detail.revisionsElsewhere = {
+          count: elsewhere,
+          note: 'tracked changes in headers, footers, footnotes or endnotes (not listed); accept_changes / reject_changes with all: true or author / type / before include them',
+        }
+    }
     if (flagBool(args, 'styles')) detail.styles = listStyles(doc)
     if (flagBool(args, 'header-footer')) detail.headerFooter = headerFooterState(doc)
     if (flagBool(args, 'sections')) detail.sections = listSections(doc)

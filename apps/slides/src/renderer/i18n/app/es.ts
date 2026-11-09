@@ -67,6 +67,10 @@ export const es = {
   appStatusAudioInserted: 'Audio insertado (incrustado en el .pptx)',
   appStatusModel3dInserted:
     'Modelo 3D insertado: selecciónelo para girarlo (PowerPoint también lo muestra en 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'No se pudo dibujar el modelo 3D aquí; su imagen no cambia',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'La grabación está vacía; no se insertó nada',
   appStatusRecordingInserted:
     'Grabación de pantalla insertada en la diapositiva actual (webm incrustado)',
@@ -165,9 +169,20 @@ export const es = {
   appPrintProgress: 'Preparando la impresión…',
   appPrintTitle: 'Imprimir',
   appPrintLayoutFull: 'Diapositivas de página completa',
+  appPrintPrinter: 'Impresora',
+  appPrintDefaultPrinter: 'Impresora predeterminada',
+  appPrintSystemDialog: 'Diálogo del sistema…',
+  appPrintCopies: 'Copias',
+  appPrintCollate: 'Intercalar',
+  appPrintDuplex: 'A doble cara',
+  appPrintDuplexOff: 'Por una cara',
+  appPrintDuplexLong: 'Doble cara, margen largo',
+  appPrintDuplexShort: 'Doble cara, margen corto',
   appPrintLayoutHandout2: 'Documentos (2 por página)',
   appPrintLayoutHandout3: 'Documentos (3 por página)',
+  appPrintLayoutHandout4: 'Documentos (4 por página)',
   appPrintLayoutHandout6: 'Documentos (6 por página)',
+  appPrintLayoutHandout9: 'Documentos (9 por página)',
   appPrintLayoutNotes: 'Páginas de notas',
   appPrintRange: 'Intervalo',
   appPrintRangeAll: 'Todas las diapositivas',
@@ -179,6 +194,9 @@ export const es = {
   appPrintPortrait: 'Vertical',
   appPrintLandscape: 'Horizontal',
   appPrintFrame: 'Enmarcar diapositivas',
+  appPrintOrderGroup: 'Orden de las diapositivas',
+  appPrintOrderHorizontal: 'Horizontal',
+  appPrintOrderVertical: 'Vertical',
   appPrintHidden: 'Imprimir diapositivas ocultas',
   appPrintPageCount: '{n} páginas',
   appPrintNoPages: 'No hay diapositivas para imprimir',
@@ -189,6 +207,7 @@ export const es = {
   appCtxSendToBack: 'Enviar al fondo',
   appCtxBringForward: 'Traer adelante',
   appCtxSendBackward: 'Enviar atrás',
+  appCtxRotate: 'Girar',
   appCtxRotateLeft90: 'Girar 90° a la izquierda',
   appCtxRotateRight90: 'Girar 90° a la derecha',
   appCtxFlipH: 'Voltear horizontalmente',
@@ -228,6 +247,8 @@ export const es = {
   appMasterFillNone: 'Sin relleno',
   appMasterStroke: 'Color del contorno…',
   appMasterStrokeNone: 'Sin contorno',
+  appMasterInsertTextBox: 'Cuadro de texto',
+  appMasterInsertShape: 'Formas',
   appStartOpening: 'Abriendo…',
   appReadingSlideTitle:
     'Haga clic para ir a la diapositiva siguiente (Esc para salir de la vista de lectura)',
@@ -257,6 +278,27 @@ export const es = {
     'La duración total de la presentación fue {duration}. ¿Desea guardar los intervalos de las diapositivas para el avance automático?',
   appRehearseDiscard: 'No guardar',
   appRehearseSave: 'Guardar',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Grabar narración',
+  appRecordSummary:
+    'Duración de la grabación: {duration}. ¿Guardar la narración y el tiempo de cada diapositiva?',
+  appRecordDiscard: 'No guardar',
+  appRecordSave: 'Guardar',
+  appStatusRecordSaved:
+    'Narración guardada en {count} diapositivas (PowerPoint también la reproduce)',
+  appStatusRecordFailed: 'No se pudo guardar la grabación',
+  appStatusNarrationCleared: 'Narración borrada',
+  appSettingsTitle: 'Configuración de IA',
+  appSettingsAccount: 'Cuenta de Genspark',
+  appSettingsChecking: 'Comprobando…',
+  appSettingsLoggedIn: 'Sesión iniciada',
+  appSettingsLoggedInEmail: 'Sesión iniciada: {email}',
+  appSettingsLoggedOut: 'Sesión no iniciada (las funciones de IA requieren una cuenta de Genspark)',
+  appSettingsLoginPending: 'Esperando el inicio de sesión en el navegador…',
+  appSettingsLogin: 'Iniciar sesión en Genspark',
+  appSettingsModel: 'Modelo',
+>>>>>>> theirs
   appSettingsCancel: 'Cancelar',
   appCropHint: 'Entrar para confirmar · Esc para cancelar · Haga clic fuera para confirmar',
   appStatusZoomsInserted:

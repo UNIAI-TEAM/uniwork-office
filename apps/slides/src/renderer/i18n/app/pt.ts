@@ -9,7 +9,11 @@ export const pt = {
   redactDialogPlaceholder: 'Nome do marcador, ex.: telefone do cliente',
   redactCancel: 'Cancelar',
   redactInsert: 'Ocultar',
+<<<<<<< ours
   redactEnable: 'Clique com o botão direito numa seleção para ocultá-la do modelo.',
+=======
+  redactEnable: 'Clique com o botão direito em uma seleção para ocultá-la do modelo.',
+>>>>>>> theirs
 
   appPhPromptTitle: 'Clique para adicionar um título',
   appPhPromptSubtitle: 'Clique para adicionar um subtítulo',
@@ -67,6 +71,10 @@ export const pt = {
   appStatusAudioInserted: 'Áudio inserido (incorporado ao .pptx)',
   appStatusModel3dInserted:
     'Modelo 3D inserido: selecione-o para girá-lo (o PowerPoint também o mostra em 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'Não foi possível desenhar o modelo 3D aqui; a imagem dele não muda',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'A gravação está vazia; nada foi inserido',
   appStatusRecordingInserted: 'Gravação de tela inserida no slide atual (webm incorporado)',
   appStatusRecording:
@@ -165,9 +173,20 @@ export const pt = {
   appPrintProgress: 'Preparando para imprimir…',
   appPrintTitle: 'Imprimir',
   appPrintLayoutFull: 'Slides em Página Inteira',
+  appPrintPrinter: 'Impressora',
+  appPrintDefaultPrinter: 'Impressora padrão',
+  appPrintSystemDialog: 'Diálogo do sistema…',
+  appPrintCopies: 'Cópias',
+  appPrintCollate: 'Agrupar',
+  appPrintDuplex: 'Frente e verso',
+  appPrintDuplexOff: 'Um lado',
+  appPrintDuplexLong: 'Frente e verso, margem longa',
+  appPrintDuplexShort: 'Frente e verso, margem curta',
   appPrintLayoutHandout2: 'Folhetos (2 por página)',
   appPrintLayoutHandout3: 'Folhetos (3 por página)',
+  appPrintLayoutHandout4: 'Folhetos (4 por página)',
   appPrintLayoutHandout6: 'Folhetos (6 por página)',
+  appPrintLayoutHandout9: 'Folhetos (9 por página)',
   appPrintLayoutNotes: 'Páginas de Anotações',
   appPrintRange: 'Intervalo',
   appPrintRangeAll: 'Todos os slides',
@@ -179,6 +198,9 @@ export const pt = {
   appPrintPortrait: 'Retrato',
   appPrintLandscape: 'Paisagem',
   appPrintFrame: 'Emoldurar slides',
+  appPrintOrderGroup: 'Ordem dos slides',
+  appPrintOrderHorizontal: 'Horizontal',
+  appPrintOrderVertical: 'Vertical',
   appPrintHidden: 'Imprimir slides ocultos',
   appPrintPageCount: '{n} páginas',
   appPrintNoPages: 'Nenhum slide para imprimir',
@@ -190,6 +212,7 @@ export const pt = {
   appCtxSendToBack: 'Enviar para Trás',
   appCtxBringForward: 'Avançar',
   appCtxSendBackward: 'Recuar',
+  appCtxRotate: 'Girar',
   appCtxRotateLeft90: 'Girar 90° para a Esquerda',
   appCtxRotateRight90: 'Girar 90° para a Direita',
   appCtxFlipH: 'Inverter Horizontalmente',
@@ -229,6 +252,8 @@ export const pt = {
   appMasterFillNone: 'Sem Preenchimento',
   appMasterStroke: 'Cor do Contorno…',
   appMasterStrokeNone: 'Sem Contorno',
+  appMasterInsertTextBox: 'Caixa de Texto',
+  appMasterInsertShape: 'Formas',
   appStartOpening: 'Abrindo…',
   appReadingSlideTitle:
     'Clique para ir ao próximo slide (Esc para sair do Modo de Exibição de Leitura)',
@@ -258,6 +283,25 @@ export const pt = {
     'O tempo total da apresentação foi de {duration}. Deseja salvar os intervalos dos slides para o avanço automático?',
   appRehearseDiscard: 'Não Salvar',
   appRehearseSave: 'Salvar',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Gravar Narração',
+  appRecordSummary: 'Duração da gravação: {duration}. Salvar a narração e o tempo de cada slide?',
+  appRecordDiscard: 'Não Salvar',
+  appRecordSave: 'Salvar',
+  appStatusRecordSaved: 'Narração salva em {count} slides (o PowerPoint também a reproduz)',
+  appStatusRecordFailed: 'Não foi possível salvar a gravação',
+  appStatusNarrationCleared: 'Narração limpa',
+  appSettingsTitle: 'Configurações de IA',
+  appSettingsAccount: 'Conta Genspark',
+  appSettingsChecking: 'Verificando…',
+  appSettingsLoggedIn: 'Conectado',
+  appSettingsLoggedInEmail: 'Conectado: {email}',
+  appSettingsLoggedOut: 'Não conectado (os recursos de IA exigem uma conta Genspark)',
+  appSettingsLoginPending: 'Aguardando o login no navegador…',
+  appSettingsLogin: 'Entrar no Genspark',
+  appSettingsModel: 'Modelo',
+>>>>>>> theirs
   appSettingsCancel: 'Cancelar',
   appCropHint: 'Enter para confirmar · Esc para cancelar · Clique fora para confirmar',
   appStatusZoomsInserted:

@@ -1,3 +1,4 @@
+<<<<<<< ours
 import {
   mergeFieldName,
   mergeOutputFileName,
@@ -10,6 +11,15 @@ import { buildDocBytes, type FileActionContext } from '../file-actions'
 import type { PmNode } from '../editor/convert'
 import type { TFunc } from '../i18n/locale'
 import { mergeAllRecords, substituteMergeFields } from './template'
+=======
+import { mergeOutputFileName, type MergeRecord } from '@genoffice/docx-engine'
+import type { MergeOutputMode } from '../../shared/ipc'
+import { buildDocBytes, type FileActionContext } from '../file-actions'
+import type { PmNode } from '../editor/convert'
+import { mergeAllRecords, substituteMergeFields } from './template'
+import { cellContentOf, labelSheetDoc, layoutSection, type MergePageLayout } from './layout'
+
+>>>>>>> theirs
 /**
  * The output half of the mail merge: the documents the merge writes.
  *
@@ -29,6 +39,11 @@ export interface MailMergeRequest {
   fields: readonly string[]
   /** the field the file names come from; empty takes the first field */
   namePattern: string
+<<<<<<< ours
+=======
+  /** the paper the labels or envelopes print on; the label and envelope modes need it */
+  layout?: MergePageLayout
+>>>>>>> theirs
 }
 
 /** one merged document, ready to be written */
@@ -54,6 +69,7 @@ export interface MailMergeResponse {
 }
 
 /**
+<<<<<<< ours
  * A merge writes ordinary local .docx copies of the template: no open password and no UniWork
  * binding. For a password-protected or UniWork-bound document the user must confirm that first
  * (never a silent plaintext copy); the returned string is the i18n key of the question, null
@@ -98,11 +114,19 @@ export function mergeWrittenLabel(tr: TFunc, lang: Lang, n: number): string {
   return tr(isSingular(lang, n) ? 'appMergeWrittenOne' : 'appMergeWritten', { n })
 }
 /**
+=======
+>>>>>>> theirs
  * The documents a merge writes.
  *
  * One document per record is the letter case: every record gets its own
  * letter, named after the record. One document for all the records is the
+<<<<<<< ours
  * directory case: the letters follow each other, each on its own page.
+=======
+ * directory case: the letters follow each other, each on its own page. The
+ * label case is one label-sheet document with the records in a grid; the
+ * envelope case is one document per record on the envelope's paper.
+>>>>>>> theirs
  */
 export async function buildMailMergeFiles(
   ctx: FileActionContext,
@@ -111,6 +135,36 @@ export async function buildMailMergeFiles(
   const editor = ctx.editor
   if (!editor || request.records.length === 0) return []
   const template = editor.getJSON() as PmNode
+<<<<<<< ours
+=======
+  if (request.mode === 'labels' || request.mode === 'envelopes') {
+    if (!request.layout) return []
+    // the output prints on the layout's paper, not the template's
+    const layoutCtx: FileActionContext = {
+      ...ctx,
+      section: layoutSection(request.layout, ctx.section),
+      sectionDirty: true,
+    }
+    if (request.mode === 'labels') {
+      const cells = request.records.map((record) =>
+        cellContentOf(substituteMergeFields(template, record)),
+      )
+      const bytes = await buildDocBytes(layoutCtx, labelSheetDoc(cells, request.layout))
+      if (!bytes) return []
+      return [{ name: mergedDocumentName(ctx), bytes }]
+    }
+    const files: MailMergeFile[] = []
+    for (const record of request.records) {
+      const bytes = await buildDocBytes(layoutCtx, substituteMergeFields(template, record))
+      if (!bytes) continue
+      files.push({
+        name: `${mergeOutputFileName(request.namePattern, record, request.fields)}.docx`,
+        bytes,
+      })
+    }
+    return files
+  }
+>>>>>>> theirs
   if (request.mode === 'perRecord') {
     const files: MailMergeFile[] = []
     for (const record of request.records) {

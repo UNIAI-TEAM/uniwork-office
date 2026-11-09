@@ -66,6 +66,10 @@ export const ru = {
   appStatusAudioInserted: 'Звук вставлен (внедрен в .pptx)',
   appStatusModel3dInserted:
     '3D-модель вставлена: выделите ее, чтобы повернуть (PowerPoint тоже показывает ее в 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'Не удалось отрисовать 3D-модель здесь; ее изображение не изменилось',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'Запись пуста; ничего не вставлено',
   appStatusRecordingInserted: 'Запись экрана вставлена на текущий слайд (внедрен webm)',
   appStatusRecording:
@@ -160,9 +164,20 @@ export const ru = {
   appPrintProgress: 'Подготовка к печати…',
   appPrintTitle: 'Печать',
   appPrintLayoutFull: 'Слайды на всю страницу',
+  appPrintPrinter: 'Принтер',
+  appPrintDefaultPrinter: 'Принтер по умолчанию',
+  appPrintSystemDialog: 'Системный диалог…',
+  appPrintCopies: 'Копии',
+  appPrintCollate: 'Разобрать',
+  appPrintDuplex: 'Двусторонняя печать',
+  appPrintDuplexOff: 'Односторонняя',
+  appPrintDuplexLong: 'Двусторонняя, по длинному краю',
+  appPrintDuplexShort: 'Двусторонняя, по короткому краю',
   appPrintLayoutHandout2: 'Выдачи (2 на странице)',
   appPrintLayoutHandout3: 'Выдачи (3 на странице)',
+  appPrintLayoutHandout4: 'Выдачи (4 на странице)',
   appPrintLayoutHandout6: 'Выдачи (6 на странице)',
+  appPrintLayoutHandout9: 'Выдачи (9 на странице)',
   appPrintLayoutNotes: 'Страницы заметок',
   appPrintRange: 'Диапазон печати',
   appPrintRangeAll: 'Все слайды',
@@ -174,6 +189,9 @@ export const ru = {
   appPrintPortrait: 'Книжная',
   appPrintLandscape: 'Альбомная',
   appPrintFrame: 'Рамка вокруг слайдов',
+  appPrintOrderGroup: 'Порядок слайдов',
+  appPrintOrderHorizontal: 'Горизонтально',
+  appPrintOrderVertical: 'Вертикально',
   appPrintHidden: 'Печатать скрытые слайды',
   appPrintPageCount: 'Страниц: {n}',
   appPrintNoPages: 'Нет слайдов для печати',
@@ -185,6 +203,7 @@ export const ru = {
   appCtxSendToBack: 'На задний план',
   appCtxBringForward: 'Переместить вперед',
   appCtxSendBackward: 'Переместить назад',
+  appCtxRotate: 'Повернуть',
   appCtxRotateLeft90: 'Повернуть на 90° влево',
   appCtxRotateRight90: 'Повернуть на 90° вправо',
   appCtxFlipH: 'Отразить по горизонтали',
@@ -224,6 +243,8 @@ export const ru = {
   appMasterFillNone: 'Без заливки',
   appMasterStroke: 'Цвет контура…',
   appMasterStrokeNone: 'Без контура',
+  appMasterInsertTextBox: 'Надпись',
+  appMasterInsertShape: 'Фигуры',
   appStartOpening: 'Открытие…',
   appReadingSlideTitle:
     'Щелкните, чтобы перейти к следующему слайду (Esc — выйти из режима чтения)',
@@ -253,6 +274,27 @@ export const ru = {
     'Общая продолжительность показа: {duration}. Сохранить время показа слайдов для автоматической смены?',
   appRehearseDiscard: 'Не сохранять',
   appRehearseSave: 'Сохранить',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Записать речевое сопровождение',
+  appRecordSummary:
+    'Длительность записи: {duration}. Сохранить речевое сопровождение и время каждого слайда?',
+  appRecordDiscard: 'Не сохранять',
+  appRecordSave: 'Сохранить',
+  appStatusRecordSaved:
+    'Речевое сопровождение сохранено, слайдов: {count} (PowerPoint его тоже воспроизводит)',
+  appStatusRecordFailed: 'Не удалось сохранить запись',
+  appStatusNarrationCleared: 'Речевое сопровождение очищено',
+  appSettingsTitle: 'Настройки ИИ',
+  appSettingsAccount: 'Учетная запись Genspark',
+  appSettingsChecking: 'Проверка…',
+  appSettingsLoggedIn: 'Выполнен вход',
+  appSettingsLoggedInEmail: 'Выполнен вход: {email}',
+  appSettingsLoggedOut: 'Вход не выполнен (для функций ИИ требуется учетная запись Genspark)',
+  appSettingsLoginPending: 'Ожидание входа в браузере…',
+  appSettingsLogin: 'Войти в Genspark',
+  appSettingsModel: 'Модель',
+>>>>>>> theirs
   appSettingsCancel: 'Отмена',
   appCropHint: 'Enter — подтвердить · Esc — отменить · Щелчок снаружи — подтвердить',
   appStatusZoomsInserted:

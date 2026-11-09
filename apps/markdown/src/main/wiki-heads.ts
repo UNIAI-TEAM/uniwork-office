@@ -1,6 +1,10 @@
 import { readFile } from 'node:fs/promises'
+<<<<<<< ours
 import { extname } from 'node:path'
 import { nodeFs, resolveWikiLinks, type WikiFs } from './wiki-resolve'
+=======
+import { nodeFs, resolveWikiLinks } from './wiki-resolve'
+>>>>>>> theirs
 import type { WikiHeadEntry } from '../shared/ipc'
 
 /**
@@ -17,8 +21,11 @@ const LONE_ID_RE = /^\^([A-Za-z0-9-]+)\s*$/
 /** each kind is capped on its own, so a heading-heavy file still shows its blocks */
 export const MAX_HEAD_ENTRIES_PER_KIND = 200
 
+<<<<<<< ours
 /** note extensions the fragment reader may parse (non-note assets are never read) */
 const NOTE_EXTS = new Set(['.md', '.markdown', '.txt'])
+=======
+>>>>>>> theirs
 /**
  * Headings and block ids of a note's raw text, in document order. Fenced code
  * and the frontmatter block are skipped; a marker alone on a line (the form a
@@ -44,6 +51,7 @@ export function parseWikiHeads(raw: string): WikiHeadEntry[] {
   for (; at < lines.length; at++) {
     const line = lines[at]!
     const open = FENCE_RE.exec(line)
+<<<<<<< ours
     if (open) {
       if (fence === null) fence = open[1]![0]!
       // the closing fence is the same character, at least as long
@@ -52,6 +60,22 @@ export function parseWikiHeads(raw: string): WikiHeadEntry[] {
       continue
     }
     if (fence !== null) continue
+=======
+    if (fence !== null) {
+      // the closing fence is the same character, at least as long, with no info string
+      const run = open?.[1]
+      if (run && run[0] === fence[0] && run.length >= fence.length && line.trim() === run) {
+        fence = null
+        previous = ''
+      }
+      continue
+    }
+    if (open) {
+      fence = open[1]!
+      previous = ''
+      continue
+    }
+>>>>>>> theirs
     if (line.trim() === '') continue
     const lone = LONE_ID_RE.exec(line)
     if (lone) {
@@ -104,17 +128,28 @@ export async function wikiHeads(
   target: string,
   fromPath: string,
   root: string,
+<<<<<<< ours
   fs: WikiFs = nodeFs(),
+=======
+>>>>>>> theirs
 ): Promise<WikiHeadEntry[]> {
   if (!target) return []
   let hit: { found: boolean; path: string } | undefined
   try {
+<<<<<<< ours
     hit = (await resolveWikiLinks([target], { fromPath, root }, fs)).get(target)
   } catch {
     return []
   }
   if (!hit?.found || !hit.path) return []
   if (!NOTE_EXTS.has(extname(hit.path).toLowerCase())) return []
+=======
+    hit = (await resolveWikiLinks([target], { fromPath, root }, nodeFs())).get(target)
+  } catch {
+    return []
+  }
+  if (!hit?.found) return []
+>>>>>>> theirs
   const raw = await readFile(hit.path, 'utf8').catch(() => null)
   return raw === null ? [] : parseWikiHeads(raw)
 }

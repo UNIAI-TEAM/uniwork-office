@@ -12,7 +12,11 @@
  */
 import { deflateSync } from 'node:zlib'
 import { crc32 } from './crc32'
+<<<<<<< ours
 import { glbBounds, isGlbContainer } from './glb-bounds'
+=======
+import { glbBounds } from './glb-bounds'
+>>>>>>> theirs
 import {
   GLB_CONTENT_TYPE,
   MODEL3D_REL_TYPE,
@@ -230,7 +234,11 @@ export function addModel3d(
   opts: NewModel3dOptions,
 ): { slide: Slide; elementId: string } | null {
   const slide = opened.deck.slides[slideIndex]
+<<<<<<< ours
   if (!slide || opts.ext.toLowerCase() !== 'glb' || !isGlbContainer(opts.bytes)) return null
+=======
+  if (!slide || opts.ext.toLowerCase() !== 'glb') return null
+>>>>>>> theirs
 
   const modelPath = newMediaPart(opened, 'model3d', 'glb', opts.bytes)
   ensureDefaultContentType(opened, 'glb', GLB_CONTENT_TYPE)

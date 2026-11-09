@@ -14,6 +14,7 @@ export {
   uniworkCloudToolAvailable,
 } from './uniwork-cloud'
 export type {
+<<<<<<< ours
   UniworkCloudCredits,
   UniworkCloudState,
   UniworkCloudStatus,
@@ -56,3 +57,45 @@ export type {
   ComposerNoteKind,
 } from './ai-notice'
 export type { AiTestFailureKind } from './ai-test-failure'
+=======
+  AiCustomCompat,
+  AiCustomEndpoint,
+  AiCustomModelProfile,
+  AiCustomProfile,
+  AiCustomProtocol,
+  AiProviderConfig,
+  AiProviderId,
+  AiProviderMeta,
+  AiSettings,
+  CodexModelCatalog,
+} from './types'
+export {
+  AI_PROVIDERS,
+  activeProvider,
+  cloudToolsEnabled,
+  DEFAULT_MAX_OUTPUT_TOKENS,
+  MAX_MAX_OUTPUT_TOKENS,
+  MIN_MAX_OUTPUT_TOKENS,
+  clampMaxOutputTokens,
+} from './providers'
+export {
+  activeCustomEndpoint,
+  customEndpointLabel,
+  newCustomEndpointId,
+  removeCustomEndpoint,
+  resolveCustomEndpoints,
+  selectCustomEndpoint,
+  upsertCustomEndpoint,
+} from './custom-endpoints'
+export {
+  AI_CUSTOM_PROTOCOLS,
+  declaredModelProfile,
+  normalizeCustomProfile,
+  resolveCustomProfile,
+} from './custom-profile'
+export type { ResolvedCustomProfile } from './custom-profile'
+export { endpointSupportsVision, getProviderAdapter, modelLacksVision } from './registry'
+export { thinkingShapeFor, type ThinkingEffort, type ThinkingShape } from './thinking-effort'
+export { AI_MEDIA_PROVIDERS, imageGenerationAvailable, mediaAnalysisAvailable } from './media'
+export { AI_SEARCH_PROVIDERS } from './search-settings'
+>>>>>>> theirs

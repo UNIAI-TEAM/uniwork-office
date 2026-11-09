@@ -25,12 +25,22 @@ function open(source: string) {
     content: '',
   })
   editors.push(editor)
+<<<<<<< ours
   const envelope = parseDocText(source)
+=======
+  // a trailing paragraph parks the caret off the links: one the selection
+  // touches shows its whole literal
+  const envelope = parseDocText(source + '\n\n.')
+>>>>>>> theirs
   editor
     .chain()
     .setMeta('addToHistory', false)
     .setContent(envelope.body, { contentType: 'markdown' })
     .run()
+<<<<<<< ours
+=======
+  editor.commands.setTextSelection(editor.state.doc.content.size)
+>>>>>>> theirs
   return { editor }
 }
 
@@ -56,7 +66,38 @@ describe('alias display', () => {
     ])
     expect(hiddenText(editor)).toEqual(['[[Note|', ']]'])
     // the document text is what it always was: this pass is view-only
+<<<<<<< ours
     expect(editor.state.doc.textContent).toBe('[[Note|Alias]]')
+=======
+    expect(editor.state.doc.textContent).toBe('[[Note|Alias]].')
+  })
+
+  it('shows the whole literal of a link the selection touches', () => {
+    const { editor } = open('[[A|one]] and [[B|two]]')
+    const away = editor.state.doc.content.size
+    // caret inside the alias: that link reveals, the other stays hidden
+    editor.commands.setTextSelection(6)
+    expect(hidden(editor)).toEqual([
+      [15, 19],
+      [22, 24],
+    ])
+    // right after the closing brackets still counts as touching
+    editor.commands.setTextSelection(10)
+    expect(hidden(editor)).toEqual([
+      [15, 19],
+      [22, 24],
+    ])
+    // a range over both reveals both
+    editor.commands.setTextSelection({ from: 3, to: 20 })
+    expect(hidden(editor)).toEqual([])
+    editor.commands.setTextSelection(away)
+    expect(hidden(editor)).toEqual([
+      [1, 5],
+      [8, 10],
+      [15, 19],
+      [22, 24],
+    ])
+>>>>>>> theirs
   })
 
   it.each([
@@ -121,7 +162,11 @@ describe('alias display', () => {
     // text nodes and no single span carries the whole of it
     const bold = editor.schema.marks.bold!.create()
     editor.view.dispatch(editor.state.tr.addMark(10, 12, bold))
+<<<<<<< ours
     expect(editor.state.doc.textContent).toBe('[[Note|bold]]')
+=======
+    expect(editor.state.doc.textContent).toBe('[[Note|bold]].')
+>>>>>>> theirs
     // the full literal stays visible; the pass never clips a segment
     expect(hidden(editor)).toEqual([])
     expect(editor.view.dom.querySelectorAll('.wiki-alias-hidden').length).toBe(0)

@@ -1,4 +1,8 @@
+<<<<<<< ours
 import { afterEach, describe, expect, it, vi } from 'vitest'
+=======
+import { describe, expect, it } from 'vitest'
+>>>>>>> theirs
 
 import { applySheetNotes, type SheetNote } from '../src/gateway/xlsx-notes'
 
@@ -86,6 +90,7 @@ const PICTURE = {
   name: 'pedigree.png',
 }
 
+<<<<<<< ours
 afterEach(() => vi.unstubAllGlobals())
 
 describe('putting a picture into a note', () => {
@@ -97,6 +102,9 @@ describe('putting a picture into a note', () => {
     ])
   })
 
+=======
+describe('putting a picture into a note', () => {
+>>>>>>> theirs
   it("paints the picture onto the note's shape", async () => {
     const { files } = await run([{ ...NOTE, picture: PICTURE }])
     const vml = files.get(VML_PATH)!

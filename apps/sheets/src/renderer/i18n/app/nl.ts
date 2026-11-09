@@ -10,7 +10,11 @@ export const nl = {
   redactDialogPlaceholder: 'Naam van placeholder, bv. telefoonnummer klant',
   redactCancel: 'Annuleren',
   redactInsert: 'Verbergen',
+<<<<<<< ours
   redactEnable: 'Rechtsklik op een selectie om die voor de AI te verbergen.',
+=======
+  redactEnable: 'Rechtsklik op een selectie om die voor het model te verbergen.',
+>>>>>>> theirs
   redactNeedsSavedRow:
     'Deze rij staat nog niet in het bestand. Sla eerst op en verberg daarna de cel.',
   redactRecoveredFromNames:
@@ -347,7 +351,9 @@ export const nl = {
   appFullLoadRunning:
     'De hele werkmap wordt geladen — sorteren en filteren zijn beschikbaar zodra dit klaar is…',
   appFullLoadTooLarge:
-    'Deze werkmap is te groot om volledig in het geheugen te laden; sorteren en filteren zijn niet beschikbaar voor dit bestand.',
+    'Deze werkmap is te groot om volledig in het geheugen te laden; sorteren en bereiken verplaatsen zijn voor dit bestand niet beschikbaar. Filteren gebeurt rechtstreeks op het bestand.',
+  appLargeFilterLoading: 'Filterkolom wordt uit het bestand gelezen…',
+  appLargeFilterApplying: 'Filter wordt op het bestand toegepast…',
   appSortValueModeFormulas:
     'Dit bereik bevat formules die in deze grote werkmap niet live worden berekend — sorteren of verplaatsen zou ze als gewone waarden opslaan. Kies een bereik zonder formules.',
   appSortRangeTooLarge:
@@ -417,6 +423,9 @@ export const nl = {
   appTableNameUsed: 'Tabelnaam "{name}" is in deze sessie al gebruikt.',
   appTableNameInFile: 'Tabelnaam "{name}" wordt al gebruikt door een tabel in het bestand.',
   appTableOverlapsSession: 'Het bereik overlapt tabel "{name}" die in deze sessie is gemaakt.',
+  appTableOverlapsFile: 'Het bereik overlapt tabel "{name}" in het bestand.',
+  appTableAlreadyInTable:
+    'De selectie staat al in tabel "{name}" — wijzig de stijl via Tabelontwerp.',
   appTablesNeedFile: 'Open eerst een XLSX-bestand — tabellen worden in het bestand geschreven.',
   appTableSelectRange: 'Selecteer eerst het gegevensbereik — veldnamen in de eerste rij.',
   appTableCreated: 'Tabel gemaakt — sla op met {saveKeys}.',
@@ -503,6 +512,7 @@ export const nl = {
   appGridlinesHidden: 'Rasterlijnen verborgen.',
   appGridlinesShown: 'Rasterlijnen weergegeven.',
   appShowingFormulas: 'Formules worden weergegeven — schakel opnieuw voor waarden.',
+  appShowingFormulasActive: 'Formules worden weergegeven',
   appShowingValues: 'Berekende waarden worden weergegeven.',
   appTraceNoFormula: 'Broncellen aanwijzen: de actieve cel bevat geen formule.',
   appTraceNoRefs: 'Broncellen aanwijzen: deze formule bevat geen celverwijzingen.',
@@ -551,6 +561,7 @@ export const nl = {
   appBridgeUnavailable:
     'De bestandsbridge van de desktop is niet beschikbaar. Start de Electron-app opnieuw.',
   appOpenCanceled: 'Werkmapselectie geannuleerd.',
+  appImportCanceled: 'Import geannuleerd.',
   appOpeningWorkbook: 'Werkmap openen…',
   appOpenStalled: 'De werkmap kon niet worden geopend.',
   appOpenRetry: 'Opnieuw proberen',
@@ -750,6 +761,7 @@ export const nl = {
   appExportPdfTitle: 'Exporteren als PDF',
   appSaveTitle: 'Opslaan',
   appSaveAs: 'Opslaan als',
+  aiNameFile: 'Naam geven met AI…',
   appUndo: 'Ongedaan maken',
   appRedo: 'Opnieuw',
   appUnsavedEditOne: '● {count} niet-opgeslagen bewerking',
@@ -781,7 +793,6 @@ export const nl = {
   appLinkPlaceholder: 'https://example.com of Sheet1!A1',
   appRemoveLink: 'Koppeling verwijderen',
   appNotAvailableYet: 'Nog niet beschikbaar',
-  appComingSoon: 'Binnenkort beschikbaar',
   appGroupChartLayouts: 'Grafiekindelingen',
   appAddChartElement: 'Grafiekelement toevoegen',
   appAddChartElementTitle: 'Titels, gegevenslabels, legenda',
@@ -1197,6 +1208,20 @@ export const nl = {
   appWatchCell: 'Cel',
   appWatchValue: 'Waarde',
   appWatchFormula: 'Formule',
+  appLinksPanel: 'Externe koppelingen',
+  appLinksPanelDetail: 'Koppelingen naar andere werkmappen tonen, bijwerken en verbreken',
+  appLinksUpdate: 'Waarden bijwerken',
+  appLinksNone: 'Deze werkmap heeft geen koppelingen naar andere werkmappen.',
+  appLinksUnsaved: 'Sla deze werkmap op voordat u de externe koppelingen toont.',
+  appLinksSource: 'Bron',
+  appLinksStatus: 'Status',
+  appLinksSheets: 'Bladen',
+  appLinksLocate: 'Bronbestand tonen',
+  appLinksReachable: 'Beschikbaar',
+  appLinksBroken: 'Niet beschikbaar',
+  appLinksBreak: 'Koppeling verbreken',
+  appLinksBreakConfirm: 'Verbreken bevestigen',
+  appLinksChangeSource: 'Bron wijzigen',
   appGroupCalculation: 'Berekening',
   appCalculationOptions: 'Berekeningsopties',
   appCalculationOptionsTitle: 'Automatisch of handmatig herberekenen',
@@ -1213,8 +1238,16 @@ export const nl = {
   appGroupGetData: 'Gegevens ophalen',
   appFromTextCsv: 'Uit tekst/CSV',
   appRefreshAll: 'Alles vernieuwen',
+  appRefreshQuery: 'Query vernieuwen',
+  appQueryConnectionsTitle: 'Werkmapquery’s vernieuwen',
+  appQueryRefreshing: '{name} wordt vernieuwd…',
+  appQueryRefreshed: '{name} vernieuwd ({rows} rijen)',
+  appQueryRefreshedClipped: '{name} vernieuwd ({rows} rijen, {dropped} pasten niet in het bereik)',
+  appQueryRefreshFailed: 'Kan {name} niet vernieuwen',
   appWorkbookNoPivot: 'Geen draaitabellen in deze werkmap.',
   appRefreshAllTitle: 'Alle draaitabellen vernieuwen',
+  appQueriesConnections: 'Query’s en verbindingen',
+  appQueriesConnectionsTitle: 'De query’s en gegevensverbindingen van de werkmap weergeven',
   appErrorCheckingDetail: 'Blad scannen op foutwaarden',
   appErrorsFound: '{count} fouten — bij {cell}: {value}',
   appCheckingErrors: 'Het hele werkblad wordt op fouten gecontroleerd…',
@@ -1249,6 +1282,7 @@ export const nl = {
   appGroupForecast: 'Prognose',
   appWhatIfAnalysis: 'Wat-als-analyse',
   appGoalSeek: 'Doelzoeken',
+  appDataTable: 'Gegevenstabel',
   appWhatIfTitle: 'Invoer bepalen voor een doelwaarde',
   appGoalSeekNeedsFormula: 'De cel moet een formule bevatten.',
   appGoalSeekByCellNotNumber: 'De te wijzigen cel moet een getal bevatten of leeg zijn.',
@@ -1346,6 +1380,7 @@ export const nl = {
   appPasswordUpdating: 'Bijwerken…',
   appUpdatePassword: 'Wachtwoord bijwerken',
   appWorkbookNotPasswordProtected: 'Deze werkmap is niet beveiligd met een openingswachtwoord.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Een met een wachtwoord beveiligde werkmap kan niet worden opgeslagen in een UniWork-document. Gebruik Opslaan als om een versleutelde kopie op deze computer te bewaren.',
   appPasswordChangeUniwork:
@@ -1354,6 +1389,8 @@ export const nl = {
     'Deze werkmap is alleen-lezen, dus het wachtwoord kan niet worden gewijzigd.',
   appEncryptedWrongPassword: 'Het wachtwoord is onjuist. Probeer het opnieuw.',
   appPasswordChangeRestored: 'Sla eerst de herstelde werkmap op en wijzig daarna het wachtwoord.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Bewerken van bereiken toestaan',
   appGroupClipboard: 'Klembord',
   appPaste: 'Plakken',
@@ -1620,6 +1657,7 @@ export const nl = {
   appVisualFlipV: 'Verticaal spiegelen',
   appVisualFlipH: 'Horizontaal spiegelen',
   appCtxPasteVisual: 'Afbeelding of vorm plakken',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Deze werkmap kan nog niet op het web worden geopend',
   appWebEngineBody:
@@ -1647,13 +1685,19 @@ export const nl = {
   appWebSavedReopenFailed:
     'Je wijzigingen zijn opgeslagen in UniWork, maar de werkmap kon hier niet opnieuw worden geopend. Laad de editor opnieuw om verder te werken.',
   appDataTable: 'Gegevenstabel',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Spelling',
   appSpellBtnDetail: 'Bladtekst controleren (F7)',
   appSpellToggle: 'Spelling controleren',
   appSpellToggleTip:
+<<<<<<< ours
     'Zet de spellingcontrole aan (F7 en de Controleren-knop); uitgeschakeld tonen commentaarvakken geen golflijnen meer',
+=======
+    'Zet de spellingcontrole aan (F7 en de Review-knop); uitgeschakeld tonen commentaarvakken geen golflijnen meer',
+>>>>>>> theirs
   appSpellOn: 'Spellingcontrole ingeschakeld.',
   appSpellOff: 'Spellingcontrole staat uit. Schakel deze in bij Controleren ▸ Controle.',
   appSpellRecheck: 'Opnieuw controleren',

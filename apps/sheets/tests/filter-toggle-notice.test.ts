@@ -29,6 +29,11 @@ interface Harness {
 function makeFilterHarness(options: {
   ok: boolean
   preloadComplete?: boolean
+<<<<<<< ours
+=======
+  /** no lazy workbook state yet (plain in-memory workbook) */
+  noState?: boolean
+>>>>>>> theirs
   /** the effective protection of the active sheet; `'unknown'` = not indexed yet */
   sheetProtection?: SheetProtectionInfo | 'unknown'
 }): Harness {
@@ -52,7 +57,11 @@ function makeFilterHarness(options: {
         },
       },
     },
+<<<<<<< ours
     lazyWorkbookRef: { current: state },
+=======
+    lazyWorkbookRef: { current: options.noState ? null : state },
+>>>>>>> theirs
     setMessage: (message: string) => {
       messages.push(message)
     },
@@ -72,6 +81,16 @@ describe('the Filter toggle', () => {
     expect(messages[0]).toMatch(/filter|\u7b5b\u9009/i)
   })
 
+<<<<<<< ours
+=======
+  it('speaks when there is no lazy workbook state at all', async () => {
+    const { ctx, messages } = makeFilterHarness({ ok: false, noState: true })
+    handleRibbonCommand(ctx, 'filter-toggle')
+    await settle()
+    expect(messages).toHaveLength(1)
+  })
+
+>>>>>>> theirs
   it('stays quiet when the filter went on', async () => {
     const { ctx, messages } = makeFilterHarness({ ok: true })
     handleRibbonCommand(ctx, 'filter-toggle')

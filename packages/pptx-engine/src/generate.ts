@@ -10,11 +10,14 @@
  *     (b/i/u/sz + solidFill color).
  *   - Untouched bytes (bodyPr/spPr/geometry/placeholder attributes…) are kept verbatim.
  *
- * If the model's run count doesn't match the original XML's <a:r> count (runs
- * added/removed / paragraph structure changed), fall back to the
- * "rebuild txBody per paragraph" path (still keeping outer bytes like spPr where
- * possible). The Phase 3 editor uses the former (lossless) when only text and
- * formatting change without structural edits; structural changes use the latter.
+ * If the model's run count doesn't match the original XML's <a:r> count, or any
+ * paragraph's run count differs (runs added/removed / paragraph structure
+ * changed), fall back to the "rebuild txBody per paragraph" path (still keeping
+ * outer bytes like spPr where possible). A text edit whose traced paragraph/run
+ * moved (element.textMoved) also rebuilds: the in-place patch would keep the
+ * attributes of the old run now at that position. The Phase 3 editor uses the
+ * former (lossless) when only text and formatting change in place; structural or
+ * reordered edits use the latter.
  */
 import type {
   SlideElement,
@@ -54,15 +57,34 @@ function bulletGlyphXml(b: BulletModel): string {
  */
 export function patchTextElementXml(el: TextElement, originalXml: string): string {
   if (!el.text || !el.text.paragraphs.length) return originalXml
+  // The in-place patch writes each run into the old run at the same position; when a
+  // traced paragraph/run moved, that position holds another run's attributes, so the
+  // model's own paragraphs are rebuilt from their traced runs instead.
+  if (el.textMoved) return rebuildTxBody(el, originalXml)
 
+  const modelParagraphs = el.text.paragraphs
   // Collect all model runs (flattened across paragraphs, incl. "\n" soft-break sentinels),
   // one-to-one with the original XML's <a:r>/<a:br> sequence (parse rewrites <a:br/>
   // as a sentinel run, order preserved)
-  const modelRuns: TextRun[] = el.text.paragraphs.flatMap((p) => p.runs)
+  const modelRuns: TextRun[] = modelParagraphs.flatMap((p) => p.runs)
   const runSpans = findRunSpans(originalXml)
+
+  // The flattened count can line up while the paragraph layout differs (4 one-run
+  // paragraphs vs 2 two-run paragraphs = 4 runs either way); each model run must stay in
+  // its own original paragraph or every run lands in the first <a:p>. Require the
+  // paragraph count and every paragraph's run count to match before patching in place.
+  const paragraphSpans = findParagraphSpans(originalXml)
+  const paragraphsAligned =
+    paragraphSpans.length === modelParagraphs.length &&
+    paragraphSpans.every(
+      (span, index) =>
+        findRunSpans(originalXml.slice(span.start, span.end)).length ===
+        modelParagraphs[index]!.runs.length,
+    )
 
   // Count and kind aligned position by position (sentinel ⇔ <a:br>) → lossless in-place patch of each run, br bytes untouched
   const aligned =
+    paragraphsAligned &&
     runSpans.length === modelRuns.length &&
     runSpans.length > 0 &&
     runSpans.every((s, i) => (s.kind === 'br' || !!s.newlineOnly) === isSoftBreakRun(modelRuns[i]!))
@@ -421,7 +443,11 @@ function patchRunProps(runXml: string, run: TextRun): string {
     // run. Apply or clear it when the model disagrees, otherwise clearing a mark
     // in the editor would silently keep withholding the words on disk.
     if (run.redact) {
+<<<<<<< ours
       if (!hasRedactExtIn(runXml)) runXml = syncRedactExt(runXml, 'a:rPr', run.redact)
+=======
+      runXml = syncRedactExt(runXml, 'a:rPr', run.redact)
+>>>>>>> theirs
     } else if (hasRedactExtIn(runXml)) {
       runXml = syncRedactExt(runXml, 'a:rPr')
     }
@@ -709,6 +735,9 @@ function buildRPrAttrs(run: TextRun): string {
   // flips the run to whatever the placeholder/master says (fld bodies always
   // rebuild, so slide-number placeholders were losing these).
   let s = ''
+  // The language tag picks the run's line-breaking rules: a rebuild must keep it
+  if (run.lang != null) s += ` lang="${escapeXmlAttr(run.lang)}"`
+  if (run.altLang != null) s += ` altLang="${escapeXmlAttr(run.altLang)}"`
   if (run.fontSize != null && !run.fontSizeImplicit) s += ` sz="${szAttr(run.fontSize)}"`
   if (run.bold != null && !run.boldImplicit) s += ` b="${run.bold ? '1' : '0'}"`
   if (run.italic != null && !run.italicImplicit) s += ` i="${run.italic ? '1' : '0'}"`
@@ -815,9 +844,11 @@ export function generateParagraphXml(p: Paragraph): string {
     pPrAttrs.push(`indent="${clampInt(p.indent, -51206400, 51206400)}"`)
   if (p.align && want('align')) pPrAttrs.push(`algn="${alignMap[p.align]}"`)
   if (p.rtl != null) pPrAttrs.push(`rtl="${p.rtl ? 1 : 0}"`)
-  if (p.eaLnBrk === false) pPrAttrs.push('eaLnBrk="0"')
-  if (p.latinLnBrk) pPrAttrs.push('latinLnBrk="1"')
-  if (p.hangingPunct === false) pPrAttrs.push('hangingPunct="0"')
+  if (p.eaLnBrk != null && want('eaLnBrk')) pPrAttrs.push(`eaLnBrk="${p.eaLnBrk ? 1 : 0}"`)
+  if (p.latinLnBrk != null && want('latinLnBrk'))
+    pPrAttrs.push(`latinLnBrk="${p.latinLnBrk ? 1 : 0}"`)
+  if (p.hangingPunct != null && want('hangingPunct'))
+    pPrAttrs.push(`hangingPunct="${p.hangingPunct ? 1 : 0}"`)
   if (p.level) pPrAttrs.push(`lvl="${p.level}"`)
 
   // CT_TextParagraphProperties child order: lnSpc → spcBef → spcAft → buClr → buSzPct → buFont → bu*

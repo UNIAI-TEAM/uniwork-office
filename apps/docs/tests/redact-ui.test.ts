@@ -116,6 +116,7 @@ describe('RedactDialog', () => {
     unmount()
   })
 
+<<<<<<< ours
   it('starts with an empty label when seeded empty so the hidden text is never pre-filled', () => {
     const { input, primary, unmount } = open({ seed: '' })
     expect(input.value).toBe('')
@@ -123,6 +124,8 @@ describe('RedactDialog', () => {
     unmount()
   })
 
+=======
+>>>>>>> theirs
   it('shows the marker the model will see, and follows what is typed', () => {
     // the reader must know what is about to be exposed before committing
     const { container, input, unmount } = open()
@@ -193,6 +196,7 @@ describe('RedactDialog', () => {
     esc.unmount()
   })
 
+<<<<<<< ours
   it('gives the input an accessible name and cancels on Escape from a dialog button', () => {
     const { container, input, primary, onCancel, unmount } = open()
     expect(input.getAttribute('aria-label')).toBe('Placeholder name, e.g. client phone')
@@ -205,6 +209,8 @@ describe('RedactDialog', () => {
     unmount()
   })
 
+=======
+>>>>>>> theirs
   it('cancels without submitting when the backdrop is dismissed', () => {
     const { container, onSubmit, onCancel, unmount } = open()
     act(() => {
@@ -276,11 +282,18 @@ describe('EditorContextMenu — the withholding item', () => {
     editor.destroy()
   })
 
+<<<<<<< ours
   it('is disabled for a picture, which cannot carry a mark through a save', () => {
     // A picture alone is a block node that takes no marks, and an inline one
     // loses the mark on save; offering the item would hide it for a session
     // and then drop the decision silently. Covered end to end in
     // redact-image-mark.test.ts.
+=======
+  it('is absent for a picture, which cannot carry a mark through a save', () => {
+    // A picture alone is a block node that takes no marks, and an inline one
+    // loses the mark on save; the picture menu lists only picture items.
+    // Covered end to end in redact-image-mark.test.ts.
+>>>>>>> theirs
     const editor = createEditor()
     const { container, unmount } = render(
       createElement(
@@ -288,7 +301,11 @@ describe('EditorContextMenu — the withholding item', () => {
         menuProps(editor, { menu: { x: 10, y: 10, imageSrc: 'data:image/png;base64,AAAA' } }),
       ),
     )
+<<<<<<< ours
     expect(item(container, LABEL)!.disabled).toBe(true)
+=======
+    expect(item(container, LABEL)).toBeUndefined()
+>>>>>>> theirs
     unmount()
     editor.destroy()
   })
@@ -444,7 +461,11 @@ describe('the item and the dialog together', () => {
         onRedact: () => {
           const { from, to } = editor.state.selection
           if (from === to) return
+<<<<<<< ours
           setTarget({ from, to, seed: '' })
+=======
+          setTarget({ from, to, seed: editor.state.doc.textBetween(from, to, ' ').trim() })
+>>>>>>> theirs
         },
         // the App.tsx wiring, trimmed: the command reads the selection itself
         onUnredact: () => editor.commands.unsetRedaction(),
@@ -452,6 +473,7 @@ describe('the item and the dialog together', () => {
       target &&
         createElement(RedactDialog, {
           seed: target.seed,
+<<<<<<< ours
           onCancel: () => {
             setTarget(null)
             editor.view.focus()
@@ -460,6 +482,12 @@ describe('the item and the dialog together', () => {
             editor
               .chain()
               .focus()
+=======
+          onCancel: () => setTarget(null),
+          onSubmit: (label: string) => {
+            editor
+              .chain()
+>>>>>>> theirs
               .setTextSelection({ from: target.from, to: target.to })
               .setRedaction(label)
               .run()
@@ -476,7 +504,11 @@ describe('the item and the dialog together', () => {
 
     act(() => item(container, LABEL)!.click())
     const input = container.querySelector<HTMLInputElement>('input')!
+<<<<<<< ours
     expect(input.value).toBe('')
+=======
+    expect(input.value).toBe('client')
+>>>>>>> theirs
     act(() => {
       const setter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,

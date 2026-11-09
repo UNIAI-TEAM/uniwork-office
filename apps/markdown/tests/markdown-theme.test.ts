@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
+<<<<<<< ours
 import { isMarkdownThemeDark, normalizeMarkdownTheme } from '../src/shared/markdown-theme'
+=======
+import { normalizeMarkdownTheme } from '../src/shared/markdown-theme'
+>>>>>>> theirs
 
 describe('normalizeMarkdownTheme', () => {
   it('passes known ids through', () => {
@@ -19,6 +23,7 @@ describe('normalizeMarkdownTheme', () => {
     expect(normalizeMarkdownTheme({})).toBe('default')
   })
 })
+<<<<<<< ours
 
 describe('isMarkdownThemeDark', () => {
   it('classifies the dark palettes', () => {
@@ -31,3 +36,5 @@ describe('isMarkdownThemeDark', () => {
     expect(isMarkdownThemeDark('default')).toBe(false)
   })
 })
+=======
+>>>>>>> theirs

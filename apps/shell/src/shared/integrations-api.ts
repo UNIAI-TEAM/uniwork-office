@@ -1,15 +1,20 @@
 import type {
   AgentId,
   AgentTarget,
+<<<<<<< ours
   LegacyKeepReason,
   LegacySkillCopy,
   LegacySweep,
+=======
+  LegacySkillCopy,
+>>>>>>> theirs
   SkillInstallState,
   SkillInstallStatus,
 } from '@genoffice/cli/agent-skills'
 import type { InstallOutcome } from '@genoffice/cli/install'
 import type { FoundSkill, RecommendedSkill } from './found-skill'
 
+<<<<<<< ours
 export type {
   AgentId,
   AgentTarget,
@@ -18,6 +23,9 @@ export type {
   SkillInstallState,
   SkillInstallStatus,
 }
+=======
+export type { AgentId, AgentTarget, LegacySkillCopy, SkillInstallState, SkillInstallStatus }
+>>>>>>> theirs
 
 export interface CliStatus extends InstallOutcome {
   /** the name to type in a terminal (filled by the main process) */
@@ -42,6 +50,16 @@ export interface IntegrationsStatus {
    * tool, never updated again, and invisible in the agent rows above
    */
   legacy: LegacySkillCopy[]
+<<<<<<< ours
+=======
+}
+
+export interface LegacySweepResult {
+  /** the copies this app wrote and removed */
+  removed: LegacySkillCopy[]
+  /** the copies edited by hand: left in place, for the user to judge */
+  kept: LegacySkillCopy[]
+>>>>>>> theirs
 }
 
 export type LegacySweepResult = LegacySweep
@@ -61,7 +79,11 @@ export interface IntegrationsApi {
   saveSkillZip(title: string): Promise<string | null>
   /** put text on the clipboard (paths, the manual PATH command) */
   copyText(text: string): Promise<void>
+<<<<<<< ours
   /** the skills in UniWork Office's own folder; nothing else is scanned */
+=======
+  /** the skills in GenOffice's own folder; nothing else is scanned */
+>>>>>>> theirs
   listSkills(): Promise<FoundSkill[]>
   /** the body of one listed SKILL.md, frontmatter stripped */
   skillBody(path: string): Promise<string>
@@ -69,7 +91,11 @@ export interface IntegrationsApi {
   importSkillFolder(title: string): Promise<FoundSkill | null>
   /** open-dialog for a skill zip or a single SKILL.md, then bring it in; null when cancelled */
   importSkillZip(title: string): Promise<FoundSkill | null>
+<<<<<<< ours
   /** the skills UniWork Office ships as suggestions, with each one's install state */
+=======
+  /** the skills GenOffice ships as suggestions, with each one's install state */
+>>>>>>> theirs
   listRecommendedSkills(): Promise<RecommendedSkill[]>
   /** copy (or, when outdated, replace) one recommended skill into our folder */
   installRecommendedSkill(name: string): Promise<FoundSkill>

@@ -82,7 +82,10 @@ describe('what a right-click means', () => {
     if (intent.kind !== 'ask') return
     expect(intent.dialog.sheetName).toBe('Customers')
     expect(intent.dialog.rangeLabel).toBe('C4')
+<<<<<<< ours
     expect(intent.dialog.seed).toBe('')
+=======
+>>>>>>> theirs
   })
 
   it('clears the mark when the selection is already inside one', () => {

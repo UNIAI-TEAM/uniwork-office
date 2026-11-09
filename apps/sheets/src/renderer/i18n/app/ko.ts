@@ -335,7 +335,9 @@ export const ko = {
   appFullLoadRunning:
     '통합 문서 전체를 로드하는 중입니다. 완료되면 정렬과 필터를 사용할 수 있습니다…',
   appFullLoadTooLarge:
-    '이 통합 문서는 너무 커서 메모리에 전부 로드할 수 없습니다. 이 파일에서는 정렬과 필터를 사용할 수 없습니다.',
+    '이 통합 문서는 너무 커서 메모리에 전부 로드할 수 없습니다. 이 파일에서는 정렬과 범위 이동을 사용할 수 없습니다. 필터는 파일에서 직접 실행됩니다.',
+  appLargeFilterLoading: '파일에서 필터 열을 읽는 중…',
+  appLargeFilterApplying: '파일에 필터를 적용하는 중…',
   appSortValueModeFormulas:
     '선택한 범위에 수식이 있지만 이 큰 통합 문서에서는 수식이 실시간으로 계산되지 않습니다. 정렬하거나 이동하면 수식이 값으로 저장됩니다. 수식이 없는 범위를 선택하세요.',
   appSortRangeTooLarge:
@@ -397,6 +399,9 @@ export const ko = {
   appTableNameUsed: '표 이름 "{name}"은(는) 이번 세션에서 이미 사용되었습니다.',
   appTableNameInFile: '테이블 이름 "{name}"은(는) 파일의 테이블에서 이미 사용 중입니다.',
   appTableOverlapsSession: '이 범위는 이번 세션에서 만든 표 "{name}"과(와) 겹칩니다.',
+  appTableOverlapsFile: '이 범위는 파일의 표 "{name}"과(와) 겹칩니다.',
+  appTableAlreadyInTable:
+    '선택 영역이 이미 표 "{name}" 안에 있습니다. 스타일은 표 디자인에서 변경하세요.',
   appTablesNeedFile: '먼저 XLSX 파일을 여십시오. 표는 파일에 기록됩니다.',
   appTableSelectRange: '먼저 데이터 범위를 선택하십시오. 첫 행이 머리글이 됩니다.',
   appTableCreated: '표를 만들었습니다 — {saveKeys}로 저장합니다.',
@@ -483,6 +488,7 @@ export const ko = {
   appGridlinesHidden: '눈금선을 숨겼습니다.',
   appGridlinesShown: '눈금선을 표시했습니다.',
   appShowingFormulas: '수식을 표시하는 중입니다 — 다시 전환하면 값이 표시됩니다.',
+  appShowingFormulasActive: '수식 표시 중',
   appShowingValues: '계산 결과를 표시하는 중입니다.',
   appTraceNoFormula: '참조되는 셀 추적: 활성 셀에 수식이 없습니다.',
   appTraceNoRefs: '참조되는 셀 추적: 이 수식에는 셀 참조가 없습니다.',
@@ -529,6 +535,7 @@ export const ko = {
   appBridgeUnavailable:
     '데스크톱 파일 브리지를 사용할 수 없습니다. Electron 앱을 다시 시작하십시오.',
   appOpenCanceled: '통합 문서 선택을 취소했습니다.',
+  appImportCanceled: '가져오기를 취소했습니다.',
   appOpeningWorkbook: '통합 문서를 여는 중…',
   appOpenStalled: '통합 문서를 열 수 없습니다.',
   appOpenRetry: '다시 시도',
@@ -725,6 +732,7 @@ export const ko = {
   appExportPdfTitle: 'PDF로 내보내기',
   appSaveTitle: '저장',
   appSaveAs: '다른 이름으로 저장',
+  aiNameFile: 'AI로 이름 지정…',
   appUndo: '실행 취소',
   appRedo: '다시 실행',
   appUnsavedEditOne: '● 저장되지 않은 편집 {count}개',
@@ -761,7 +769,6 @@ export const ko = {
   appRemoveLink: '링크 제거',
   // Ribbon common
   appNotAvailableYet: '아직 사용할 수 없음',
-  appComingSoon: '곧 제공 예정',
   // Chart Design tab
   appGroupChartLayouts: '차트 레이아웃',
   appAddChartElement: '차트 요소 추가',
@@ -1181,6 +1188,20 @@ export const ko = {
   appWatchCell: '셀',
   appWatchValue: '값',
   appWatchFormula: '수식',
+  appLinksPanel: '외부 링크',
+  appLinksPanelDetail: '다른 통합 문서 링크 보기, 업데이트, 끊기',
+  appLinksUpdate: '값 업데이트',
+  appLinksNone: '이 통합 문서에 다른 통합 문서로의 링크가 없습니다.',
+  appLinksUnsaved: '외부 링크를 나열하려면 먼저 이 통합 문서를 저장하세요.',
+  appLinksSource: '원본',
+  appLinksStatus: '상태',
+  appLinksSheets: '시트',
+  appLinksLocate: '원본 파일 열기',
+  appLinksReachable: '사용 가능',
+  appLinksBroken: '사용 안 함',
+  appLinksBreak: '링크 끊기',
+  appLinksBreakConfirm: '끊기 확인',
+  appLinksChangeSource: '원본 변경',
   appGroupCalculation: '계산',
   appCalculationOptions: '계산 옵션',
   appCalculationOptionsTitle: '자동 또는 수동 재계산',
@@ -1198,8 +1219,16 @@ export const ko = {
   appGroupGetData: '데이터 가져오기',
   appFromTextCsv: '텍스트/CSV에서',
   appRefreshAll: '모두 새로 고침',
+  appRefreshQuery: '쿼리 새로 고침',
+  appQueryConnectionsTitle: '워크북의 쿼리를 새로 고칩니다',
+  appQueryRefreshing: '{name} 새로 고치는 중…',
+  appQueryRefreshed: '{name} 새로 고침 완료 ({rows}행)',
+  appQueryRefreshedClipped: '{name} 새로 고침 완료 ({rows}행, {dropped}행이 범위를 벗어남)',
+  appQueryRefreshFailed: '{name} 새로 고침에 실패했습니다',
   appWorkbookNoPivot: '통합 문서에 피벗 테이블이 없습니다.',
   appRefreshAllTitle: '모든 피벗 테이블 새로 고침',
+  appQueriesConnections: '쿼리 및 연결',
+  appQueriesConnectionsTitle: '통합 문서의 쿼리와 데이터 연결 목록 보기',
   appErrorCheckingDetail: '시트의 오류 값 검사',
   appErrorsFound: '오류 {count}개 — {cell}: {value}',
   appCheckingErrors: '시트 전체의 오류를 검사하는 중…',
@@ -1234,6 +1263,7 @@ export const ko = {
   appGroupForecast: '예측',
   appWhatIfAnalysis: '가상 분석',
   appGoalSeek: '목표값 찾기',
+  appDataTable: '데이터 테이블',
   appWhatIfTitle: '목표값에 맞는 입력 찾기',
   appGoalSeekNeedsFormula: '수식 셀에는 수식이 있어야 합니다.',
   appGoalSeekByCellNotNumber: '값을 바꿀 셀은 숫자이거나 비어 있어야 합니다.',
@@ -1332,12 +1362,15 @@ export const ko = {
   appPasswordUpdating: '업데이트 중…',
   appUpdatePassword: '암호 업데이트',
   appWorkbookNotPasswordProtected: '이 통합 문서에는 열기 암호가 설정되어 있지 않습니다.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     '암호가 설정된 통합 문서는 UniWork 문서에 저장할 수 없습니다. 다른 이름으로 저장을 사용해 이 컴퓨터에 암호화된 사본을 보관하세요.',
   appPasswordChangeUniwork: 'UniWork 문서의 암호는 여기에서 변경할 수 없습니다.',
   appPasswordChangeReadOnly: '이 통합 문서는 읽기 전용이므로 암호를 변경할 수 없습니다.',
   appEncryptedWrongPassword: '암호가 올바르지 않습니다. 다시 시도하세요.',
   appPasswordChangeRestored: '복구한 통합 문서를 먼저 저장한 다음 암호를 변경하세요.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: '범위 편집 허용',
   // Home tab
   appGroupClipboard: '클립보드',
@@ -1598,6 +1631,7 @@ export const ko = {
   appVisualFlipV: '상하 대칭',
   appVisualFlipH: '좌우 대칭',
   appCtxPasteVisual: '그림/도형 붙여넣기',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: '이 통합 문서는 아직 웹에서 열 수 없습니다',
   appWebEngineBody:
@@ -1625,15 +1659,23 @@ export const ko = {
   appWebSavedReopenFailed:
     '변경 사항은 UniWork에 저장되었지만 여기서 통합 문서를 다시 열 수 없습니다. 편집기를 새로 고쳐 계속 작업하세요.',
   appDataTable: '데이터 테이블',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: '맞춤법 검사',
   appSpellBtnDetail: '시트 텍스트 검사 (F7)',
   appSpellToggle: '맞춤법 검사',
   appSpellToggleTip:
+<<<<<<< ours
     '맞춤법 검사(F7 및 검토 버튼)를 켭니다. 끄면 댓글 입력란에 맞춤법 물결표가 표시되지 않습니다',
   appSpellOn: '맞춤법 검사를 켰습니다.',
   appSpellOff: '맞춤법 검사가 꺼져 있습니다. 검토 ▸ 언어 교정에서 켤 수 있습니다.',
+=======
+    '맞춤법 검사(F7 및 Review 버튼)를 켭니다. 끄면 댓글 입력란에 맞춤법 물결표가 표시되지 않습니다',
+  appSpellOn: '맞춤법 검사를 켰습니다.',
+  appSpellOff: '맞춤법 검사가 꺼져 있습니다. Review ▸ 교정에서 켤 수 있습니다.',
+>>>>>>> theirs
   appSpellRecheck: '다시 검사',
   appSpellNone: '의심되는 맞춤법 오류가 없습니다.',
   appSpellFindings: '의심되는 맞춤법 오류 {count}건. 행을 클릭하면 이동합니다.',

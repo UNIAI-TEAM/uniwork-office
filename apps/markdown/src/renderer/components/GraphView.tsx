@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { useI18n } from '../i18n/locale'
 import { layoutGraph, type LayoutPoint } from './graph-layout'
+<<<<<<< ours
 import { readGraphColors, type GraphColors } from './graph-colors'
+=======
+>>>>>>> theirs
 import type { WikiGraph } from '../../shared/ipc'
 
 /** node radius, in world px */
@@ -38,7 +41,10 @@ export function GraphView({
   const { t } = useI18n()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+<<<<<<< ours
   const closeRef = useRef<HTMLButtonElement>(null)
+=======
+>>>>>>> theirs
   const drawRef = useRef<() => void>(() => {})
   const viewportRef = useRef<Viewport>({ x: 0, y: 0, scale: 1 })
   const layoutRef = useRef<Map<string, LayoutPoint>>(new Map())
@@ -74,9 +80,23 @@ export function GraphView({
   }, [])
 
   /** theme colors, read off the canvas's own computed style at draw time */
+<<<<<<< ours
   const colors = useCallback((): GraphColors => {
     const el = canvasRef.current
     return readGraphColors(el ? getComputedStyle(el) : null)
+=======
+  const colors = useCallback((): { text: string; dim: string; accent: string; line: string } => {
+    const el = canvasRef.current
+    const style = el ? getComputedStyle(el) : null
+    const pick = (name: string, fallback: string): string =>
+      style?.getPropertyValue(name).trim() || fallback
+    return {
+      text: pick('--text', '#333333'),
+      dim: pick('--text-tertiary', '#999999'),
+      accent: pick('--accent', '#4a7d00'),
+      line: pick('--border-strong', '#cccccc'),
+    }
+>>>>>>> theirs
   }, [])
 
   useEffect(() => {
@@ -238,6 +258,7 @@ export function GraphView({
     }
   }, [onClose])
 
+<<<<<<< ours
   // focus moves into the dialog on open and returns to whatever opened it on close
   useEffect(() => {
     const opener = document.activeElement
@@ -249,6 +270,10 @@ export function GraphView({
 
   return (
     <div className="graph-overlay" role="dialog" aria-modal="true" aria-label={t('graph')}>
+=======
+  return (
+    <div className="graph-overlay" role="dialog" aria-label={t('graph')}>
+>>>>>>> theirs
       <div className="graph-head">
         <span className="graph-title">{t('graph')}</span>
         {graph?.truncated === true && (
@@ -257,7 +282,10 @@ export function GraphView({
           </span>
         )}
         <button
+<<<<<<< ours
           ref={closeRef}
+=======
+>>>>>>> theirs
           type="button"
           className="graph-close"
           aria-label={t('graphClose')}
@@ -267,6 +295,7 @@ export function GraphView({
         </button>
       </div>
       <div className="graph-body" ref={wrapRef}>
+<<<<<<< ours
         {failed ? null : graph !== null && graph.nodes.length === 0 ? (
           <div className="graph-empty">{t('graphEmpty')}</div>
         ) : graph !== null ? (
@@ -274,6 +303,13 @@ export function GraphView({
             ref={canvasRef}
             role="img"
             aria-label={t('graph')}
+=======
+        {failed || (graph !== null && graph.nodes.length === 0) ? (
+          <div className="graph-empty">{failed ? t('slashNoResults') : t('graphEmpty')}</div>
+        ) : graph !== null ? (
+          <canvas
+            ref={canvasRef}
+>>>>>>> theirs
             className="graph-canvas"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}

@@ -15,6 +15,10 @@
   },
   "devDependencies": {
     "typescript": "^5.9.3",
+<<<<<<< ours
     "vitest": "4.1.12"
+=======
+    "vitest": "^4.1.12"
+>>>>>>> theirs
   }
 }

@@ -9,7 +9,11 @@ import { GraphView } from '../src/renderer/components/GraphView'
  * same reason). While the overlay is up <html> must carry the
  * `markdown-graph-open` marker (rows yield to presses through it), and a press
  * on the ✕ — or Escape, the way any other full-screen view dismisses — has to
+<<<<<<< ours
  * reach onClose.
+=======
+ * reach onClose. genoffice#2134
+>>>>>>> theirs
  */
 
 const onClose = vi.fn()
@@ -37,7 +41,11 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+<<<<<<< ours
 describe('GraphView close paths', () => {
+=======
+describe('GraphView close paths (genoffice#2134)', () => {
+>>>>>>> theirs
   it('a press on the close button calls onClose', async () => {
     await renderGraph()
     const button = document.querySelector<HTMLButtonElement>('.graph-close')
@@ -67,6 +75,7 @@ describe('GraphView close paths', () => {
     root = null
     expect(document.documentElement.classList.contains('markdown-graph-open')).toBe(false)
   })
+<<<<<<< ours
 
   it('is a modal dialog: focus moves to the close button and returns to the opener on close', async () => {
     const opener = document.createElement('button')
@@ -80,4 +89,6 @@ describe('GraphView close paths', () => {
     root = null
     expect(document.activeElement).toBe(opener)
   })
+=======
+>>>>>>> theirs
 })

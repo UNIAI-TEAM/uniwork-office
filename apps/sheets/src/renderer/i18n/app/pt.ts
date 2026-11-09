@@ -10,11 +10,19 @@ export const pt = {
   redactDialogPlaceholder: 'Nome do marcador, ex.: telefone do cliente',
   redactCancel: 'Cancelar',
   redactInsert: 'Ocultar',
+<<<<<<< ours
   redactEnable: 'Clique com o botão direito numa seleção para ocultá-la da IA.',
   redactNeedsSavedRow:
     'Esta linha ainda não está no ficheiro. Guarde primeiro e depois oculte a célula.',
   redactRecoveredFromNames:
     'Outra aplicação reescreveu este ficheiro e descartou o registo do que está oculto. As células ocultas foram recuperadas a partir dos nomes na pasta de trabalho; guardar restaura o registo completo.',
+=======
+  redactEnable: 'Clique com o botão direito em uma seleção para ocultá-la do modelo.',
+  redactNeedsSavedRow:
+    'Esta linha ainda não está no arquivo. Salve primeiro e depois oculte a célula.',
+  redactRecoveredFromNames:
+    'Outro aplicativo reescreveu este arquivo e descartou o registro do que está oculto. As células ocultas foram recuperadas a partir dos nomes na pasta de trabalho; salvar restaura o registro completo.',
+>>>>>>> theirs
 
   appMergeWorkbooks: 'Mesclar pastas de trabalho',
   appMergeWorkbooksTip: 'Adicionar planilhas de outros arquivos do Excel a esta pasta de trabalho',
@@ -354,7 +362,9 @@ export const pt = {
   appFullLoadRunning:
     'Carregando toda a pasta de trabalho — classificar e filtrar ficarão disponíveis ao concluir…',
   appFullLoadTooLarge:
-    'Esta pasta de trabalho é grande demais para ser totalmente carregada na memória; classificar e filtrar não estão disponíveis para este arquivo.',
+    'Esta pasta de trabalho é grande demais para ser carregada por completo na memória; ordenar e mover intervalos não estão disponíveis para este arquivo. A filtragem é executada diretamente no arquivo.',
+  appLargeFilterLoading: 'Lendo a coluna do filtro a partir do arquivo…',
+  appLargeFilterApplying: 'Aplicando o filtro no arquivo…',
   appSortValueModeFormulas:
     'Este intervalo contém fórmulas que não são calculadas ao vivo nesta pasta grande — classificá-lo ou movê-lo as salvaria como valores simples. Escolha um intervalo sem fórmulas.',
   appSortRangeTooLarge:
@@ -419,6 +429,9 @@ export const pt = {
   appTableNameUsed: 'O nome de tabela "{name}" já foi usado nesta sessão.',
   appTableNameInFile: 'O nome de tabela "{name}" já é usado por uma tabela no arquivo.',
   appTableOverlapsSession: 'O intervalo sobrepõe a tabela "{name}" criada nesta sessão.',
+  appTableOverlapsFile: 'O intervalo sobrepõe a tabela "{name}" do arquivo.',
+  appTableAlreadyInTable:
+    'A seleção já está na tabela "{name}" — altere o estilo em Design da Tabela.',
   appTablesNeedFile: 'Abra primeiro um arquivo XLSX — as tabelas são gravadas no arquivo.',
   appTableSelectRange: 'Selecione primeiro o intervalo de dados — cabeçalhos na primeira linha.',
   appTableCreated: 'Tabela criada — salve com {saveKeys}.',
@@ -504,6 +517,7 @@ export const pt = {
   appGridlinesHidden: 'Linhas de grade ocultas.',
   appGridlinesShown: 'Linhas de grade exibidas.',
   appShowingFormulas: 'Exibindo fórmulas — alterne novamente para ver os valores.',
+  appShowingFormulasActive: 'Exibindo fórmulas',
   appShowingValues: 'Exibindo valores calculados.',
   appTraceNoFormula: 'Rastrear Precedentes: a célula ativa não tem fórmula.',
   appTraceNoRefs: 'Rastrear Precedentes: esta fórmula não tem referências de células.',
@@ -554,6 +568,7 @@ export const pt = {
   appBridgeUnavailable:
     'A ponte de arquivos do desktop está indisponível. Reinicie o aplicativo Electron.',
   appOpenCanceled: 'Seleção de pasta de trabalho cancelada.',
+  appImportCanceled: 'Importação cancelada.',
   appOpeningWorkbook: 'Abrindo pasta de trabalho…',
   appOpenStalled: 'Não foi possível abrir a pasta de trabalho.',
   appOpenRetry: 'Tentar novamente',
@@ -750,6 +765,7 @@ export const pt = {
   appExportPdfTitle: 'Exportar como PDF',
   appSaveTitle: 'Salvar',
   appSaveAs: 'Salvar Como',
+  aiNameFile: 'Nomear com IA…',
   appUndo: 'Desfazer',
   appRedo: 'Refazer',
   appUnsavedEditOne: '● {count} edição não salva',
@@ -782,12 +798,11 @@ export const pt = {
   appLinkPlaceholder: 'https://example.com ou Sheet1!A1',
   appRemoveLink: 'Remover Link',
   appNotAvailableYet: 'Ainda não disponível',
-  appComingSoon: 'Em breve',
   appGroupChartLayouts: 'Layouts de gráfico',
   appAddChartElement: 'Adicionar Elemento de Gráfico',
   appAddChartElementTitle: 'Títulos, rótulos de dados, legenda',
   appQuickLayout: 'Layout Rápido',
-  appQuickLayoutTitle: 'Layouts predefinidos de legenda + rótulos',
+  appQuickLayoutTitle: 'Layouts padrão de legenda + rótulos',
   appChangeColors: 'Alterar Cores',
   appRecolorSlices: 'Recolorir cada fatia',
   appRecolorSeries: 'Recolorir cada série',
@@ -1198,6 +1213,20 @@ export const pt = {
   appWatchCell: 'Célula',
   appWatchValue: 'Valor',
   appWatchFormula: 'Fórmula',
+  appLinksPanel: 'Vínculos externos',
+  appLinksPanelDetail: 'Listar, atualizar e interromper vínculos a outras pastas de trabalho',
+  appLinksUpdate: 'Atualizar valores',
+  appLinksNone: 'Esta pasta de trabalho não tem vínculos para outras pastas de trabalho.',
+  appLinksUnsaved: 'Salve esta pasta de trabalho antes de listar as suas ligações externas.',
+  appLinksSource: 'Origem',
+  appLinksStatus: 'Estado',
+  appLinksSheets: 'Planilhas',
+  appLinksLocate: 'Localizar arquivo de origem',
+  appLinksReachable: 'Disponível',
+  appLinksBroken: 'Indisponível',
+  appLinksBreak: 'Interromper vínculos',
+  appLinksBreakConfirm: 'Confirmar interrupção',
+  appLinksChangeSource: 'Alterar origem',
   appGroupCalculation: 'Cálculo',
   appCalculationOptions: 'Opções de Cálculo',
   appCalculationOptionsTitle: 'Recálculo automático ou manual',
@@ -1214,8 +1243,16 @@ export const pt = {
   appGroupGetData: 'Obter Dados',
   appFromTextCsv: 'De Texto/CSV',
   appRefreshAll: 'Atualizar Tudo',
+  appRefreshQuery: 'Atualizar consulta',
+  appQueryConnectionsTitle: 'Atualizar as consultas da pasta de trabalho',
+  appQueryRefreshing: 'Atualizando {name}…',
+  appQueryRefreshed: '{name} atualizado ({rows} linhas)',
+  appQueryRefreshedClipped: '{name} atualizado ({rows} linhas, {dropped} não cabem no intervalo)',
+  appQueryRefreshFailed: 'Não foi possível atualizar {name}',
   appWorkbookNoPivot: 'Nenhuma tabela dinâmica nesta pasta de trabalho.',
   appRefreshAllTitle: 'Atualizar todas as tabelas dinâmicas',
+  appQueriesConnections: 'Consultas e conexões',
+  appQueriesConnectionsTitle: 'Listar as consultas e conexões de dados da pasta de trabalho',
   appErrorCheckingDetail: 'Verificar valores de erro na planilha',
   appErrorsFound: '{count} erros — em {cell}: {value}',
   appCheckingErrors: 'Procurando erros na planilha inteira…',
@@ -1251,6 +1288,7 @@ export const pt = {
   appGroupForecast: 'Previsão',
   appWhatIfAnalysis: 'Teste de Hipóteses',
   appGoalSeek: 'Atingir meta',
+  appDataTable: 'Tabela de dados',
   appWhatIfTitle: 'Resolver uma entrada para um valor-alvo',
   appGoalSeekNeedsFormula: 'A célula deve conter uma fórmula.',
   appGoalSeekByCellNotNumber: 'A célula a alterar deve conter um número ou estar vazia.',
@@ -1349,6 +1387,7 @@ export const pt = {
   appUpdatePassword: 'Atualizar senha',
   appWorkbookNotPasswordProtected:
     'Esta pasta de trabalho não está protegida por uma senha de abertura.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Uma pasta de trabalho protegida por senha não pode ser salva em um documento do UniWork. Use Salvar como para manter uma cópia criptografada neste computador.',
   appPasswordChangeUniwork: 'A senha de um documento do UniWork não pode ser alterada aqui.',
@@ -1357,6 +1396,8 @@ export const pt = {
   appEncryptedWrongPassword: 'A senha está incorreta. Tente novamente.',
   appPasswordChangeRestored:
     'Salve primeiro a pasta de trabalho restaurada e depois altere a senha dela.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Permitir Edição de Intervalos',
   appGroupClipboard: 'Área de Transferência',
   appPaste: 'Colar',
@@ -1547,7 +1588,11 @@ export const pt = {
   appNotePictureUnavailable: 'Não é possível exibir esta imagem.',
   appNotePicturesToggle: 'Imagens das anotações',
   appNoteInsertPicture: 'Inserir imagem',
+<<<<<<< ours
   appNotePictureInserted: 'Imagem adicionada à nota em {cell}. Salve para gravá-la no ficheiro.',
+=======
+  appNotePictureInserted: 'Imagem adicionada à nota em {cell}. Salve para gravá-la no arquivo.',
+>>>>>>> theirs
   appNotePictureRemoved: 'Imagem removida da nota em {cell}.',
   appNotePictureRemove: 'Remover imagem',
   appCommentsPaneTitle: 'Comentários',
@@ -1599,9 +1644,15 @@ export const pt = {
   appVisualEmbedInCell: 'Inserir imagem na célula',
   appVisualEmbedFailed: 'Não foi possível inserir esta imagem na célula.',
   appVisualDelete: 'Eliminar',
+<<<<<<< ours
   appVisualArranged: 'Objeto atualizado — guarde com {saveKeys}.',
   appVisualCopied: 'Objeto copiado.',
   appVisualPasted: 'Objeto colado — guarde com {saveKeys}.',
+=======
+  appVisualArranged: 'Objeto atualizado — salve com ⌘S.',
+  appVisualCopied: 'Objeto copiado.',
+  appVisualPasted: 'Objeto colado — salve com ⌘S.',
+>>>>>>> theirs
   appVisualNoCopy: 'Este objeto não pode ser copiado.',
   appVisualSelectTwo: 'Shift+clique para selecionar pelo menos dois objetos a alinhar.',
   appVisualSelectThree: 'Shift+clique para selecionar pelo menos três objetos a distribuir.',
@@ -1622,6 +1673,7 @@ export const pt = {
   appVisualFlipV: 'Inverter verticalmente',
   appVisualFlipH: 'Inverter horizontalmente',
   appCtxPasteVisual: 'Colar imagem ou forma',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Esta pasta de trabalho ainda não pode ser aberta na web',
   appWebEngineBody:
@@ -1649,6 +1701,8 @@ export const pt = {
   appWebSavedReopenFailed:
     'Suas alterações foram salvas no UniWork, mas não foi possível reabrir a pasta de trabalho aqui. Recarregue o editor para continuar.',
   appDataTable: 'Tabela de dados',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Ortografia',

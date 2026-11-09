@@ -152,7 +152,11 @@ export function AiQueueStrip({
             data-tip={paused ? labels.resumeTitle : labels.pauseTitle}
             aria-label={paused ? labels.resumeTitle : labels.pauseTitle}
           >
+<<<<<<< ours
             {paused ? <IconPlay size={14} /> : <IconPause size={14} />}
+=======
+            {paused ? <IconPlay size={13} /> : <IconPause size={13} />}
+>>>>>>> theirs
           </button>
         )}
         <button
@@ -162,7 +166,11 @@ export function AiQueueStrip({
           data-tip={labels.clearTitle}
           aria-label={labels.clearTitle}
         >
+<<<<<<< ours
           <IconBroom size={14} />
+=======
+          <IconBroom size={13} />
+>>>>>>> theirs
         </button>
       </div>
       {open && (
@@ -218,7 +226,11 @@ export function AiQueueStrip({
                       data-tip={labels.editTitle}
                       aria-label={labels.editTitle}
                     >
+<<<<<<< ours
                       <IconPencil size={14} />
+=======
+                      <IconPencil size={13} />
+>>>>>>> theirs
                     </button>
                     <button
                       type="button"
@@ -227,7 +239,11 @@ export function AiQueueStrip({
                       data-tip={labels.removeTitle}
                       aria-label={labels.removeTitle}
                     >
+<<<<<<< ours
                       <IconTrash size={14} />
+=======
+                      <IconTrash size={13} />
+>>>>>>> theirs
                     </button>
                   </>
                 )}

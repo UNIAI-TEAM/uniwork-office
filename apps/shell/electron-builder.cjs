@@ -29,8 +29,15 @@
  * users can still install local font files.
  */
 
+// Buffer comes from node:buffer, not the global: this file is evaluated
+// inside a vm sandbox (the packaging tests) that has no Buffer global.
+const { Buffer } = require('node:buffer')
 const { execFileSync } = require('node:child_process')
+<<<<<<< ours
 const { existsSync, readFileSync, rmSync, writeFileSync } = require('node:fs')
+=======
+const { closeSync, existsSync, openSync, readFileSync, readSync, rmSync } = require('node:fs')
+>>>>>>> theirs
 const { join } = require('node:path')
 
 // Legal identity (company, contact, homepage, copyright year): one file shared
@@ -91,6 +98,7 @@ if (winArm64 && !process.env.ELECTRON_BUILDER_7Z_FILTER) {
   process.env.ELECTRON_BUILDER_7Z_FILTER = 'BCJ'
 }
 const winArch = winArm64 ? 'arm64' : 'x64'
+<<<<<<< ours
 // The x64 sidecar defaults to the MinGW cross-compile path (built on a
 // mac/linux host). A Windows host builds it natively with MSVC instead, where
 // native/xlsx-engine/.cargo/config.toml links the CRT statically;
@@ -104,6 +112,51 @@ if (!WIN_X64_SIDECAR_TARGETS.includes(winX64SidecarTarget)) {
 }
 const winSidecarTarget = winArm64 ? 'aarch64-pc-windows-msvc' : winX64SidecarTarget
 const WIN_SIDECAR = `../sheets/native/xlsx-engine/target/${winSidecarTarget}/release/xlsx-sidecar.exe`
+=======
+const winSidecarTarget = winArm64 ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-gnu'
+// Where the release pipeline puts the sidecar: an explicit cross-compilation
+// triple (CI builds it that way). A Windows contributor's plain
+// `npm run build:all` instead leaves it in cargo's host-native target/release
+// (MSVC, statically linked per native/xlsx-engine/.cargo/config.toml), so that
+// output is accepted too — but only when the host arch really matches the
+// packaged one: an x64 host build must never be shipped inside an arm64
+// installer, which has to come from a cross build.
+const winSidecarCandidates = [
+  `../sheets/native/xlsx-engine/target/${winSidecarTarget}/release/xlsx-sidecar.exe`,
+  ...(process.platform === 'win32' && (process.arch === 'arm64') === winArm64
+    ? ['../sheets/native/xlsx-engine/target/release/xlsx-sidecar.exe']
+    : []),
+]
+const WIN_SIDECAR =
+  winSidecarCandidates.find((rel) => existsSync(join(__dirname, rel))) ?? winSidecarCandidates[0]
+
+// GENOFFICE_LINUX_ARM64=1 — package the arm64 Linux artifacts instead of x64.
+// Config support only: no CI job runs a second Linux pass yet, and whether
+// Linux arm64 joins the release matrix is decided on the maintainers' side.
+// With the flag set the AppImage/deb/rpm targets switch to arm64, and the
+// sidecar has to be an aarch64 build — cargo's host-native target/release when
+// the build host is arm64 Linux itself (a native ubuntu-arm64 runner needs no
+// cross toolchain), or an explicit cross-compilation triple otherwise.
+// beforePack checks the ELF machine type either way, because
+// electron-builder exits 0 on a missing/odd extraResources source and would
+// otherwise ship Sheets dead on every install.
+const linuxArm64 = process.env.GENOFFICE_LINUX_ARM64 === '1'
+const linuxSidecarTarget = linuxArm64 ? 'aarch64-unknown-linux-gnu' : 'x86_64-unknown-linux-gnu'
+// Mirrors the Windows candidate list above: the explicit triple first, then
+// cargo's plain host-native output — but only when the host really is the
+// packaged architecture, so an arm64 host can never hand its native sidecar
+// to an x64 package (and the other way round). The x64 pass therefore keeps
+// the historical host-native source on an x64 Linux host.
+const linuxSidecarCandidates = [
+  `../sheets/native/xlsx-engine/target/${linuxSidecarTarget}/release/xlsx-sidecar`,
+  ...(process.platform === 'linux' && (process.arch === 'arm64') === linuxArm64
+    ? ['../sheets/native/xlsx-engine/target/release/xlsx-sidecar']
+    : []),
+]
+const LINUX_SIDECAR =
+  linuxSidecarCandidates.find((rel) => existsSync(join(__dirname, rel))) ??
+  linuxSidecarCandidates[0]
+>>>>>>> theirs
 
 // Shipped next to THIRD-PARTY-NOTICES.txt (see extraResources)
 const LEGAL_FILES = ['LICENSE', 'NOTICE', 'MODIFICATIONS', 'LICENSE-UNICODE.txt']
@@ -118,12 +171,16 @@ function assertExtraResourceSources() {
     '../../node_modules/electron/dist/LICENSES.chromium.html',
     '../../node_modules/@embedpdf/pdfium/dist/pdfium.wasm',
     '../pdf/node_modules/harfbuzzjs/hb-subset.wasm',
+<<<<<<< ours
     `../../${OCR_TESSERACT}/tess-ocr.cjs`,
     `../../${OCR_TESSERACT}/tessdata/vie.traineddata`,
     `../../${OCR_TESSERACT}/tessdata/LICENSE`,
     `../../${OCR_TESSERACT}/tessdata/README.md`,
     `../../${OCR_TESSERACT}/LICENSES-tesseract-core.txt`,
     ...LEGAL_FILES.map((name) => `../../${name}`),
+=======
+    '../../node_modules/@rhwp/core/rhwp_bg.wasm',
+>>>>>>> theirs
   ]) {
     if (!existsSync(join(__dirname, rel))) {
       throw new Error(
@@ -133,6 +190,35 @@ function assertExtraResourceSources() {
   }
   // the helper's npm runtime must be exactly the reviewed closure
   assertTesseractResources()
+}
+
+/** ELF e_machine check (little-endian header): refuse a sidecar whose
+ *  architecture does not match the package being built. 0x3E = EM_X86_64,
+ *  0xB7 = EM_AARCH64. */
+function assertLinuxSidecarArch(sidecarPath, wantArm64) {
+  const fd = openSync(sidecarPath, 'r')
+  try {
+    const header = Buffer.alloc(20)
+    if (
+      readSync(fd, header, 0, 20, 0) < 20 ||
+      header.subarray(0, 4).toString('latin1') !== '\x7fELF'
+    ) {
+      throw new Error(`not an ELF binary: ${sidecarPath}`)
+    }
+    const machine = header.readUInt16LE(18)
+    const got = machine === 0xb7 ? 'aarch64' : machine === 0x3e ? 'x86_64' : `e_machine=${machine}`
+    const want = wantArm64 ? 'aarch64' : 'x86_64'
+    if (got !== want) {
+      throw new Error(
+        `linux sidecar is ${got} but this package ships ${want}: ${sidecarPath} — ` +
+          (wantArm64
+            ? 'cross-build it (cargo zigbuild --target aarch64-unknown-linux-gnu) or build natively on an arm64 host'
+            : 'rebuild it for x64'),
+      )
+    }
+  } finally {
+    closeSync(fd)
+  }
 }
 
 // macOS local-OCR helper (scanned-page text recovery): a swiftc output, not
@@ -377,6 +463,196 @@ function ensureThirdPartyNotices() {
 }
 
 /** @type {import('electron-builder').Configuration} */
+// NSIS makes every declared ProgId the extension's default opener; for the
+// office types that is the point, for plain text/JSON and the legacy Word
+// 97-2003 .doc/.dot it would hijack the system editor, so Windows leaves those
+// out (mac/Linux still declare them for Open With). GenOffice opens .doc/.dot
+// through its own Open dialog on every platform.
+const WIN_OPEN_WITH_ONLY_EXTS = new Set(['txt', 'json', 'doc', 'dot'])
+const FILE_ASSOCIATIONS = [
+  {
+    ext: 'docx',
+    name: 'Word Document',
+    description: 'Word Document',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  },
+  {
+    // import-only: opens as a converted .docx copy, GenOffice never writes .doc
+    ext: 'doc',
+    name: 'Word 97-2003 Document',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/msword',
+  },
+  {
+    // import-only: the template opens as a converted .docx copy
+    ext: 'dot',
+    name: 'Word 97-2003 Template',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/msword',
+  },
+  {
+    ext: 'xlsx',
+    name: 'Excel Workbook',
+    description: 'Excel Workbook',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  },
+  {
+    ext: 'xlsm',
+    name: 'Excel Macro-Enabled Workbook',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'application/vnd.ms-excel.sheet.macroEnabled.12',
+  },
+  {
+    ext: 'pptx',
+    name: 'PowerPoint Presentation',
+    description: 'PowerPoint Presentation',
+    role: 'Editor',
+    icon: 'pptx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  },
+  {
+    ext: 'xls',
+    name: 'Excel 97-2003 Workbook',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'application/vnd.ms-excel',
+  },
+  {
+    ext: 'csv',
+    name: 'CSV Document',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'text/csv',
+  },
+  {
+    // opens as a converted copy and saves as .xlsx (genoffice#1146)
+    ext: 'tsv',
+    name: 'TSV Document',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'text/tab-separated-values',
+  },
+  {
+    // import-only: opens as a converted .xlsx copy, GenOffice never writes ODF
+    ext: 'ods',
+    name: 'OpenDocument Spreadsheet',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'application/vnd.oasis.opendocument.spreadsheet',
+  },
+  {
+    ext: 'ots',
+    name: 'OpenDocument Spreadsheet Template',
+    role: 'Editor',
+    icon: 'xlsx',
+    mimeType: 'application/vnd.oasis.opendocument.spreadsheet-template',
+  },
+  {
+    // import-only: opens as a converted .docx copy, GenOffice never writes ODF
+    ext: 'odt',
+    name: 'OpenDocument Text',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/vnd.oasis.opendocument.text',
+  },
+  {
+    ext: 'ott',
+    name: 'OpenDocument Text Template',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/vnd.oasis.opendocument.text-template',
+  },
+  {
+    // import-only: opens as a converted .docx copy, GenOffice never writes HWPX
+    ext: 'hwpx',
+    name: 'Hancom HWPX Document',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/hwp+zip',
+  },
+  {
+    // import-only, like .hwpx: HWP binaries are read through rhwp into HWPX first
+    ext: 'hwp',
+    name: 'Hancom HWP Document',
+    role: 'Editor',
+    icon: 'docx',
+    mimeType: 'application/x-hwp',
+  },
+  {
+    // import-only: opens as a converted .pptx copy, GenOffice never writes ODF
+    ext: 'odp',
+    name: 'OpenDocument Presentation',
+    role: 'Editor',
+    icon: 'pptx',
+    mimeType: 'application/vnd.oasis.opendocument.presentation',
+  },
+  {
+    ext: 'otp',
+    name: 'OpenDocument Presentation Template',
+    role: 'Editor',
+    icon: 'pptx',
+    mimeType: 'application/vnd.oasis.opendocument.presentation-template',
+  },
+  {
+    ext: 'pdf',
+    name: 'PDF Document',
+    role: 'Editor',
+    icon: 'pdf',
+    mimeType: 'application/pdf',
+  },
+  {
+    ext: 'md',
+    name: 'Markdown Document',
+    role: 'Editor',
+    icon: 'md',
+    mimeType: 'text/markdown',
+  },
+  {
+    ext: 'markdown',
+    name: 'Markdown Document',
+    role: 'Editor',
+    icon: 'md',
+    mimeType: 'text/markdown',
+  },
+  {
+    ext: 'txt',
+    name: 'Text Document',
+    description: 'Text Document',
+    role: 'Editor',
+    icon: 'txt',
+    mimeType: 'text/plain',
+  },
+  {
+    ext: 'json',
+    name: 'JSON Document',
+    description: 'JSON Document',
+    role: 'Editor',
+    icon: 'json',
+    mimeType: 'application/json',
+  },
+  {
+    ext: 'html',
+    name: 'HTML Document',
+    role: 'Editor',
+    icon: 'html',
+    mimeType: 'text/html',
+  },
+  {
+    ext: 'htm',
+    name: 'HTML Document',
+    role: 'Editor',
+    icon: 'html',
+    mimeType: 'text/html',
+  },
+]
+
 const config = {
   appId: 'com.uniwork.office',
   productName: 'UniWork Office',
@@ -461,6 +737,11 @@ const config = {
     {
       from: '../pdf/node_modules/harfbuzzjs/hb-subset.wasm',
       to: 'wasm/hb-subset.wasm',
+    },
+    // .hwp import (packages/hwp2docx/src/hwp.ts): rhwp reads HWP binaries into HWPX
+    {
+      from: '../../node_modules/@rhwp/core/rhwp_bg.wasm',
+      to: 'wasm/rhwp_bg.wasm',
     },
     // platform system-OCR helpers for scanned-page recovery (each exists only
     // on its own build platform; electron-builder skips absent sources and the
@@ -557,6 +838,7 @@ const config = {
   // bare UniWork Office logo instead of a per-type document icon. The icns/ico
   // pairs are generated from the shell renderer's file-type tiles by
   // tools/gen-file-association-icons.mjs.
+<<<<<<< ours
   //
   // `rank: 'Alternate'` (LSHandlerRank, macOS): the app is listed under "Open
   // With" but never claims the default by itself; Settings → General has the
@@ -765,6 +1047,9 @@ const config = {
     { name: 'UniWork', schemes: ['uniwork'] },
     { name: 'UniWork Office sign-in', schemes: ['uniwork-office'] },
   ],
+=======
+  fileAssociations: FILE_ASSOCIATIONS,
+>>>>>>> theirs
   npmRebuild: false,
   mac: {
     // Two separate arch packages (NOT universal): arm64 keeps the exact
@@ -787,7 +1072,11 @@ const config = {
     // audio-input entitlement, and macOS asks for it with this text
     extendInfo: {
       NSMicrophoneUsageDescription:
+<<<<<<< ours
         'UniWork Office records your narration when you record a slide show.',
+=======
+        'GenOffice records your narration when you record a slide show.',
+>>>>>>> theirs
     },
     notarize: true,
     extraResources: [
@@ -808,6 +1097,7 @@ const config = {
         arch: [winArch],
       },
     ],
+    fileAssociations: FILE_ASSOCIATIONS.filter((a) => !WIN_OPEN_WITH_ONLY_EXTS.has(a.ext)),
     extraResources: [
       {
         from: WIN_SIDECAR,
@@ -826,20 +1116,31 @@ const config = {
   },
   // Unlike win (which cross-compiles the sidecar to an explicit target
   // triple), linux takes it from cargo's host-native target/release/ — the
-  // same source mac uses. So no `arch` is pinned here: electron-builder
-  // defaults to the build host's architecture, which is the only one the
-  // sidecar was actually built for. Packaging arm64 on an x64 host, or the
-  // reverse, needs a matching `cargo build --target` first.
+  // same source mac uses. So no `arch` is pinned here beyond the flag below:
+  // electron-builder defaults to the build host's architecture, which is the
+  // only one the sidecar was actually built for — and GENOFFICE_LINUX_ARM64=1
+  // switches every target to arm64, where the sidecar must come from a native
+  // arm64 host or an explicit cross build (see linuxSidecarCandidates and the
+  // ELF check). That flag is config support only: no second Linux pass runs
+  // anywhere yet, so the arm64 artifacts are not produced by this repo.
   linux: {
     // AppImage (self-contained, any distro) + deb (apt install, pulls in the
     // GTK/NSS runtime deps) + rpm (dnf/zypper install on Fedora / RHEL /
+<<<<<<< ours
     // openSUSE). Plain local packaging keeps electron-builder's AppImage name
     // (UniWork Office-<v>.AppImage) and the deb / rpm names below; dev / beta
     // release builds rename all of them (release block at the end).
+=======
+    // openSUSE). Default artifact names are kept on purpose —
+    // GenOffice-<v>.AppImage / genoffice_<v>_amd64.deb — because the public
+    // README download links and the already-published linux-v0.5.149 release
+    // use them. The arm64 targets reuse the ${arch}-templated deb/rpm names
+    // (genoffice_<v>_arm64.deb).
+>>>>>>> theirs
     target: [
-      { target: 'AppImage', arch: ['x64'] },
-      { target: 'deb', arch: ['x64'] },
-      { target: 'rpm', arch: ['x64'] },
+      { target: 'AppImage', arch: [linuxArm64 ? 'arm64' : 'x64'] },
+      { target: 'deb', arch: [linuxArm64 ? 'arm64' : 'x64'] },
+      { target: 'rpm', arch: [linuxArm64 ? 'arm64' : 'x64'] },
     ],
     // deb / rpm control metadata from legal.json: Maintainer is "<company>
     // <email>", Vendor the company. Homepage comes from extraMetadata.homepage
@@ -870,9 +1171,10 @@ const config = {
     syncDesktopName: true,
     extraResources: [
       {
-        from: '../sheets/native/xlsx-engine/target/release/xlsx-sidecar',
+        from: LINUX_SIDECAR,
         to: 'native/xlsx-sidecar',
       },
+<<<<<<< ours
       // public key of the signed apt repository; the deb postinst installs it
       // under /usr/share/keyrings (build/linux-after-install.sh)
       {
@@ -882,6 +1184,17 @@ const config = {
       {
         from: `${LO_CACHE_PREFIX}/linux-\${arch}/libreoffice`,
         to: 'libreoffice',
+=======
+      // Same blank templates the Windows installer registers for Explorer's
+      // "New" menu. The deb/rpm post-install step copies them into
+      // /usr/share/templates, which KDE Plasma's Dolphin "Create New" menu
+      // scans (genoffice#2384). AppImage gets the payload too but runs no
+      // install script, so it adds no templates.
+      {
+        from: 'build/shell-new',
+        to: 'shell-new',
+        filter: ['*.docx', '*.xlsx', '*.pptx'],
+>>>>>>> theirs
       },
     ],
   },
@@ -945,8 +1258,25 @@ const config = {
     }
     if (context.electronPlatformName === 'win32' && !existsSync(join(__dirname, WIN_SIDECAR))) {
       throw new Error(
-        `win extraResources source missing: ${WIN_SIDECAR} (cargo build --target ${winSidecarTarget} first)`,
+        `win extraResources source missing: ${winSidecarCandidates.join(' or ')} ` +
+          `(run "npm run native:build -w @genoffice/sheets", or cargo build --target ${winSidecarTarget})`,
       )
+    }
+    if (context.electronPlatformName === 'linux') {
+      const sidecar = join(__dirname, LINUX_SIDECAR)
+      if (!existsSync(sidecar)) {
+        // The candidate list is picked by the flag, so the x64 pass never
+        // points at an aarch64 build (and the arm64 pass never at an x64 one).
+        const hint = linuxArm64
+          ? 'cross-build with "cargo zigbuild --release --target aarch64-unknown-linux-gnu", ' +
+            'or build natively on an arm64 Linux host'
+          : 'run "npm run native:build -w @genoffice/sheets" on an x64 Linux host, ' +
+            'or cross-build with "cargo zigbuild --release --target x86_64-unknown-linux-gnu"'
+        throw new Error(
+          `linux extraResources source missing: ${linuxSidecarCandidates.join(' or ')} (${hint})`,
+        )
+      }
+      assertLinuxSidecarArch(sidecar, linuxArm64)
     }
   },
   dmg: {

@@ -116,6 +116,11 @@ export const es = {
     'Control de cambios activado: los cambios de contenido de la IA se marcan como revisiones (inserciones subrayadas, eliminaciones tachadas); acéptalas o recházalas en Revisar',
   aiTrackOffTitle:
     'Control de cambios desactivado: los cambios de la IA se aplican de inmediato (aún puedes revertir mediante instantáneas de versión)',
+  aiRevisionBarTitle: 'Revisiones',
+  aiRevisionCount: '{count} cambios pendientes',
+  aiRevisionRejectAll: 'Rechazar todo',
+  aiRevisionAcceptAll: 'Aceptar todo',
+  aiRevisionPara: 'Párrafo {n}',
   aiTurnLimit:
     '(Se alcanzó el límite de llamadas a herramientas de esta solicitud; la respuesta anterior refleja los pasos completados hasta ahora y puede estar incompleta.)',
   aiStopped: '(Detenido)',
@@ -128,6 +133,8 @@ export const es = {
   aiUnknownError: 'Error desconocido',
   aiTimeoutError:
     'La solicitud de IA agotó el tiempo de espera: no hubo respuesta de la red y se detuvo. Comprueba tu conexión e inténtalo de nuevo',
+  aiRegionError:
+    'El proveedor de este modelo no da servicio en tu región actual — elige otro modelo o cambia de red',
   aiOverloadedError:
     'El servicio de IA está saturado en este momento; inténtalo de nuevo en unos instantes',
   aiNetworkError:
@@ -136,6 +143,9 @@ export const es = {
   aiSumImageAttachment: 'Imagen adjunta {name}',
   aiSumRead: 'Leer {name}',
   aiSumReadAttachmentName: 'Leer dato adjunto {name}',
+  aiSumSkillsList: 'Habilidades instaladas listadas',
+  aiSumSkillRead: 'Skill {name} leído',
+  aiSumRunCli: 'Ejecutó {args}',
   aiSumWebSearch: 'Búsqueda web',
   aiSumWebSearchDone: 'Búsqueda de «{query}» ({count} resultados)',
   aiSumImageSearch: 'Búsqueda de imágenes',
@@ -199,6 +209,7 @@ export const es = {
   aiCmdImages: '{count} imagen(es) actualizada(s)',
   aiCmdToc: 'Tabla de contenido insertada ({count} entradas)',
   aiCmdSkipped: ' ({count} bloque(s) protegido(s) omitido(s))',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
   aiClarifyTitle: 'Unas preguntas antes de continuar',
@@ -213,6 +224,8 @@ export const es = {
   aiClarifySubmit: 'Continuar',
   aiSumClarify: 'Aclaración respondida',
   aiSumClarifySkipped: 'Aclaración omitida',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Generar un mapa mental de este documento',
   aiMindMapBtn: 'Mapa mental IA',
   aiMindMapPrompt:
@@ -223,7 +236,18 @@ export const es = {
   aiMindMapAskPrompt: 'Háblame de «{label}» en este documento',
   aiMindMapJump: 'Ir al pasaje citado',
   aiMindMapExport: 'Exportar PNG',
+<<<<<<< ours
   aiMindMapReset: 'Restablecer vista',
   aiMindMapExpand: 'Expandir rama',
   aiMindMapCollapse: 'Contraer rama',
+=======
+  aiMindMapExportSvg: 'Exportar SVG',
+  aiMindMapInsert: 'Insertar en el documento',
+  aiMindMapReset: 'Restablecer vista',
+  aiMindMapExpand: 'Expandir rama',
+  aiMindMapCollapse: 'Contraer rama',
+  aiMindMapToggleLayout: 'Cambiar diseño',
+  aiMindMapLayoutTopDown: 'Cambiar al diseño de arriba abajo',
+  aiMindMapLayoutLeftRight: 'Cambiar al diseño de izquierda a derecha',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

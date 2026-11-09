@@ -1,6 +1,10 @@
 import { existsSync } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
+<<<<<<< ours
 import { atomicCopyFileExclusive } from './atomic-write'
+=======
+import { atomicCopyFile } from './atomic-write'
+>>>>>>> theirs
 
 export interface DuplicateFileDeps {
   copySuffix: string
@@ -19,9 +23,14 @@ export async function duplicateDocumentFile(
     const target = join(dirname(path), `${base} ${deps.copySuffix}${i === 1 ? '' : ` ${i}`}${ext}`)
     if (existsSync(target)) continue
     try {
+<<<<<<< ours
       await atomicCopyFileExclusive(path, target)
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') continue
+=======
+      await atomicCopyFile(path, target)
+    } catch (error) {
+>>>>>>> theirs
       deps.onError(error)
       return
     }

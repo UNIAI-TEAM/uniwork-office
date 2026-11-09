@@ -1,3 +1,4 @@
+<<<<<<< ours
 import { accessSync, constants, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -20,6 +21,10 @@ vi.mock('node:fs', async (importOriginal) => {
     accessSync: vi.fn(actual.accessSync),
   }
 })
+=======
+import { describe, expect, it } from 'vitest'
+import { launchPathsWithLastSession, readLastSessionDocuments } from '../src/main/last-session'
+>>>>>>> theirs
 
 const all = () => true
 
@@ -41,6 +46,7 @@ describe('readLastSessionDocuments', () => {
     const many = Array.from({ length: 500 }, (_, i) => `/doc-${i}.md`)
     expect(readLastSessionDocuments({ lastSessionDocuments: many })).toHaveLength(50)
   })
+<<<<<<< ours
 
   it('skips paths inside the UniWork store and under unreachable folder roots', () => {
     const list = [
@@ -59,6 +65,8 @@ describe('readLastSessionDocuments', () => {
       '/local/c.pptx',
     ])
   })
+=======
+>>>>>>> theirs
 })
 
 describe('launchPathsWithLastSession', () => {
@@ -77,6 +85,7 @@ describe('launchPathsWithLastSession', () => {
       '/c.pdf',
     ])
   })
+<<<<<<< ours
 
   it('drops stored paths that fall inside the UniWork store or an unreachable root at launch', () => {
     const settings = {
@@ -359,4 +368,6 @@ describe('createSessionSnapshotRecorder', () => {
 
     expect(writes).toEqual([['/shell/s.docx', '/detached/d.xlsx'], ['/shell/fresh.docx']])
   })
+=======
+>>>>>>> theirs
 })

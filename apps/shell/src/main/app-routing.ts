@@ -1,9 +1,17 @@
 import type { DocumentTabKind } from '../shared/tabs-api'
 
 // shared by the open route, the open-dialog filter and the rename gate so they cannot drift
+<<<<<<< ours
 const DOCX_RE = /\.docx$/i
 const XLSX_RE = /\.(xlsx|xlsm|xls|csv|tsv|ods|ots)$/i
 const PPTX_RE = /\.pptx$/i
+=======
+// .odt/.odp (and the .ott/.ots/.otp templates), legacy Word .doc/.dot and .hwp/.hwpx
+// open through the docs/slides/sheets import filters (converted copies)
+const DOCX_RE = /\.(docx|doc|dot|odt|ott|hwpx|hwp)$/i
+const XLSX_RE = /\.(xlsx|xlsm|xls|csv|tsv|ods|ots)$/i
+const PPTX_RE = /\.(pptx|odp|otp)$/i
+>>>>>>> theirs
 const PDF_RE = /\.pdf$/i
 const HTML_RE = /\.html?$/i
 // the legacy binaries and OpenDocument files open through the converter (legacy-open.ts), then in docs / sheets / slides

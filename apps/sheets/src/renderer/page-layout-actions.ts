@@ -24,9 +24,16 @@ import type { HeaderFooterResult } from './HeaderFooterDialog'
 import { t } from './i18n/locale'
 import { effectivePageBreaks } from './page-break-preview'
 import { COLOR_SCHEMES, FONT_SCHEMES, rethemeStyles, THEME_PRESETS } from './themes'
+<<<<<<< ours
 import { startFullLoad } from './full-load'
 import { fitsFullLoad, workbookCellCounts } from './load-budget'
 import { loadVisibleRange } from './univer-sync'
+=======
+import { settleFormulas } from './formula-settle'
+import { startFullLoad } from './full-load'
+import { fitsFullLoad, workbookCellCounts } from './load-budget'
+import { ensureSheetFileState, loadVisibleRange } from './univer-sync'
+>>>>>>> theirs
 import {
   layoutSheetPrint,
   PrintError,
@@ -385,6 +392,11 @@ async function sheetPrintDocument(
   withVisuals: boolean,
 ): Promise<SheetPrintDocument> {
   const sheetId = worksheet.getSheetId()
+  // A sheet the viewport never visited has no captured file state, so its
+  // page setup (and manual breaks) would print with the defaults instead of
+  // the file's. Index it on demand; when that does not finish in time, the
+  // defaults print as before.
+  if (state) await ensureSheetFileState(state, sheetId, ctx.lazyWorkbookRef)
   const journal = { ...(state?.editJournal.pageSetup.get(sheetId) ?? {}), ...overrides }
   const fileSetup = state?.sheetFilePageSetups.get(sheetId) ?? null
   const fileSheet = state?.file.sheets.find((sheet) => sheet.id === sheetId)
@@ -588,8 +600,14 @@ async function loadWorkbookForPrint(
   return true
 }
 
+<<<<<<< ours
 /// File → Print: loads a streamed workbook first, then opens the Print
 /// dialog's host; null (after a status message) when it cannot be opened.
+=======
+/// File → Print: loads a streamed workbook and settles its formulas first,
+/// then opens the Print dialog's host; null (after a status message) when it
+/// cannot be opened.
+>>>>>>> theirs
 export async function openPrintPreviewHost(
   ctx: PageLayoutContext,
 ): Promise<PrintPreviewHost | null> {
@@ -605,6 +623,11 @@ export async function openPrintPreviewHost(
     })
     if (!loaded) return null
   }
+<<<<<<< ours
+=======
+  await settleFormulas(ctx.univerRef.current)
+  if (ctx.lazyWorkbookRef.current !== state) return null
+>>>>>>> theirs
   return createPrintPreviewHost(ctx)
 }
 
@@ -621,8 +644,15 @@ async function activeSheetPrintPayload(
   }
   const state = ctx.lazyWorkbookRef.current
   if (state && !(await loadWorkbookForPrint(ctx, state, messages))) return null
+<<<<<<< ours
 
   // The load awaited: take the sheet again, it may have changed meanwhile.
+=======
+  await settleFormulas(ctx.univerRef.current)
+
+  // The load and the formula pass awaited: take the sheet again, it may have
+  // changed meanwhile.
+>>>>>>> theirs
   const worksheet = activeSheet()
   if (!worksheet) {
     ctx.setMessage(t('appActiveSheetUnavailable'))
@@ -637,6 +667,7 @@ async function activeSheetPrintPayload(
   return printRequest([document], `${document.fileName}.pdf`)
 }
 
+<<<<<<< ours
 /// A cold load reaches preloadComplete before the formula engine's first pass
 /// lands in the model, so an export right after it prints formula cells
 /// empty. Force one calculation pass, wait for its end (bounded) and then let
@@ -687,6 +718,8 @@ async function settleFormulasBeforePrint(ctx: PageLayoutContext): Promise<void> 
   }
 }
 
+=======
+>>>>>>> theirs
 /// Every visible, non-removed sheet laid out in order: the headless export's
 /// PDF stands for the whole file, so a chart or table on any other sheet must
 /// print too. Each sheet is made active before its layout — floating visuals
@@ -713,7 +746,11 @@ async function workbookPrintPayload(
   if (ctx.lazyWorkbookRef.current !== state) return null
 
   ctx.setMessage(messages.preparing)
+<<<<<<< ours
   await settleFormulasBeforePrint(ctx)
+=======
+  await settleFormulas(ctx.univerRef.current)
+>>>>>>> theirs
 
   const activeId = current.getActiveSheet()?.getSheetId()
   const sheets = current

@@ -16,7 +16,10 @@ import {
   type AgentId,
   type AgentTarget,
   type BundledSkill,
+<<<<<<< ours
   type LegacyKeepReason,
+=======
+>>>>>>> theirs
   type LegacySkillCopy,
   type SkillInstallState,
   type SkillLedger,
@@ -98,7 +101,10 @@ interface LegacyRow {
   path: string
   /** the copy still holds the bytes this app wrote, so it can be removed */
   ours: boolean
+<<<<<<< ours
   reason?: LegacyKeepReason
+=======
+>>>>>>> theirs
 }
 
 function legacyRow(copy: LegacySkillCopy): LegacyRow {
@@ -108,7 +114,10 @@ function legacyRow(copy: LegacySkillCopy): LegacyRow {
     skills_dir: copy.skillsDir,
     path: copy.path,
     ours: copy.ours,
+<<<<<<< ours
     ...(copy.reason ? { reason: copy.reason } : {}),
+=======
+>>>>>>> theirs
   }
 }
 
@@ -124,7 +133,10 @@ function list(ctx: CommandContext) {
   const current = agents.filter((a) => a.detected && a.up_to_date).length
   const found = agents.filter((a) => a.detected)
   const legacy = findLegacySkillCopies(ledger, ctx.env, home(ctx.env)).map(legacyRow)
+<<<<<<< ours
   if (Object.keys(ledger).length !== beforeKeys) writeLedger(ctx.env, ledger)
+=======
+>>>>>>> theirs
   return {
     summary: [
       found.length
@@ -241,10 +253,16 @@ function install(
   // the shared `.agents` copy is the one every legacy tool reads now; once it
   // is in place the per-tool copies it replaced are stale duplicates, so they
   // go. Without it they are all the user has, so they stay.
+<<<<<<< ours
   const beforeSweepKeys = Object.keys(ledger).length
   const sweep = currentSkillInstalled(ledger, ctx.env, home(ctx.env))
     ? sweepLegacySkillCopies(ledger, ctx.env, home(ctx.env))
     : { removed: [], kept: [], failed: [] }
+=======
+  const sweep = currentSkillInstalled(ledger, ctx.env, home(ctx.env))
+    ? sweepLegacySkillCopies(ledger, ctx.env, home(ctx.env))
+    : { removed: [], kept: [] }
+>>>>>>> theirs
   for (const c of sweep.removed) {
     warnings.push({
       code: 'legacy_copy_removed',
@@ -254,6 +272,7 @@ function install(
   for (const c of sweep.kept) {
     warnings.push({
       code: 'legacy_copy_kept',
+<<<<<<< ours
       message: `${c.label}: ${keptMessage(c.path, c.reason)}`,
       suggestion: 'delete it yourself if the tool still reads it',
     })
@@ -268,6 +287,13 @@ function install(
   if (dirty || sweep.removed.length || Object.keys(ledger).length !== beforeSweepKeys) {
     writeLedger(ctx.env, ledger)
   }
+=======
+      message: `${c.label}: the copy at ${c.path} was edited by hand; left in place`,
+      suggestion: 'delete it yourself if the tool still reads it',
+    })
+  }
+  if (dirty || sweep.removed.length) writeLedger(ctx.env, ledger)
+>>>>>>> theirs
   return {
     ...(sweep.failed.length ? { status: 'partial' as const } : {}),
     summary: written.length
@@ -277,6 +303,7 @@ function install(
     detail: { bundled_version: skill.version, agents: rows },
   }
 }
+<<<<<<< ours
 
 function keptMessage(path: string, reason: LegacyKeepReason): string {
   if (reason === 'edited') return `the copy at ${path} was edited by hand; left in place`
@@ -286,6 +313,8 @@ function keptMessage(path: string, reason: LegacyKeepReason): string {
   }
   return `could not inspect the copy at ${path}; left in place`
 }
+=======
+>>>>>>> theirs
 function refusal(state: SkillInstallState, force: boolean): string | null {
   if (state.status === 'occupied') return 'the genoffice folder there holds something else'
   if (force) return null

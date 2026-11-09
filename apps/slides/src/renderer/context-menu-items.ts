@@ -290,6 +290,14 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
           ]
         : []),
       {
+        // Withhold the selection from the model. Disabled on a bare caret, like Cut/Copy above:
+        // there is nothing there to hide, but the row stays so the menu does not reflow.
+        // A selection that is already withheld clears the mark instead of asking again.
+        label: t('redactMenuLabel'),
+        disabled: ctxMenu.collapsed,
+        onClick: onSel(() => redactActions.openTextRedaction(ctx)),
+      },
+      {
         label: t('appCtxSelectAll'),
         hint: '⌘A',
         onClick: onSel(() => void document.execCommand('selectAll')),
@@ -456,8 +464,9 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
     ),
     onClick: () => void arrangeActions.reorderSelected(ctx, ctxMenu.targetId, dir),
   })
-  // PowerPoint's shape/picture menu order; rotate/flip and align/distribute (ribbon-only
-  // in PowerPoint) follow the Format entry, Delete stays last
+  // WPS-style shape/picture menu: Delete sits with the clipboard group so it is findable
+  // without scrolling, and rotate/flip and align/distribute (ribbon-only in PowerPoint)
+  // collapse into flyouts to keep the menu shorter than the viewport
   return [
     ...tableItems,
     { label: t('appCtxCut'), hint: '⌘X', onClick: () => void clipboardActions.cutSelected(ctx) },
@@ -467,6 +476,12 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
       hint: '⌘V',
       disabled: !ctx.hasClipboard,
       onClick: () => void clipboardActions.pasteClipboard(ctx),
+    },
+    {
+      label: t('appCtxDelete'),
+      hint: '⌫',
+      danger: true,
+      onClick: () => void clipboardActions.deleteSelected(ctx),
     },
     null,
     ...(node && isEditableText(node)
@@ -571,6 +586,7 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
           // the setRedaction op. Disabled on a multi-selection, like Bring to Front above: the
           // op addresses one element, and marking only the right-clicked one of several would
           // withhold less than the reader asked for. The row stays so the menu does not reflow.
+<<<<<<< ours
           // Same `ai` gate as the text entry: it is only meaningful with a model to hide from.
           ...(cap('ai')
             ? [
@@ -581,6 +597,13 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
                 } as CtxItem,
               ]
             : []),
+=======
+          {
+            label: t('redactMenuLabel'),
+            disabled: !single,
+            onClick: () => void redactActions.toggleElementRedaction(ctx, ctxMenu.targetId),
+          } as CtxItem,
+>>>>>>> theirs
         ]
       : []),
     ...(defaultStyle
@@ -608,74 +631,77 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
     !isLine
       ? [
           {
-            label: t('appCtxRotateLeft90'),
-            onClick: () => void arrangeActions.rotateSelected(ctx, -90),
+            label: t('appCtxRotate'),
+            sub: [
+              {
+                label: t('appCtxRotateLeft90'),
+                onClick: () => void arrangeActions.rotateSelected(ctx, -90),
+              },
+              {
+                label: t('appCtxRotateRight90'),
+                onClick: () => void arrangeActions.rotateSelected(ctx, 90),
+              },
+              null,
+              {
+                label: t('appCtxFlipH'),
+                onClick: () => void arrangeActions.flipSelected(ctx, 'h'),
+              },
+              {
+                label: t('appCtxFlipV'),
+                onClick: () => void arrangeActions.flipSelected(ctx, 'v'),
+              },
+            ],
           } as CtxItem,
-          {
-            label: t('appCtxRotateRight90'),
-            onClick: () => void arrangeActions.rotateSelected(ctx, 90),
-          } as CtxItem,
-          null,
-          {
-            label: t('appCtxFlipH'),
-            onClick: () => void arrangeActions.flipSelected(ctx, 'h'),
-          } as CtxItem,
-          {
-            label: t('appCtxFlipV'),
-            onClick: () => void arrangeActions.flipSelected(ctx, 'v'),
-          } as CtxItem,
-          null,
         ]
       : []),
     ...(selectedIds.length >= 1
       ? [
           {
-            label: t('appCtxAlignLeft'),
-            onClick: () => void arrangeActions.alignSelected(ctx, 'left'),
-          } as CtxItem,
-          {
-            label: t('appCtxAlignCenterH'),
-            onClick: () => void arrangeActions.alignSelected(ctx, 'center-h'),
-          } as CtxItem,
-          {
-            label: t('appCtxAlignRight'),
-            onClick: () => void arrangeActions.alignSelected(ctx, 'right'),
-          } as CtxItem,
-          {
-            label: t('appCtxAlignTop'),
-            onClick: () => void arrangeActions.alignSelected(ctx, 'top'),
-          } as CtxItem,
-          {
-            label: t('appCtxAlignCenterV'),
-            onClick: () => void arrangeActions.alignSelected(ctx, 'center-v'),
-          } as CtxItem,
-          {
-            label: t('appCtxAlignBottom'),
-            onClick: () => void arrangeActions.alignSelected(ctx, 'bottom'),
-          } as CtxItem,
-        ]
-      : []),
-    ...(selectedIds.length >= 3
-      ? [
-          {
-            label: t('appCtxDistributeH'),
-            onClick: () => void arrangeActions.alignSelected(ctx, 'distribute-h'),
-          } as CtxItem,
-          {
-            label: t('appCtxDistributeV'),
-            onClick: () => void arrangeActions.alignSelected(ctx, 'distribute-v'),
+            label: t('ribbonAlignMenu'),
+            sub: [
+              {
+                label: t('appCtxAlignLeft'),
+                onClick: () => void arrangeActions.alignSelected(ctx, 'left'),
+              },
+              {
+                label: t('appCtxAlignCenterH'),
+                onClick: () => void arrangeActions.alignSelected(ctx, 'center-h'),
+              },
+              {
+                label: t('appCtxAlignRight'),
+                onClick: () => void arrangeActions.alignSelected(ctx, 'right'),
+              },
+              {
+                label: t('appCtxAlignTop'),
+                onClick: () => void arrangeActions.alignSelected(ctx, 'top'),
+              },
+              {
+                label: t('appCtxAlignCenterV'),
+                onClick: () => void arrangeActions.alignSelected(ctx, 'center-v'),
+              },
+              {
+                label: t('appCtxAlignBottom'),
+                onClick: () => void arrangeActions.alignSelected(ctx, 'bottom'),
+              },
+              ...(selectedIds.length >= 3
+                ? [
+                    null,
+                    {
+                      label: t('appCtxDistributeH'),
+                      onClick: () => void arrangeActions.alignSelected(ctx, 'distribute-h'),
+                    },
+                    {
+                      label: t('appCtxDistributeV'),
+                      onClick: () => void arrangeActions.alignSelected(ctx, 'distribute-v'),
+                    },
+                  ]
+                : []),
+            ],
           } as CtxItem,
         ]
       : []),
     null,
     { label: t('ribbonNewComment'), onClick: () => ctx.newComment() },
-    null,
-    {
-      label: t('appCtxDelete'),
-      hint: '⌫',
-      danger: true,
-      onClick: () => void clipboardActions.deleteSelected(ctx),
-    },
   ]
 }
 

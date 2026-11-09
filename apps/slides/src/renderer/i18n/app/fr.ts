@@ -67,6 +67,10 @@ export const fr = {
   appStatusAudioInserted: 'Audio inséré (incorporé dans le .pptx)',
   appStatusModel3dInserted:
     'Modèle 3D inséré : sélectionnez-le pour le faire pivoter (PowerPoint l’affiche aussi en 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'Le modèle 3D n’a pas pu être dessiné ici ; son image reste inchangée',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'L’enregistrement est vide ; rien n’a été inséré',
   appStatusRecordingInserted:
     'Enregistrement d’écran inséré dans la diapositive actuelle (webm incorporé)',
@@ -166,9 +170,20 @@ export const fr = {
   appPrintProgress: 'Préparation de l’impression…',
   appPrintTitle: 'Imprimer',
   appPrintLayoutFull: 'Diapositives pleine page',
+  appPrintPrinter: 'Imprimante',
+  appPrintDefaultPrinter: 'Imprimante par défaut',
+  appPrintSystemDialog: 'Boîte de dialogue système…',
+  appPrintCopies: 'Copies',
+  appPrintCollate: 'Assembler',
+  appPrintDuplex: 'Recto verso',
+  appPrintDuplexOff: 'Recto seul',
+  appPrintDuplexLong: 'Recto verso, reliure grand côté',
+  appPrintDuplexShort: 'Recto verso, reliure petit côté',
   appPrintLayoutHandout2: 'Documents (2 par page)',
   appPrintLayoutHandout3: 'Documents (3 par page)',
+  appPrintLayoutHandout4: 'Documents (4 par page)',
   appPrintLayoutHandout6: 'Documents (6 par page)',
+  appPrintLayoutHandout9: 'Documents (9 par page)',
   appPrintLayoutNotes: 'Pages de notes',
   appPrintRange: 'Étendue',
   appPrintRangeAll: 'Toutes les diapositives',
@@ -180,6 +195,9 @@ export const fr = {
   appPrintPortrait: 'Portrait',
   appPrintLandscape: 'Paysage',
   appPrintFrame: 'Encadrer les diapositives',
+  appPrintOrderGroup: 'Ordre des diapositives',
+  appPrintOrderHorizontal: 'Horizontale',
+  appPrintOrderVertical: 'Verticale',
   appPrintHidden: 'Imprimer les diapositives masquées',
   appPrintPageCount: '{n} pages',
   appPrintNoPages: 'Aucune diapositive à imprimer',
@@ -191,6 +209,7 @@ export const fr = {
   appCtxSendToBack: 'Mettre à l’arrière-plan',
   appCtxBringForward: 'Avancer',
   appCtxSendBackward: 'Reculer',
+  appCtxRotate: 'Rotation',
   appCtxRotateLeft90: 'Faire pivoter de 90° à gauche',
   appCtxRotateRight90: 'Faire pivoter de 90° à droite',
   appCtxFlipH: 'Retourner horizontalement',
@@ -230,6 +249,8 @@ export const fr = {
   appMasterFillNone: 'Aucun remplissage',
   appMasterStroke: 'Couleur du contour…',
   appMasterStrokeNone: 'Aucun contour',
+  appMasterInsertTextBox: 'Zone de texte',
+  appMasterInsertShape: 'Formes',
   appStartOpening: 'Ouverture…',
   appReadingSlideTitle:
     'Cliquez pour passer à la diapositive suivante (Échap pour quitter le mode Lecture)',
@@ -259,6 +280,26 @@ export const fr = {
     'La durée totale du diaporama était de {duration}. Voulez-vous enregistrer le minutage des diapositives pour le défilement automatique ?',
   appRehearseDiscard: 'Ne pas enregistrer',
   appRehearseSave: 'Enregistrer',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Enregistrer la narration',
+  appRecordSummary:
+    'Durée de l’enregistrement : {duration}. Enregistrer la narration et le minutage de chaque diapositive ?',
+  appRecordDiscard: 'Ne pas enregistrer',
+  appRecordSave: 'Enregistrer',
+  appStatusRecordSaved: 'Narration enregistrée sur {count} diapositives (PowerPoint la lit aussi)',
+  appStatusRecordFailed: 'L’enregistrement n’a pas pu être sauvegardé',
+  appStatusNarrationCleared: 'Narration effacée',
+  appSettingsTitle: 'Paramètres IA',
+  appSettingsAccount: 'Compte Genspark',
+  appSettingsChecking: 'Vérification…',
+  appSettingsLoggedIn: 'Connecté',
+  appSettingsLoggedInEmail: 'Connecté : {email}',
+  appSettingsLoggedOut: 'Non connecté (les fonctionnalités IA nécessitent un compte Genspark)',
+  appSettingsLoginPending: 'En attente de la connexion dans le navigateur…',
+  appSettingsLogin: 'Se connecter à Genspark',
+  appSettingsModel: 'Modèle',
+>>>>>>> theirs
   appSettingsCancel: 'Annuler',
   appCropHint: 'Entrée pour confirmer · Échap pour annuler · Cliquez à l’extérieur pour confirmer',
   appStatusZoomsInserted:

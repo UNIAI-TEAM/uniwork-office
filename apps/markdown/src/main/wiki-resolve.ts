@@ -241,18 +241,30 @@ export async function resolveWikiLinks(
                 }
               }
             }
+<<<<<<< ours
             let taken: string | null = null
+=======
+            const satisfied: string[] = []
+>>>>>>> theirs
             for (const key of names) {
               const items = wanted.get(key)
               if (!items) continue
               for (const item of items) {
                 if (out.get(item.raw)?.found) continue
                 out.set(item.raw, { path: join(dir, file), fragment: item.fragment, found: true })
+<<<<<<< ours
                 taken = taken ?? key
               }
             }
             if (taken === null) continue
             for (const key of names) if (key === taken) wanted.delete(key)
+=======
+                if (!satisfied.includes(key)) satisfied.push(key)
+              }
+            }
+            if (satisfied.length === 0) continue
+            for (const key of satisfied) wanted.delete(key)
+>>>>>>> theirs
             if (wanted.size === 0) break
           }
           if (wanted.size === 0 || budget <= 0 || depth + 1 > MAX_DEPTH) continue

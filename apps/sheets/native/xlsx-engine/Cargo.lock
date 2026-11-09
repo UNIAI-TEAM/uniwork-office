@@ -36,15 +36,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arbitrary"
-version = "1.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
-dependencies = [
- "derive_arbitrary",
-]
-
-[[package]]
 name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -134,7 +125,11 @@ dependencies = [
  "log",
  "quick-xml 0.42.0",
  "serde",
+<<<<<<< ours
  "zip 9.1.0",
+=======
+ "zip",
+>>>>>>> theirs
 ]
 
 [[package]]
@@ -265,6 +260,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7eed2c4702fa172d1ce21078faa7c5203e69f5394d48cc436d25928394a867a2"
 
 [[package]]
+<<<<<<< ours
 name = "derive_arbitrary"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -276,6 +272,8 @@ dependencies = [
 ]
 
 [[package]]
+=======
+>>>>>>> theirs
 name = "either"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -438,7 +436,11 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+<<<<<<< ours
  "zip 9.1.0",
+=======
+ "zip",
+>>>>>>> theirs
 ]
 
 [[package]]
@@ -1002,6 +1004,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "uuid",
+<<<<<<< ours
  "zip 4.6.1",
 ]
 
@@ -1017,6 +1020,9 @@ dependencies = [
  "indexmap",
  "memchr",
  "zopfli",
+=======
+ "zip",
+>>>>>>> theirs
 ]
 
 [[package]]

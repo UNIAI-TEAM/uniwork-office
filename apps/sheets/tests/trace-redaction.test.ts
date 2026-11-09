@@ -117,6 +117,7 @@ describe('trace_precedents with a withheld cell', () => {
     expect(out.output).not.toContain(SECRET)
     expect(out.output).toContain('{{client phone}}')
   })
+<<<<<<< ours
 
   it('projects cross-sheet precedents against the referenced sheet, not the formula sheet', () => {
     const crossSheet = deps({
@@ -142,6 +143,8 @@ describe('trace_precedents with a withheld cell', () => {
     expect(out.output).toContain('{{client phone}}')
     expect(out.output).toContain('withheld from the model')
   })
+=======
+>>>>>>> theirs
 })
 
 describe('trace_dependents with a withheld cell', () => {

@@ -115,6 +115,11 @@ export const ru = {
     'Запись исправлений включена: изменения содержимого от ИИ помечаются как исправления (вставки подчеркнуты, удаления зачеркнуты); примите или отклоните их в разделе «Рецензирование»',
   aiTrackOffTitle:
     'Запись исправлений выключена: изменения ИИ применяются сразу (откат по-прежнему возможен через снимки версий)',
+  aiRevisionBarTitle: 'Исправления',
+  aiRevisionCount: 'Изменений: {count}',
+  aiRevisionRejectAll: 'Отклонить все',
+  aiRevisionAcceptAll: 'Принять все',
+  aiRevisionPara: 'Абзац {n}',
   aiTurnLimit:
     '(Достигнут лимит вызовов инструментов для этого запроса; ответ выше основан на уже выполненных шагах и может быть неполным.)',
   aiStopped: '(Остановлено)',
@@ -127,6 +132,8 @@ export const ru = {
   aiUnknownError: 'Неизвестная ошибка',
   aiTimeoutError:
     'Тайм-аут запроса ИИ: сеть не отвечает, выполнение остановлено. Проверьте подключение и повторите попытку',
+  aiRegionError:
+    'Поставщик этой модели не обслуживает ваш текущий регион — выберите другую модель или смените сеть',
   aiOverloadedError: 'Сервис ИИ сейчас перегружен — повторите попытку чуть позже',
   aiNetworkError:
     'Проблема с сетью: не удалось подключиться к сервису ИИ. Проверьте подключение и повторите попытку',
@@ -134,6 +141,9 @@ export const ru = {
   aiSumImageAttachment: 'Вложенное изображение {name}',
   aiSumRead: 'Чтение {name}',
   aiSumReadAttachmentName: 'Чтение вложения {name}',
+  aiSumSkillsList: 'Список установленных навыков',
+  aiSumSkillRead: 'Прочитан навык {name}',
+  aiSumRunCli: 'Выполнено: {args}',
   aiSumWebSearch: 'Поиск в Интернете',
   aiSumWebSearchDone: 'Поиск «{query}» ({count} результатов)',
   aiSumImageSearch: 'Поиск изображений',
@@ -196,6 +206,7 @@ export const ru = {
   aiCmdImages: 'Обновлено изображений: {count}',
   aiCmdToc: 'Вставлено оглавление (элементов: {count})',
   aiCmdSkipped: ' (пропущено защищенных блоков: {count})',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
   aiClarifyTitle: 'Несколько вопросов, прежде чем продолжить',
@@ -210,6 +221,8 @@ export const ru = {
   aiClarifySubmit: 'Продолжить',
   aiSumClarify: 'Уточнения получены',
   aiSumClarifySkipped: 'Уточнения пропущены',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Создать ментальную карту документа',
   aiMindMapBtn: 'ИИ-ментальная карта',
   aiMindMapPrompt:
@@ -220,7 +233,18 @@ export const ru = {
   aiMindMapAskPrompt: 'Расскажи про «{label}» в этом документе',
   aiMindMapJump: 'Перейти к цитируемому фрагменту',
   aiMindMapExport: 'Экспорт PNG',
+<<<<<<< ours
   aiMindMapReset: 'Сбросить вид',
   aiMindMapExpand: 'Развернуть ветку',
   aiMindMapCollapse: 'Свернуть ветку',
+=======
+  aiMindMapExportSvg: 'Экспорт SVG',
+  aiMindMapInsert: 'Вставить в документ',
+  aiMindMapReset: 'Сбросить вид',
+  aiMindMapExpand: 'Развернуть ветку',
+  aiMindMapCollapse: 'Свернуть ветку',
+  aiMindMapToggleLayout: 'Сменить макет',
+  aiMindMapLayoutTopDown: 'Переключиться на макет сверху вниз',
+  aiMindMapLayoutLeftRight: 'Переключиться на макет слева направо',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

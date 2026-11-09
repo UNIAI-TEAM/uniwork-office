@@ -15,15 +15,37 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import {
+<<<<<<< ours
   aiSettingsFileOf,
   defaultAiSettings,
   refreshUniworkCloudStatus,
+=======
+  AiCreditsError,
+  AiTimeoutError,
+  isAiNetworkError,
+  isAiOverloadedError,
+  isAiRegionBlockedError,
+  defaultAiSettings,
+  activeProvider,
+  maxOutputTokensOf,
+  resolveAiSettings,
+  sanitizeAiSettings,
+  setAiUserAgent,
+  setRescueFetch,
+  resolveProfileCredential,
+  streamForProvider,
+>>>>>>> theirs
   type AiSettings,
   type AiStreamChunk,
   type AiStreamRequest,
   type GenSparkAccountStatus,
 } from '@genoffice/ai-provider'
+<<<<<<< ours
 import { saveAiSettingsFile, scrubAiSettingsFile } from '@genoffice/ai-provider/settings-file'
+=======
+import { shutdownCodexAppServers } from '@genoffice/ai-provider/codex-app-server'
+import { startAiTrace } from '@genoffice/ai-provider/trace'
+>>>>>>> theirs
 import {
   MAX_REMOTE_IMAGE_BYTES,
   fetchRemoteImage,
@@ -33,6 +55,13 @@ import {
 import {
   webSearchTool,
   imageSearchTool,
+<<<<<<< ours
+=======
+  ensureGenofficeLogin,
+  noteGskCallFailure,
+  setGenofficeLoginOpener,
+  gskApiKey,
+>>>>>>> theirs
   generateImageTool,
   analyzeMediaTool,
   documentMediaRoots,
@@ -123,13 +152,34 @@ export function registerAiIpc(): void {
     },
   )
 
+<<<<<<< ours
   ipcMain.handle('ai:set-settings', (_event, settings: unknown) => {
     // the file keeps only the cloud-tools opt-out: every other field of the renderer's copy is dropped
     saveAiSettingsFile(AI_SETTINGS_PATH(), settings)
+=======
+  // a 401 on the gsk key opens the device-code login once (genoffice-auth recovery)
+  setGenofficeLoginOpener((url) => void shell.openExternal(url))
+
+  ipcMain.handle('ai:gsk-login', () => {
+    ensureGenofficeLogin((url) => void shell.openExternal(url))
+  })
+
+  ipcMain.handle('ai:set-settings', (_event, settings: AiSettings) => {
+    // SECURITY.md: payloads are schema-checked in the main process. The settings
+    // file feeds cliPath into spawn() and baseUrl receives the gsk bearer token,
+    // so the renderer's copy is sanitized before it touches disk.
+    const sanitized = sanitizeAiSettings(settings)
+    if (!sanitized) {
+      console.warn('[ai] rejected invalid ai:set-settings payload')
+      return
+    }
+    writeJsonAtomic(AI_SETTINGS_PATH(), sanitized)
+>>>>>>> theirs
     for (const wc of webContents.getAllWebContents())
       if (!wc.isDestroyed()) wc.send('ai:settings-changed')
   })
 
+<<<<<<< ours
   ipcMain.handle('ai:stream', (event, request: AiStreamRequest) => {
     // UniWork AI needs the UniWork session of the shell; this standalone module has none
     if (event.sender.isDestroyed()) return
@@ -139,6 +189,141 @@ export function registerAiIpc(): void {
       error: 'UniWork AI is not available here.',
       uniworkCode: 'ai_disabled',
     } satisfies AiStreamChunk)
+=======
+  ipcMain.handle('ai:log-run-failure', (_event, entry: AiRunFailure) => {
+    appendRunFailure(entry)
+  })
+
+  ipcMain.handle('ai:stream', async (event, request: AiStreamRequest) => {
+    // per-request settings get the same schema check as the persisted ones: a
+    // compromised renderer could otherwise hand cliPath/baseUrl straight to
+    // the provider layer without ever touching the settings file
+    const settings = sanitizeAiSettings(request.settings)
+    if (!settings) {
+      event.sender.send('ai:stream-chunk', {
+        requestId: request.requestId,
+        type: 'error',
+        error: 'invalid AI settings payload',
+      } satisfies AiStreamChunk)
+      return
+    }
+    const { requestId, system, messages } = request
+    const tools = request.tools ?? []
+    const maxTokens = request.maxTokens ?? maxOutputTokensOf(settings)
+    const provider = settings.provider
+    let config = settings.providers?.[provider]
+    // The genspark key never enters the settings file; it is fetched from the gsk login state per request
+    // set only when the gsk key was injected: a 401 then means that key expired
+    let gskKey = ''
+    if (provider === 'genspark' && config && !config.apiKey) {
+      gskKey = gskApiKey()
+      config = { ...config, apiKey: gskKey }
+    }
+    // a custom endpoint may name an environment variable instead of storing a key
+    config = config ? resolveProfileCredential(config) : config
+    const send = (chunk: AiStreamChunk) => {
+      if (!event.sender.isDestroyed()) event.sender.send('ai:stream-chunk', chunk)
+    }
+    if (!config || (provider !== 'codex' && !config.apiKey)) {
+      send({
+        requestId,
+        type: 'error',
+        error: provider === 'genspark' ? tm('errGskNotLoggedIn') : tm('errNoApiKey', { provider }),
+      })
+      return
+    }
+    if (provider !== 'codex' && !config.model) {
+      send({ requestId, type: 'error', error: tm('errNoModel') })
+      return
+    }
+    const controller = new AbortController()
+    activeAiStreams.set(requestId, controller)
+    const unwatchSender = abortOnDestroyed(event.sender, controller)
+    // wire-activity keepalive: lets the renderer's silence watchdog tell a slow turn from a dead one
+    let lastPing = 0
+    const ping = () => {
+      const now = Date.now()
+      if (now - lastPing < 5_000) return
+      lastPing = now
+      send({ requestId, type: 'ping' })
+    }
+    const trace = startAiTrace({
+      requestId,
+      sessionId: request.sessionId,
+      source: event.sender.getURL(),
+      provider,
+      model: config.model,
+      maxTokens,
+      system,
+      messages,
+      tools,
+    })
+    try {
+      let stopReason: string | undefined
+      await streamForProvider(provider, config, system, messages, tools, maxTokens, {
+        ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+        signal: controller.signal,
+        onDelta: (text) => {
+          trace?.onDelta(text)
+          send({ requestId, type: 'delta', text })
+        },
+        onReasoningDelta: (text) => {
+          trace?.onReasoningDelta(text)
+          send({ requestId, type: 'reasoning', text })
+        },
+        onToolCall: (toolCall) => {
+          trace?.onToolCall(toolCall)
+          send({ requestId, type: 'tool-call', toolCall })
+        },
+        onActivity: ping,
+        onStopReason: (reason) => {
+          stopReason = reason
+          trace?.onStopReason(reason)
+        },
+        onUsage: (usage) => {
+          trace?.onUsage(usage)
+          send({ requestId, type: 'usage', usage })
+        },
+      })
+      trace?.finish()
+      send(
+        stopReason === undefined
+          ? { requestId, type: 'done' }
+          : { requestId, type: 'done', stopReason },
+      )
+    } catch (err) {
+      trace?.finish(
+        controller.signal.aborted ? 'aborted' : err instanceof Error ? err.message : String(err),
+      )
+      if (controller.signal.aborted) {
+        send({ requestId, type: 'done' })
+      } else {
+        // an expired/revoked key drops to signed-out so the inline sign-in button shows
+        noteGskCallFailure(gskKey, err)
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, msg)
+        send({
+          requestId,
+          type: 'error',
+          error: msg,
+          ...(err instanceof AiTimeoutError
+            ? { errorCode: 'timeout' as const }
+            : err instanceof AiCreditsError
+              ? { errorCode: 'credits' as const }
+              : isAiNetworkError(err)
+                ? { errorCode: 'network' as const }
+                : isAiOverloadedError(err)
+                  ? { errorCode: 'overloaded' as const }
+                  : isAiRegionBlockedError(err)
+                    ? { errorCode: 'region' as const }
+                    : {}),
+        })
+      }
+    } finally {
+      unwatchSender()
+      activeAiStreams.delete(requestId)
+    }
+>>>>>>> theirs
   })
 
   // nothing streams here, so there is nothing to cancel; the channel stays answered

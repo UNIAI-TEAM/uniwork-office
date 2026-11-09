@@ -3,7 +3,11 @@
  * are the whole behaviour, so the fixture is a real tree on disk rather than a
  * stubbed fs.
  */
+<<<<<<< ours
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs'
+=======
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+>>>>>>> theirs
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -157,9 +161,12 @@ describe('listing cache', () => {
     const dir = mkdtempSync(join(tmpdir(), 'wikicache-'))
     try {
       writeFileSync(join(dir, 'One.md'), '# one\n')
+<<<<<<< ours
       // some filesystems keep a coarse directory mtime; start from a clearly past one so the next write moves it
       const past = new Date(Date.now() - 60_000)
       utimesSync(dir, past, past)
+=======
+>>>>>>> theirs
       const first = await fs.list(dir)
       expect(first.files).toEqual(['One.md'])
       writeFileSync(join(dir, 'Two.md'), '# two\n')

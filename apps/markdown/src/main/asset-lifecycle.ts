@@ -478,6 +478,7 @@ export async function resolveSafeVaultImagePath(
   }
 }
 
+<<<<<<< ours
 /**
  * Whether the vault-root picture rule may apply at all. The md-asset protocol cannot tell
  * which window asked, so one bound UniWork working copy among the open documents turns the
@@ -492,6 +493,8 @@ export function vaultRootServesPictures(
   return true
 }
 
+=======
+>>>>>>> theirs
 function ownedNameForSource(source: string): string | null {
   const decoded = decodeLocalSource(source)
   if (!decoded) return null

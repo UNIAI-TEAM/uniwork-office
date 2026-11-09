@@ -10,7 +10,11 @@ export const ms = {
   redactDialogPlaceholder: 'Nama placeholder, cth. telefon pelanggan',
   redactCancel: 'Batal',
   redactInsert: 'Sembunyikan',
+<<<<<<< ours
   redactEnable: 'Klik kanan pada pilihan untuk menyembunyikannya daripada AI.',
+=======
+  redactEnable: 'Klik kanan pada teks yang dipilih untuk menyembunyikannya daripada model.',
+>>>>>>> theirs
   redactNeedsSavedRow:
     'Baris ini belum lagi dalam fail. Simpan dahulu, kemudian sembunyikan selnya.',
   redactRecoveredFromNames:
@@ -333,7 +337,9 @@ export const ms = {
   appFullLoadRunning:
     'Memuatkan seluruh buku kerja — pengisihan dan penapisan tersedia selepas selesai…',
   appFullLoadTooLarge:
-    'Buku kerja ini terlalu besar untuk dimuatkan sepenuhnya ke ingatan; pengisihan dan penapisan tidak tersedia untuk fail ini.',
+    'Buku kerja ini terlalu besar untuk dimuatkan sepenuhnya ke memori; pengisihan dan pemindahan julat tidak tersedia untuk fail ini. Penapisan dijalankan terus pada fail.',
+  appLargeFilterLoading: 'Membaca lajur penapis daripada fail…',
+  appLargeFilterApplying: 'Menggunakan penapis pada fail…',
   appSortValueModeFormulas:
     'Julat ini mengandungi formula yang tidak dikira secara langsung dalam buku kerja besar ini — mengisih atau mengalihkannya akan menyimpannya sebagai nilai biasa. Pilih julat tanpa formula.',
   appSortRangeTooLarge:
@@ -392,6 +398,9 @@ export const ms = {
   appTableNameUsed: 'Nama jadual "{name}" telah digunakan dalam sesi ini.',
   appTableNameInFile: 'Nama jadual "{name}" sudah digunakan oleh jadual dalam fail.',
   appTableOverlapsSession: 'Julat bertindih dengan jadual "{name}" yang dicipta dalam sesi ini.',
+  appTableOverlapsFile: 'Julat bertindih dengan jadual "{name}" dalam fail.',
+  appTableAlreadyInTable:
+    'Pilihan sudah berada dalam jadual "{name}" — tukar gaya daripada Reka Bentuk Jadual.',
   appTablesNeedFile: 'Buka fail XLSX dahulu — jadual ditulis ke dalam fail.',
   appTableSelectRange: 'Pilih julat data dahulu — pengepala pada baris pertamanya.',
   appTableCreated: 'Jadual dicipta — simpan dengan {saveKeys}.',
@@ -475,6 +484,7 @@ export const ms = {
   appGridlinesHidden: 'Garis grid disembunyikan.',
   appGridlinesShown: 'Garis grid ditunjukkan.',
   appShowingFormulas: 'Memaparkan formula — togol sekali lagi untuk nilai.',
+  appShowingFormulasActive: 'Memaparkan formula',
   appShowingValues: 'Memaparkan nilai terkira.',
   appTraceNoFormula: 'Surih Presedens: sel aktif tiada formula.',
   appTraceNoRefs: 'Surih Presedens: formula ini tiada rujukan sel.',
@@ -520,6 +530,7 @@ export const ms = {
   appColumnLabel: 'Lajur {col}',
   appBridgeUnavailable: 'Jambatan fail desktop tidak tersedia. Mulakan semula aplikasi Electron.',
   appOpenCanceled: 'Pemilihan buku kerja dibatalkan.',
+  appImportCanceled: 'Import dibatalkan.',
   appOpeningWorkbook: 'Membuka buku kerja…',
   appOpenStalled: 'Buku kerja tidak dapat dibuka.',
   appOpenRetry: 'Cuba lagi',
@@ -712,6 +723,7 @@ export const ms = {
   appExportPdfTitle: 'Eksport sebagai PDF',
   appSaveTitle: 'Simpan',
   appSaveAs: 'Simpan Sebagai',
+  aiNameFile: 'Namakan dengan AI…',
   appUndo: 'Buat Asal',
   appRedo: 'Buat Semula',
   appUnsavedEditOne: '● {count} suntingan belum disimpan',
@@ -743,7 +755,6 @@ export const ms = {
   appLinkPlaceholder: 'https://example.com atau Sheet1!A1',
   appRemoveLink: 'Alih Keluar Pautan',
   appNotAvailableYet: 'Belum tersedia',
-  appComingSoon: 'Akan datang',
   appGroupChartLayouts: 'Bentangan carta',
   appAddChartElement: 'Tambah Elemen Carta',
   appAddChartElementTitle: 'Tajuk, label data, petunjuk',
@@ -1160,6 +1171,20 @@ export const ms = {
   appWatchCell: 'Sel',
   appWatchValue: 'Nilai',
   appWatchFormula: 'Formula',
+  appLinksPanel: 'Pautan luaran',
+  appLinksPanelDetail: 'Senaraikan, kemas kini dan putuskan pautan ke buku kerja lain',
+  appLinksUpdate: 'Kemas kini nilai',
+  appLinksNone: 'Buku kerja ini tiada pautan ke buku kerja lain.',
+  appLinksUnsaved: 'Simpan buku kerja ini sebelum menyenaraikan pautan luarnya.',
+  appLinksSource: 'Sumber',
+  appLinksStatus: 'Status',
+  appLinksSheets: 'Helaian',
+  appLinksLocate: 'Buka lokasi fail sumber',
+  appLinksReachable: 'Tersedia',
+  appLinksBroken: 'Tiada',
+  appLinksBreak: 'Putuskan Pautan',
+  appLinksBreakConfirm: 'Sahkan pemutusan',
+  appLinksChangeSource: 'Tukar Sumber',
   appGroupCalculation: 'Pengiraan',
   appCalculationOptions: 'Opsyen Pengiraan',
   appCalculationOptionsTitle: 'Pengiraan semula automatik atau manual',
@@ -1176,8 +1201,17 @@ export const ms = {
   appGroupGetData: 'Dapatkan Data',
   appFromTextCsv: 'Daripada Teks/CSV',
   appRefreshAll: 'Segar Semula Semua',
+  appRefreshQuery: 'Muat semula pertanyaan',
+  appQueryConnectionsTitle: 'Muat semula pertanyaan buku',
+  appQueryRefreshing: 'Memuat semula {name}…',
+  appQueryRefreshed: '{name} disegarkan semula ({rows} baris)',
+  appQueryRefreshedClipped:
+    '{name} disegarkan semula ({rows} baris, {dropped} tidak muat dalam julat)',
+  appQueryRefreshFailed: 'Gagal memuat semula {name}',
   appWorkbookNoPivot: 'Tiada Jadual Pangsi dalam buku kerja ini.',
   appRefreshAllTitle: 'Segar semula semua Jadual Pangsi',
+  appQueriesConnections: 'Pertanyaan & Sambungan',
+  appQueriesConnectionsTitle: 'Senaraikan pertanyaan dan sambungan data buku kerja',
   appErrorCheckingDetail: 'Imbas nilai ralat dalam helaian',
   appErrorsFound: '{count} ralat — di {cell}: {value}',
   appCheckingErrors: 'Mengimbas ralat di seluruh helaian…',
@@ -1212,6 +1246,7 @@ export const ms = {
   appGroupForecast: 'Ramalan',
   appWhatIfAnalysis: 'Analisis Bagaimana-Jika',
   appGoalSeek: 'Cari Matlamat',
+  appDataTable: 'Jadual Data',
   appWhatIfTitle: 'Cari input untuk nilai sasaran',
   appGoalSeekNeedsFormula: 'Sel mesti mengandungi formula.',
   appGoalSeekByCellNotNumber: 'Sel yang diubah mesti mengandungi nombor atau kosong.',
@@ -1309,6 +1344,7 @@ export const ms = {
   appPasswordUpdating: 'Mengemas kini…',
   appUpdatePassword: 'Kemas Kini Kata Laluan',
   appWorkbookNotPasswordProtected: 'Buku kerja ini tidak dilindungi oleh kata laluan pembukaan.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Buku kerja yang dilindungi kata laluan tidak boleh disimpan ke dokumen UniWork. Gunakan Simpan Sebagai untuk menyimpan salinan disulitkan pada komputer ini.',
   appPasswordChangeUniwork: 'Kata laluan dokumen UniWork tidak boleh ditukar di sini.',
@@ -1317,6 +1353,8 @@ export const ms = {
   appEncryptedWrongPassword: 'Kata laluan salah. Cuba lagi.',
   appPasswordChangeRestored:
     'Simpan dahulu buku kerja yang dipulihkan, kemudian tukar kata laluannya.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Benarkan Edit Julat',
   appGroupClipboard: 'Papan Klip',
   appPaste: 'Tampal',
@@ -1580,6 +1618,7 @@ export const ms = {
   appVisualFlipV: 'Balikkan Menegak',
   appVisualFlipH: 'Balikkan Mendatar',
   appCtxPasteVisual: 'Tampal Gambar atau Bentuk',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Buku kerja ini belum boleh dibuka di web',
   appWebEngineBody:
@@ -1607,15 +1646,23 @@ export const ms = {
   appWebSavedReopenFailed:
     'Perubahan anda telah disimpan ke UniWork, tetapi buku kerja tidak dapat dibuka semula di sini. Muat semula editor untuk teruskan.',
   appDataTable: 'Jadual Data',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Ejaan',
   appSpellBtnDetail: 'Semak teks helaian (F7)',
   appSpellToggle: 'Semak ejaan',
   appSpellToggleTip:
+<<<<<<< ours
     'Mengaktifkan semakan ejaan (F7 dan butang Semakan); apabila dimatikan, kotak komen tidak lagi menampilkan garis bergelombang',
   appSpellOn: 'Semakan ejaan diaktifkan.',
   appSpellOff: 'Semakan ejaan dimatikan. Aktifkannya pada Semakan ▸ Pembacaan Pruf.',
+=======
+    'Mengaktifkan semakan ejaan (F7 dan butang Semak Semula); apabila dimatikan, kotak komen tidak lagi menampilkan garis bergelombang',
+  appSpellOn: 'Semakan ejaan diaktifkan.',
+  appSpellOff: 'Semakan ejaan dimatikan. Aktifkannya pada Semak Semula ▸ Semakan.',
+>>>>>>> theirs
   appSpellRecheck: 'Semak semula',
   appSpellNone: 'Tiada kesalahan ejaan yang disyaki ditemui.',
   appSpellFindings: '{count} kesalahan disyaki. Klik baris untuk ke lokasinya.',

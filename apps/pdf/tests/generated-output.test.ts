@@ -41,7 +41,11 @@ describe('uniqueGeneratedPdfPath', () => {
     // have eaten the stem had the colon not been replaced first; on posix
     // the same string is one file name and the sanitizer flattens it.
     const winPath = 'C:\\users\\report.pdf'
+<<<<<<< ours
     const expected = platform === 'win32' ? 'report.pdf' : 'C__users_report.pdf'
+=======
+    const expected = process.platform === 'win32' ? 'report.pdf' : 'C__users_report.pdf'
+>>>>>>> theirs
     expect(uniqueGeneratedPdfPath('/save', winPath, () => false)).toBe(join('/save', expected))
   })
 })

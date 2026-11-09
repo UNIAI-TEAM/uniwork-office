@@ -31,7 +31,11 @@ function table(): { th: Element; td: Element } {
   const host = document.createElement('div')
   host.innerHTML =
     '<div class="tableWrapper"><table><tbody>' +
+<<<<<<< ours
     '<tr><th><p>Column</p></th></tr>' +
+=======
+    '<tr><th><p>위치</p></th></tr>' +
+>>>>>>> theirs
     "<tr><td><p><code>split_part(src_schema_id,'.',1)</code></p></td></tr>" +
     '</tbody></table></div>'
   return { th: host.querySelector('th')!, td: host.querySelector('td')! }

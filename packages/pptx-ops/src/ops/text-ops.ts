@@ -39,6 +39,7 @@ import type { EditParagraph } from '../types'
 import {
   applyEditParagraphs,
   collectParagraphFormatPatches,
+  fontSizeDriftNote,
   levelsChanged,
   type EditParagraphFormatPatch,
 } from '../edit-text'
@@ -101,6 +102,21 @@ function groupChildBytes(grp: GroupElement, child: TextElement): string {
 /** Horizontal half of an autoshape's centering; an alignment the caller asked for wins. */
 function centerParagraphs(paragraphs: Paragraph[]): void {
   for (const p of paragraphs) if (!p.align) p.align = 'center'
+}
+
+/**
+ * True when a traced paragraph or run landed at a different index than its source
+ * (reordered, split or inserted). The in-place run patch then writes the text into
+ * the old run at its new position and keeps that run's attributes, so setText flags
+ * the element and save rebuilds the txBody from the traced model runs instead. The
+ * flag stays set until the element is reparsed/materialized.
+ */
+function textMovedInPlace(paragraphs: EditParagraph[]): boolean {
+  return paragraphs.some(
+    (p, pi) =>
+      (p.srcPara != null && p.srcPara !== pi) ||
+      p.runs.some((r, ri) => r.srcRun != null && r.srcRun !== ri),
+  )
 }
 
 // ── setText ─────────────────────────────────────────────────────────────
@@ -180,7 +196,12 @@ register({
       const childBody = textChild.text!
       const previousXml = patchSlideXml(slide)
       const before = plainText(childBody.paragraphs)
-      childBody.paragraphs = applyEditParagraphs(childBody.paragraphs, paragraphs)
+      const oldParas = childBody.paragraphs
+      childBody.paragraphs = applyEditParagraphs(oldParas, paragraphs)
+      if (textMovedInPlace(paragraphs)) textChild.textMoved = true
+      const note = freshBody
+        ? undefined
+        : fontSizeDriftNote(oldParas, paragraphs, childBody.paragraphs)
       if (autoShape) centerParagraphs(childBody.paragraphs)
       ensureRunLinkRels(ctx.opened, index, childBody.paragraphs)
       if (!patchGroupChildText(slide, groupId, textChild)) {
@@ -195,7 +216,7 @@ register({
         setGroupChildParagraphFormat(slide, groupId, id, fmt, [pi])
       }
       cleanupSupersededSlideResources(ctx.opened, slide, previousXml, patchSlideXml(slide))
-      return { op, before, after: { levelDirty: false } }
+      return { op, before, after: { levelDirty: false, note } }
     }
     const { el } = resolveElement(ctx, op, { types: ['text', 'shape'], allowPart: true })
     const te = el as TextElement
@@ -210,7 +231,10 @@ register({
     const previousXml = patchSlideXml(slide)
     const before = plainText(body.paragraphs)
     const levelDirty = levelsChanged(body.paragraphs, paragraphs)
-    body.paragraphs = applyEditParagraphs(body.paragraphs, paragraphs)
+    const oldParas = body.paragraphs
+    body.paragraphs = applyEditParagraphs(oldParas, paragraphs)
+    if (textMovedInPlace(paragraphs)) te.textMoved = true
+    const note = freshBody ? undefined : fontSizeDriftNote(oldParas, paragraphs, body.paragraphs)
     if (autoShape) centerParagraphs(body.paragraphs)
     // Link rels and level rematerialization are deck-slide concerns (rels live on
     // the slide part; levels resolve against the chrome being edited) — skip on parts
@@ -227,7 +251,7 @@ register({
       te.dirtyPPr = { ...te.dirtyPPr, level: true, indents: true }
       materializeSlide(ctx.opened, index)
     }
-    return { op, before, after: { levelDirty } }
+    return { op, before, after: { levelDirty, note } }
   },
 })
 

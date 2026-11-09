@@ -8,7 +8,11 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+<<<<<<< ours
 import { createWikiNote, mayCreateWikiNote } from '../src/main/wiki-create'
+=======
+import { createWikiNote } from '../src/main/wiki-create'
+>>>>>>> theirs
 
 const dirs: string[] = []
 afterEach(async () => {
@@ -109,6 +113,7 @@ describe('createWikiNote', () => {
     await expect(createWikiNote('Note', { root, fromDir: '' })).rejects.toThrow()
   })
 })
+<<<<<<< ours
 
 describe('mayCreateWikiNote', () => {
   const bound = (path: string): boolean => path.startsWith('/work/bound/')
@@ -122,3 +127,5 @@ describe('mayCreateWikiNote', () => {
     expect(mayCreateWikiNote('', bound)).toBe(true)
   })
 })
+=======
+>>>>>>> theirs

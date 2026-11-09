@@ -10,7 +10,11 @@ export const hi = {
   redactDialogPlaceholder: 'प्लेसहोल्डर का नाम, जैसे ग्राहक का फ़ोन',
   redactCancel: 'रद्द करें',
   redactInsert: 'छिपाएँ',
+<<<<<<< ours
   redactEnable: 'चयन पर राइट-क्लिक करके इसे AI से छिपाएँ।',
+=======
+  redactEnable: 'चयनित पाठ पर राइट-क्लिक करके इसे मॉडल से छिपाएँ।',
+>>>>>>> theirs
   redactNeedsSavedRow: 'यह पंक्ति अभी फ़ाइल में नहीं है। पहले सहेजें, फिर सेल छिपाएँ।',
   redactRecoveredFromNames:
     'किसी अन्य ऐप ने इस फ़ाइल को दोबारा लिखा और छिपे हुए चीज़ों का रिकॉर्ड हटा दिया। छिपे हुए सेल वर्कबुक के नामों से वापस मिला लिए गए थे; सहेजने पर पूरा रिकॉर्ड वापस आ जाता है।',
@@ -334,7 +338,9 @@ export const hi = {
   appFullLoadRunning:
     'पूरी वर्कबुक लोड हो रही है — पूरा होते ही क्रमबद्ध करना और फ़िल्टर उपलब्ध होंगे…',
   appFullLoadTooLarge:
-    'यह वर्कबुक मेमोरी में पूरी तरह लोड करने के लिए बहुत बड़ी है; इस फ़ाइल पर क्रमबद्ध करना और फ़िल्टर उपलब्ध नहीं हैं।',
+    'यह वर्कबुक मेमोरी में पूरी तरह लोड करने के लिए बहुत बड़ी है; इस फ़ाइल के लिए सॉर्ट और रेंज स्थानांतरण उपलब्ध नहीं हैं। फ़िल्टर सीधे फ़ाइल पर चलता है।',
+  appLargeFilterLoading: 'फ़ाइल से फ़िल्टर कॉलम पढ़ा जा रहा है…',
+  appLargeFilterApplying: 'फ़ाइल पर फ़िल्टर लागू किया जा रहा है…',
   appSortValueModeFormulas:
     'इस श्रेणी में सूत्र हैं जो इस बड़ी वर्कबुक में लाइव गणना नहीं होते — इसे क्रमबद्ध या स्थानांतरित करने पर वे सादे मानों के रूप में सहेजे जाएँगे। बिना सूत्र वाली श्रेणी चुनें।',
   appSortRangeTooLarge:
@@ -394,6 +400,9 @@ export const hi = {
   appTableNameUsed: 'तालिका नाम "{name}" इस सत्र में पहले से उपयोग हो चुका है।',
   appTableNameInFile: 'तालिका नाम "{name}" फ़ाइल की किसी तालिका द्वारा पहले से उपयोग में है।',
   appTableOverlapsSession: 'यह श्रेणी इस सत्र में बनाई गई तालिका "{name}" से अतिव्याप्त होती है।',
+  appTableOverlapsFile: 'यह श्रेणी फ़ाइल की तालिका "{name}" से अतिव्याप्त होती है।',
+  appTableAlreadyInTable:
+    'चयन पहले से तालिका "{name}" में है — शैली बदलने के लिए तालिका डिज़ाइन का उपयोग करें।',
   appTablesNeedFile: 'पहले एक XLSX फ़ाइल खोलें — तालिकाएँ फ़ाइल में लिखी जाती हैं।',
   appTableSelectRange: 'पहले डेटा श्रेणी चुनें — पहली पंक्ति में शीर्ष।',
   appTableCreated: 'तालिका बनाई गई — {saveKeys} से सहेजें।',
@@ -474,6 +483,7 @@ export const hi = {
   appGridlinesHidden: 'ग्रिडलाइन छिपाई गईं।',
   appGridlinesShown: 'ग्रिडलाइन दिखाई गईं।',
   appShowingFormulas: 'सूत्र दिखाए जा रहे हैं — मानों के लिए फिर टॉगल करें।',
+  appShowingFormulasActive: 'सूत्र दिखाए जा रहे हैं',
   appShowingValues: 'परिकलित मान दिखाए जा रहे हैं।',
   appTraceNoFormula: 'पूर्ववर्ती ट्रेस करें: सक्रिय सेल में कोई सूत्र नहीं है।',
   appTraceNoRefs: 'पूर्ववर्ती ट्रेस करें: इस सूत्र में कोई सेल संदर्भ नहीं है।',
@@ -519,6 +529,7 @@ export const hi = {
   appColumnLabel: 'स्तंभ {col}',
   appBridgeUnavailable: 'डेस्कटॉप फ़ाइल ब्रिज उपलब्ध नहीं है। Electron ऐप पुनः प्रारंभ करें।',
   appOpenCanceled: 'कार्यपुस्तिका चयन रद्द किया गया।',
+  appImportCanceled: 'आयात रद्द किया गया।',
   appOpeningWorkbook: 'कार्यपुस्तिका खोली जा रही है…',
   appOpenStalled: 'कार्यपुस्तिका नहीं खोली जा सकी।',
   appOpenRetry: 'फिर से प्रयास करें',
@@ -711,6 +722,7 @@ export const hi = {
   appExportPdfTitle: 'PDF के रूप में निर्यात करें',
   appSaveTitle: 'सहेजें',
   appSaveAs: 'इस रूप में सहेजें',
+  aiNameFile: 'AI से नाम दें…',
   appUndo: 'पूर्ववत करें',
   appRedo: 'फिर से करें',
   appUnsavedEditOne: '● {count} असहेजा संपादन',
@@ -742,7 +754,6 @@ export const hi = {
   appLinkPlaceholder: 'https://example.com या Sheet1!A1',
   appRemoveLink: 'लिंक निकालें',
   appNotAvailableYet: 'अभी उपलब्ध नहीं',
-  appComingSoon: 'जल्द आ रहा है',
   appGroupChartLayouts: 'चार्ट लेआउट',
   appAddChartElement: 'चार्ट तत्व जोड़ें',
   appAddChartElementTitle: 'शीर्षक, डेटा लेबल, लीजेंड',
@@ -1158,6 +1169,20 @@ export const hi = {
   appWatchCell: 'सेल',
   appWatchValue: 'मान',
   appWatchFormula: 'सूत्र',
+  appLinksPanel: 'बाहरी लिंक',
+  appLinksPanelDetail: 'अन्य कार्यपुस्तिकाओं के लिंक सूचीबद्ध, अपडेट और तोड़ें',
+  appLinksUpdate: 'मान अपडेट करें',
+  appLinksNone: 'इस कार्यपुस्तिका में अन्य कार्यपुस्तिकाओं के लिंक नहीं हैं।',
+  appLinksUnsaved: 'इसकी बाहरी लिंक सूचीबद्ध करने से पहले इस कार्यपुस्तिका को सहेजें।',
+  appLinksSource: 'स्रोत',
+  appLinksStatus: 'स्थिति',
+  appLinksSheets: 'शीट',
+  appLinksLocate: 'स्रोत फ़ाइल खोलें',
+  appLinksReachable: 'उपलब्ध',
+  appLinksBroken: 'अनुपलब्ध',
+  appLinksBreak: 'लिंक तोड़ें',
+  appLinksBreakConfirm: 'तोड़ने की पुष्टि करें',
+  appLinksChangeSource: 'स्रोत बदलें',
   appGroupCalculation: 'गणना',
   appCalculationOptions: 'गणना विकल्प',
   appCalculationOptionsTitle: 'स्वचालित या मैन्युअल पुनर्गणना',
@@ -1174,8 +1199,17 @@ export const hi = {
   appGroupGetData: 'डेटा प्राप्त करें',
   appFromTextCsv: 'पाठ/CSV से',
   appRefreshAll: 'सभी ताज़ा करें',
+  appRefreshQuery: 'क्वेरी रीफ़्रेश करें',
+  appQueryConnectionsTitle: 'वर्कबुक के प्रश्न रीफ़्रेश करें',
+  appQueryRefreshing: '{name} रीफ़्रेश हो रहा है…',
+  appQueryRefreshed: '{name} रीफ़्रेश हो गया ({rows} पंक्तियाँ)',
+  appQueryRefreshedClipped:
+    '{name} रीफ़्रेश हो गया ({rows} पंक्तियाँ, {dropped} सीमा में नहीं आईं)',
+  appQueryRefreshFailed: '{name} रीफ़्रेश नहीं हो सका',
   appWorkbookNoPivot: 'इस वर्कबुक में कोई पिवट टेबल नहीं।',
   appRefreshAllTitle: 'सभी पिवट टेबल रीफ़्रेश करें',
+  appQueriesConnections: 'क्वेरी और कनेक्शन',
+  appQueriesConnectionsTitle: 'वर्कबुक की क्वेरी और डेटा कनेक्शन दिखाएँ',
   appErrorCheckingDetail: 'शीट में त्रुटि मान खोजें',
   appErrorsFound: '{count} त्रुटियाँ — {cell} पर: {value}',
   appCheckingErrors: 'पूरी शीट में त्रुटियों के लिए स्कैन हो रहा है…',
@@ -1210,6 +1244,7 @@ export const hi = {
   appGroupForecast: 'पूर्वानुमान',
   appWhatIfAnalysis: 'क्या-यदि विश्लेषण',
   appGoalSeek: 'लक्ष्य खोज',
+  appDataTable: 'डेटा टेबल',
   appWhatIfTitle: 'लक्ष्य मान के लिए इनपुट खोजें',
   appGoalSeekNeedsFormula: 'सेट सेल में सूत्र होना चाहिए।',
   appGoalSeekByCellNotNumber: 'बदले जाने वाले सेल में संख्या हो या वह खाली हो।',
@@ -1307,6 +1342,7 @@ export const hi = {
   appPasswordUpdating: 'अपडेट हो रहा है…',
   appUpdatePassword: 'पासवर्ड अपडेट करें',
   appWorkbookNotPasswordProtected: 'यह वर्कबुक खोलने वाले पासवर्ड से सुरक्षित नहीं है।',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'पासवर्ड से सुरक्षित वर्कबुक को UniWork दस्तावेज़ में सहेजा नहीं जा सकता। इस कंप्यूटर पर एन्क्रिप्टेड प्रति रखने के लिए इस रूप में सहेजें का उपयोग करें।',
   appPasswordChangeUniwork: 'UniWork दस्तावेज़ का पासवर्ड यहाँ नहीं बदला जा सकता।',
@@ -1314,6 +1350,8 @@ export const hi = {
     'यह वर्कबुक केवल देखने के लिए है, इसलिए इसका पासवर्ड नहीं बदला जा सकता।',
   appEncryptedWrongPassword: 'पासवर्ड गलत है। फिर से कोशिश करें।',
   appPasswordChangeRestored: 'पहले पुनर्स्थापित कार्यपुस्तिका सहेजें, फिर उसका पासवर्ड बदलें।',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'श्रेणियाँ संपादित करने दें',
   appGroupClipboard: 'क्लिपबोर्ड',
   appPaste: 'चिपकाएँ',
@@ -1575,6 +1613,7 @@ export const hi = {
   appVisualFlipV: 'लंबवत पलटें',
   appVisualFlipH: 'क्षैतिज पलटें',
   appCtxPasteVisual: 'चित्र या आकृति पेस्ट करें',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'यह वर्कबुक अभी वेब पर नहीं खोली जा सकती',
   appWebEngineBody:
@@ -1602,15 +1641,23 @@ export const hi = {
   appWebSavedReopenFailed:
     'आपके बदलाव UniWork में सहेज लिए गए, लेकिन वर्कबुक यहाँ दोबारा नहीं खुल सकी। काम जारी रखने के लिए एडिटर को फिर से लोड करें।',
   appDataTable: 'डेटा टेबल',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'वर्तनी',
   appSpellBtnDetail: 'शीट टेक्स्ट जाँचें (F7)',
   appSpellToggle: 'वर्तनी जाँचें',
   appSpellToggleTip:
+<<<<<<< ours
     'वर्तनी जाँच (F7 और समीक्षा बटन) चालू करता है; बंद होने पर टिप्पणी बॉक्स लहरदार रेखाएँ नहीं दिखाते',
   appSpellOn: 'वर्तनी जाँच चालू कर दी गई।',
   appSpellOff: 'वर्तनी जाँच बंद है। इसे समीक्षा ▸ प्रूफ़िंग में चालू करें।',
+=======
+    'वर्तनी जाँच (F7 और Review बटन) चालू करता है; बंद होने पर टिप्पणी बॉक्स लहरदार रेखाएँ नहीं दिखाते',
+  appSpellOn: 'वर्तनी जाँच चालू कर दी गई।',
+  appSpellOff: 'वर्तनी जाँच बंद है। इसे Review ▸ प्रूफ़िंग में चालू करें।',
+>>>>>>> theirs
   appSpellRecheck: 'फिर जाँचें',
   appSpellNone: 'कोई संदिग्ध वर्तनी त्रुटि नहीं मिली।',
   appSpellFindings: '{count} संदिग्ध त्रुटियाँ। स्थान पर जाने के लिए किसी पंक्ति पर क्लिक करें।',

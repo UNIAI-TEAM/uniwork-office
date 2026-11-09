@@ -197,6 +197,20 @@ export function colorNodeHex(
     .join('')
 }
 
+const COLOR_NODE_NAMES = ['a:srgbClr', 'a:schemeClr', 'a:sysClr', 'a:prstClr']
+
+/** a:alpha of a solid fill's color as 0..1; undefined when opaque or absent */
+export function solidFillAlpha(solidFill: XNode | undefined): number | undefined {
+  if (!solidFill) return undefined
+  for (const name of COLOR_NODE_NAMES) {
+    const color = findChild(solidFill, name)
+    if (!color) continue
+    const raw = parseInt(attrsOf(findChild(color, 'a:alpha') ?? {})['val'] ?? '', 10)
+    return Number.isFinite(raw) && raw >= 0 && raw < 100000 ? raw / 100000 : undefined
+  }
+  return undefined
+}
+
 /** anchored-drawing placement of one top-level w:drawing fragment */
 export interface DrawingAnchorMeta {
   offsetXEmu?: number
@@ -211,6 +225,8 @@ export interface DrawingAnchorMeta {
   pageYEmu?: number
   /** wp:wrapTopAndBottom: body text is excluded from the drawing's vertical band */
   topBottom?: boolean
+  /** layoutInCell="0": a cell-anchored drawing positions against the page/column, not its cell */
+  outsideCell?: boolean
   anchored?: boolean
   /** wp:positionH/V relativeFrom */
   relH?: string
@@ -224,9 +240,11 @@ export interface DrawingAnchorMeta {
   /** wp:extent (drawing size) */
   extentXEmu?: number
   extentYEmu?: number
-  /** wp:anchor distL/distR: text clearance beside a side-wrapped drawing */
+  /** wp:anchor distL/distR/distT/distB: text clearance around a side-wrapped drawing */
   distLEmu?: number
   distREmu?: number
+  distTEmu?: number
+  distBEmu?: number
   /** relativeHeight − Word's 251658240 base: paint order among overlapping anchors */
   z?: number
 }
@@ -286,7 +304,7 @@ export function drawingAnchorMeta(frag: string): DrawingAnchorMeta {
   }
   meta.offsetXEmu = posOf('H')
   meta.offsetYEmu = posOf('V')
-  for (const side of ['L', 'R'] as const) {
+  for (const side of ['L', 'R', 'T', 'B'] as const) {
     const v = parseInt(
       new RegExp(`\\bdist${side}\\s*=\\s*["'](\\d+)["']`).exec(anchorTag)?.[1] ?? '',
       10,
@@ -329,6 +347,7 @@ export function drawingAnchorMeta(frag: string): DrawingAnchorMeta {
   const relHeight = Number(/relativeHeight\s*=\s*["'](\d+)["']/.exec(anchorTag)?.[1] ?? NaN)
   if (Number.isFinite(relHeight) && relHeight - 251658240 !== 0) meta.z = relHeight - 251658240
   if (ownXml.includes('<wp:wrapTopAndBottom')) meta.topBottom = true
+  if (/layoutInCell\s*=\s*["'](?:0|false)["']/.test(anchorTag)) meta.outsideCell = true
   return meta
 }
 
@@ -369,10 +388,8 @@ export function resolveAnchorPagePos(
   if (relH !== 'page' && relH !== 'margin') return null
   if (meta.pctH === undefined && meta.alignH === undefined) return null
   const pageW = sect.pageWidth * EMU_PER_TWIP
-  const pageH = sect.pageHeight * EMU_PER_TWIP
   const marL = sect.marginLeft * EMU_PER_TWIP
   const marR = sect.marginRight * EMU_PER_TWIP
-  const marT = sect.marginTop * EMU_PER_TWIP
   const w = meta.extentXEmu ?? 0
   const refW = relH === 'page' ? pageW : pageW - marL - marR
   const relX =
@@ -388,24 +405,37 @@ export function resolveAnchorPagePos(
     xEmu: pageX - marL,
     outsideColumn: pageX + w <= marL || pageX >= pageW - marR,
   }
-  if (
-    (meta.relV === 'page' || meta.relV === 'margin') &&
-    (meta.pctV !== undefined || meta.alignV !== undefined)
-  ) {
-    const marB = sect.marginBottom * EMU_PER_TWIP
-    const h = meta.extentYEmu ?? 0
-    const refH = meta.relV === 'page' ? pageH : pageH - marT - marB
-    const relY =
-      meta.pctV !== undefined
-        ? Math.round((refH * meta.pctV) / 100000)
-        : meta.alignV === 'center'
-          ? Math.round((refH - h) / 2)
-          : meta.alignV === 'bottom' || meta.alignV === 'outside'
-            ? refH - h
-            : 0
-    pos.yEmu = (meta.relV === 'page' ? relY : marT + relY) - marT
-  }
+  const yEmu = resolveAnchorPageYEmu(meta, sect)
+  if (yEmu !== undefined) pos.yEmu = yEmu
   return pos
+}
+
+/**
+ * Page/margin-relative V placement (wp14:pctPosVOffset or wp:align) as an EMU
+ * offset from the body top, independent of how X is anchored. Undefined for
+ * plain posOffset or paragraph/line-relative anchors.
+ */
+export function resolveAnchorPageYEmu(
+  meta: DrawingAnchorMeta,
+  sect: SectionSettings | undefined,
+): number | undefined {
+  if (!sect) return undefined
+  if (meta.relV !== 'page' && meta.relV !== 'margin') return undefined
+  if (meta.pctV === undefined && meta.alignV === undefined) return undefined
+  const pageH = sect.pageHeight * EMU_PER_TWIP
+  const marT = sect.marginTop * EMU_PER_TWIP
+  const marB = sect.marginBottom * EMU_PER_TWIP
+  const h = meta.extentYEmu ?? 0
+  const refH = meta.relV === 'page' ? pageH : pageH - marT - marB
+  const relY =
+    meta.pctV !== undefined
+      ? Math.round((refH * meta.pctV) / 100000)
+      : meta.alignV === 'center'
+        ? Math.round((refH - h) / 2)
+        : meta.alignV === 'bottom' || meta.alignV === 'outside'
+          ? refH - h
+          : 0
+  return (meta.relV === 'page' ? relY : marT + relY) - marT
 }
 
 /**

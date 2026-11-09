@@ -9,9 +9,13 @@ import { describe, expect, it } from 'vitest'
 import {
   convertOdpToPptx,
   convertOdtToDocx,
+<<<<<<< ours
   MAX_ODF_ENTRIES,
   MAX_ODF_PART_BYTES,
   MAX_ODF_TOTAL_BYTES,
+=======
+  MAX_ODF_PART_BYTES,
+>>>>>>> theirs
   OdfConvertError,
 } from '../src/index'
 
@@ -131,6 +135,7 @@ describe('oversized zip entries', () => {
   it('refuses the same archive on the presentation route', async () => {
     await expect(convertOdpToPptx(await buildOdp(true))).rejects.toThrow(OdfConvertError)
   })
+<<<<<<< ours
 
   it('refuses three 24 MiB parts that exceed the 64 MiB archive-wide inflation budget', async () => {
     const partSize = 24 * 1024 * 1024
@@ -190,4 +195,6 @@ describe('oversized zip entries', () => {
     await expect(convertOdtToDocx(archive)).rejects.toThrow(new OdfConvertError('unreadable'))
     expect(performance.now() - start).toBeLessThan(100)
   }, 30_000)
+=======
+>>>>>>> theirs
 })

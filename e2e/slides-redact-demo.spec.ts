@@ -150,6 +150,7 @@ test('a reader can withhold a picture from the model without losing it', async (
     await expect(confirm).toBeEnabled()
     await confirm.click()
     await expect(dialog).toHaveCount(0)
+<<<<<<< ours
 
     // the modal unmounts before the setRedaction op finishes its main-process
     // roundtrip, so a save fired here can still serialize the unmarked deck
@@ -162,6 +163,8 @@ test('a reader can withhold a picture from the model without losing it', async (
         intervals: [250, 500, 1000],
       })
       .toBe(true)
+=======
+>>>>>>> theirs
     await shot('5-marked')
 
     // save through the app's own API rather than the keyboard shortcut: a

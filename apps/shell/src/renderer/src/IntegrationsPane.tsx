@@ -71,7 +71,10 @@ export function IntegrationsPane({
   const [notice, setNotice] = useState<{
     agentId?: AgentId
     legacy?: boolean
+<<<<<<< ours
     alert?: boolean
+=======
+>>>>>>> theirs
     text: string
   } | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
@@ -171,6 +174,7 @@ export function IntegrationsPane({
     setBusy(true)
     try {
       const res = await api()!.sweepLegacySkillCopies()
+<<<<<<< ours
       const failedCount = res.failed?.length ?? 0
       focusLegacyNoticeRef.current = res.kept.length === 0 && failedCount === 0
       setNotice({
@@ -190,6 +194,15 @@ export function IntegrationsPane({
             ? t('intgLegacyFailedNoSharedCopy')
             : t('intgLegacyFailed'),
       })
+=======
+      setNotice({
+        legacy: true,
+        text: t('intgLegacyCleaned', { n: res.removed.length, k: res.kept.length }),
+      })
+      await refresh()
+    } catch (err) {
+      setNotice({ legacy: true, text: t('intgLegacyFailed', { msg: String(err) }) })
+>>>>>>> theirs
     } finally {
       setBusy(false)
     }
@@ -240,7 +253,6 @@ export function IntegrationsPane({
     status.skillNeedsCli &&
     status.cli.version &&
     compare(status.cli.version, status.skillNeedsCli) < 0
-  const anyInstalled = status.agents.some((a) => a.state.status !== 'missing')
   const launch = mcpLaunch(status.cli)
   // a link in ~/.local/bin that the shell does not search is not "ready": show the PATH line instead of the sudo command
   const cliOnPath = status.cli.status === 'present' && !status.cli.pathHint
@@ -371,7 +383,11 @@ export function IntegrationsPane({
                   <ul className="set-intg-legacy">
                     {legacy.map((c) => (
                       <li key={c.path} className="set-intg-legacy-item">
+<<<<<<< ours
                         {c.label} — <span dir="ltr">{c.path}</span>
+=======
+                        {c.label} — {c.path}
+>>>>>>> theirs
                       </li>
                     ))}
                   </ul>
@@ -383,6 +399,7 @@ export function IntegrationsPane({
                 </button>
               </div>
             </div>
+<<<<<<< ours
           </div>
         )}
 
@@ -394,6 +411,9 @@ export function IntegrationsPane({
             tabIndex={-1}
           >
             {notice.text}
+=======
+            {notice?.legacy && <div className="set-field-desc set-intg-notice">{notice.text}</div>}
+>>>>>>> theirs
           </div>
         )}
 
@@ -440,6 +460,7 @@ export function IntegrationsPane({
           )}
         </details>
 
+<<<<<<< ours
         <h5 className="set-intg-sub">{t('intgStep2Title')}</h5>
         <div className="set-field-desc set-intg-lead">
           {anyInstalled ? t('intgStep2Desc') : t('intgStep2DescBefore')}
@@ -449,6 +470,8 @@ export function IntegrationsPane({
           {t('intgStep2Note', { cmd: status.cli.command })}
         </div>
 
+=======
+>>>>>>> theirs
         <details className="set-intg-details set-intg-cli">
           <summary>{t('intgCliTitle')}</summary>
           <div className="set-field-desc set-intg-lead">
@@ -550,7 +573,7 @@ export function IntegrationsPane({
         <h5 className="set-intg-sub">{t('intgStep2Title')}</h5>
         <div className="set-field-desc set-intg-lead">{t('intgStep2Desc')}</div>
         {examples}
-        <div className="set-field-desc set-intg-lead">{t('intgMcpTryNote')}</div>
+        <div className="set-field-desc set-intg-lead">{t('intgStep2Note')}</div>
       </section>
     </>
   )

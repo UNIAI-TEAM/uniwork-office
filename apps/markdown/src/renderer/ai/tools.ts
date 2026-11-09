@@ -21,7 +21,11 @@ import {
   type OpsContext,
 } from '../editor/ops'
 import { t } from '../i18n/locale'
+<<<<<<< ours
 import { MIND_MAP_LIMITS, MIND_MAP_TOOL, parseMindMapTree } from './mind-map'
+=======
+import { MIND_MAP_LIMITS, MIND_MAP_TOOL, parseMindMapTree } from '@genoffice/agent-core/mind-map'
+>>>>>>> theirs
 import {
   DraftLanding,
   type AiDocWriter,

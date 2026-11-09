@@ -8,7 +8,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./redact-range": "./src/redact-range.ts",
+<<<<<<< ours
     "./redact-core": "./src/redact-core.ts"
+=======
+    "./redact-core": "./src/redact-core.ts",
+    "./mind-map": "./src/mind-map.ts"
+>>>>>>> theirs
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -17,6 +22,10 @@
   },
   "devDependencies": {
     "typescript": "^5.9.3",
+<<<<<<< ours
     "vitest": "4.1.12"
+=======
+    "vitest": "^4.1.12"
+>>>>>>> theirs
   }
 }

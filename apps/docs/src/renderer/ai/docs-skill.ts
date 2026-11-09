@@ -245,6 +245,7 @@ export function createDocsSkill(
         ? redactLabelsOf(editor.getJSON() as unknown as Parameters<typeof redactLabelsOf>[0])
         : []
       const redact = labels.length > 0 ? `\n\n${placeholderInstruction(labels)}` : ''
+<<<<<<< ours
       return (
         AGENT_SYSTEM_PROMPT +
         mediaOffNote() +
@@ -252,6 +253,9 @@ export function createDocsSkill(
         protectionNote() +
         redact
       )
+=======
+      return AGENT_SYSTEM_PROMPT + mediaOffNote() + redact
+>>>>>>> theirs
     },
     get tools() {
       const hidden = mediaToolsOff()

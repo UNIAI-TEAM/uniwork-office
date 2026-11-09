@@ -15,7 +15,8 @@ import type {
   InsertKind,
   TransitionKind,
 } from '../../shared/ipc'
-import type { InkPenSettings, InkTool } from '../ink'
+import type { InkTool } from '../ink'
+import type { InkPreset } from '../ink-presets'
 import type { WordArtPreset } from '@genoffice/ui'
 import type { ChartPresetDef, IconDef, SmartArtDef } from '../insert-presets'
 import type { ZoomMode } from '../zoom-actions'
@@ -298,6 +299,8 @@ export interface Props {
   onUndo: () => void
   onRedo: () => void
   onSaveAs: () => void
+  /** Ask the model for a name, then open Save As with it prefilled */
+  onNameWithAi: () => void
   /** Export as PDF (hidden slides skipped) */
   onExportPdf: () => void
   /** Web frame: a feature the web does not offer (File > Print-quality PDF) says so (UseAppDialog) */
@@ -305,6 +308,8 @@ export interface Props {
   onPrint: () => void
   /** Export as images (one PNG per page, hidden slides skipped) */
   onExportImages: () => void
+  /** Export as images (one JPG per page, hidden slides skipped) */
+  onExportImagesJpg: () => void
   onFormat: (cmd: FormatCmd) => void
   zoom: number
   onZoom: (z: number | ((current: number) => number)) => void
@@ -453,10 +458,10 @@ export interface Props {
   /** Drawing tool (select = exit drawing) */
   inkTool: InkTool
   onInkTool: (tool: InkTool) => void
-  inkPen: InkPenSettings
-  onInkPen: (settings: InkPenSettings) => void
-  inkHighlighter: InkPenSettings
-  onInkHighlighter: (settings: InkPenSettings) => void
+  inkPresets: InkPreset[]
+  inkActiveId: string
+  onInkPresets: (presets: InkPreset[]) => void
+  onInkActivate: (id: string) => void
   /** Current page's stroke count (clear button availability) */
   inkCount: number
   /** Clear all ink on the current page */

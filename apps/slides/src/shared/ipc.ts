@@ -13,6 +13,11 @@ import type { CustGeomPathCmd, SlideComment, SectionInfo } from '@genoffice/pptx
 import type { FontSizeStep } from '@genoffice/pptx-ops/font-size'
 // the font catalog's shape is the store's to declare, not a copy kept in step by hand
 import type { CatalogEntry as FontCatalogEntry } from '@genoffice/electron-utils/font-store'
+import type { PrintDuplex, PrintJobOptions, PrinterInfo } from '@genoffice/electron-utils/print-job'
+import type { PrinterOption } from '@genoffice/electron-utils/printer-options'
+
+export type { PrintDuplex, PrintJobOptions, PrinterInfo }
+export type { PrinterOption }
 import type { LayoutSkeleton } from '../renderer/ai/layout-skeleton'
 import type {
   AiSettings,
@@ -166,7 +171,7 @@ export interface ApplyTxnResult {
   plan?: string[]
   failures?: Array<{ index: number; error: string }>
   /** compact journal echo: op name, target, ids minted by additive ops */
-  records?: Array<{ op: string; target?: string; created?: string[] }>
+  records?: Array<{ op: string; target?: string; created?: string[]; note?: string }>
   /** full deck after a mutation (a transaction may touch any slide) */
   slides?: RenderSlide[]
 }
@@ -326,6 +331,24 @@ export interface MasterEditStrokeOp {
 
 export interface MasterDeleteElementOp {
   sourceId: string
+}
+
+/** Insert onto the current master/layout part; pixel coordinates like AddElementOp, the part is the session's edit target */
+export interface MasterAddElementOp {
+  kind: InsertKind
+  xPx: number
+  yPx: number
+  wPx: number
+  hPx: number
+  fitWidthPx: number
+  /** Rich-text paragraphs (a text box starts empty; shape defaults apply otherwise) */
+  paragraphs?: EditParagraph[]
+  /** Shape solid fill #RRGGBB */
+  fillColor?: string
+  /** Shape stroke (solid color + point width) */
+  stroke?: { color: string; widthPt: number }
+  /** Text body wrap / autofit (click-to-type text boxes); absent = wrap="square", no autofit */
+  bodyPr?: { wrap?: 'square' | 'none'; autoFit?: 'shrink' | 'resize' }
 }
 
 /** Find/replace: matches within runs across pages; firstOnly+elementId used by "Replace" for the current hit. */
@@ -737,11 +760,19 @@ export interface RepasteSlideOp {
 /** Partial render update; order includes every part path, slides only changed pages. */
 export interface SlideUpdate {
   order: string[]
+<<<<<<< ours
   slides: RenderSlide[]
 }
 
 export interface DeckChange {
   slides: RenderSlide[]
+=======
+  slides: RenderSlide[]
+}
+
+export interface DeckChange {
+  slides: RenderSlide[]
+>>>>>>> theirs
   size: { cx: number; cy: number }
   /** Present for a partial update; omitted for a full resync. */
   order?: string[]
@@ -1184,13 +1215,15 @@ export interface EditChartOp {
 
 // ── Export (PDF / images) ─────────────────────────────────────────────
 
-/** Export as images: the renderer has already rendered hi-res PNGs; the main process only writes them to disk. */
+/** Export as images: the renderer has already rendered hi-res pages; the main process only writes them to disk. */
 export interface ExportImagesOp {
   /** Target directory (absolute path chosen via pickExportDir) */
   dir: string
-  /** File base name (without extension), written as <baseName>-01.png / -02.png … */
+  /** File base name (without extension), written as <baseName>-01.png / -02.png … (or .jpg) */
   baseName: string
-  /** base64 per page PNG (without the data: prefix), in page order */
+  /** Image format of the rendered pages; anything but 'jpg' is written as .png */
+  format?: 'png' | 'jpg'
+  /** base64 per page image (without the data: prefix), in page order */
   pngsBase64: string[]
 }
 
@@ -1260,13 +1293,18 @@ export interface PrintSlidesOp {
   widthPx: number
   heightPx: number
   /** Layout: full slides / handouts (N per page) / notes pages (slide + notes text) */
-  layout?: 'full' | 'handout2' | 'handout3' | 'handout6' | 'notes'
+  layout?: 'full' | 'handout2' | 'handout3' | 'handout4' | 'handout6' | 'handout9' | 'notes'
   /** Per-page notes text for the notes layout (same order as pngsBase64) */
   notes?: string[]
   /** Paper orientation for handout/notes pages (full pages always follow the slide ratio) */
   orientation?: 'portrait' | 'landscape'
+  /** Thumbnail order across the handout grid (row-first vs column-first) */
+  order?: 'horizontal' | 'vertical'
   /** Border around full-page slides */
   frame?: boolean
+  /** A printer the dialog picked: present = print silently with these job
+   *  options (macOS routes through lp); absent = the system print dialog. */
+  job?: PrintJobOptions
 }
 
 /** Show sync state from presenter view -> audience window (absolute state mirror; audience seek is idempotent) */
@@ -1303,8 +1341,10 @@ export type MenuCommand =
   /** the shell's flush of a converted legacy deck for the UniWork first save: write in place, no dialog */
   | 'save-in-place'
   | 'save-as'
+  | 'name-with-ai'
   | 'export-pdf'
   | 'export-images'
+  | 'export-images-jpg'
   | 'print'
   | 'zoom-in'
   | 'zoom-out'
@@ -1385,7 +1425,11 @@ export interface SlidesApi {
   /** New blank presentation (single blank 16:9 page, untitled) */
   /** `size` (EMU): the "Use for New Presentations" slide size; omitted keeps the 16:9 template */
   newBlank: (fitWidthPx: number, size?: { cx: number; cy: number }) => Promise<OpenResult>
+<<<<<<< ours
   /** Land generated pages: each pageMarkers entry is a marker (cloudpptx:<path>) redeemable for a one-slide pptx.
+=======
+  /** Land generated pages: each pageMarkers entry is a marker (genpptx:<path>) redeemable for a one-slide pptx.
+>>>>>>> theirs
    *  mode="append" merges the new pages onto the existing deck (appendedFrom = existing page count);
    *  mode="replace_at" redoes page atIndex in place from a single marker (other pages untouched, undoable, replacedIndex = that page's index);
    *  mode="insert_at" inserts a new page at atIndex from a single marker (later pages shift back, undoable, insertedIndex = that page's index);
@@ -1407,6 +1451,7 @@ export interface SlidesApi {
       })
     | { error: string }
   >
+<<<<<<< ours
   /** Whether cloud single-page generation is available (always false: slide generation is not a UniWork cloud tool) */
   cloudGenStatus: () => Promise<{ enabled: boolean }>
   /** Abort every in-flight cloud page generation of this window (AI panel stop) */
@@ -1422,6 +1467,9 @@ export interface SlidesApi {
     height?: number
   }) => Promise<{ ok: boolean; marker?: string; error?: string }>
   /** Local single-page generation: a JSON slide spec (LLM output) built directly into a one-slide pptx; same marker kind as the cloud path */
+=======
+  /** Single-page generation: a JSON slide spec (LLM output) built directly into a one-slide pptx; the marker goes into a landGeneratedPages pageMarkers slot */
+>>>>>>> theirs
   localGeneratePage: (op: {
     specJson: string
   }) => Promise<{ ok: boolean; marker?: string; error?: string; imageFailures?: string[] }>
@@ -1441,6 +1489,8 @@ export interface SlidesApi {
   editTransform: (op: EditTransformOp) => Promise<RenderSlide | null>
   /** Multi-selection nudge/rotate: every item commits like editTransform, all in one undo step */
   editTransformMulti: (op: EditTransformMultiOp) => Promise<RenderSlide | null>
+  /** Escape during a previewed resize: drop the gesture's preview frames and its undo snapshot */
+  cancelTransformPreview: (op: { slideIndex: number }) => Promise<RenderSlide | null>
   /** Connector endpoint drag: reposition ends and attach/detach shape anchors (stCxn/endCxn) */
   editConnectorEndpoints: (op: EditConnectorEndpointsOp) => Promise<RenderSlide | null>
   /** Batch position update (align/distribute); all items share one undo step */
@@ -1642,9 +1692,15 @@ export interface SlidesApi {
   getShowTiming: (slideIndex: number) => Promise<ShowTiming>
   /** Batch-write each page's auto-advance time (rehearsal timing save; the saved pptx auto-advances in PowerPoint shows); returns success */
   setAdvanceTimes: (op: SetAdvanceTimesOp) => Promise<boolean>
+<<<<<<< ours
   /** Replaces the recorded slides' narration and advance time in one undo step; returns a partial update. */
   saveRecording: (op: SaveRecordingOp) => Promise<SlideUpdate | null>
   clearNarration: (slideIndexes: number[]) => Promise<SlideUpdate | null>
+=======
+  /** Replaces the recorded slides' narration and advance time in one undo step; the whole deck back. */
+  saveRecording: (op: SaveRecordingOp) => Promise<RenderSlide[] | null>
+  clearNarration: (slideIndexes: number[]) => Promise<RenderSlide[] | null>
+>>>>>>> theirs
   /** Asks the OS for the microphone where it gates it (macOS); false when refused. */
   microphoneAccess: () => Promise<boolean>
   /** The current page's animation list (read by the Animations tab / during shows) */
@@ -1695,7 +1751,7 @@ export interface SlidesApi {
   /** Apply an edit script's collected primitives as ONE atomic op transaction (the executor rolls back on any failure); returns the rebuilt slide or a guided error */
   applyEditScript: (
     op: ApplyEditScriptOp,
-  ) => Promise<{ slide: RenderSlide } | { error: string } | null>
+  ) => Promise<{ slide: RenderSlide; notes?: string[] } | { error: string } | null>
   /** AI batch surface: apply raw ops as one transaction (atomic/per_op, dry-run supported) */
   applyTxn: (op: ApplyTxnOp) => Promise<ApplyTxnResult | null>
   /** Roll the deck back to an AI rollback point; returns the restored full RenderSlide array, null when the id is unknown */
@@ -1742,8 +1798,9 @@ export interface SlidesApi {
   savePicture: (op: SavePictureOp) => Promise<SavePictureResult>
   /** Main process printToPDF via a hidden window, written to disk */
   exportPdf: (op: ExportPdfOp) => Promise<ExportPdfResult>
-  /** Print (system dialog; cancel counts as ok=false without an error) */
+  /** Print: with job = silent (macOS named printers spool through lp); without = system dialog */
   printSlides: (op: PrintSlidesOp) => Promise<{ ok: boolean; error?: string }>
+<<<<<<< ours
   /** `origin` 'auto' = AutoSave pass (never writes a UniWork document); omitted = explicit Save */
   save: (origin?: 'user' | 'auto' | 'in-place') => Promise<{
     ok: boolean
@@ -1759,6 +1816,13 @@ export interface SlidesApi {
   onUniworkStateChanged?: (cb: (path: string) => void) => () => void
   /** EL-1(b) fix6: explicit Save on a read-only bound deck asks main to explain */
   uniworkReadOnlySave?: (path?: string) => Promise<void>
+=======
+  /** installed printers for the in-app print dialog */
+  listPrinters: () => Promise<PrinterInfo[]>
+  /** the driver option groups a queue advertises (quality, color, media type); empty when none */
+  printerOptions: (queue: string) => Promise<PrinterOption[]>
+  save: () => Promise<{ ok: boolean; path?: string; error?: string; slides?: RenderSlide[] }>
+>>>>>>> theirs
   saveAs: (
     defaultName: string,
   ) => Promise<{ ok: boolean; path?: string; error?: string; slides?: RenderSlide[] }>
@@ -1783,6 +1847,12 @@ export interface SlidesApi {
   onAiSettingsChanged: (handler: () => void) => () => void
   /** shell only: switch to Home and open Settings › Account, UniWork AI sign-in (rejects in standalone) */
   openAiModelSettings: () => Promise<void>
+  /** shell only: switch to Home and open Settings › Integrations (the skills list) */
+  openSkillsSettings: () => Promise<void>
+  /** the skills installed into GenOffice's own folder */
+  skillsList: () => Promise<UserSkillEntry[]>
+  /** one installed skill's body, by name; the main process resolves the path */
+  skillText: (name: string) => Promise<string>
   aiStream: (request: AiStreamRequest) => Promise<void>
   aiStreamCancel: (requestId: string) => Promise<void>
   /** UniWork cloud account status (internal gsk name; signed in to UniWork + plan includes cloud AI) */
@@ -1890,6 +1960,10 @@ export interface SlidesApi {
   masterEditFill: (op: MasterEditFillOp) => Promise<RenderSlide | null>
   masterEditStroke: (op: MasterEditStrokeOp) => Promise<RenderSlide | null>
   masterDeleteElement: (op: MasterDeleteElementOp) => Promise<RenderSlide | null>
+  /** Insert a text box / preset shape / line onto the current master/layout part */
+  masterAddElement: (
+    op: MasterAddElementOp,
+  ) => Promise<{ slide: RenderSlide; sourceId: string } | null>
   // ── Presenter-view multi-screen show ────────────────────────────────
   /** Enter presenter view: detects multiple displays and opens a fullscreen audience show window on the external screen (sharing this session's document) */
   presenterStart: () => Promise<{ audience: boolean }>
@@ -1926,4 +2000,10 @@ declare global {
     slidesApi: SlidesApi
     desktop: DesktopFilesApi
   }
+}
+
+export interface UserSkillEntry {
+  name: string
+  description: string
+  relevant: boolean
 }

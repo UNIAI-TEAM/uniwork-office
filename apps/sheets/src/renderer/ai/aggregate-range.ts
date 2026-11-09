@@ -14,8 +14,12 @@ import type { CellScalar } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { isSheetRemoved, journalEntriesInRange } from '../edit-journal'
 import type { LazyWorkbookState } from '../univer-state'
 import { createRangeAggregator, type RangeAggregate } from './aggregate'
+<<<<<<< ours
 import { sessionHasInputEdits } from './cell-read'
 import { redactionsOf, rowVisibilityProbe, type WorkbookReadContext } from './workbook-readers'
+=======
+import { redactionsOf, type WorkbookReadContext } from './workbook-readers'
+>>>>>>> theirs
 import { countWithheldIn } from './redact'
 
 interface ConstantFill {
@@ -263,9 +267,69 @@ export function prepareLazyRange(
   state: LazyWorkbookState,
   sheetId: string | undefined,
   bounds: RangeBounds,
+<<<<<<< ours
   toolName: string,
 ): PreparedLazyRange | { ok: false; error: string } {
+=======
+  options: AggregateRangeOptions = {},
+): Promise<{ ok: true; aggregate: RangeAggregate } | { ok: false; error: string }> {
+  const aggregator = createRangeAggregator()
+  const state = ctx.lazyWorkbookRef.current
+  const workbook = ctx.univerRef.current?.univerAPI.getActiveWorkbook()
+  const activeSheetId = workbook?.getActiveSheet()?.getSheetId()
+  if (!state) {
+    // Demo workbook: the snapshot holds every cell in memory.
+    const snapshot = ctx.adapterRef.current.getSnapshot()
+    const sheet = sheetIdArg
+      ? snapshot.sheets.find((candidate) => candidate.id === sheetIdArg)
+      : (snapshot.sheets.find((candidate) => candidate.id === activeSheetId) ?? snapshot.sheets[0])
+    if (!sheet) {
+      return {
+        ok: false,
+        error: sheetIdArg
+          ? `Unknown sheet: ${sheetIdArg} (use an id from get_workbook_context)`
+          : 'No workbook is open.',
+      }
+    }
+    const worksheet = workbook?.getSheetBySheetId(sheet.id)
+    const redactions = redactionsOf(ctx)
+    let counted = 0
+    for (const [address, cell] of Object.entries(sheet.cells)) {
+      const position = parseAddress(address)
+      if (
+        position.row < bounds.startRow ||
+        position.row > bounds.endRow ||
+        position.column < bounds.startColumn ||
+        position.column > bounds.endColumn
+      ) {
+        continue
+      }
+      if (redactions.labelAt(sheet.id, position.row, position.column) !== null) {
+        // Counted, never summed: see addWithheld in ./aggregate.
+        aggregator.addWithheld(1)
+        counted += 1
+        continue
+      }
+      let value = cell.value
+      // The in-memory model stores value:null for formula cells; the computed
+      // value lives in Univer's formula engine — backfill like find_cells.
+      if (cell.formula && value === null && worksheet) {
+        try {
+          value = (worksheet.getRange(address).getValue() as CellScalar) ?? null
+        } catch {
+          /* fail-open: count the cell as empty */
+        }
+      }
+      aggregator.add(value)
+      counted += 1
+    }
+    aggregator.addEmpty(rangeCellCount(bounds) - counted)
+    return { ok: true, aggregate: aggregator.finish(50) }
+  }
+  const sheetId = sheetIdArg ?? activeSheetId
+>>>>>>> theirs
   if (!sheetId) return { ok: false, error: 'No workbook is open.' }
+  const redactions = redactionsOf(ctx)
   if (isSheetRemoved(state.editJournal, sheetId)) {
     return { ok: false, error: `Unknown sheet: ${sheetId}` }
   }
@@ -593,7 +657,11 @@ export async function aggregateWorkbookRange(
     }
   }
   for (const { row, column, value } of journalValues.values()) {
+<<<<<<< ours
     if (dropped.has(row)) continue
+=======
+    if (hiddenRows.has(row)) continue
+>>>>>>> theirs
     if (redactions.labelAt(sheetId, row, column) !== null) {
       aggregator.addWithheld(1)
       counted += 1

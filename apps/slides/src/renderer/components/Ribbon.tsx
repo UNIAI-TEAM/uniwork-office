@@ -21,7 +21,11 @@ import {
   THEME_COLOR_SHADES,
   STANDARD_COLORS,
 } from '@genoffice/ui'
-import { getRecentColors, pushRecentColor } from '../recent-colors'
+import {
+  createRecentColorSession,
+  getRecentColors,
+  type RecentColorSession,
+} from '../recent-colors'
 import { ICON_COLORS } from '../insert-presets'
 import { THEME_PRESETS, type SlideThemePreset } from '../themes'
 import { restoreEditSelection } from '../TextEditOverlay'
@@ -30,14 +34,13 @@ import { nextPreset, prevPreset } from '../zoom-steps'
 import { TABLE_SHADING_COLORS } from './table-shading-colors'
 import { findShortcut } from '@genoffice/shortcuts'
 import { useI18n, type StringKey } from '../i18n/locale'
+import { RibbonDrawTab, type PenPanel } from './DrawTab'
 import {
   IconSlideMaster,
   IconBullets,
   IconArrangeAll,
   IconComment,
-  IconCursor,
   IconCustomShow,
-  IconEraser,
   IconHideSlide,
   IconNavPane,
   IconOutlineView,
@@ -127,6 +130,7 @@ import { RibbonInsertTab } from './RibbonInsertTab'
 import { RibbonTabScroller } from './RibbonTabScroller'
 import { ShapeGalleryContent } from './ShapeGalleryPopover'
 import { autoContextTabForElement, contextTabForElement, type ContextTab } from './context-tabs'
+<<<<<<< ours
 import { cap, isViewOnly, isWeb } from '../capabilities'
 import {
   shortcutPlatform,
@@ -136,6 +140,8 @@ import {
   slidesPlainLabel,
   slidesTipKbd,
 } from '../shortcuts'
+=======
+>>>>>>> theirs
 import { MODEL3D_VIEWS } from '../model3d/views'
 import {
   defaultNewSlideSize,
@@ -245,56 +251,6 @@ const TRANSLATE_TARGETS: StringKey[] = [
 
 /** One-time "AI rewrites the whole document" acknowledgement */
 const AI_REWRITE_ACK_KEY = 'slides-ai-rewrite-ack'
-
-// Draw tab palettes/pen widths (same as apps/docs DrawTab)
-const INK_COLORS = [
-  '000000',
-  'C00000',
-  'FF0000',
-  'FFC000',
-  'FFFF00',
-  '92D050',
-  '00B050',
-  '00B0F0',
-  '0070C0',
-  '7030A0',
-]
-const PEN_WIDTHS = [1, 2, 3.5, 5]
-const HIGHLIGHTER_WIDTHS = [6, 10, 16]
-
-/** Draw-tab pen gallery presets (tray of ready pens) */
-interface PenPreset {
-  kind: 'pen' | 'highlighter'
-  color: string
-  width: number
-}
-
-const DEFAULT_PEN_PRESETS: PenPreset[] = [
-  { kind: 'pen', color: '000000', width: 2 },
-  { kind: 'pen', color: 'FF0000', width: 2 },
-  { kind: 'pen', color: '0070C0', width: 2 },
-  { kind: 'highlighter', color: 'FFFF00', width: 10 },
-  { kind: 'highlighter', color: '00B050', width: 10 },
-]
-
-/** Pen thumbnail hanging tip-down in the tray */
-function PenThumb({ kind, color }: { kind: PenPreset['kind']; color: string }) {
-  const c = `#${color}`
-  return kind === 'pen' ? (
-    <svg width="24" height="56" viewBox="0 0 24 56" aria-hidden="true">
-      <rect x="5" y="0" width="14" height="34" rx="2.5" fill={c} />
-      <path d="M5 34h14l-3.5 8h-7Z" fill={c} opacity="0.85" />
-      <rect x="8.6" y="41" width="6.8" height="3.4" rx="1.2" fill="#fff" opacity="0.9" />
-      <path d="M8.5 44.5h7L12 55Z" fill={c} />
-    </svg>
-  ) : (
-    <svg width="26" height="56" viewBox="0 0 26 56" aria-hidden="true">
-      <rect x="3" y="0" width="20" height="36" rx="2.5" fill={c} />
-      <path d="M6 36h14l-2.5 9h-8Z" fill={c} opacity="0.8" />
-      <path d="M9 45h8l-1.5 8h-5Z" fill={c} />
-    </svg>
-  )
-}
 
 const TRANSITIONS: Array<{ kind: TransitionKind; label: StringKey; icon: React.ReactElement }> = [
   { kind: 'none', label: 'ribbonNone', icon: <IconTransNone size={BIG} /> },
@@ -914,9 +870,16 @@ function ShapeFillMenu({
     })
   }
   useEffect(() => cancelFlyoutClose, [])
+  // The native input previews a color per drag movement of the OS panel;
+  // recording each one would flood the whole recents row with the drag trail
+  // of a single pick (gendesk #279). The session records only the final value,
+  // on whichever path closes the menu.
+  const recentSession = useRef<RecentColorSession | null>(null)
+  if (recentSession.current === null) recentSession.current = createRecentColorSession()
+  useEffect(() => () => recentSession.current?.close(), [])
   const pickHex = (hex: string) => {
     onClose()
-    pushRecentColor(hex)
+    recentSession.current?.commit(hex)
     onPickFill(hex)
   }
   const swatch = (bare: string, title: string, key?: string) => (
@@ -981,7 +944,7 @@ function ShapeFillMenu({
             defaultValue={(current ?? '#ffffff').toLowerCase()}
             onPointerDown={(e) => armColorInput(e.currentTarget)}
             onChange={(e) => {
-              pushRecentColor(e.target.value)
+              recentSession.current?.preview(e.target.value)
               onPickFill(e.target.value)
             }}
           />
@@ -1160,10 +1123,12 @@ export function Ribbon({
   onUndo,
   onRedo,
   onSaveAs,
+  onNameWithAi,
   onExportPdf,
   onUseApp,
   onPrint,
   onExportImages,
+  onExportImagesJpg,
   onFormat,
   zoom,
   onZoom,
@@ -1242,10 +1207,10 @@ export function Ribbon({
   onToggleHidden,
   inkTool,
   onInkTool,
-  inkPen,
-  onInkPen,
-  inkHighlighter,
-  onInkHighlighter,
+  inkPresets,
+  inkActiveId,
+  onInkPresets,
+  onInkActivate,
   inkCount,
   onInkClearAll,
   viewMode,
@@ -1382,11 +1347,7 @@ export function Ribbon({
   >(null)
   // Chart design: dropdown panels (add chart element / change colors, at most one open at a time)
   const [chartDrop, setChartDrop] = useState<'elements' | 'colors' | null>(null)
-  // Draw tab pen gallery: per-preset customisations live for the session;
-  // clicking the already-selected pen opens its color/width flyout
-  const [penPresets, setPenPresets] = useState<PenPreset[]>(DEFAULT_PEN_PRESETS)
-  const [selectedPen, setSelectedPen] = useState(0)
-  const [penFlyout, setPenFlyout] = useState<{ index: number; x: number; y: number } | null>(null)
+  const [penPanel, setPenPanel] = useState<PenPanel | null>(null)
   const [chartTypeDlgOpen, setChartTypeDlgOpen] = useState(false)
   const chartTitleRef = useRef<HTMLInputElement>(null)
   const catAxisRef = useRef<HTMLInputElement>(null)
@@ -1419,7 +1380,7 @@ export function Ribbon({
     if (!keep.includes('insert')) setInsertDrop(null)
     if (!keep.includes('chart')) setChartDrop(null)
     if (!keep.includes('collapse')) setCollapseOpen(null)
-    if (!keep.includes('pen')) setPenFlyout(null)
+    if (!keep.includes('pen')) setPenPanel(null)
     if (!keep.includes('slideShow')) setSlideShowOpen(false)
     if (!keep.includes('record')) setRecordOpen(false)
   }, [])
@@ -1450,7 +1411,11 @@ export function Ribbon({
     lineSpacingOpen ||
     recordOpen ||
     collapseOpen != null ||
+<<<<<<< ours
     penFlyout != null
+=======
+    penPanel != null
+>>>>>>> theirs
 
   // Clicking elsewhere collapses every popup (the font color palette uses
   // onMouseDown without stealing focus, collapsing naturally when the edit
@@ -1475,6 +1440,7 @@ export function Ribbon({
   // Expanded/collapsed widths are cached per group so the required width is
   // computable in every state (before the first fold the collapsed width is
   // an estimate, corrected by measurement as soon as the group first folds).
+<<<<<<< ours
   const collapse = useRibbonCollapse(
     'ai-slides-ribbon-collapsed',
     {
@@ -1490,6 +1456,15 @@ export function Ribbon({
       platform: shortcutPlatform(),
     },
   )
+=======
+  const collapse = useRibbonCollapse('ai-slides-ribbon-collapsed', {
+    collapse: t('ribbonCollapse'),
+    expand: t('ribbonExpand'),
+    // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (docs parity, see #362)
+    compact: t('ribbonCompact'),
+    expandFull: t('ribbonExpand'),
+  })
+>>>>>>> theirs
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const inlineWidthsRef = useRef(new Map<string, number>())
   const collapsedWidthsRef = useRef(new Map<string, number>())
@@ -1839,6 +1814,7 @@ export function Ribbon({
               {t('ribbonTabFile')}
             </button>
             {fileOpen && (
+<<<<<<< ours
               <div className="file-menu" onMouseDown={(e) => e.stopPropagation()}>
                 {cap('open') && (
                   <button
@@ -1921,6 +1897,80 @@ export function Ribbon({
                     {t('ribbonFileExportImages')}
                   </button>
                 )}
+=======
+              <div className="file-menu">
+                <button
+                  onClick={() => {
+                    setFileOpen(false)
+                    onOpen()
+                  }}
+                >
+                  {t('ribbonFileOpen')} <span className="file-menu-key">Ctrl+O</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onSave()
+                  }}
+                >
+                  {t('ribbonFileSave')} <span className="file-menu-key">Ctrl+S</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onSaveAs()
+                  }}
+                >
+                  {t('ribbonFileSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onNameWithAi()
+                  }}
+                >
+                  {t('aiNameFile')}
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onExportPdf()
+                  }}
+                >
+                  {t('ribbonFileExportPdf')}
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onPrint()
+                  }}
+                >
+                  {t('ribbonFilePrint')} <span className="file-menu-key">Ctrl+P</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onExportImages()
+                  }}
+                >
+                  {t('ribbonFileExportImages')}
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setFileOpen(false)
+                    onExportImagesJpg()
+                  }}
+                >
+                  {t('ribbonFileExportImagesJpg')}
+                </button>
+>>>>>>> theirs
               </div>
             )}
           </div>
@@ -2029,6 +2079,7 @@ export function Ribbon({
         ) : tab === 'insert' ? (
           <RibbonInsertTab rb={tabCtx} />
         ) : tab === 'draw' ? (
+<<<<<<< ours
           (() => {
             // Draw tab: tool buttons, then a tray of ready pens.
             // Clicking a pen picks it up; clicking the held pen opens its
@@ -2202,6 +2253,22 @@ export function Ribbon({
               </>
             )
           })()
+=======
+          <RibbonDrawTab
+            hasDoc={hasDoc}
+            tool={inkTool}
+            onTool={onInkTool}
+            presets={inkPresets}
+            activeId={inkActiveId}
+            onPresets={onInkPresets}
+            onActivate={onInkActivate}
+            inkCount={inkCount}
+            onClearAll={onInkClearAll}
+            panel={penPanel}
+            setPanel={setPenPanel}
+            closePanels={closePanels}
+          />
+>>>>>>> theirs
         ) : tab === 'design' ? (
           <>
             <Group label={t('ribbonGroupThemes')}>
@@ -2693,6 +2760,7 @@ export function Ribbon({
                 </span>
                 <span>{t('ribbonRehearse')}</span>
               </button>
+<<<<<<< ours
               {cap('slideRecord') && (
                 <div className="rb-drop-wrap">
                   <button
@@ -2704,6 +2772,99 @@ export function Ribbon({
                   >
                     <span className="rb-big-icon">
                       <IconRecord size={BIG} />
+=======
+              <div className="rb-drop-wrap">
+                <button
+                  className={`rb-big${recordOpen ? ' active' : ''}`}
+                  disabled={!hasDoc}
+                  onMouseDown={(e) => closeSiblingPanels(e, closePanels, 'record')}
+                  onClick={() => setRecordOpen((v) => !v)}
+                  data-tip={t('ribbonRecordTip')}
+                >
+                  <span className="rb-big-icon">
+                    <IconRecord size={BIG} />
+                  </span>
+                  <span>{t('ribbonRecord')}</span>
+                </button>
+                {recordOpen && (
+                  <div className="rb-drop rb-menu" onMouseDown={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => {
+                        setRecordOpen(false)
+                        onRecord(true)
+                      }}
+                    >
+                      <span className="rb-menu-glyph">
+                        <IconPlayFromStart size={20} />
+                      </span>
+                      {t('ribbonRecordFromBeginning')}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRecordOpen(false)
+                        onRecord(false)
+                      }}
+                    >
+                      <span className="rb-menu-glyph">
+                        <IconPlayCurrent size={20} />
+                      </span>
+                      {t('ribbonRecordFromCurrent')}
+                    </button>
+                    <div className="rb-menu-sep" />
+                    <button
+                      onClick={() => {
+                        setRecordOpen(false)
+                        onClearNarration(false)
+                      }}
+                    >
+                      {t('ribbonClearNarrationCurrent')}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRecordOpen(false)
+                        onClearNarration(true)
+                      }}
+                    >
+                      {t('ribbonClearNarrationAll')}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </Group>
+          </>
+        ) : tab === 'review' ? (
+          <>
+            <Group label={t('ribbonGroupProofing')}>
+              <button
+                className="rb-big"
+                disabled={!hasDoc}
+                data-tip={`${t('ribbonSpellCheckTip')} — ${t('ribbonAiCreditNote')}`}
+                onClick={() => {
+                  if (confirmAiRewrite()) onAiPreset(t('ribbonSpellCheckPrompt'))
+                }}
+              >
+                <span className="rb-big-icon">
+                  <span className="ai-feature-icon" aria-hidden="true">
+                    <img src={iconSpelling} width={22} height={22} alt="" />
+                  </span>
+                </span>
+                <span>{t('ribbonSpellCheck')}</span>
+              </button>
+              <div className="rb-drop-wrap">
+                <button
+                  className={`rb-big ${translateOpen ? 'active' : ''}`}
+                  disabled={!hasDoc}
+                  data-tip={`${t('ribbonTranslateTip')} — ${t('ribbonAiCreditNote')}`}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    closeSiblingPanels(e, closePanels, 'translate')
+                  }}
+                  onClick={() => setTranslateOpen((v) => !v)}
+                >
+                  <span className="rb-big-icon">
+                    <span className="ai-feature-icon" aria-hidden="true">
+                      <img src={iconTranslate} width={22} height={22} alt="" />
+>>>>>>> theirs
                     </span>
                     <span>{t('ribbonRecord')}</span>
                   </button>
@@ -3526,7 +3687,11 @@ export function Ribbon({
               </div>
             </Group>
           </>
+<<<<<<< ours
         ) : tab === 'model3dFormat' && cap('model3d') ? (
+=======
+        ) : tab === 'model3dFormat' ? (
+>>>>>>> theirs
           <Group label={t('ribbonModel3dViews')}>
             <button
               className="rb-big"

@@ -8,6 +8,7 @@
  * WebContentsViews painted beside it, never inside it — so zooming the shell's
  * frame cannot reach a document canvas. That is the whole reason this is a
  * `--ui-scale` variable and not a window zoom: see src/main/ui-scale.ts. */
+<<<<<<< ours
 /* unscaled default for anything portalled to <body>, outside the zoomed frame */
 :root {
   --ui-vh: 1vh;
@@ -21,6 +22,10 @@
    * these units instead (`calc(var(--ui-vh) * 90)` = 90vh of the visible window). */
   --ui-vh: calc(1vh / var(--ui-scale, 1));
   --ui-vw: calc(1vw / var(--ui-scale, 1));
+=======
+.app-frame {
+  zoom: var(--ui-scale);
+>>>>>>> theirs
 }
 
 .tab-bar {
@@ -276,6 +281,10 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+}
+
+.tab-item.tab-dormant .tab-title {
+  opacity: 0.55;
 }
 
 .tab-title {

@@ -38,6 +38,10 @@ export type AgentId =
   | 'openclaw'
   | 'copilot'
   | 'opencode'
+<<<<<<< ours
+=======
+  | 'dsh'
+>>>>>>> theirs
 
 export interface AgentTarget {
   id: AgentId
@@ -179,6 +183,7 @@ const LEGACY_SKILL_DIRS: readonly {
   dir: (env: NodeJS.ProcessEnv, home: string) => string
 }[] = [
   {
+<<<<<<< ours
     id: 'codex',
     root: (env, home) => env.CODEX_HOME || home,
     dir: (env, home) => join(env.CODEX_HOME || join(home, '.codex'), 'skills'),
@@ -205,6 +210,41 @@ const LEGACY_SKILL_DIRS: readonly {
   },
 ]
 
+=======
+    // DSH_HOME (default ~/.dsh): the row exists so `agentConfigDir('dsh')`
+    // finds the dotfolder and `genoffice mcp` can write its Cordis patch
+    id: 'dsh',
+    label: 'DeepSeek Harness (dsh)',
+    probe: (env, home) => env.DSH_HOME || join(home, '.dsh'),
+    skills: (p) => join(p, 'skills'),
+    skillsTarget: false,
+  },
+]
+
+/**
+ * The skills directories the layout before the shared `.agents` row wrote to.
+ * Codex, Cursor, Gemini CLI, Copilot and OpenCode now read `~/.agents/skills`,
+ * so a copy this app wrote in one of these folders is a stale duplicate: the
+ * tool still finds it — Cursor loads `~/.codex` for compatibility, Gemini CLI
+ * treats `~/.gemini/skills` as a tier of its own — and nothing ever updates
+ * it again, while the pane reports the shared copy as current. Claude Code,
+ * Windsurf and OpenClaw keep their own folders, so theirs are current.
+ */
+const LEGACY_SKILL_DIRS: readonly {
+  id: AgentId
+  dir: (env: NodeJS.ProcessEnv, home: string) => string
+}[] = [
+  { id: 'codex', dir: (env, home) => join(env.CODEX_HOME || join(home, '.codex'), 'skills') },
+  { id: 'cursor', dir: (_env, home) => join(home, '.cursor', 'skills') },
+  { id: 'gemini', dir: (_env, home) => join(home, '.gemini', 'skills') },
+  { id: 'copilot', dir: (_env, home) => join(home, '.copilot', 'skills') },
+  {
+    id: 'opencode',
+    dir: (env, home) => join(env.XDG_CONFIG_HOME || join(home, '.config'), 'opencode', 'skills'),
+  },
+]
+
+>>>>>>> theirs
 /** The skills install targets, in pane order: the shared row first, per-tool rows after. */
 export function agentIds(): AgentId[] {
   return AGENTS.filter((a) => a.skillsTarget).map((a) => a.id)
@@ -391,8 +431,11 @@ export function uninstallSkill(skillsDir: string, ledger: SkillLedger): boolean 
   return true
 }
 
+<<<<<<< ours
 export type LegacyKeepReason = 'edited' | 'unsafe_link' | 'no_shared_copy' | 'error'
 
+=======
+>>>>>>> theirs
 export interface LegacySkillCopy {
   /** the tool whose dotfolder held the copy */
   agent: AgentId
@@ -404,13 +447,17 @@ export interface LegacySkillCopy {
   path: string
   /** the copy still holds the bytes this app wrote */
   ours: boolean
+<<<<<<< ours
   /** why the copy is not treated as ours or could not be removed */
   reason?: LegacyKeepReason
+=======
+>>>>>>> theirs
 }
 
 export interface LegacySweep {
   /** the copies this app wrote and removed */
   removed: LegacySkillCopy[]
+<<<<<<< ours
   /** the copies left in place (edited, unsafe symlink chain, or no shared copy) */
   kept: Array<LegacySkillCopy & { reason: LegacyKeepReason }>
   /** the copies whose removal threw a filesystem error */
@@ -419,11 +466,20 @@ export interface LegacySweep {
 
 export interface LegacyCandidateHooks {
   beforeUnlink?: (copy: LegacySkillCopy) => void
+=======
+  /** the copies edited by hand: left in place, for the user to judge */
+  kept: LegacySkillCopy[]
+>>>>>>> theirs
 }
 
 /**
  * The legacy per-tool copies this app wrote, read from the ledger. A path the
+<<<<<<< ours
  * ledger does not know was not written by this app and is not ours to touch.
+=======
+ * ledger does not know was not written by this app and is not ours to touch;
+ * a ledger row whose file is already gone is dropped.
+>>>>>>> theirs
  */
 export function findLegacySkillCopies(
   ledger: SkillLedger,
@@ -431,17 +487,21 @@ export function findLegacySkillCopies(
   home = homedir(),
 ): LegacySkillCopy[] {
   const out: LegacySkillCopy[] = []
+<<<<<<< ours
   const shared = AGENTS.find((a) => a.id === 'agents')
   const sharedDir = shared
     ? shared.skills(shared.probe(env, home), env, home)
     : join(home, '.agents', 'skills')
   const sharedFile = skillFilePath(sharedDir)
   const seen = new Set<string>()
+=======
+>>>>>>> theirs
   for (const legacy of LEGACY_SKILL_DIRS) {
     const skillsDir = legacy.dir(env, home)
     const path = skillFilePath(skillsDir)
     const entry = ledger[path]
     if (!entry) continue
+<<<<<<< ours
     if (isSameOrInsideShared(path, sharedFile, sharedDir)) continue
     const key = normKey(resolveExistingOrPath(path))
     if (seen.has(key)) continue
@@ -459,6 +519,17 @@ export function findLegacySkillCopies(
       ours: inspected.state === 'ours',
       ...(inspected.reason ? { reason: inspected.reason } : {}),
     })
+=======
+    if (!existsSync(path)) {
+      delete ledger[path]
+      continue
+    }
+    let ours = false
+    try {
+      ours = sha256(readFileSync(path, 'utf-8')) === entry.sha256
+    } catch {}
+    out.push({ agent: legacy.id, label: agentLabel(legacy.id), skillsDir, path, ours })
+>>>>>>> theirs
   }
   return out
 }
@@ -472,6 +543,7 @@ export function sweepLegacySkillCopies(
   ledger: SkillLedger,
   env: NodeJS.ProcessEnv = process.env,
   home = homedir(),
+<<<<<<< ours
   hooks?: LegacyCandidateHooks,
 ): LegacySweep {
   const removed: LegacySkillCopy[] = []
@@ -522,11 +594,29 @@ export function sweepLegacySkillCopies(
     const dir = join(copy.skillsDir, SKILL_NAME)
     try {
       rmdirSync(dir)
+=======
+): LegacySweep {
+  const removed: LegacySkillCopy[] = []
+  const kept: LegacySkillCopy[] = []
+  for (const copy of findLegacySkillCopies(ledger, env, home)) {
+    if (!copy.ours) {
+      kept.push(copy)
+      continue
+    }
+    rmSync(copy.path, { force: true })
+    const dir = join(copy.skillsDir, SKILL_NAME)
+    try {
+      if (readdirSync(dir).length === 0) rmSync(dir, { recursive: true })
+>>>>>>> theirs
     } catch {}
     delete ledger[copy.path]
     removed.push(copy)
   }
+<<<<<<< ours
   return { removed, kept, failed }
+=======
+  return { removed, kept }
+>>>>>>> theirs
 }
 
 /**
@@ -541,10 +631,15 @@ export function currentSkillInstalled(
 ): boolean {
   const shared = AGENTS.find((a) => a.id === 'agents')
   if (!shared) return false
+<<<<<<< ours
   const sharedPath = skillFilePath(shared.skills(shared.probe(env, home), env, home))
   const entry = ledger[sharedPath]
   if (!entry) return false
   return inspectCandidate(sharedPath, home, entry.sha256).state === 'ours'
+=======
+  const path = skillFilePath(shared.skills(shared.probe(env, home), env, home))
+  return Boolean(ledger[path]) && existsSync(path)
+>>>>>>> theirs
 }
 
 /** `genoffice/SKILL.md` inside a zip: the layout claude.ai and the desktop apps accept for an uploaded skill. */

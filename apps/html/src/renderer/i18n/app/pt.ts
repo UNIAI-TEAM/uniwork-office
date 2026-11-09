@@ -9,6 +9,14 @@ export const pt = {
   redactDialogPlaceholder: 'Nome do marcador, ex.: telefone do cliente',
   redactCancel: 'Cancelar',
   redactInsert: 'Ocultar',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'Este arquivo foi alterado por outro programa.',
+  diskConflictMsg: 'Este arquivo mudou no disco; salvar substituirá essas alterações.',
+  diskReload: 'Recarregar',
+  diskKeepMine: 'Manter o meu',
+  diskOverwrite: 'Substituir mesmo assim',
+>>>>>>> theirs
 
   loading: 'Carregando…',
   loadFailed: 'Não foi possível abrir o arquivo',
@@ -79,6 +87,7 @@ export const pt = {
   linkNeedsSelection: 'Selecione primeiro um texto na visualização',
   save: 'Salvar (⌘S)',
   saveAs: 'Salvar Como…',
+  aiNameFile: 'Nomear com IA…',
   ribbonCollapse: 'Recolher a Faixa de Opções',
   ribbonExpand: 'Expandir a Faixa de Opções',
   ribbonGroupInsert: 'Inserir',
@@ -109,6 +118,7 @@ export const pt = {
   alignLeft: 'Alinhar à esquerda',
   alignCenter: 'Centralizar',
   alignRight: 'Alinhar à direita',
+  alignJustify: 'Justificar',
   fontSizeDec: 'Diminuir tamanho da fonte',
   fontSizeInc: 'Aumentar tamanho da fonte',
   typography: 'Tipografia',

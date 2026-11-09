@@ -15,6 +15,7 @@ export interface SpellEngine {
   getWordSuggestions(word: string): string[]
 }
 
+<<<<<<< ours
 /** A fixed nonsense word no dictionary contains; see {@link spellEngineHasDictionary}. */
 export const SPELL_PROBE_WORD = 'xqzvjkwpt'
 
@@ -32,6 +33,8 @@ export function spellEngineHasDictionary(engine: SpellEngine): boolean {
   }
 }
 
+=======
+>>>>>>> theirs
 /** One string cell candidate for the checker (raw in-memory snapshot value). */
 export interface SpellCellRef {
   readonly sheetId: string
@@ -139,9 +142,16 @@ export function collectWorkbookTextCells(
 
 /**
  * The distinct words of a cell text, first-seen order: letters (plus the
+<<<<<<< ours
  * apostrophe-dash tail every dictionary spelling carries), lower-cased so
  * a repeated word costs one engine call. Numbers, codes and URLs mostly
  * never make it in — a token must start with a letter.
+=======
+ * apostrophe-dash tail every dictionary spelling carries), as written —
+ * Hunspell is case-sensitive for capitalised entries — and deduplicated
+ * case-insensitively. Numbers, codes and URLs mostly never make it in — a
+ * token must start with a letter.
+>>>>>>> theirs
  */
 export function tokenizeCellText(text: string): string[] {
   const seen = new Set<string>()
@@ -152,7 +162,11 @@ export function tokenizeCellText(text: string): string[] {
     const key = raw.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
+<<<<<<< ours
     words.push(key)
+=======
+    words.push(raw)
+>>>>>>> theirs
   }
   return words
 }
@@ -210,6 +224,11 @@ export interface RichDoc {
   readonly body?: {
     readonly dataStream?: string | undefined
     readonly textRuns?: readonly { st: number; ed: number; readonly ts?: unknown }[] | undefined
+<<<<<<< ours
+=======
+    readonly paragraphs?: readonly { startIndex: number }[] | undefined
+    readonly customRanges?: readonly { startIndex: number; endIndex: number }[] | undefined
+>>>>>>> theirs
   } | null
 }
 
@@ -240,7 +259,28 @@ export function replaceInRichDoc(doc: RichDoc, word: string, suggestion: string)
     if (ed <= st) continue
     runs.push({ st, ed, ...(run.ts !== undefined ? { ts: run.ts } : {}) })
   }
+<<<<<<< ours
   return { body: { ...(doc.body ?? {}), dataStream: nextStream, textRuns: runs } as never }
+=======
+  const shift = (index: number): number => (index >= end ? index + delta : index)
+  const body = doc.body ?? {}
+  const paragraphs = body.paragraphs?.map((p) => ({ ...p, startIndex: shift(p.startIndex) }))
+  const customRanges = body.customRanges?.map((r) => ({
+    ...r,
+    startIndex: shift(r.startIndex),
+    endIndex: shift(r.endIndex),
+  }))
+  return {
+    ...doc,
+    body: {
+      ...body,
+      dataStream: nextStream,
+      textRuns: runs,
+      ...(paragraphs ? { paragraphs } : {}),
+      ...(customRanges ? { customRanges } : {}),
+    },
+  }
+>>>>>>> theirs
 }
 
 // ─── The run ───────────────────────────────────────────────────────────────
@@ -248,8 +288,14 @@ export function replaceInRichDoc(doc: RichDoc, word: string, suggestion: string)
 /**
  * Checks every cell against the frame engine, synchronously — Hunspell over
  * a few thousand words costs milliseconds, so there is nothing to stream or
+<<<<<<< ours
  * cancel. Duplicate words cost one engine call each; the map caches
  * `null` for a correct word and the suggestions for a misspelled one.
+=======
+ * cancel. Duplicate words cost one engine call each; the map caches, per
+ * spelling as written, `null` for a correct word and the suggestions for a
+ * misspelled one.
+>>>>>>> theirs
  */
 export function runSheetSpellCheck(
   cells: readonly SpellCellRef[],
@@ -280,14 +326,21 @@ export function runSheetSpellCheck(
         verdicts.set(word, cached)
       }
       if (cached === null) continue
+<<<<<<< ours
       // the finding carries the word as written, so the list reads like the sheet
       const asWritten = new RegExp(escapeRegExp(word), 'i').exec(cell.text)?.[0] ?? word
       findings.push({ cell, word: asWritten, suggestions: cached })
+=======
+      findings.push({ cell, word, suggestions: cached })
+>>>>>>> theirs
     }
   }
   return findings
 }
+<<<<<<< ours
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
+=======
+>>>>>>> theirs

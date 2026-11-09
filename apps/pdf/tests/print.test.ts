@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { printPdf, printScaleForAreas, PRINT_DIALOG_TIMEOUT_MS } from '../src/renderer/print'
+import {
+  filterPageParity,
+  maySpoolOriginal,
+  printPdf,
+  printScaleForAreas,
+  PRINT_DIALOG_TIMEOUT_MS,
+} from '../src/renderer/print'
 
 function fakeDoc(numPages: number, render = vi.fn(() => ({ promise: Promise.resolve() }))) {
   const getPage = vi.fn(async () => ({
@@ -183,6 +189,46 @@ describe('printPdf', () => {
 /** US-Letter page area at scale 1 (PDF points²) */
 const LETTER_AREA = 612 * 792
 
+describe('printPdf with a printer job', () => {
+  it('prints through the main process instead of the system dialog', async () => {
+    const { doc } = fakeDoc(2)
+    let imgsAtPrintTime = 0
+    const print = vi.fn(async () => {
+      imgsAtPrintTime = document.querySelectorAll('.pdf-print-root img').length
+      return { ok: true }
+    })
+    ;(window as unknown as { pdfApi: unknown }).pdfApi = { print }
+
+    const job = { deviceName: 'HP', copies: 2, collate: true, duplex: 'longEdge' as const }
+    await printPdf(doc, undefined, job)
+
+    // the measured first page rides along for the CUPS print route's paper size
+    expect(print).toHaveBeenCalledWith({ ...job, pageSizeIn: { width: 8.5, height: 11 } })
+    expect(imgsAtPrintTime).toBe(2)
+    expect(window.print).not.toHaveBeenCalled()
+    expect(document.querySelector('.pdf-print-root')).toBeNull()
+  })
+
+  it('surfaces a main-process failure and still releases the print root', async () => {
+    const { doc } = fakeDoc(1)
+    ;(window as unknown as { pdfApi: unknown }).pdfApi = {
+      print: vi.fn(async () => ({ ok: false, error: 'printer offline' })),
+    }
+    await expect(printPdf(doc, undefined, { deviceName: '' })).rejects.toThrow('printer offline')
+    expect(document.querySelector('.pdf-print-root')).toBeNull()
+  })
+})
+
+describe('filterPageParity', () => {
+  it('keeps odd or even file pages and passes everything through for all', () => {
+    const pages = [1, 2, 3, 4, 5]
+    expect(filterPageParity(pages, 'all')).toBe(pages)
+    expect(filterPageParity(pages, 'odd')).toEqual([1, 3, 5])
+    expect(filterPageParity(pages, 'even')).toEqual([2, 4])
+    expect(filterPageParity([3], 'even')).toEqual([])
+  })
+})
+
 describe('printScaleForAreas', () => {
   it('uses the 200 DPI target while the document fits the pixel budget', () => {
     expect(printScaleForAreas([LETTER_AREA])).toBeCloseTo(200 / 72, 10)
@@ -277,5 +323,12 @@ describe('printPdf render scale', () => {
     // NaN pages are skipped and huge pages render at their own reduced scale
     // rather than aborting the whole print
     expect(imgsAtPrintTime).toBe(2)
+  })
+})
+
+describe('maySpoolOriginal', () => {
+  it('spools the original only when the file is not password-protected on disk', () => {
+    expect(maySpoolOriginal(null)).toBe(true)
+    expect(maySpoolOriginal('secret')).toBe(false)
   })
 })

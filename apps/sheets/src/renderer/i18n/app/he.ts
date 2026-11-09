@@ -2,7 +2,11 @@ import type { zh } from './zh'
 
 export const he = {
   // ── Withholding cells from the model ──
+<<<<<<< ours
   redactMenuLabel: 'הסתרת הבחירה מה-AI',
+=======
+  redactMenuLabel: 'הסתרת הבחירה מהמודל',
+>>>>>>> theirs
   redactDialogDesc:
     'הבחירה נשארת במסמך ובקובץ; המודל רואה רק את הסימון. תן לו שם כדי שיהיה ברור מה הוא מייצג.',
   redactDialogScope:
@@ -10,7 +14,11 @@ export const he = {
   redactDialogPlaceholder: 'שם הסימון, לדוגמה: טלפון הלקוח',
   redactCancel: 'ביטול',
   redactInsert: 'הסתר',
+<<<<<<< ours
   redactEnable: 'לחיצה ימנית על הבחירה מסתירה אותה מה-AI.',
+=======
+  redactEnable: 'לחיצה ימנית על טקסט נבחר מסתיר אותו מהמודל.',
+>>>>>>> theirs
   redactNeedsSavedRow: 'השורה הזו עדיין אינה בקובץ. שמור תחילה, ואז הסתר את התא.',
   redactRecoveredFromNames:
     'יישום אחר כתב מחדש את הקובץ הזה והשמיט את הרשומה של מה מוסתר. התאים המוסתרים שוחזרו מהשמות שבחוברת העבודה; שמירה משחזרת את הרשומה המלאה.',
@@ -307,7 +315,9 @@ export const he = {
   appFullLoadStart: 'טען הכול',
   appFullLoadRunning: 'טוען את כל חוברת העבודה — מיון וסינון יהיו זמינים בסיום…',
   appFullLoadTooLarge:
-    'חוברת העבודה גדולה מכדי להיטען במלואה לזיכרון; מיון וסינון אינם זמינים עבור קובץ זה.',
+    'חוברת העבודה גדולה מכדי להיטען במלואה לזיכרון; מיון והעברת טווחים אינם זמינים לקובץ זה. הסינון פועל ישירות על הקובץ.',
+  appLargeFilterLoading: 'קורא את עמודת הסינון מהקובץ…',
+  appLargeFilterApplying: 'מחיל את הסינון על הקובץ…',
   appSortValueModeFormulas:
     'טווח זה מכיל נוסחאות שאינן מחושבות באופן חי בחוברת עבודה גדולה זו — מיון או הזזה ישמרו אותן כערכים רגילים. בחרו טווח ללא נוסחאות.',
   appSortRangeTooLarge: 'טווח זה גדול מכדי למיין או להזיז אותו בבת אחת — בחרו פחות תאים.',
@@ -359,6 +369,8 @@ export const he = {
   appTableNameUsed: 'שם הטבלה "{name}" כבר שימש בהפעלה זו.',
   appTableNameInFile: 'שם הטבלה "{name}" כבר בשימוש על ידי טבלה בקובץ.',
   appTableOverlapsSession: 'הטווח חופף לטבלה "{name}" שנוצרה בהפעלה זו.',
+  appTableOverlapsFile: 'הטווח חופף לטבלה "{name}" שבקובץ.',
+  appTableAlreadyInTable: 'הבחירה כבר נמצאת בטבלה "{name}" — שנו את הסגנון דרך עיצוב טבלה.',
   appTablesNeedFile: 'פתח תחילה קובץ XLSX — טבלאות נכתבות לקובץ.',
   appTableSelectRange: 'בחר תחילה את טווח הנתונים — כותרות בשורה הראשונה.',
   appTableCreated: 'הטבלה נוצרה — שמור עם {saveKeys}.',
@@ -433,6 +445,7 @@ export const he = {
   appGridlinesHidden: 'קווי הרשת הוסתרו.',
   appGridlinesShown: 'קווי הרשת מוצגים.',
   appShowingFormulas: 'מציג נוסחאות — החלף שוב לערכים.',
+  appShowingFormulasActive: 'מציג נוסחאות',
   appShowingValues: 'מציג ערכים מחושבים.',
   appTraceNoFormula: 'עקוב אחר גורמים מזינים: בתא הפעיל אין נוסחה.',
   appTraceNoRefs: 'עקוב אחר גורמים מזינים: לנוסחה זו אין הפניות לתאים.',
@@ -476,6 +489,7 @@ export const he = {
   appColumnLabel: 'עמודה {col}',
   appBridgeUnavailable: 'גשר הקבצים של שולחן העבודה אינו זמין. הפעל מחדש את אפליקציית Electron.',
   appOpenCanceled: 'בחירת חוברת העבודה בוטלה.',
+  appImportCanceled: 'הייבוא בוטל.',
   appOpeningWorkbook: 'פותח חוברת עבודה…',
   appOpenStalled: 'לא ניתן היה לפתוח את חוברת העבודה.',
   appOpenRetry: 'נסה שוב',
@@ -656,6 +670,7 @@ export const he = {
   appExportPdfTitle: 'ייצא כ-PDF',
   appSaveTitle: 'שמור',
   appSaveAs: 'שמירה בשם',
+  aiNameFile: 'מתן שם באמצעות AI…',
   appUndo: 'בטל',
   appRedo: 'בצע שוב',
   appUnsavedEditOne: '● {count} עריכה שלא נשמרה',
@@ -687,7 +702,6 @@ export const he = {
   appLinkPlaceholder: 'https://example.com או Sheet1!A1',
   appRemoveLink: 'הסר קישור',
   appNotAvailableYet: 'לא זמין עדיין',
-  appComingSoon: 'בקרוב',
   appGroupChartLayouts: 'פריסות תרשים',
   appAddChartElement: 'הוסף רכיב תרשים',
   appAddChartElementTitle: 'כותרות, תוויות נתונים, מקרא',
@@ -1102,6 +1116,20 @@ export const he = {
   appWatchCell: 'תא',
   appWatchValue: 'ערך',
   appWatchFormula: 'נוסחה',
+  appLinksPanel: 'קישורים חיצוניים',
+  appLinksPanelDetail: 'רישום, עדכון וניתוק קישורים לחוברות עבודה אחרות',
+  appLinksUpdate: 'עדכון ערכים',
+  appLinksNone: 'לחוברת זו אין קישורים לחוברות עבודה אחרות.',
+  appLinksUnsaved: 'שמור את חוברת העבודה הזו לפני הצגת הקישורים החיצוניים שלה.',
+  appLinksSource: 'מקור',
+  appLinksStatus: 'מצב',
+  appLinksSheets: 'גיליונות',
+  appLinksLocate: 'הצגת קובץ המקור',
+  appLinksReachable: 'זמין',
+  appLinksBroken: 'לא זמין',
+  appLinksBreak: 'נתק את הקישור',
+  appLinksBreakConfirm: 'אשר את הניתוק',
+  appLinksChangeSource: 'שנה מקור',
   appGroupCalculation: 'חישוב',
   appCalculationOptions: 'אפשרויות חישוב',
   appCalculationOptionsTitle: 'חישוב מחדש אוטומטי או ידני',
@@ -1118,8 +1146,16 @@ export const he = {
   appGroupGetData: 'קבל נתונים',
   appFromTextCsv: 'מטקסט/CSV',
   appRefreshAll: 'רענן הכל',
+  appRefreshQuery: 'רענן שאילתה',
+  appQueryConnectionsTitle: 'רענן את השאילתות בחוברת',
+  appQueryRefreshing: 'מרענן {name}…',
+  appQueryRefreshed: '{name} רוענן ({rows} שורות)',
+  appQueryRefreshedClipped: '{name} רוענן ({rows} שורות, {dropped} לא נכנסו לטווח)',
+  appQueryRefreshFailed: 'לא ניתן לרענן {name}',
   appWorkbookNoPivot: 'אין טבלאות ציר בחוברת זו.',
   appRefreshAllTitle: 'רענון כל טבלאות הציר',
+  appQueriesConnections: 'שאילתות וחיבורים',
+  appQueriesConnectionsTitle: 'הצגת השאילתות וחיבורי הנתונים של חוברת העבודה',
   appErrorCheckingDetail: 'סריקת הגיליון לערכי שגיאה',
   appErrorsFound: '{count} שגיאות — ב-{cell}: {value}',
   appCheckingErrors: 'סורקים את הגיליון כולו לאיתור שגיאות…',
@@ -1154,6 +1190,7 @@ export const he = {
   appGroupForecast: 'חיזוי',
   appWhatIfAnalysis: 'ניתוח מה-אם',
   appGoalSeek: 'חתירה למטרה',
+  appDataTable: 'טבלת נתונים',
   appWhatIfTitle: 'מציאת קלט לערך יעד',
   appGoalSeekNeedsFormula: 'התא חייב להכיל נוסחה.',
   appGoalSeekByCellNotNumber: 'התא המשתנה חייב להכיל מספר או להיות ריק.',
@@ -1250,12 +1287,15 @@ export const he = {
   appPasswordUpdating: 'מעדכן…',
   appUpdatePassword: 'עדכן סיסמה',
   appWorkbookNotPasswordProtected: 'חוברת עבודה זו אינה מוגנת בסיסמת פתיחה.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'לא ניתן לשמור חוברת עבודה מוגנת בסיסמה במסמך UniWork. השתמשו ב״שמירה בשם״ כדי לשמור עותק מוצפן במחשב זה.',
   appPasswordChangeUniwork: 'לא ניתן לשנות כאן את הסיסמה של מסמך UniWork.',
   appPasswordChangeReadOnly: 'חוברת עבודה זו היא לקריאה בלבד, ולכן לא ניתן לשנות את הסיסמה שלה.',
   appEncryptedWrongPassword: 'הסיסמה שגויה. נסו שוב.',
   appPasswordChangeRestored: 'שמרו תחילה את חוברת העבודה ששוחזרה, ואז שנו את הסיסמה שלה.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'אפשר עריכת טווחים',
   appGroupClipboard: 'לוח',
   appPaste: 'הדבק',
@@ -1513,6 +1553,7 @@ export const he = {
   appVisualFlipV: 'הפוך אנכית',
   appVisualFlipH: 'הפוך אופקית',
   appCtxPasteVisual: 'הדבק תמונה או צורה',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'עדיין לא ניתן לפתוח את חוברת העבודה הזו באינטרנט',
   appWebEngineBody:
@@ -1539,6 +1580,8 @@ export const he = {
   appWebSavedReopenFailed:
     'השינויים שלך נשמרו ב-UniWork, אך לא ניתן היה לפתוח את החוברת מחדש כאן. טען מחדש את העורך כדי להמשיך.',
   appDataTable: 'טבלת נתונים',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'איות',

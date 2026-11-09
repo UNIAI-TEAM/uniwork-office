@@ -8,7 +8,10 @@ import { blocksToPmDoc, pmDocToSavePlan, type PmNode } from '../src/renderer/edi
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { DocRedaction } from '../src/renderer/editor/redaction'
 import { REDACT_MARK } from '../src/renderer/ai/redact'
+<<<<<<< ours
 import { modelTextOf, redactionCount } from '../src/renderer/ai/redact-view'
+=======
+>>>>>>> theirs
 
 /**
  * The whole feature rests on the mark surviving a .docx round trip: a
@@ -170,6 +173,7 @@ describe('a saved file is XML a word processor can open', () => {
     )
     expect(xml).toMatch(/mc:PreserveElements="w14:plc go:redact"/)
   })
+<<<<<<< ours
 
   it('extends single-quoted mc:Ignorable and mc:PreserveElements without duplicating attributes', async () => {
     const from = await buildDocx({
@@ -217,6 +221,8 @@ describe('a saved file is XML a word processor can open', () => {
     expect(xml).toMatch(/mc:Ignorable=['"][^'"]*\bgo\b/)
     expect(xml).toMatch(/mc:PreserveElements=['"][^'"]*\bgo:redact\b/)
   })
+=======
+>>>>>>> theirs
 })
 
 describe('a withheld span survives the .docx', () => {
@@ -327,6 +333,7 @@ describe('a withheld span survives the .docx', () => {
     expect(redactionMarks(editor)).toEqual([])
     expect(editor.state.doc.textContent).toContain(SECRET)
   })
+<<<<<<< ours
 
   it('showing a saved hidden span to AI again strips the hide border and go:redact while keeping unrelated rPr', async () => {
     const docx = await makeDocx('<w:r><w:rPr><w:em w:val="dot"/></w:rPr><w:t>secret</w:t></w:r>')
@@ -411,6 +418,8 @@ describe('a withheld span survives the .docx', () => {
       color: '6B4FC0',
     })
   })
+=======
+>>>>>>> theirs
 })
 
 describe('the label never breaks the file', () => {

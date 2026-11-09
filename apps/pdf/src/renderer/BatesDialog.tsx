@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import type { TFunc } from './i18n/locale'
+<<<<<<< ours
 import { useModalDialog } from './modal-dialog'
+=======
+>>>>>>> theirs
 import {
   BATES_MAX_FONT,
   BATES_MIN_FONT,
@@ -73,7 +76,10 @@ export function BatesDialog({
   const [firstPage, setFirstPage] = useState('1')
   const [lastPage, setLastPage] = useState('')
   const [error, setError] = useState<string | null>(null)
+<<<<<<< ours
   const dialogRef = useModalDialog(onClose)
+=======
+>>>>>>> theirs
 
   const cfg: BatesConfig = {
     prefix,
@@ -131,8 +137,12 @@ export function BatesDialog({
   return (
     <div className="pdf-modal-mask" onClick={onClose}>
       <div
+<<<<<<< ours
         ref={dialogRef}
         className="pdf-modal pdf-bates-dialog"
+=======
+        className="pdf-modal"
+>>>>>>> theirs
         role="dialog"
         aria-modal="true"
         aria-label={t('batesTitle')}
@@ -141,7 +151,11 @@ export function BatesDialog({
         <div className="pdf-modal-title">{t('batesTitle')}</div>
         <div className="pdf-modal-hint">{t('batesHint')}</div>
 
+<<<<<<< ours
         <div className="pdf-field pdf-bates-grid">
+=======
+        <div className="pdf-field">
+>>>>>>> theirs
           <label className="pdf-perm-row">
             <span>{t('batesPrefix')}</span>
             <input
@@ -207,7 +221,11 @@ export function BatesDialog({
           </div>
         </div>
 
+<<<<<<< ours
         <div className="pdf-field pdf-bates-grid">
+=======
+        <div className="pdf-field">
+>>>>>>> theirs
           <label className="pdf-perm-row">
             <span>{t('batesFirstPage')}</span>
             {numberInput(firstPage, setFirstPage, { min: 1 })}

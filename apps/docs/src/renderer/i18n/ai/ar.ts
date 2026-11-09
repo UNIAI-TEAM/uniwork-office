@@ -112,6 +112,11 @@ export const ar = {
     'تعقب التغييرات مفعّل: تُوضع علامة على تغييرات محتوى الذكاء الاصطناعي كمراجعات (الإدراجات مسطّرة والحذف مشطوب)؛ اقبلها أو ارفضها في «مراجعة»',
   aiTrackOffTitle:
     'تعقب التغييرات متوقف: تُطبَّق تغييرات الذكاء الاصطناعي فورًا (لا يزال بإمكانك الاسترجاع عبر لقطات الإصدارات)',
+  aiRevisionBarTitle: 'المراجعات',
+  aiRevisionCount: '{count} تغييرات معلقة',
+  aiRevisionRejectAll: 'رفض الكل',
+  aiRevisionAcceptAll: 'قبول الكل',
+  aiRevisionPara: 'الفقرة {n}',
   aiTurnLimit:
     '(تم بلوغ الحد الأقصى لجولات استدعاء الأدوات لهذا الطلب؛ الإجابة أعلاه تستند إلى الخطوات المكتملة وقد تكون غير كاملة.)',
   aiStopped: '(تم الإيقاف)',
@@ -123,6 +128,8 @@ export const ar = {
   aiUnknownError: 'خطأ غير معروف',
   aiTimeoutError:
     'انتهت مهلة طلب الذكاء الاصطناعي: لا توجد استجابة من الشبكة وتم الإيقاف. تحقق من الاتصال وحاول مجددًا',
+  aiRegionError:
+    'مزوّد هذا النموذج لا يقدم الخدمة في منطقتك الحالية — اختر نموذجًا آخر أو غيّر الشبكة',
   aiOverloadedError: 'خدمة الذكاء الاصطناعي مشغولة حاليًا — يرجى المحاولة مرة أخرى بعد قليل',
   aiNetworkError:
     'مشكلة في الشبكة: تعذّر الوصول إلى خدمة الذكاء الاصطناعي. تحقق من الاتصال وحاول مجددًا',
@@ -130,6 +137,9 @@ export const ar = {
   aiSumImageAttachment: 'مرفق صورة {name}',
   aiSumRead: 'قراءة {name}',
   aiSumReadAttachmentName: 'قراءة المرفق {name}',
+  aiSumSkillsList: 'سرد المهارات المثبتة',
+  aiSumSkillRead: 'قراءة المهارة {name}',
+  aiSumRunCli: 'تنفيذ {args}',
   aiSumWebSearch: 'بحث على الويب',
   aiSumWebSearchDone: 'تم البحث عن «{query}» ({count} نتيجة)',
   aiSumImageSearch: 'بحث عن صور',
@@ -191,6 +201,7 @@ export const ar = {
   aiCmdImages: 'تم تحديث {count} صورة',
   aiCmdToc: 'تم إدراج جدول محتويات ({count} إدخالًا)',
   aiCmdSkipped: ' (تم تخطي {count} كتلة محمية)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
   aiClarifyTitle: 'بعض الأسئلة قبل المتابعة',
@@ -205,6 +216,8 @@ export const ar = {
   aiClarifySubmit: 'متابعة',
   aiSumClarify: 'تمت الإجابة عن أسئلة التوضيح',
   aiSumClarifySkipped: 'تم تخطي أسئلة التوضيح',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'إنشاء خريطة ذهنية لهذا المستند',
   aiMindMapBtn: 'خريطة ذهنية بالذكاء الاصطناعي',
   aiMindMapPrompt:
@@ -215,7 +228,18 @@ export const ar = {
   aiMindMapAskPrompt: 'حدثني عن «{label}» في هذا المستند',
   aiMindMapJump: 'الانتقال إلى المقطع المشار إليه',
   aiMindMapExport: 'تصدير PNG',
+<<<<<<< ours
   aiMindMapReset: 'إعادة ضبط العرض',
   aiMindMapExpand: 'توسيع الفرع',
   aiMindMapCollapse: 'طي الفرع',
+=======
+  aiMindMapExportSvg: 'تصدير SVG',
+  aiMindMapInsert: 'إدراج في المستند',
+  aiMindMapReset: 'إعادة ضبط العرض',
+  aiMindMapExpand: 'توسيع الفرع',
+  aiMindMapCollapse: 'طي الفرع',
+  aiMindMapToggleLayout: 'تبديل التخطيط',
+  aiMindMapLayoutTopDown: 'التبديل إلى التخطيط من أعلى إلى أسفل',
+  aiMindMapLayoutLeftRight: 'التبديل إلى التخطيط من اليسار إلى اليمين',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

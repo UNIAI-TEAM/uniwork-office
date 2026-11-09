@@ -72,6 +72,7 @@ interface BlockContext {
 
 const HEADING_MAX = 6
 
+<<<<<<< ours
 /**
  * Occupancy-grid slot limits so a wide or many-row table cannot exhaust the
  * heap before XML generation finishes. Checked per table and across all tables
@@ -80,6 +81,8 @@ const HEADING_MAX = 6
 export const MAX_ODT_TABLE_CELLS = 100_000
 export const MAX_ODT_DOCUMENT_TABLE_CELLS = 250_000
 
+=======
+>>>>>>> theirs
 export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult> {
   const pack = await loadOdfPackage(odt)
   if (!pack) throw new OdfConvertError('unreadable')
@@ -92,6 +95,7 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
   const drafts: Draft[] = []
   const listFrames: ListFrame[] = []
   let listCounter = 0
+<<<<<<< ours
   let documentTableCells = 0
 
   function emitTable(node: XNode): Draft {
@@ -109,6 +113,8 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
     const grid = placeCells(rows, columns.length, ctx)
     return { kind: 'xml', xml: tableXml(columns, grid) }
   }
+=======
+>>>>>>> theirs
 
   const walkElements = (nodes: XNode[], context: BlockContext): void => {
     for (const element of elements(nodes)) {
@@ -126,10 +132,16 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
           walkList(element.node, null, 0, context)
           break
         case 'table:table':
+<<<<<<< ours
           drafts.push(emitTable(element.node))
           break
         case 'text:section':
         case 'text:index-title':
+=======
+          drafts.push(tableDraft(element.node, ctx))
+          break
+        case 'text:section':
+>>>>>>> theirs
           if (attr(element.node, 'text:display') !== 'none') {
             walkElements(nodeChildren(element.node), context)
           }
@@ -145,6 +157,7 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
           else drops.add('stale-indexes')
           break
         }
+<<<<<<< ours
         case 'text:tracked-changes': {
           const regions = childElements(element.node).filter(
             ({ name }) => name === 'text:changed-region',
@@ -166,6 +179,10 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
         case 'office:forms':
           // LibreOffice writes an empty office:forms into nearly every file; only real form controls are a loss.
           if (childElements(element.node).length > 0) drops.add('unhandled-blocks')
+=======
+        case 'text:sequence-decls':
+        case 'text:soft-page-break':
+>>>>>>> theirs
           break
         case 'draw:frame':
           emitFrame(element.node, context)
@@ -223,7 +240,11 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
           } else if (inner.name === 'text:list') {
             walkList(inner.node, frame, depth, context)
           } else if (inner.name === 'table:table') {
+<<<<<<< ours
             drafts.push(emitTable(inner.node))
+=======
+            drafts.push(tableDraft(inner.node, ctx))
+>>>>>>> theirs
           } else if (inner.name === 'draw:frame') {
             emitFrame(inner.node, context)
           }
@@ -292,7 +313,10 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
   }
 
   walkElements(nodeChildren(body), { list: null, depth: 0 })
+<<<<<<< ours
   countDroppedMasterPageParts(pack.stylesRoots, drops)
+=======
+>>>>>>> theirs
 
   // -- assembly ---------------------------------------------------------------
 
@@ -348,6 +372,7 @@ function elements(nodes: XNode[]): Array<{ name: string; node: XNode }> {
   return out
 }
 
+<<<<<<< ours
 const HEADER_FOOTER_ELEMENTS: Record<string, true> = {
   'style:header': true,
   'style:header-left': true,
@@ -377,6 +402,8 @@ function countDroppedMasterPageParts(stylesRoots: XNode[] | null, drops: Drops):
   for (const root of stylesRoots) walk(root)
 }
 
+=======
+>>>>>>> theirs
 function clampHeadingLevel(text: string | undefined): number {
   const level = Number(text ?? '1')
   if (!Number.isInteger(level) || level < 1) return 1
@@ -496,15 +523,28 @@ const CELL_GEN_CTX = {
   },
 }
 
+<<<<<<< ours
 const MAX_TABLE_COLUMNS = 1024
+=======
+function tableDraft(node: XNode, ctx: WalkContext): Draft {
+  const columns = readColumns(node, ctx)
+  const rows = readRows(node)
+  const grid = placeCells(rows, columns.length, ctx)
+  return { kind: 'xml', xml: tableXml(columns, grid) }
+}
+>>>>>>> theirs
 
 function readColumns(table: XNode, ctx: WalkContext): ColumnSpec[] {
   const out: ColumnSpec[] = []
   const push = (node: XNode): void => {
     const width = ctx.styles.columnWidthEmu(attr(node, 'table:style-name'))
     const repeat = clampRepeat(attr(node, 'table:number-columns-repeated'))
+<<<<<<< ours
     const count = Math.min(repeat, Math.max(0, MAX_TABLE_COLUMNS - out.length))
     for (let index = 0; index < count; index++) out.push({ widthEmu: width })
+=======
+    for (let index = 0; index < repeat; index++) out.push({ widthEmu: width })
+>>>>>>> theirs
   }
   const walk = (node: XNode): void => {
     for (const { name, node: child } of childElements(node)) {
@@ -536,11 +576,14 @@ function clampRepeat(text: string | undefined, cap = 1024): number {
   return Math.min(value, cap)
 }
 
+<<<<<<< ours
 function parsePositiveSpan(text: string | undefined): number {
   const value = Number(text ?? '1')
   if (!Number.isSafeInteger(value) || value < 1) return 1
   return value
 }
+=======
+>>>>>>> theirs
 /** resolve the occupancy grid: every (row, column) slot names the cell that paints it */
 function placeCells(
   rows: XNode[],
@@ -554,6 +597,21 @@ function placeCells(
       if (name === 'table:table-cell') {
         const repeat = clampRepeat(attr(node, 'table:number-columns-repeated'), 64)
         for (let index = 0; index < repeat; index++) out.push(makeCell(node, ctx))
+<<<<<<< ours
+=======
+      } else if (name === 'table:covered-table-cell') {
+        const repeat = clampRepeat(attr(node, 'table:number-columns-repeated'), 64)
+        for (let index = 0; index < repeat; index++) {
+          out.push({
+            row: -1,
+            column: -1,
+            colSpan: 1,
+            rowSpan: 1,
+            contentXml: '<w:p/>',
+            fill: null,
+          })
+        }
+>>>>>>> theirs
       }
     }
     return out
@@ -567,8 +625,12 @@ function placeCells(
       while (column < columnCount && slotRow[column]) column++
       if (column >= columnCount) break
       const colSpan = Math.max(1, Math.min(cell.colSpan, columnCount - column))
+<<<<<<< ours
       const rowSpan = Math.max(1, Math.min(cell.rowSpan, rows.length - rowIndex))
       for (let dr = 0; dr < rowSpan; dr++) {
+=======
+      for (let dr = 0; dr < cell.rowSpan; dr++) {
+>>>>>>> theirs
         while (occupancy.length <= rowIndex + dr) occupancy.push(new Array(columnCount).fill(null))
         const slot = occupancy[rowIndex + dr]
         for (let dc = 0; dc < colSpan; dc++) slot[column + dc] = cell
@@ -576,7 +638,10 @@ function placeCells(
       cell.row = rowIndex
       cell.column = column
       cell.colSpan = colSpan
+<<<<<<< ours
       cell.rowSpan = rowSpan
+=======
+>>>>>>> theirs
       column += colSpan
     }
     rowIndex++
@@ -636,8 +701,13 @@ function makeCell(node: XNode, ctx: WalkContext): GridCell {
   return {
     row: -1,
     column: -1,
+<<<<<<< ours
     colSpan: parsePositiveSpan(attr(node, 'table:number-columns-spanned')),
     rowSpan: parsePositiveSpan(attr(node, 'table:number-rows-spanned')),
+=======
+    colSpan: Math.max(1, Number(attr(node, 'table:number-columns-spanned') ?? '1') || 1),
+    rowSpan: Math.max(1, Number(attr(node, 'table:number-rows-spanned') ?? '1') || 1),
+>>>>>>> theirs
     contentXml,
     fill: ctx.styles.cellFill(attr(node, 'table:style-name')),
   }

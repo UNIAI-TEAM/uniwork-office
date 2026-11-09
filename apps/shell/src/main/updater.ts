@@ -116,6 +116,23 @@ const tUpd = createI18n({
     updApt:
       'Bản cập nhật cho phiên bản này được gửi qua apt. Hãy chạy: sudo apt update && sudo apt upgrade',
   },
+  tr: {
+    updTitle: 'Yazılım Güncellemesi',
+    updHeadline: 'Yeni bir sürüm mevcut',
+    updDesc:
+      'Bu güncelleme performans iyileştirmeleri ve hata düzeltmeleri içerir. Şimdi güncellemenizi öneririz.',
+    updDownload: 'Şimdi Güncelle',
+    updLater: 'Simge Durumuna Küçült',
+    updInstall: 'Yeniden Başlat ve Yükle',
+    updDownloading: 'Güncelleme indiriliyor…',
+    updFailed: 'Güncelleme indirilemedi. Ağ bağlantınızı kontrol edip yeniden deneyin.',
+    updRetry: 'Yeniden Dene',
+    updManual:
+      'Otomatik güncelleme başarısız oldu. Lütfen en son sürümü indirme sayfasından alıp elle yükleyin.',
+    updUpToDate: 'Güncel sürümü kullanıyorsunuz (sürüm {version}).',
+    updCheckFailed: 'Güncellemeler denetlenemedi. Ağ bağlantınızı kontrol edip yeniden deneyin.',
+    updOpenDownload: 'İndirme Sayfasını Aç',
+  },
   ja: {
     updTitle: 'ソフトウェアアップデート',
     updHeadline: '新しいバージョンがあります',
@@ -651,6 +668,12 @@ function updatesThroughApt(): boolean {
 // resolves true when it found a newer release and showed the window
 let macReleaseCheck: ((manual: boolean) => Promise<boolean>) | null = null
 
+// The check in flight is quiet when a background timer started it: the package
+// then downloads in the background and the app installs it when it quits
+// (genoffice#2389). A check the user asked for — the Help entry, the About
+// dialog button, a channel switch — opens the update card instead.
+let quietCheck = false
+
 function log(...args: unknown[]): void {
   console.log('[updater]', ...args)
 }
@@ -688,6 +711,8 @@ function initialState(version: string): UpdateUiState {
 export function applyUpdateChannel(channel: UpdateChannel): void {
   if (!updaterActive || pinnedChannel !== null) return
   resetDownloadFlow?.()
+  // the user asked for this channel: it gets the card, not a quiet download
+  quietCheck = false
   autoUpdater.channel = CHANNEL_FEED[channel]
   // the channel setter unconditionally flips allowDowngrade to true; force it
   // back off since a beta user switching to stable must not downgrade
@@ -742,6 +767,8 @@ export async function checkForUpdatesNow(): Promise<void> {
       return
     }
     dismissedVersion = null
+    // the user asked for it: the card, not a quiet download
+    quietCheck = false
     let result
     try {
       result = await autoUpdater.checkForUpdates()
@@ -839,8 +866,16 @@ function initMacReleaseNotifier(
 export function initAutoUpdater(
   getWindow: () => BrowserWindow | null,
   initialChannel: UpdateChannel = 'stable',
+<<<<<<< ours
   /** Settings › "Check for updates automatically"; read at every background check */
   autoCheckEnabled: () => boolean = () => true,
+=======
+  /** Settings › "Check for updates automatically"; read at every background check (genoffice#2127) */
+  autoCheckEnabled: () => boolean = () => true,
+  /** Settings › "Install updates silently" (off by default): a background check
+   *  downloads the package quietly and installs it on quit instead of opening the card */
+  silentInstallEnabled: () => boolean = () => false,
+>>>>>>> theirs
 ): void {
   if (started) return
   started = true
@@ -949,19 +984,23 @@ export function initAutoUpdater(
     clearUpdateState()
   }
 
+  /** Download the version on offer. The card's "Update Now" button and the
+   *  quiet background download share this path. */
+  const startDownload = (): void => {
+    if (downloadInFlight || phase === 'downloaded') return
+    downloadInFlight = true
+    setPhase({ phase: 'downloading', percent: 0 })
+    const gen = ++downloadGen
+    downloadToken = new CancellationToken()
+    autoUpdater.downloadUpdate(downloadToken).catch((err) => {
+      if (gen !== downloadGen) return
+      log('download failed:', err?.message ?? err)
+      failDownload()
+    })
+  }
+
   const actions = {
-    onDownload: () => {
-      if (phase === 'downloading' || phase === 'downloaded') return
-      downloadInFlight = true
-      setPhase({ phase: 'downloading', percent: 0 })
-      const gen = ++downloadGen
-      downloadToken = new CancellationToken()
-      autoUpdater.downloadUpdate(downloadToken).catch((err) => {
-        if (gen !== downloadGen) return
-        log('download failed:', err?.message ?? err)
-        failDownload()
-      })
-    },
+    onDownload: startDownload,
     onInstall: () => {
       closeUpdateWindow()
       if (latestSeenVersion === null) return
@@ -1009,6 +1048,12 @@ export function initAutoUpdater(
     latestSeenVersion = info.version
     manualDownloadUrl = manualDownloadUrlFor(info)
     log('update available:', info.version)
+    if (quietCheck && silentInstallEnabled()) {
+      // quiet path: no card, the package downloads in the background and the
+      // app installs it when it quits (genoffice#2389)
+      startDownload()
+      return
+    }
     // a periodic recheck resolving to the version the open dialog already
     // shows must not reset its phase to 'available' — that would wipe an
     // in-progress download or a terminal 'manual' fallback back to the
@@ -1037,6 +1082,12 @@ export function initAutoUpdater(
   const check = (): void => {
     // turned off: only an explicit check (Help › Check for Updates…, a channel switch) asks the feed
     if (!autoCheckEnabled()) return
+<<<<<<< ours
+=======
+    // a background check is quiet: the package downloads in the background and
+    // the app installs it when it quits (genoffice#2389)
+    quietCheck = true
+>>>>>>> theirs
     autoUpdater.checkForUpdates().catch((err) => log('check failed:', err?.message ?? err))
   }
   setTimeout(check, FIRST_CHECK_DELAY_MS)

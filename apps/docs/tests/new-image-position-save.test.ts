@@ -15,6 +15,10 @@ import JSZip from 'jszip'
 import { buildBlankDocx, parseDocx, saveDocx } from '@genoffice/docx-engine'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
 import { pictureNode } from '../src/renderer/ai/floating-ops'
+<<<<<<< ours
+=======
+import { insertPictureAtSelection } from '../src/renderer/editor/insert-picture'
+>>>>>>> theirs
 import { blocksToPmDoc, pmDocToSavePlan, type PmNode } from '../src/renderer/editor/convert'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 
@@ -47,6 +51,7 @@ const picture = {
   label: 'Picture',
 }
 
+<<<<<<< ours
 function insertPictureAtSelection(editor: Editor, pic: typeof picture): boolean {
   return editor
     .chain()
@@ -71,6 +76,8 @@ function insertPictureAtSelection(editor: Editor, pic: typeof picture): boolean 
     .run()
 }
 
+=======
+>>>>>>> theirs
 async function openBlank() {
   const source = await buildBlankDocx()
   const parsed = await parseDocx(source)
@@ -98,7 +105,11 @@ function selectPicture(editor: Editor) {
 
 async function save(editor: Editor, parsed: Awaited<ReturnType<typeof parseDocx>>) {
   const plan = pmDocToSavePlan(editor.getJSON() as PmNode, parsed.blocks)
+<<<<<<< ours
   const bytes = await saveDocx(parsed, plan.saveBlocks)
+=======
+  const bytes = await saveDocx(parsed, plan.saveBlocks, { newPictures: plan.newPictures })
+>>>>>>> theirs
   const zip = await JSZip.loadAsync(bytes)
   return { plan, zip, xml: await zip.file('word/document.xml')!.async('string') }
 }

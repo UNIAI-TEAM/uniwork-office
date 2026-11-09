@@ -68,6 +68,11 @@ export const de = {
   appStatusAudioInserted: 'Audio eingefügt (in die .pptx-Datei eingebettet)',
   appStatusModel3dInserted:
     '3D-Modell eingefügt: zum Drehen auswählen (PowerPoint zeigt es ebenfalls in 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview:
+    'Das 3D-Modell konnte hier nicht gezeichnet werden; sein Bild bleibt unverändert',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'Die Aufzeichnung ist leer; nichts wurde eingefügt',
   appStatusRecordingInserted:
     'Bildschirmaufzeichnung auf der aktuellen Folie eingefügt (eingebettetes WebM)',
@@ -169,9 +174,20 @@ export const de = {
   appPrintProgress: 'Druck wird vorbereitet…',
   appPrintTitle: 'Drucken',
   appPrintLayoutFull: 'Ganzseitige Folien',
+  appPrintPrinter: 'Drucker',
+  appPrintDefaultPrinter: 'Standarddrucker',
+  appPrintSystemDialog: 'Systemdialog…',
+  appPrintCopies: 'Kopien',
+  appPrintCollate: 'Sortieren',
+  appPrintDuplex: 'Beidseitig',
+  appPrintDuplexOff: 'Einseitig',
+  appPrintDuplexLong: 'Beidseitig, Bindung an langer Kante',
+  appPrintDuplexShort: 'Beidseitig, Bindung an kurzer Kante',
   appPrintLayoutHandout2: 'Handzettel (2 pro Seite)',
   appPrintLayoutHandout3: 'Handzettel (3 pro Seite)',
+  appPrintLayoutHandout4: 'Handzettel (4 pro Seite)',
   appPrintLayoutHandout6: 'Handzettel (6 pro Seite)',
+  appPrintLayoutHandout9: 'Handzettel (9 pro Seite)',
   appPrintLayoutNotes: 'Notizenseiten',
   appPrintRange: 'Druckbereich',
   appPrintRangeAll: 'Alle Folien',
@@ -183,6 +199,9 @@ export const de = {
   appPrintPortrait: 'Hochformat',
   appPrintLandscape: 'Querformat',
   appPrintFrame: 'Folien einrahmen',
+  appPrintOrderGroup: 'Folienreihenfolge',
+  appPrintOrderHorizontal: 'Horizontal',
+  appPrintOrderVertical: 'Vertikal',
   appPrintHidden: 'Ausgeblendete Folien drucken',
   appPrintPageCount: '{n} Seiten',
   appPrintNoPages: 'Keine Folien zum Drucken',
@@ -194,6 +213,7 @@ export const de = {
   appCtxSendToBack: 'In den Hintergrund',
   appCtxBringForward: 'Eine Ebene nach vorne',
   appCtxSendBackward: 'Eine Ebene nach hinten',
+  appCtxRotate: 'Drehen',
   appCtxRotateLeft90: 'Um 90° nach links drehen',
   appCtxRotateRight90: 'Um 90° nach rechts drehen',
   appCtxFlipH: 'Horizontal spiegeln',
@@ -233,6 +253,8 @@ export const de = {
   appMasterFillNone: 'Keine Füllung',
   appMasterStroke: 'Konturfarbe…',
   appMasterStrokeNone: 'Keine Kontur',
+  appMasterInsertTextBox: 'Textfeld',
+  appMasterInsertShape: 'Formen',
   appStartOpening: 'Wird geöffnet…',
   appReadingSlideTitle: 'Klicken für die nächste Folie (Esc zum Beenden der Leseansicht)',
   appReadingPrev: '‹ Zurück',
@@ -262,6 +284,26 @@ export const de = {
     'Die Gesamtdauer der Bildschirmpräsentation betrug {duration}. Möchten Sie die Anzeigedauer der einzelnen Folien für den automatischen Folienwechsel speichern?',
   appRehearseDiscard: 'Nicht speichern',
   appRehearseSave: 'Speichern',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Kommentar aufzeichnen',
+  appRecordSummary: 'Aufnahmedauer {duration}. Kommentar und Anzeigedauer jeder Folie speichern?',
+  appRecordDiscard: 'Nicht speichern',
+  appRecordSave: 'Speichern',
+  appStatusRecordSaved:
+    'Kommentar auf {count} Folien gespeichert (PowerPoint spielt ihn ebenfalls ab)',
+  appStatusRecordFailed: 'Die Aufnahme konnte nicht gespeichert werden',
+  appStatusNarrationCleared: 'Kommentar gelöscht',
+  appSettingsTitle: 'KI-Einstellungen',
+  appSettingsAccount: 'Genspark-Konto',
+  appSettingsChecking: 'Wird überprüft…',
+  appSettingsLoggedIn: 'Angemeldet',
+  appSettingsLoggedInEmail: 'Angemeldet: {email}',
+  appSettingsLoggedOut: 'Nicht angemeldet (KI-Funktionen erfordern ein Genspark-Konto)',
+  appSettingsLoginPending: 'Warten auf Anmeldung im Browser…',
+  appSettingsLogin: 'Bei Genspark anmelden',
+  appSettingsModel: 'Modell',
+>>>>>>> theirs
   appSettingsCancel: 'Abbrechen',
   appCropHint: 'Eingabetaste zum Bestätigen · Esc zum Abbrechen · Klick außerhalb zum Bestätigen',
   appStatusZoomsInserted:

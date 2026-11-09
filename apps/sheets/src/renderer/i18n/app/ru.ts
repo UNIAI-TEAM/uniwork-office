@@ -10,7 +10,11 @@ export const ru = {
   redactDialogPlaceholder: 'Имя метки, напр. телефон клиента',
   redactCancel: 'Отмена',
   redactInsert: 'Скрыть',
+<<<<<<< ours
   redactEnable: 'Правый клик по выделению скрывает его от ИИ.',
+=======
+  redactEnable: 'Правый клик по выделению скрывает его от модели.',
+>>>>>>> theirs
   redactNeedsSavedRow: 'Этой строки ещё нет в файле. Сначала сохраните, затем скройте ячейку.',
   redactRecoveredFromNames:
     'Другая программа переписала этот файл и потеряла запись о том, что скрыто. Скрытые ячейки восстановлены по именам в книге; сохранение возвращает полную запись.',
@@ -339,7 +343,9 @@ export const ru = {
   appFullLoadRunning:
     'Идёт полная загрузка книги — сортировка и фильтрация станут доступны после завершения…',
   appFullLoadTooLarge:
-    'Книга слишком велика для полной загрузки в память; сортировка и фильтрация для этого файла недоступны.',
+    'Книга слишком велика для полной загрузки в память; сортировка и перемещение диапазонов для этого файла недоступны. Фильтрация выполняется непосредственно по файлу.',
+  appLargeFilterLoading: 'Чтение столбца фильтра из файла…',
+  appLargeFilterApplying: 'Применение фильтра к файлу…',
   appSortValueModeFormulas:
     'Этот диапазон содержит формулы, которые в этой большой книге не вычисляются в реальном времени — сортировка или перемещение сохранит их как обычные значения. Выберите диапазон без формул.',
   appSortRangeTooLarge:
@@ -402,6 +408,9 @@ export const ru = {
   appTableNameUsed: 'Имя таблицы «{name}» уже использовалось в этом сеансе.',
   appTableNameInFile: 'Имя таблицы "{name}" уже используется таблицей в файле.',
   appTableOverlapsSession: 'Диапазон пересекается с таблицей «{name}», созданной в этом сеансе.',
+  appTableOverlapsFile: 'Диапазон пересекается с таблицей «{name}» в файле.',
+  appTableAlreadyInTable:
+    'Выделение уже находится в таблице «{name}» — измените стиль в разделе «Конструктор таблиц».',
   appTablesNeedFile: 'Сначала откройте файл XLSX — таблицы записываются в файл.',
   appTableSelectRange: 'Сначала выделите диапазон данных — заголовки в его первой строке.',
   appTableCreated: 'Таблица создана — сохраните с помощью {saveKeys}.',
@@ -487,6 +496,7 @@ export const ru = {
   appGridlinesHidden: 'Сетка скрыта.',
   appGridlinesShown: 'Сетка показана.',
   appShowingFormulas: 'Показ формул — переключите снова, чтобы увидеть значения.',
+  appShowingFormulasActive: 'Показываются формулы',
   appShowingValues: 'Показ вычисленных значений.',
   appTraceNoFormula: 'Влияющие ячейки: в активной ячейке нет формулы.',
   appTraceNoRefs: 'Влияющие ячейки: в этой формуле нет ссылок на ячейки.',
@@ -531,6 +541,7 @@ export const ru = {
   appColumnLabel: 'Столбец {col}',
   appBridgeUnavailable: 'Мост файлов рабочего стола недоступен. Перезапустите приложение Electron.',
   appOpenCanceled: 'Выбор книги отменён.',
+  appImportCanceled: 'Импорт отменён.',
   appOpeningWorkbook: 'Открытие книги…',
   appOpenStalled: 'Не удалось открыть книгу.',
   appOpenRetry: 'Повторить',
@@ -728,6 +739,7 @@ export const ru = {
   appExportPdfTitle: 'Экспорт в PDF',
   appSaveTitle: 'Сохранить',
   appSaveAs: 'Сохранить как',
+  aiNameFile: 'Назвать с помощью ИИ…',
   appUndo: 'Отменить',
   appRedo: 'Вернуть',
   appUnsavedEditOne: '● Несохранённых изменений: {count}',
@@ -759,7 +771,6 @@ export const ru = {
   appLinkPlaceholder: 'напр. https://example.com или Sheet1!A1',
   appRemoveLink: 'Удалить ссылку',
   appNotAvailableYet: 'Пока недоступно',
-  appComingSoon: 'Скоро будет',
   appGroupChartLayouts: 'Макеты диаграмм',
   appAddChartElement: 'Добавить элемент диаграммы',
   appAddChartElementTitle: 'Названия, подписи данных, легенда',
@@ -1176,6 +1187,20 @@ export const ru = {
   appWatchCell: 'Ячейка',
   appWatchValue: 'Значение',
   appWatchFormula: 'Формула',
+  appLinksPanel: 'Внешние связи',
+  appLinksPanelDetail: 'Просмотр, обновление и разрыв связей с другими книгами',
+  appLinksUpdate: 'Обновить значения',
+  appLinksNone: 'В этой книге нет связей с другими книгами.',
+  appLinksUnsaved: 'Сохраните эту книгу, прежде чем показывать её внешние ссылки.',
+  appLinksSource: 'Источник',
+  appLinksStatus: 'Состояние',
+  appLinksSheets: 'Листы',
+  appLinksLocate: 'Найти исходный файл',
+  appLinksReachable: 'Доступна',
+  appLinksBroken: 'Недоступна',
+  appLinksBreak: 'Разорвать связь',
+  appLinksBreakConfirm: 'Подтвердить разрыв',
+  appLinksChangeSource: 'Изменить источник',
   appGroupCalculation: 'Вычисление',
   appCalculationOptions: 'Параметры вычислений',
   appCalculationOptionsTitle: 'Автоматический или ручной пересчёт',
@@ -1192,8 +1217,16 @@ export const ru = {
   appGroupGetData: 'Получить данные',
   appFromTextCsv: 'Из текстового/CSV-файла',
   appRefreshAll: 'Обновить все',
+  appRefreshQuery: 'Обновить запрос',
+  appQueryConnectionsTitle: 'Обновить запросы книги',
+  appQueryRefreshing: 'Обновление {name}…',
+  appQueryRefreshed: '{name} обновлён ({rows} строк)',
+  appQueryRefreshedClipped: '{name} обновлён ({rows} строк, {dropped} не поместилось в диапазон)',
+  appQueryRefreshFailed: 'Не удалось обновить {name}',
   appWorkbookNoPivot: 'В книге нет сводных таблиц.',
   appRefreshAllTitle: 'Обновить все сводные таблицы',
+  appQueriesConnections: 'Запросы и подключения',
+  appQueriesConnectionsTitle: 'Показать запросы и подключения к данным книги',
   appErrorCheckingDetail: 'Найти значения ошибок на листе',
   appErrorsFound: 'Ошибок: {count} — в {cell}: {value}',
   appCheckingErrors: 'Идёт поиск ошибок по всему листу…',
@@ -1228,6 +1261,7 @@ export const ru = {
   appGroupForecast: 'Прогноз',
   appWhatIfAnalysis: 'Анализ «что если»',
   appGoalSeek: 'Подбор параметра',
+  appDataTable: 'Таблица данных',
   appWhatIfTitle: 'Найти вход для целевого значения',
   appGoalSeekNeedsFormula: 'Целевая ячейка должна содержать формулу.',
   appGoalSeekByCellNotNumber: 'Изменяемая ячейка должна содержать число или быть пустой.',
@@ -1325,6 +1359,7 @@ export const ru = {
   appPasswordUpdating: 'Обновление…',
   appUpdatePassword: 'Обновить пароль',
   appWorkbookNotPasswordProtected: 'Эта книга не защищена паролем на открытие.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Книгу, защищённую паролем, нельзя сохранить в документ UniWork. Используйте «Сохранить как», чтобы оставить зашифрованную копию на этом компьютере.',
   appPasswordChangeUniwork: 'Пароль документа UniWork нельзя изменить здесь.',
@@ -1332,6 +1367,8 @@ export const ru = {
     'Эта книга доступна только для просмотра, поэтому её пароль изменить нельзя.',
   appEncryptedWrongPassword: 'Неверный пароль. Повторите попытку.',
   appPasswordChangeRestored: 'Сначала сохраните восстановленную книгу, затем измените её пароль.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Разрешить изменение диапазонов',
   appGroupClipboard: 'Буфер обмена',
   appPaste: 'Вставить',
@@ -1593,6 +1630,7 @@ export const ru = {
   appVisualFlipV: 'Отразить сверху вниз',
   appVisualFlipH: 'Отразить слева направо',
   appCtxPasteVisual: 'Вставить рисунок или фигуру',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Эту книгу пока нельзя открыть в веб-версии',
   appWebEngineBody:
@@ -1620,6 +1658,8 @@ export const ru = {
   appWebSavedReopenFailed:
     'Ваши изменения сохранены в UniWork, но книгу не удалось открыть заново здесь. Перезагрузите редактор, чтобы продолжить работу.',
   appDataTable: 'Таблица данных',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Орфография',

@@ -64,7 +64,10 @@ import {
   renameOwnedAssetDocument,
   resolveSafeRelativeImagePath,
   resolveSafeVaultImagePath,
+<<<<<<< ours
   vaultRootServesPictures,
+=======
+>>>>>>> theirs
   resolveSourcePendingAfterSaveAs,
   restoreOwnedAssetFiles,
   rollbackPreparedSaveAsAssets,
@@ -86,12 +89,20 @@ import type {
   WikiNoteEntry,
 } from '../shared/ipc'
 import { nodeFs, resolveWikiLinks } from './wiki-resolve'
+<<<<<<< ours
 import { cleanDraftName } from '../shared/draft-name'
 import { listWikiNotes } from './wiki-notes'
 import { createWikiNote, mayCreateWikiNote } from './wiki-create'
 import { wikiHeads } from './wiki-heads'
 import { nodeVaultFs, warmWikiIndex, wikiBacklinks, wikiGraph, wikiTags } from './wiki-index'
 import { notifyViewsShowingNote, takeWikiFragment } from './wiki-fragment'
+=======
+import { listWikiNotes } from './wiki-notes'
+import { createWikiNote } from './wiki-create'
+import { wikiHeads } from './wiki-heads'
+import { nodeVaultFs, warmWikiIndex, wikiBacklinks, wikiGraph, wikiTags } from './wiki-index'
+import { rememberWikiFragment, takeWikiFragment } from './wiki-fragment'
+>>>>>>> theirs
 import { isImageHostUsable, normalizeImageHostConfig, uploadImageToHost } from './image-host'
 import {
   EXPORT_IMAGE_EXTS,
@@ -150,6 +161,19 @@ const tDlg = createI18n({
     btnSave: 'Lưu',
     btnDontSave: 'Không lưu',
     btnCancel: 'Hủy',
+  },
+  tr: {
+    dlgSaveTitle: 'Markdown belgesini kaydet',
+    filterMarkdown: 'Metin dosyaları (Markdown, TXT, JSON)',
+    dlgPickImage: 'Bir görsel seçin',
+    dlgSaveImage: 'Görseli kaydet',
+    filterImages: 'Görseller',
+    untitledFile: 'Adsız',
+    closeUnsavedMsg: 'Bu belge kaydedilmemiş değişiklikler içeriyor.',
+    closeUnsavedDetail: 'Kapatmadan önce değişiklikleri kaydetmek istiyor musunuz?',
+    btnSave: 'Kaydet',
+    btnDontSave: 'Kaydetme',
+    btnCancel: 'İptal',
   },
   ja: {
     dlgSaveTitle: 'Markdown ドキュメントを保存',
@@ -501,9 +525,13 @@ export function markdownFileRenamed(contents: WebContents, oldPath: string, newP
   if (openPathByWc.get(wcId) === oldPath) openPathByWc.set(wcId, newPath)
   const allowed = allowedByWc.get(wcId)
   if (allowed?.has(oldPath)) allowed.add(newPath)
+<<<<<<< ours
   if (savePathByWc.get(wcId) === newPath) {
     void diskWatcherByWc.get(wcId)?.watch(uniworkIsBound(newPath) ? null : newPath)
   }
+=======
+  if (savePathByWc.get(wcId) === newPath) void diskWatcherByWc.get(wcId)?.watch(newPath)
+>>>>>>> theirs
   void renameOwnedAssetDocument(oldPath, newPath).catch((error) => {
     console.warn('[markdown] asset manifest rename sync failed:', error)
   })
@@ -692,13 +720,30 @@ async function writeTextAtomic(path: string, text: string): Promise<void> {
   await atomicWriteFile(path, Buffer.from(text, 'utf8'))
 }
 
+/**
+ * A file-name stem from an untrusted source (a model's answer, or a heading).
+ *
+ * The answer is a bare string from outside the app, so it goes through the same
+ * filter whichever name it is destined for: a stem carrying a separator, a
+ * control character, or a trailing dot would otherwise become a path the save
+ * refuses, or worse, writes somewhere else. Empty when nothing usable is left.
+ */
+function fileNameStem(raw: string | undefined): string {
+  return (raw ?? '')
+    .replace(/[/\\:*?"<>|]/g, '_')
+    .slice(0, 80)
+    .trim()
+}
+
 async function resolveSaveTarget(
   e: Electron.IpcMainInvokeEvent,
   mode: SaveMode,
   suggestedName?: string,
+  defaultName?: string,
 ): Promise<string | null | 'canceled'> {
   const current = savePathByWc.get(e.sender.id)
   if (mode === 'save' && current) return current
+<<<<<<< ours
   // a name the AI panel suggested after a run only pre-fills the dialog below: an untitled
   // document is never written without the user seeing where it goes
   const suggestedBase = cleanDraftName(
@@ -709,6 +754,35 @@ async function resolveSaveTarget(
   const defaultPath = current
     ? uniworkSaveAsDefault(current)
     : join(configuredDefaultSaveDir(app), `${suggestedBase || tm('untitledFile')}.md`)
+=======
+  // AI auto-naming: silent first save of an untitled document
+  if (mode === 'save' && !current && suggestedName) {
+    const base = fileNameStem(suggestedName)
+    if (base) {
+      const dir = configuredDefaultSaveDir(app)
+      let target = join(dir, `${base}.md`)
+      for (let n = 1; existsSync(target); n++) target = join(dir, `${base}-${n}.md`)
+      return target
+    }
+  }
+  const win =
+    BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined
+  // A name proposed by the model (or the document's first heading) prefills the
+  // dialog rather than replacing it: the reader still chooses the location, and
+  // cancelling still cancels. Without one, the dialog opens on the file's own
+  // name, or on the untitled default for a document that has never been saved.
+  const proposed = fileNameStem(defaultName)
+  const defaultPath = proposed
+    ? // keep the open file's extension: a .md proposal must not offer to
+      // rewrite an opened .markdown (or .txt) file as a different format
+      join(
+        current ? dirname(current) : configuredDefaultSaveDir(app),
+        `${proposed}${current ? extname(current) : '.md'}`,
+      )
+    : current
+      ? join(dirname(current), basename(current))
+      : join(configuredDefaultSaveDir(app), `${tm('untitledFile')}.md`)
+>>>>>>> theirs
   const picked = await showSaveDialogWithMemory(dialog, win, {
     title: tm('dlgSaveTitle'),
     defaultPath,
@@ -758,24 +832,40 @@ function registerImageProtocol(): void {
       return new Response(null, { status: 404 })
     }
     let served: string | null = null
+<<<<<<< ours
     const openDocs = new Set([...openPathByWc.values(), ...savePathByWc.values()])
     for (const doc of openDocs) {
+=======
+    for (const doc of new Set([...openPathByWc.values(), ...savePathByWc.values()])) {
+>>>>>>> theirs
       const dir = resolve(dirname(doc))
       // isInDocDir handles filesystem-root docs ("/", "C:\") whose dir
       // already ends in a separator — dir + sep would 403 every sibling.
       if (!isInDocDir(target, dir)) continue
+<<<<<<< ours
       const safe = await resolveSafeRelativeImagePath(doc, relative(dir, target), { decoded: true })
+=======
+      const safe = await resolveSafeRelativeImagePath(doc, relative(dir, target))
+>>>>>>> theirs
       if (safe) {
         served = safe
         break
       }
     }
+<<<<<<< ours
     // a cross-folder embed resolves through the vault root the wiki resolver
     // walks, so the picture next to the note (vault attachments/ from a
     // nested note, the Obsidian layout) renders too: the same root decides,
     // realpath-resolved so a symlink escape is refused. Local documents only:
     // a bound UniWork working copy keeps the own-directory rule above.
     if (!served && vaultRootServesPictures(openDocs, uniworkIsBound)) {
+=======
+    if (!served) {
+      // a cross-folder embed resolves through the vault root the wiki resolver
+      // walks, so the picture next to the note (vault attachments/ from a
+      // nested note, the Obsidian layout) renders too: the same root decides,
+      // realpath-resolved so a symlink escape is refused
+>>>>>>> theirs
       served = await resolveSafeVaultImagePath(configuredDefaultSaveDir(app), target)
     }
     if (!served) return new Response(null, { status: 403 })
@@ -823,6 +913,10 @@ function registerMarkdownIpc(): void {
   ipcMain.on(MARKDOWN_CHANNELS.ackFileChangedOnDisk, (e) => {
     void diskWatcherByWc.get(e.sender.id)?.acknowledge()
   })
+<<<<<<< ours
+=======
+
+>>>>>>> theirs
   ipcMain.handle(MARKDOWN_CHANNELS.readFile, async (e, path: unknown) => {
     if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {
       throw new Error('markdown: path not granted to this view')
@@ -926,6 +1020,76 @@ function registerMarkdownIpc(): void {
   )
 
   ipcMain.handle(
+    MARKDOWN_CHANNELS.resolveWikiLinks,
+    async (_e, request: WikiLinkResolveRequest): Promise<Record<string, WikiLinkResolved>> => {
+      const fromPath = typeof request?.fromPath === 'string' ? request.fromPath : ''
+      const targets = Array.isArray(request?.targets)
+        ? request.targets.filter((t): t is string => typeof t === 'string')
+        : []
+      const resolved = await resolveWikiLinks(
+        targets,
+        { fromPath, root: configuredDefaultSaveDir(app) },
+        vaultFs,
+      )
+      // a Map is structured-cloneable but arrives as an empty object; ship the
+      // shape the renderer asked for
+      return Object.fromEntries(resolved)
+    },
+  )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.rememberWikiFragment, (_e, path: unknown, fragment: unknown) => {
+    if (typeof path !== 'string' || typeof fragment !== 'string') return
+    rememberWikiFragment(path, fragment)
+  })
+
+  ipcMain.handle(MARKDOWN_CHANNELS.takeWikiFragment, (_e, path: unknown): string =>
+    typeof path === 'string' ? takeWikiFragment(path) : '',
+  )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.listWikiNotes, async (): Promise<WikiNoteEntry[]> =>
+    listWikiNotes(configuredDefaultSaveDir(app), nodeFs()),
+  )
+
+  ipcMain.handle(
+    MARKDOWN_CHANNELS.wikiHeads,
+    async (_e, request: WikiHeadsRequest): Promise<WikiHeadEntry[]> => {
+      const target = typeof request?.target === 'string' ? request.target : ''
+      const fromPath = typeof request?.fromPath === 'string' ? request.fromPath : ''
+      return wikiHeads(target, fromPath, configuredDefaultSaveDir(app))
+    },
+  )
+
+  ipcMain.handle(
+    MARKDOWN_CHANNELS.createWikiNote,
+    async (e, request: WikiCreateNoteRequest): Promise<WikiCreateNoteResult> => {
+      const target = typeof request?.target === 'string' ? request.target : ''
+      if (!target) return { ok: false }
+      // where a bare name lands follows the document this view holds: the
+      // saved path wins (Save As moved it), the opened path is the fallback
+      const fromPath = savePathByWc.get(e.sender.id) ?? openPathByWc.get(e.sender.id) ?? ''
+      const made = await createWikiNote(target, {
+        root: configuredDefaultSaveDir(app),
+        fromDir: fromPath ? dirname(fromPath) : '',
+      }).catch(() => null)
+      return made ? { ok: true, ...made } : { ok: false }
+    },
+  )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.wikiBacklinks, (_e, path: unknown): Promise<WikiBacklink[]> =>
+    typeof path === 'string'
+      ? wikiBacklinks(configuredDefaultSaveDir(app), path, nodeVaultFs())
+      : Promise.resolve([]),
+  )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.wikiGraph, (): Promise<WikiGraph> =>
+    wikiGraph(configuredDefaultSaveDir(app), nodeVaultFs()),
+  )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.wikiTags, (): Promise<{ tag: string; files: string[] }[]> =>
+    wikiTags(configuredDefaultSaveDir(app), nodeVaultFs()),
+  )
+
+  ipcMain.handle(
     MARKDOWN_CHANNELS.save,
     async (e, request: SaveMarkdownRequest): Promise<SaveMarkdownResult> => {
       const waiter = saveWaiters.get(e.sender.id)
@@ -957,7 +1121,9 @@ function registerMarkdownIpc(): void {
       try {
         const suggestedName =
           typeof request.suggestedName === 'string' ? request.suggestedName : undefined
-        const target = await resolveSaveTarget(e, mode, suggestedName)
+        const defaultName =
+          typeof request.defaultName === 'string' ? request.defaultName : undefined
+        const target = await resolveSaveTarget(e, mode, suggestedName, defaultName)
         if (target === 'canceled') return done({ ok: true, canceled: true })
         if (!target) return done({ ok: false, error: 'markdown: no save target' })
         const currentPath = pathAtRequest
@@ -991,6 +1157,7 @@ function registerMarkdownIpc(): void {
         const textToWrite = prepared?.text ?? request.text
         const savedImageSources = prepared?.imageSources ?? imageSources
         const watcher = diskWatcherByWc.get(e.sender.id)
+<<<<<<< ours
         if (
           watcher &&
           !isNewPath &&
@@ -999,6 +1166,9 @@ function registerMarkdownIpc(): void {
           request.overwrite !== true &&
           !(await watcher.isCurrent())
         ) {
+=======
+        if (watcher && !isNewPath && request.overwrite !== true && !(await watcher.isCurrent())) {
+>>>>>>> theirs
           if (prepared) await rollbackPreparedSaveAsAssets(prepared).catch(() => {})
           return done({ ok: false, error: 'markdown: file changed on disk', conflict: true })
         }
@@ -1009,7 +1179,11 @@ function registerMarkdownIpc(): void {
           if (prepared) await rollbackPreparedSaveAsAssets(prepared).catch(() => {})
           throw error
         } finally {
+<<<<<<< ours
           await watcher?.endOwnWrite(uniworkIsBound(target) ? '' : target)
+=======
+          await watcher?.endOwnWrite(target)
+>>>>>>> theirs
         }
         savePathByWc.set(e.sender.id, target)
         // keep the reload path in sync — a stale openPathByWc would make a
@@ -1439,16 +1613,24 @@ function registerMarkdownIpc(): void {
 function grantAndTrack(wc: WebContents, openPath?: string | null): void {
   const wcId = wc.id
   const watcher = createDocumentDiskWatcher((path) => {
+<<<<<<< ours
     if (!wc.isDestroyed() && !uniworkIsBound(path)) {
       wc.send(MARKDOWN_CHANNELS.fileChangedOnDisk, path)
     }
+=======
+    if (!wc.isDestroyed()) wc.send(MARKDOWN_CHANNELS.fileChangedOnDisk, path)
+>>>>>>> theirs
   })
   diskWatcherByWc.set(wcId, watcher)
   if (openPath && existsSync(openPath)) {
     openPathByWc.set(wcId, openPath)
     savePathByWc.set(wcId, openPath)
     allowedByWc.set(wcId, new Set([openPath]))
+<<<<<<< ours
     if (!uniworkIsBound(openPath)) void watcher.watch(openPath)
+=======
+    void watcher.watch(openPath)
+>>>>>>> theirs
   }
   wc.setWindowOpenHandler(({ url }) => {
     const target = safeExternalUrl(url, { allowedProtocols: ['http:', 'https:', 'mailto:'] })

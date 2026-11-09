@@ -133,6 +133,7 @@ export function buildOcrBakeInserts(
     }
   })
 }
+<<<<<<< ours
 
 /**
  * What a save may write of the bake. A document the user cannot edit (view-only,
@@ -146,3 +147,5 @@ export function ocrBakeForSave<T>(
 ): readonly T[] {
   return opts.readOnly || opts.drainedAfterBake ? [] : inserts
 }
+=======
+>>>>>>> theirs

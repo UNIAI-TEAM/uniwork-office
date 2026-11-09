@@ -33,17 +33,38 @@ import type {
   ThemeColors,
   ThemeFonts,
 } from './types'
+import type { AutoSpace } from './types'
 import { resolveThemeColor } from './theme'
 import { isOn } from './checkbox-control'
 
 /** No run un-hides itself and nothing anchors here (bookmarks, comments, sectPr,
- *  drawings, numbering): safe to collapse a style-vanished paragraph entirely */
+ *  drawings): safe to collapse a style-vanished paragraph entirely. Numbering is
+ *  fine: the hidden item still advances the counter (see hiddenParagraph) */
 export function staysVanished(xml: string): boolean {
   if (/<w:vanish\s[^>]*w:val=(?:"(?:0|false|none|off)"|'(?:0|false|none|off)')/i.test(xml))
     return false
-  return !/<w:(?:drawing|pict|object|sectPr|bookmarkStart|commentRangeStart|commentRangeEnd|numPr)[\s/>]/.test(
+  return !/<w:(?:drawing|pict|object|sectPr|bookmarkStart|commentRangeStart|commentRangeEnd)[\s/>]/.test(
     xml,
   )
+}
+
+/** Every run of the paragraph is w:vanish (not specVanish): with a hidden mark
+ *  Word gives such a paragraph no height (probe 2026-10-22: after=120 ->
+ *  hidden text paragraph -> before=120 pitches like no paragraph at all).
+ *  Runs inside hyperlinks, fields and revisions count; w:pPr is skipped. */
+export function allRunsVanished(node: XNode): boolean {
+  for (const child of childrenOf(node)) {
+    const name = nameOf(child)
+    if (name === 'w:pPr' || name === 'w:rPr') continue
+    if (name === 'w:r') {
+      const rPr = findChild(child, 'w:rPr')
+      if (!rPr || onOffOf(rPr, 'w:vanish') !== true || onOffOf(rPr, 'w:specVanish') === true)
+        return false
+      continue
+    }
+    if (!allRunsVanished(child)) return false
+  }
+  return true
 }
 
 /** Text-less run content that still affects layout (breaks, tabs, note marks,
@@ -278,13 +299,17 @@ export const JC_ALIGN: Record<string, ParaFormat['align']> = {
   distribute: 'distribute',
 }
 
-/** w:autoSpaceDE/DN (Word default on): false only when both are explicitly off */
-export function autoSpaceOf(pPr: XNode): boolean | undefined {
-  const de = onOffOf(pPr, 'w:autoSpaceDE')
-  const dn = onOffOf(pPr, 'w:autoSpaceDN')
+/** w:autoSpaceDE (CJK/Latin letters) and w:autoSpaceDN (CJK/digits) as written, Word default on */
+export function autoSpaceFlagsOf(pPr: XNode): { de?: boolean; dn?: boolean } {
+  return { de: onOffOf(pPr, 'w:autoSpaceDE'), dn: onOffOf(pPr, 'w:autoSpaceDN') }
+}
+
+/** the two switches folded into the renderer's mode; undefined when neither is written */
+export function autoSpaceMode(de?: boolean, dn?: boolean): AutoSpace | undefined {
+  if (de === undefined && dn === undefined) return undefined
+  if (de !== false && dn !== false) return true
   if (de === false && dn === false) return false
-  if (de === true || dn === true) return true
-  return undefined
+  return de === false ? 'digits' : 'latin'
 }
 
 /** pPr <w:tabs> → TabStop[] (shared by direct paragraph format and style display) */
@@ -379,8 +404,10 @@ export function fieldCharsBalanced(xml: string): boolean {
   return depth === 0
 }
 
-/** Zotero Word fields. Their cached result is the visible citation/bibliography text. */
-export const ZOTERO_INLINE_FIELD_RE = /^\s*(?:ADDIN\s+)?(?:ZOTERO_|CSL_)(?:ITEM|BIBL|TEMP)\b/i
+/** Zotero (ZOTERO_ITEM/BIBL/TEMP) and Mendeley (CSL_CITATION/CSL_BIBLIOGRAPHY) Word fields.
+ * Their cached result is the visible citation/bibliography text. */
+export const ZOTERO_INLINE_FIELD_RE =
+  /^\s*(?:ADDIN\s+)?(?:ZOTERO_(?:ITEM|BIBL|TEMP)|CSL_(?:ITEM|BIBL|TEMP|CITATION|BIBLIOGRAPHY))\b/i
 
 /** HYPERLINK "url" (optional \o "tip"): the only field form folded into an editable link run;
  * any other switch (\l bookmark, \t frame...) keeps the protected-passthrough path */
@@ -395,11 +422,51 @@ export function convertibleHyperlink(instr: string): { href: string; tooltip?: s
 /** every field instruction is EMBED/LINK (the object-field forms of legacy OLE) */
 export function onlyOleFields(xml: string): boolean {
   if (xml.includes('<w:fldSimple')) return false
-  const instrs = xml.match(/<w:instrText[^>]*>[\s\S]*?<\/w:instrText>/g) ?? []
+  const instrs = fieldInstructions(xml)
   if (instrs.length === 0) return false
-  return instrs.every((fragment) =>
-    /^\s*(EMBED|LINK)\b/.test(decodeEntities(fragment.replace(/<[^>]+>/g, ''))),
-  )
+  return instrs.every((text) => /^\s*(EMBED|LINK)\b/.test(text))
+}
+
+function fieldsNested(xml: string): boolean {
+  let depth = 0
+  const re = /<w:fldChar\b[^>]*\bw:fldCharType=["'](begin|end)["']/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(xml)) !== null) {
+    if (m[1] === 'begin') {
+      if (++depth > 1) return true
+    } else depth--
+  }
+  return false
+}
+
+/** Complex-field instructions, one string per field: Word splits a long
+ * instruction (Mendeley/Zotero JSON) over several w:instrText runs, so the
+ * fragments must be joined before any instruction regex sees them. Nested
+ * fields contribute their own entry. */
+export function fieldInstructions(xml: string): string[] {
+  const out: string[] = []
+  const stack: { text: string; inResult: boolean }[] = []
+  const re = /<w:fldChar\b[^>]*>|<w:instrText\b[^>]*>([\s\S]*?)<\/w:instrText>/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(xml)) !== null) {
+    if (m[0].startsWith('<w:instrText')) {
+      const top = stack[stack.length - 1]
+      if (top && !top.inResult) top.text += decodeEntities(m[1])
+      else if (!top) out.push(decodeEntities(m[1]))
+      continue
+    }
+    const type = /\bw:fldCharType\s*=\s*["'](begin|separate|end)["']/.exec(m[0])?.[1]
+    if (type === 'begin') stack.push({ text: '', inResult: false })
+    else if (type === 'separate') {
+      const top = stack[stack.length - 1]
+      if (top) top.inResult = true
+    } else if (type === 'end') {
+      const top = stack.pop()
+      if (top) out.push(top.text)
+    }
+  }
+  for (const open of stack) out.push(open.text)
+  return out
 }
 
 export function onlyXeFields(xml: string): boolean {
@@ -409,9 +476,12 @@ export function onlyXeFields(xml: string): boolean {
     (m) => /\bw:instr="([^"]*)"/.exec(m[1])?.[1],
   )
   if (simple.some((instr) => instr === undefined)) return false
-  const instrs = xml.match(/<w:instrText[^>]*>[\s\S]*?<\/w:instrText>/g) ?? []
+  const instrs = fieldInstructions(xml)
   if (instrs.length === 0 && simple.length === 0) return false
   if (!fieldCharsBalanced(xml)) return false
+  // an instruction-less field stays editable unless it nests another field,
+  // which the empty-instruction run could not carry through a save
+  if (instrs.some((text) => text.trim() === '') && fieldsNested(xml)) return false
   const simpleOk = simple.every((raw) => {
     const text = decodeEntities(raw!)
     return (
@@ -423,13 +493,13 @@ export function onlyXeFields(xml: string): boolean {
   })
   if (!simpleOk) return false
   let checkboxInstrs = 0
-  const ok = instrs.every((fragment) => {
-    const text = decodeEntities(fragment.replace(/<[^>]+>/g, ''))
+  const ok = instrs.every((text) => {
     if (/^\s*FORMCHECKBOX\s*$/.test(text)) {
       checkboxInstrs++
       return true
     }
     return (
+      text.trim() === '' ||
       /^\s*XE[\s"]/.test(text) ||
       /^\s*REF\s/.test(text) ||
       ZOTERO_INLINE_FIELD_RE.test(text) ||
@@ -608,13 +678,25 @@ export function emptyParaSizeHalfPoints(
   pNode: XNode,
   pPr: XNode | undefined,
   markOnly = false,
+  csSizeHalfPoints?: number,
 ): number | undefined {
-  let sz = pPr
-    ? attrsOf(findChild(findChild(pPr, 'w:rPr') ?? {}, 'w:sz') ?? {})['w:val']
-    : undefined
+  // an rtl mark is sized by its Cs twin, the chain's szCs when it has none (Word:
+  // a `<w:sz 36/><w:rtl/>` mark under a szCs=24 style lays a 12pt empty line)
+  const bidi = pPr ? onOffOf(pPr, 'w:bidi') === true : false
+  const sizeOf = (rPr: XNode | undefined, isMark = false): string | undefined => {
+    if (!rPr) return undefined
+    if ((isMark && bidi) || onOffOf(rPr, 'w:rtl') === true) {
+      return (
+        attrsOf(findChild(rPr, 'w:szCs') ?? {})['w:val'] ??
+        (csSizeHalfPoints !== undefined ? String(csSizeHalfPoints) : undefined)
+      )
+    }
+    return attrsOf(findChild(rPr, 'w:sz') ?? {})['w:val']
+  }
+  let sz = pPr ? sizeOf(findChild(pPr, 'w:rPr'), true) : undefined
   if (!sz && !markOnly) {
     for (const r of findChildren(pNode, 'w:r')) {
-      const v = attrsOf(findChild(findChild(r, 'w:rPr') ?? {}, 'w:sz') ?? {})['w:val']
+      const v = sizeOf(findChild(r, 'w:rPr'))
       if (v) sz = v
     }
   }
@@ -639,7 +721,7 @@ export function emptyParaMarkFont(
     // an East Asian slot alone leaves the inherited Latin face in charge (Word probe
     // 2026-09-05: a DengXian-only mark lays its line with the ascii face)
     const rf = themedRFonts(a, themeFonts)
-    return rf.ascii ?? rf.hAnsi
+    return rf.ascii
   }
   let font = pPr ? pick(findChild(pPr, 'w:rPr')) : undefined
   if (!font && !markOnly) {
@@ -739,7 +821,7 @@ export function rubyPartText(rubyNode: XNode, part: 'w:rubyBase' | 'w:rt'): stri
 }
 
 /** Word's face for an East Asian theme slot whose typeface is empty (<a:ea typeface=""/>) */
-const EMPTY_EA_THEME_FONT = 'DengXian'
+export const EMPTY_EA_THEME_FONT = 'DengXian'
 
 /** empty EA slot faces by settings.xml w:themeFontLang w:eastAsia (zh-CN / missing → DengXian) */
 const EMPTY_EA_SLOT_BY_LANG: Record<string, { major: string; minor: string }> = {
@@ -809,27 +891,40 @@ function emptyEaSlotFont(fonts: ThemeFonts, eaRef: string | undefined): string {
   return themeLangEaSlotFont(fonts, eaRef) ?? EMPTY_EA_THEME_FONT
 }
 
+/** theme script-table face (<a:font script=…>) of the font group for themeFontLang
+ * w:eastAsia. Word lays an EA theme slot with this face whenever the table names one,
+ * over the literal <a:ea> typeface (Word probe 2026-11-03: a:ea Batang + Hang Malgun
+ * under ko-KR -> Malgun, the reverse -> Batang, no table -> the literal; a:ea MS Mincho
+ * + Jpan Yu Mincho under ja-JP -> Yu Mincho). */
+export function themeScriptEaFont(
+  fonts: ThemeFonts,
+  eaRef: string | undefined,
+): string | undefined {
+  const full = fonts.eaLang?.toLowerCase()
+  if (!full || (eaRef !== 'majorEastAsia' && eaRef !== 'minorEastAsia')) return undefined
+  const script = EA_LANG_SCRIPT[full] ?? EA_LANG_SCRIPT[full.split('-')[0]]
+  const table = eaRef === 'majorEastAsia' ? fonts.majorScripts : fonts.minorScripts
+  return (script ? table?.[script] : undefined) || undefined
+}
+
 /** empty-EA-slot face themeFontLang specifically resolves (theme script table first,
  * then the probed per-language defaults); undefined = only the generic DengXian applies */
 export function themeLangEaSlotFont(
   fonts: ThemeFonts,
   eaRef: string | undefined,
 ): string | undefined {
-  const full = fonts.eaLang?.toLowerCase()
-  if (!full) return undefined
-  const lang = full.split('-')[0]
-  const script = EA_LANG_SCRIPT[full] ?? EA_LANG_SCRIPT[lang]
-  const table = eaRef === 'majorEastAsia' ? fonts.majorScripts : fonts.minorScripts
-  const fromScript = script ? table?.[script] : undefined
+  const fromScript = themeScriptEaFont(fonts, eaRef)
   if (fromScript) return fromScript
-  const byLang = EMPTY_EA_SLOT_BY_LANG[lang]
+  const lang = fonts.eaLang?.toLowerCase().split('-')[0]
+  const byLang = lang ? EMPTY_EA_SLOT_BY_LANG[lang] : undefined
   return byLang ? (eaRef === 'majorEastAsia' ? byLang.major : byLang.minor) : undefined
 }
 
 /** w:rFonts with theme references resolved: theme attrs supersede same-slot literal
  * values (ECMA-376 §17.3.2.26). Unresolvable references fall back to the literal,
  * except an empty eastAsia theme slot: Word keeps the theme's authority and renders
- * the theme language's default face, never the leftover literal name (eaSlotEmpty marks this). */
+ * the theme language's default face, never the leftover literal name (eaSlotEmpty marks this).
+ * A filled EA slot still yields to the script table's themeFontLang face (themeScriptEaFont). */
 export function themedRFonts(
   attrs: Record<string, string | undefined>,
   fonts: ThemeFonts | null | undefined,
@@ -863,15 +958,17 @@ export function themedRFonts(
     }
   }
   const eaRef = attrs['w:eastAsiaTheme']
-  const themedEa = themeVal(eaRef)
+  const literalEa = themeVal(eaRef)
   const eaSlotEmpty =
-    !themedEa && !!fonts && (eaRef === 'majorEastAsia' || eaRef === 'minorEastAsia')
+    !literalEa && !!fonts && (eaRef === 'majorEastAsia' || eaRef === 'minorEastAsia')
+  const themedEa = literalEa && fonts ? (themeScriptEaFont(fonts, eaRef) ?? literalEa) : literalEa
   // an empty cs or EA slot likewise keeps the theme's authority over the
   // literal: a Latin slot pointing at minorEastAsia renders the language
   // default EA face (Word probe 2026-09-17: MS Mincho digits under ja-JP)
   const themedOrEmptySlot = (ref: string | undefined): string | undefined => {
     const themed = themeVal(ref)
-    if (themed || !fonts) return themed
+    if (!fonts) return themed
+    if (themed) return themeScriptEaFont(fonts, ref) ?? themed
     if (ref === 'majorBidi' || ref === 'minorBidi') return emptyCsSlotFont(fonts, ref)
     if (ref === 'majorEastAsia' || ref === 'minorEastAsia') return emptyEaSlotFont(fonts, ref)
     return undefined
@@ -946,7 +1043,7 @@ function sameStyle(a: Run, b: Run): boolean {
 
 function sameRevision(a: RevisionInfo | undefined, b: RevisionInfo | undefined): boolean {
   if (!a || !b) return !a === !b
-  return a.author === b.author && a.date === b.date && a.id === b.id
+  return a.author === b.author && a.date === b.date && a.dateUtc === b.dateUtc && a.id === b.id
 }
 
 /** ST_Shd pct values that are not the literal digits in the name */

@@ -43,6 +43,8 @@
   --pdf-form-text: #222;
   --pdf-form-control-border: #333;
   --pdf-form-control-mark: #111;
+  --pdf-formdesign-fill: rgb(60 120 216 / 14%);
+  --pdf-formdesign-fill-selected: rgb(60 120 216 / 24%);
   --pdf-sign-drop-bg: rgb(196 62 28 / 6%);
   --pdf-search-hit-bg: rgb(255 214 0 / 35%);
   --pdf-search-hit-cur-bg: rgb(255 150 50 / 55%);
@@ -779,6 +781,12 @@ button {
   cursor: default;
 }
 
+.thumb-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+
 /* ── Markup floating bar for selected text ── */
 
 .pdf-sel-popup {
@@ -1067,8 +1075,50 @@ button {
 }
 
 .pdf-form-input.is-required-empty,
+.pdf-form-input.is-invalid,
 .pdf-form-select.is-required-empty .gs-dd-btn {
   border-color: var(--pdf-error);
+}
+
+.pdf-form-date-pick {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.pdf-form-date-pick:hover {
+  color: var(--pdf-select);
+}
+
+.pdf-form-date-pick svg {
+  width: 70%;
+  height: 70%;
+}
+
+.pdf-form-date-native {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pdf-form-date-error {
+  position: absolute;
+  z-index: 2;
+  padding: 2px 6px;
+  border: 1px solid var(--pdf-error);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--pdf-error);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: var(--shadow-menu);
 }
 
 .pdf-form-checkbox.is-required-empty,
@@ -1077,15 +1127,15 @@ button {
   outline-offset: 1px;
 }
 
-.pdf-form-input.is-active,
-.pdf-form-select.is-active,
-.pdf-form-radio.is-active,
-.pdf-form-signature.is-active {
+.pdf-form-input.is-active:focus-within,
+.pdf-form-select.is-active:focus-within,
+.pdf-form-radio.is-active:focus-within,
+.pdf-form-signature.is-active:focus-within {
   outline: 2px solid var(--pdf-select);
   outline-offset: 1px;
 }
 
-.pdf-form-checkbox.is-active {
+.pdf-form-checkbox.is-active:focus-within {
   outline: 1px dotted var(--pdf-form-control-mark);
   outline-offset: 3px;
 }
@@ -1385,6 +1435,7 @@ button {
   overflow-y: auto;
 }
 .pdf-comments-filter {
+<<<<<<< ours
   box-sizing: border-box;
   width: 100%;
   height: 28px;
@@ -1403,6 +1454,9 @@ button {
 }
 .pdf-comments-filter::placeholder {
   color: var(--text-muted);
+=======
+  margin-bottom: 4px;
+>>>>>>> theirs
 }
 .pdf-comment-row {
   display: flex;
@@ -1709,6 +1763,35 @@ button {
   min-width: 0;
 }
 
+.pdf-print-field > span {
+  flex: 1;
+}
+
+.pdf-print-field select.pdf-modal-input {
+  flex: 1.6;
+  color: var(--text);
+}
+
+.pdf-print-copies {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.pdf-print-copies .pdf-modal-input {
+  width: 64px;
+}
+
+.pdf-print-divider {
+  border-top: 1px solid var(--border);
+  margin: 2px 0;
+}
+
+.pdf-print-empty {
+  color: var(--danger);
+}
+
 .pdf-modal-check {
   display: inline-flex;
   align-items: center;
@@ -1758,6 +1841,70 @@ button {
   gap: 8px;
 }
 
+<<<<<<< ours
+=======
+/* Attachments panel: rows with a pending tag while the edit has not been saved */
+.pdf-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.pdf-attachments-add {
+  align-self: flex-start;
+}
+
+.pdf-attachments-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pdf-attachment {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.pdf-attachment:hover {
+  background: var(--hover);
+}
+
+.pdf-attachment.removing {
+  opacity: 0.55;
+}
+
+.pdf-attachment-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92em;
+}
+
+.pdf-attachment-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--pdf-prop-bg);
+  color: var(--text-secondary);
+  font-size: 0.78em;
+}
+
+.pdf-attachment-size {
+  color: var(--text-secondary);
+  font-size: 0.8em;
+}
+
+>>>>>>> theirs
 /* Label rows inside form dialogs: control left, label beside it, one per line */
 .pdf-perm-row {
   display: flex;
@@ -1776,6 +1923,7 @@ button {
   flex: 1;
 }
 
+<<<<<<< ours
 /* Bates dialog: the card never outgrows the viewport; the numeric fields sit in a
  * grid that wraps to one column when the pane is narrow */
 .pdf-modal.pdf-bates-dialog {
@@ -1802,19 +1950,31 @@ button {
 
 /* Bates preview: a page outline with the number strips where the position puts them.
  * The preview is a sheet of paper so every ink colour choice stays readable in dark. */
+=======
+/* Bates preview: a page outline with the number strips where the position puts them */
+>>>>>>> theirs
 .pdf-bates-preview {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 12px;
+<<<<<<< ours
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   background: var(--pdf-paper);
+=======
+  border: 1px solid var(--border);
+  border-radius: 8px;
+>>>>>>> theirs
 }
 
 .pdf-bates-preview-page {
   height: 64px;
+<<<<<<< ours
   border: 1px dashed var(--pdf-thumb-border-hover);
+=======
+  border: 1px dashed var(--border-strong);
+>>>>>>> theirs
   border-radius: 4px;
 }
 
@@ -1980,6 +2140,284 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   top: 0;
   z-index: 5;
   overflow: visible;
+}
+
+.pdf-formdesign-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 6;
+  touch-action: none;
+}
+
+.pdf-formdesign-layer.is-drawing {
+  cursor: crosshair;
+}
+
+.pdf-formdesign-field {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed var(--pdf-form-border);
+  background: var(--pdf-formdesign-fill);
+  cursor: move;
+  overflow: visible;
+}
+
+.pdf-formdesign-field.is-selected {
+  border-style: solid;
+  background: var(--pdf-formdesign-fill-selected);
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.pdf-formdesign-field.is-live {
+  pointer-events: none;
+}
+
+.pdf-formdesign-field.is-existing {
+  border-style: dotted;
+}
+
+.pdf-formdesign-layer.is-preview .pdf-formdesign-preview {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.pdf-formdesign-marquee {
+  position: absolute;
+  pointer-events: none;
+  border: 1px dashed var(--accent);
+  background: var(--pdf-formdesign-fill);
+}
+
+.pdf-formdesign-guide {
+  position: absolute;
+  pointer-events: none;
+  background: var(--accent);
+  opacity: 0.7;
+}
+
+.pdf-formdesign-guide.is-v {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.pdf-formdesign-guide.is-h {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+.pdf-formdesign-field.is-signature {
+  border-style: dashed;
+}
+
+.pdf-formdesign-field:hover,
+.pdf-formdesign-field.is-selected {
+  z-index: 1;
+}
+
+.pdf-formdesign-field.is-live,
+.pdf-formdesign-marquee,
+.pdf-formdesign-guide {
+  z-index: 2;
+}
+
+.pdf-formdesign-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  border-radius: 1px;
+}
+
+.pdf-formdesign-handle.is-nw {
+  left: -4px;
+  top: -4px;
+  cursor: nwse-resize;
+}
+
+.pdf-formdesign-handle.is-n,
+.pdf-formdesign-handle.is-s {
+  left: calc(50% - 4px);
+  cursor: ns-resize;
+}
+
+.pdf-formdesign-handle.is-n {
+  top: -4px;
+}
+
+.pdf-formdesign-handle.is-s {
+  bottom: -4px;
+}
+
+.pdf-formdesign-handle.is-e,
+.pdf-formdesign-handle.is-w {
+  top: calc(50% - 4px);
+  cursor: ew-resize;
+}
+
+.pdf-formdesign-handle.is-e {
+  right: -4px;
+}
+
+.pdf-formdesign-handle.is-w {
+  left: -4px;
+}
+
+.pdf-formdesign-handle.is-ne {
+  right: -4px;
+  top: -4px;
+  cursor: nesw-resize;
+}
+
+.pdf-formdesign-handle.is-sw {
+  left: -4px;
+  bottom: -4px;
+  cursor: nesw-resize;
+}
+
+.pdf-formdesign-handle.is-se {
+  right: -4px;
+  bottom: -4px;
+  cursor: nwse-resize;
+}
+
+.pdf-formdesign-props {
+  position: absolute;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max-content;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--pdf-shadow-popup);
+  font-size: 12px;
+  color: var(--text);
+  cursor: default;
+}
+
+.pdf-formdesign-props label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pdf-formdesign-props label > span {
+  color: var(--text-muted);
+}
+
+.pdf-formdesign-props textarea,
+.pdf-formdesign-props select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.pdf-formdesign-props input:not([type='checkbox']) {
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.pdf-formdesign-props .pdf-formdesign-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-formdesign-props .pdf-formdesign-check > span {
+  color: var(--text);
+}
+
+.pdf-formdesign-props input:disabled {
+  color: var(--text-muted);
+}
+
+.pdf-formdesign-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.pdf-formdesign-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+<<<<<<< ours
+/* Option toggles (Aa / W): same word-style active plate as the selection markup bar */
+.pdf-search-bar .pdf-search-opt {
+  font-size: 12px;
+}
+
+.pdf-search-bar .pdf-search-opt.is-active {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.pdf-search-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+=======
+.pdf-formdesign-actions .pdf-formdesign-remove {
+  margin-right: auto;
+>>>>>>> theirs
+}
+
+.pdf-formdesign-actions button {
+  height: 24px;
+  padding: 0 8px;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pdf-formdesign-actions button:hover {
+  background: var(--hover);
+}
+
+.pdf-formdesign-actions .pdf-formdesign-done {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--pdf-on-accent);
+}
+
+.pdf-formdesign-remove {
+  align-self: flex-start;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pdf-formdesign-remove:hover {
+  background: var(--hover);
 }
 
 .pdf-redaction-mark {
@@ -3232,6 +3670,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   cursor: default;
 }
 
+<<<<<<< ours
 /* "Use the app" note of the web frame (Convert to Office): feature line, the shared hint and the
    Open-in-app action, inside a ribbon dropdown */
 .pdf-app-only {
@@ -3252,6 +3691,12 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 
 .pdf-app-only-hint {
   font-weight: 600;
+=======
+.rb-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+>>>>>>> theirs
 }
 
 /* Dialog color well (stamp dialog): swatch trigger + the shared picker popover.
@@ -3917,7 +4362,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 .ai-msg {
   position: relative;
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -4530,7 +4975,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
    * with the content, so clipped lines would sit flush against chips/footer */
   padding: 0 14px;
   margin: 12px 0 4px;
-  font-size: 16px;
+  font-size: 14px;
   font-family: inherit;
   line-height: 24px;
   outline: none;
@@ -4826,6 +5271,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   min-width: 0;
 }
 
+<<<<<<< ours
 /* ── questionnaire card (ask_clarification; copied from html/slides) ── */
 
 /* AI survey card */
@@ -5428,6 +5874,8 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   }
 }
 
+=======
+>>>>>>> theirs
 /* ── Digital signatures: banner, panel, certificate dialog ── */
 
 .pdf-sig-banner {
@@ -5569,7 +6017,10 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 
 /* Bookmark editing (pending outline tree) */
 .pdf-bookmark-row {
+<<<<<<< ours
   position: relative;
+=======
+>>>>>>> theirs
   display: flex;
   align-items: center;
   gap: 4px;
@@ -5587,6 +6038,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   text-align: left;
   cursor: pointer;
 }
+<<<<<<< ours
 /* Row actions overlay the end of the row so a long title keeps its full width */
 .pdf-bookmark-actions {
   display: none;
@@ -5599,6 +6051,13 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 }
 .pdf-bookmark-row:hover .pdf-bookmark-actions,
 .pdf-bookmark-row:focus-within .pdf-bookmark-actions {
+=======
+.pdf-bookmark-actions {
+  display: none;
+  flex-shrink: 0;
+}
+.pdf-bookmark-row:hover .pdf-bookmark-actions {
+>>>>>>> theirs
   display: inline-flex;
 }
 .pdf-bookmark-add {
@@ -5619,6 +6078,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   gap: 8px;
   padding: 8px;
   overflow-y: auto;
+<<<<<<< ours
   overflow-x: hidden;
 }
 
@@ -5633,6 +6093,12 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   text-align: center;
   white-space: normal;
   overflow-wrap: anywhere;
+=======
+}
+
+.pdf-compare-pick {
+  align-self: flex-start;
+>>>>>>> theirs
 }
 
 .pdf-compare-swap {
@@ -5646,8 +6112,12 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 }
 
 .pdf-compare-other {
+<<<<<<< ours
   color: var(--text-secondary);
   overflow-wrap: anywhere;
+=======
+  color: var(--text-muted);
+>>>>>>> theirs
 }
 
 .pdf-compare-list {
@@ -5661,9 +6131,14 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 
 .pdf-compare-row {
   display: flex;
+<<<<<<< ours
   flex-wrap: wrap;
   align-items: center;
   gap: 2px 8px;
+=======
+  align-items: center;
+  gap: 8px;
+>>>>>>> theirs
   width: 100%;
   border: none;
   background: none;
@@ -5681,7 +6156,10 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 
 .pdf-compare-page {
   min-width: 72px;
+<<<<<<< ours
   max-width: 100%;
+=======
+>>>>>>> theirs
   font-size: 0.88em;
 }
 
@@ -5700,6 +6178,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   font-size: 0.82em;
 }
 
+<<<<<<< ours
 .pdf-attachments {
   display: flex;
   flex-direction: column;
@@ -5760,4 +6239,18 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   color: var(--text-secondary);
   font-size: 0.85em;
   white-space: nowrap;
+=======
+/* a page whose probe failed: same frame as a rendered page, an error line instead of a canvas */
+.pdf-page-broken {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  color: var(--danger);
+  font-size: 12px;
+>>>>>>> theirs
 }

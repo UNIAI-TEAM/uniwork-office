@@ -10,7 +10,11 @@ export const en = {
   redactDialogPlaceholder: 'Placeholder name, e.g. client phone',
   redactCancel: 'Cancel',
   redactInsert: 'Hide',
+<<<<<<< ours
   redactEnable: 'Right-click a selection to hide it from AI.',
+=======
+  redactEnable: 'Right-click a selection to hide it from the model.',
+>>>>>>> theirs
   redactNeedsSavedRow: 'This row is not in the file yet. Save first, then hide a cell in it.',
   redactRecoveredFromNames:
     'Another app rewrote this file and dropped the record of what is hidden. The hidden cells were recovered from the names in the workbook; saving restores the full record.',
@@ -324,7 +328,9 @@ export const en = {
   appFullLoadRunning:
     'Loading the entire workbook — sorting and filtering unlock when it finishes…',
   appFullLoadTooLarge:
-    'This workbook is too large to load fully into memory; sorting and filtering are unavailable for this file.',
+    'This workbook is too large to load fully into memory; sorting and moving ranges are unavailable for this file. Filtering runs directly on the file.',
+  appLargeFilterLoading: 'Reading the filter column from the file…',
+  appLargeFilterApplying: 'Applying the filter on the file…',
   appSortValueModeFormulas:
     'This range contains formulas that are not live in this large workbook — sorting or moving it would save them as plain values. Pick a range without formulas.',
   appSortRangeTooLarge: 'This range is too large to sort or move in one step — select fewer cells.',
@@ -380,6 +386,9 @@ export const en = {
   appTableNameUsed: 'Table name "{name}" was already used this session.',
   appTableNameInFile: 'Table name "{name}" is already used by a table in the file.',
   appTableOverlapsSession: 'The range overlaps table "{name}" created this session.',
+  appTableOverlapsFile: 'The range overlaps table "{name}" in the file.',
+  appTableAlreadyInTable:
+    'The selection is already in table "{name}" — pick a style from Table Design to change it.',
   appTablesNeedFile: 'Open an XLSX file first — tables are written into the file.',
   appTableSelectRange: 'Select the data range first — headers in its first row.',
   appTableCreated: 'Table created — save with {saveKeys}.',
@@ -457,6 +466,7 @@ export const en = {
   appGridlinesHidden: 'Gridlines hidden.',
   appGridlinesShown: 'Gridlines shown.',
   appShowingFormulas: 'Showing formulas — toggle again for values.',
+  appShowingFormulasActive: 'Showing formulas',
   appShowingValues: 'Showing calculated values.',
   appTraceNoFormula: 'Trace Precedents: the active cell has no formula.',
   appTraceNoRefs: 'Trace Precedents: this formula has no cell references.',
@@ -501,6 +511,7 @@ export const en = {
   appColumnLabel: 'Column {col}',
   appBridgeUnavailable: 'Desktop file bridge is unavailable. Restart the Electron app.',
   appOpenCanceled: 'Workbook selection canceled.',
+  appImportCanceled: 'Import canceled.',
   appOpeningWorkbook: 'Opening workbook…',
   appOpenStalled: 'The workbook could not be opened.',
   appOpenRetry: 'Retry',
@@ -689,6 +700,7 @@ export const en = {
   appExportPdfTitle: 'Export as PDF',
   appSaveTitle: 'Save',
   appSaveAs: 'Save As',
+  aiNameFile: 'Name with AI…',
   appUndo: 'Undo',
   appRedo: 'Redo',
   appUnsavedEditOne: '● {count} unsaved edit',
@@ -720,7 +732,6 @@ export const en = {
   appLinkPlaceholder: 'https://example.com or Sheet1!A1',
   appRemoveLink: 'Remove Link',
   appNotAvailableYet: 'Not available yet',
-  appComingSoon: 'Coming soon',
   appGroupChartLayouts: 'Chart layouts',
   appAddChartElement: 'Add Chart Element',
   appAddChartElementTitle: 'Titles, data labels, legend',
@@ -1136,6 +1147,20 @@ export const en = {
   appWatchCell: 'Cell',
   appWatchValue: 'Value',
   appWatchFormula: 'Formula',
+  appLinksPanel: 'External Links',
+  appLinksPanelDetail: 'List, update and break links to other workbooks',
+  appLinksUpdate: 'Update Values',
+  appLinksNone: 'This workbook has no links to other workbooks.',
+  appLinksUnsaved: 'Save this workbook before listing its external links.',
+  appLinksSource: 'Source',
+  appLinksStatus: 'Status',
+  appLinksSheets: 'Sheets',
+  appLinksLocate: 'Locate source file',
+  appLinksReachable: 'Available',
+  appLinksBroken: 'Unavailable',
+  appLinksBreak: 'Break Link',
+  appLinksBreakConfirm: 'Confirm break',
+  appLinksChangeSource: 'Change Source',
   appGroupCalculation: 'Calculation',
   appCalculationOptions: 'Calculation Options',
   appCalculationOptionsTitle: 'Automatic or manual recalculation',
@@ -1152,8 +1177,16 @@ export const en = {
   appGroupGetData: 'Get Data',
   appFromTextCsv: 'From Text/CSV',
   appRefreshAll: 'Refresh All',
+  appRefreshQuery: 'Refresh query',
+  appQueryConnectionsTitle: 'Refresh the workbook’s queries',
+  appQueryRefreshing: 'Refreshing {name}…',
+  appQueryRefreshed: '{name} refreshed ({rows} rows)',
+  appQueryRefreshedClipped: '{name} refreshed ({rows} rows, {dropped} did not fit the range)',
+  appQueryRefreshFailed: 'Could not refresh {name}',
   appWorkbookNoPivot: 'No pivot tables in this workbook.',
   appRefreshAllTitle: 'Refresh every pivot table',
+  appQueriesConnections: 'Queries & Connections',
+  appQueriesConnectionsTitle: "List the workbook's queries and data connections",
   appErrorCheckingDetail: 'Scan the sheet for error values',
   appErrorsFound: '{count} errors — at {cell}: {value}',
   appCheckingErrors: 'Scanning the whole sheet for errors…',
@@ -1188,6 +1221,7 @@ export const en = {
   appGroupForecast: 'Forecast',
   appWhatIfAnalysis: 'What-If Analysis',
   appGoalSeek: 'Goal Seek',
+  appDataTable: 'Data Table',
   appWhatIfTitle: 'Solve an input for a target value',
   appGoalSeekNeedsFormula: 'Set cell must contain a formula.',
   appGoalSeekByCellNotNumber: 'By changing cell must hold a plain number or be empty.',
@@ -1285,12 +1319,15 @@ export const en = {
   appPasswordUpdating: 'Updating…',
   appUpdatePassword: 'Update Password',
   appWorkbookNotPasswordProtected: 'This workbook is not protected by an open password.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'A password-protected workbook cannot be saved to a UniWork document. Use Save As to keep an encrypted copy on this computer.',
   appPasswordChangeUniwork: 'The password of a UniWork document cannot be changed here.',
   appPasswordChangeReadOnly: 'This workbook is view-only, so its password cannot be changed.',
   appEncryptedWrongPassword: 'The password is incorrect. Try again.',
   appPasswordChangeRestored: 'Save the restored workbook first, then change its password.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Allow Edit Ranges',
   appGroupClipboard: 'Clipboard',
   appPaste: 'Paste',
@@ -1552,6 +1589,7 @@ export const en = {
   appVisualFlipV: 'Flip Vertical',
   appVisualFlipH: 'Flip Horizontal',
   appCtxPasteVisual: 'Paste Picture or Shape',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: "This workbook can't be opened on the web yet",
   appWebEngineBody:
@@ -1579,6 +1617,8 @@ export const en = {
   appWebSavedReopenFailed:
     'Your changes were saved to UniWork, but the workbook could not be reopened here. Reload the editor to keep working.',
   appDataTable: 'Data Table',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Spelling',

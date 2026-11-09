@@ -4,6 +4,7 @@ import { NodeSelection } from '@tiptap/pm/state'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { selectedWordCount } from '../src/renderer/word-count'
 
+<<<<<<< ours
 /**
  * Status-bar word count. Word shows "selected/total" while a selection
  * exists and the plain total once the caret collapses again. GenOffice only
@@ -11,6 +12,10 @@ import { selectedWordCount } from '../src/renderer/word-count'
  * alone — a user who hides that panel (Settings > AI sidebar, #1951) had no
  * way to see it at all.
  */
+=======
+// Word shows "selected/total" while a selection exists and the plain total
+// once the caret collapses again.
+>>>>>>> theirs
 
 interface JsonNode {
   type: string
@@ -44,27 +49,46 @@ function createEditor(content: JsonNode[]): Editor {
 
 describe('selectedWordCount', () => {
   it('is 0 for a collapsed caret, so the status bar shows the plain total', () => {
+<<<<<<< ours
     const editor = createEditor([para('思维导图已经提交')])
+=======
+    const editor = createEditor([para('\u601d\u7ef4\u5bfc\u56fe\u5df2\u7ecf\u63d0\u4ea4')])
+>>>>>>> theirs
     editor.commands.setTextSelection(3)
     expect(selectedWordCount(editor.state.doc, editor.state.selection)).toBe(0)
   })
 
   it('counts the selection with the same Word rule as the total', () => {
+<<<<<<< ours
     const editor = createEditor([para('思维导图已经提交')])
+=======
+    const editor = createEditor([para('\u601d\u7ef4\u5bfc\u56fe\u5df2\u7ecf\u63d0\u4ea4')])
+>>>>>>> theirs
     // select the first 4 asian chars (counted one by one)
     editor.commands.setTextSelection({ from: 1, to: 5 })
     expect(selectedWordCount(editor.state.doc, editor.state.selection)).toBe(4)
   })
 
   it('counts a mixed CJK/latin selection the way the dialog would', () => {
+<<<<<<< ours
     const editor = createEditor([para('GenOffice 思维导图')])
+=======
+    const editor = createEditor([para('GenOffice \u601d\u7ef4\u5bfc\u56fe')])
+>>>>>>> theirs
     // the whole paragraph: "GenOffice" as 1 word + 4 asian chars
     editor.commands.setTextSelection({ from: 1, to: editor.state.doc.content.size - 1 })
     expect(selectedWordCount(editor.state.doc, editor.state.selection)).toBe(5)
   })
 
   it('sums a selection that spans several paragraphs', () => {
+<<<<<<< ours
     const editor = createEditor([para('思维导图'), para('已经合并')])
+=======
+    const editor = createEditor([
+      para('\u601d\u7ef4\u5bfc\u56fe'),
+      para('\u5df2\u7ecf\u5408\u5e76'),
+    ])
+>>>>>>> theirs
     // the whole document: both paragraphs, 4 + 4 asian chars
     editor.commands.setTextSelection({
       from: 1,
@@ -82,6 +106,26 @@ describe('selectedWordCount', () => {
     expect(selectedWordCount(editor.state.doc, editor.state.selection)).toBe(0)
   })
 
+<<<<<<< ours
+=======
+  it('counts an inline formula the way the total does', () => {
+    const editor = createEditor([
+      {
+        type: 'docParagraph',
+        attrs: { docxIndex: null },
+        content: [
+          {
+            type: 'docInlineMath',
+            attrs: { omml: '', mathml: '', latex: 'E=mc^2', text: 'E=mc2' },
+          },
+        ],
+      },
+    ])
+    editor.commands.setTextSelection({ from: 1, to: 2 })
+    expect(selectedWordCount(editor.state.doc, editor.state.selection)).toBe(2)
+  })
+
+>>>>>>> theirs
   it('a NodeSelection (an image) has no text range, so the figure is 0', () => {
     const editor = createEditor([
       { type: 'docImage', attrs: { docxIndex: null, src: 'data:image/png;base64,AA' } },

@@ -10,7 +10,11 @@ export const it = {
   redactDialogPlaceholder: 'Nome del segnaposto, es. telefono del cliente',
   redactCancel: 'Annulla',
   redactInsert: 'Nascondi',
+<<<<<<< ours
   redactEnable: 'Clic destro su una selezione per nasconderla all’IA.',
+=======
+  redactEnable: 'Clic destro su una selezione per nasconderla al modello.',
+>>>>>>> theirs
   redactNeedsSavedRow: 'Questa riga non è ancora nel file. Salva prima, poi nascondi la cella.',
   redactRecoveredFromNames:
     "Un'altra app ha riscritto questo file e ha perso il registro di ciò che è nascosto. Le celle nascoste sono state recuperate dai nomi del foglio di lavoro; salvando il file viene ripristinato il registro completo.",
@@ -357,7 +361,9 @@ export const it = {
   appFullLoadRunning:
     'Caricamento della cartella completa in corso: ordinamento e filtri saranno disponibili al termine…',
   appFullLoadTooLarge:
-    'Questa cartella di lavoro è troppo grande per essere caricata completamente in memoria; ordinamento e filtri non sono disponibili per questo file.',
+    'Questa cartella di lavoro è troppo grande per essere caricata completamente in memoria; ordinamento e spostamento di intervalli non sono disponibili per questo file. Il filtro viene eseguito direttamente sul file.',
+  appLargeFilterLoading: 'Lettura della colonna del filtro dal file…',
+  appLargeFilterApplying: 'Applicazione del filtro sul file…',
   appSortValueModeFormulas:
     'Questo intervallo contiene formule che in questa cartella di grandi dimensioni non vengono calcolate in tempo reale: ordinarlo o spostarlo le salverebbe come semplici valori. Scegliere un intervallo senza formule.',
   appSortRangeTooLarge:
@@ -422,6 +428,9 @@ export const it = {
   appTableNameInFile: 'Il nome di tabella "{name}" è già usato da una tabella nel file.',
   appTableOverlapsSession:
     'L\'intervallo si sovrappone alla tabella "{name}" creata in questa sessione.',
+  appTableOverlapsFile: 'L\'intervallo si sovrappone alla tabella "{name}" del file.',
+  appTableAlreadyInTable:
+    'La selezione è già nella tabella "{name}": cambia lo stile da Progettazione tabella.',
   appTablesNeedFile: 'Apri prima un file XLSX — le tabelle vengono scritte nel file.',
   appTableSelectRange: "Seleziona prima l'intervallo di dati — intestazioni nella prima riga.",
   appTableCreated: 'Tabella creata — salva con {saveKeys}.',
@@ -507,6 +516,7 @@ export const it = {
   appGridlinesHidden: 'Griglia nascosta.',
   appGridlinesShown: 'Griglia visualizzata.',
   appShowingFormulas: 'Formule visualizzate — attiva/disattiva di nuovo per i valori.',
+  appShowingFormulasActive: 'Formule visualizzate',
   appShowingValues: 'Valori calcolati visualizzati.',
   appTraceNoFormula: 'Individua precedenti: la cella attiva non contiene una formula.',
   appTraceNoRefs: 'Individua precedenti: questa formula non ha riferimenti di cella.',
@@ -552,6 +562,7 @@ export const it = {
   appColumnLabel: 'Colonna {col}',
   appBridgeUnavailable: "Il bridge dei file desktop non è disponibile. Riavvia l'app Electron.",
   appOpenCanceled: 'Selezione della cartella di lavoro annullata.',
+  appImportCanceled: 'Importazione annullata.',
   appOpeningWorkbook: 'Apertura della cartella di lavoro…',
   appOpenStalled: 'Impossibile aprire la cartella di lavoro.',
   appOpenRetry: 'Riprova',
@@ -751,6 +762,7 @@ export const it = {
   appExportPdfTitle: 'Esporta come PDF',
   appSaveTitle: 'Salva',
   appSaveAs: 'Salva con nome',
+  aiNameFile: 'Assegna un nome con IA…',
   appUndo: 'Annulla',
   appRedo: 'Ripeti',
   appUnsavedEditOne: '● {count} modifica non salvata',
@@ -783,7 +795,6 @@ export const it = {
   appLinkPlaceholder: 'https://example.com o Sheet1!A1',
   appRemoveLink: 'Rimuovi collegamento',
   appNotAvailableYet: 'Non ancora disponibile',
-  appComingSoon: 'Prossimamente',
   appGroupChartLayouts: 'Layout grafici',
   appAddChartElement: 'Aggiungi elemento grafico',
   appAddChartElementTitle: 'Titoli, etichette dati, legenda',
@@ -1200,6 +1211,20 @@ export const it = {
   appWatchCell: 'Cella',
   appWatchValue: 'Valore',
   appWatchFormula: 'Formula',
+  appLinksPanel: 'Collegamenti esterni',
+  appLinksPanelDetail: 'Elenca, aggiorna e interrompe i collegamenti ad altre cartelle di lavoro',
+  appLinksUpdate: 'Aggiorna valori',
+  appLinksNone: 'Questa cartella di lavoro non contiene collegamenti ad altre cartelle di lavoro.',
+  appLinksUnsaved: 'Salva questa cartella di lavoro prima di elencare i suoi collegamenti esterni.',
+  appLinksSource: 'Origine',
+  appLinksStatus: 'Stato',
+  appLinksSheets: 'Fogli',
+  appLinksLocate: 'Mostra file di origine',
+  appLinksReachable: 'Disponibile',
+  appLinksBroken: 'Non disponibile',
+  appLinksBreak: 'Interrompi collegamento',
+  appLinksBreakConfirm: 'Conferma interruzione',
+  appLinksChangeSource: 'Modifica origine',
   appGroupCalculation: 'Calcolo',
   appCalculationOptions: 'Opzioni di calcolo',
   appCalculationOptionsTitle: 'Ricalcolo automatico o manuale',
@@ -1216,8 +1241,16 @@ export const it = {
   appGroupGetData: 'Recupera dati',
   appFromTextCsv: 'Da testo/CSV',
   appRefreshAll: 'Aggiorna tutti',
+  appRefreshQuery: 'Aggiorna query',
+  appQueryConnectionsTitle: 'Aggiorna le query della cartella di lavoro',
+  appQueryRefreshing: 'Aggiornamento di {name}…',
+  appQueryRefreshed: '{name} aggiornato ({rows} righe)',
+  appQueryRefreshedClipped: "{name} aggiornato ({rows} righe, {dropped} oltre l'intervallo)",
+  appQueryRefreshFailed: 'Impossibile aggiornare {name}',
   appWorkbookNoPivot: 'Nessuna tabella pivot in questa cartella.',
   appRefreshAllTitle: 'Aggiorna tutte le tabelle pivot',
+  appQueriesConnections: 'Query e connessioni',
+  appQueriesConnectionsTitle: 'Elenca le query e le connessioni dati della cartella di lavoro',
   appErrorCheckingDetail: 'Cerca valori di errore nel foglio',
   appErrorsFound: '{count} errori — in {cell}: {value}',
   appCheckingErrors: 'Ricerca errori in corso su tutto il foglio…',
@@ -1253,6 +1286,7 @@ export const it = {
   appGroupForecast: 'Previsione',
   appWhatIfAnalysis: 'Analisi di simulazione',
   appGoalSeek: 'Ricerca obiettivo',
+  appDataTable: 'Tabella dati',
   appWhatIfTitle: 'Trova un input per un valore obiettivo',
   appGoalSeekNeedsFormula: 'La cella deve contenere una formula.',
   appGoalSeekByCellNotNumber: 'La cella da cambiare deve contenere un numero o essere vuota.',
@@ -1351,6 +1385,7 @@ export const it = {
   appUpdatePassword: 'Aggiorna password',
   appWorkbookNotPasswordProtected:
     'Questa cartella di lavoro non è protetta da una password di apertura.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Una cartella di lavoro protetta da password non può essere salvata in un documento UniWork. Usa Salva con nome per conservare una copia cifrata su questo computer.',
   appPasswordChangeUniwork: 'La password di un documento UniWork non può essere modificata qui.',
@@ -1359,6 +1394,8 @@ export const it = {
   appEncryptedWrongPassword: 'La password non è corretta. Riprova.',
   appPasswordChangeRestored:
     'Salva prima la cartella di lavoro ripristinata, poi cambia la sua password.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Consenti modifica intervalli',
   appGroupClipboard: 'Appunti',
   appPaste: 'Incolla',
@@ -1623,6 +1660,7 @@ export const it = {
   appVisualFlipV: 'Capovolgi verticalmente',
   appVisualFlipH: 'Capovolgi orizzontalmente',
   appCtxPasteVisual: 'Incolla immagine o forma',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Questa cartella di lavoro non può ancora essere aperta sul web',
   appWebEngineBody:
@@ -1650,6 +1688,8 @@ export const it = {
   appWebSavedReopenFailed:
     "Le modifiche sono state salvate in UniWork, ma non è stato possibile riaprire qui la cartella di lavoro. Ricarica l'editor per continuare.",
   appDataTable: 'Tabella dati',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Ortografia',
@@ -1658,8 +1698,12 @@ export const it = {
   appSpellToggleTip:
     'Attiva il controllo ortografico (F7 e il pulsante Revisione); disattivato, le caselle dei commenti non mostrano più le sottolineature',
   appSpellOn: 'Controllo ortografico attivato.',
+<<<<<<< ours
   appSpellOff:
     'Il controllo ortografico è disattivato. Attivalo in Revisione ▸ Strumenti di correzione.',
+=======
+  appSpellOff: 'Il controllo ortografico è disattivato. Attivalo in Revisione ▸ Correzione.',
+>>>>>>> theirs
   appSpellRecheck: 'Ricontrolla',
   appSpellNone: 'Nessun errore ortografico sospetto trovato.',
   appSpellFindings: '{count} errori sospetti. Fai clic su una riga per individuarlo.',

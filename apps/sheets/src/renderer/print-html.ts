@@ -137,6 +137,15 @@ interface PrintCellStyle {
 /// prints thin at 0.75pt (1px @ 96dpi), medium at 1.5pt and thick at
 /// 2.25pt — the same 1 : 2 : 3 ladder the grid draws. Dash patterns keep
 /// printing solid (unchanged); only the weight is mapped here.
+/// A NONE edge is the row/column-default blocker (NO_BORDER_STYLE), not a line.
+function borderEdge(
+  style: PrintCellStyle | null | undefined,
+  key: 't' | 'b' | 'l' | 'r',
+): NonNullable<NonNullable<PrintCellStyle['bd']>['t']> | undefined {
+  const edge = style?.bd?.[key]
+  return edge == null || edge.s === BorderStyleTypes.NONE ? undefined : edge
+}
+
 export function printBorderWidthPt(style: number | undefined): number {
   switch (style) {
     case BorderStyleTypes.MEDIUM:
@@ -406,18 +415,19 @@ export function layoutSheetPrint(
     const text = displayAt(data, row, column)
     const align = style?.vt === 1 ? 'flex-start' : style?.vt === 2 ? 'center' : 'flex-end'
     const custom = (r: number | null, c: number | null, edge: 't' | 'b' | 'l' | 'r'): boolean =>
-      r !== null && c !== null && styleAt(r, c)?.bd?.[edge] != null
+      r !== null && c !== null && borderEdge(styleAt(r, c), edge) !== undefined
     const edges = {
       top:
-        style?.bd?.t != null
+        borderEdge(style, 't') !== undefined
           ? near.above === null || !custom(near.above, column, 'b')
           : gridlines && near.above === null && !headings,
       left:
-        style?.bd?.l != null
+        borderEdge(style, 'l') !== undefined
           ? near.leftOf === null || !custom(row, near.leftOf, 'r')
           : gridlines && near.leftOf === null && !headings,
-      bottom: style?.bd?.b != null || (gridlines && !custom(near.below, column, 't')),
-      right: style?.bd?.r != null || (gridlines && !custom(row, near.rightOf, 'l')),
+      bottom:
+        borderEdge(style, 'b') !== undefined || (gridlines && !custom(near.below, column, 't')),
+      right: borderEdge(style, 'r') !== undefined || (gridlines && !custom(row, near.rightOf, 'l')),
     }
     return (
       `<td${span} style="${cellCss(style, rawAt(data, row, column), gridlines, edges)}">` +
@@ -540,7 +550,12 @@ export function layoutSheetPrint(
     const overlayLayer = overlays
       ? `<div class="ov" style="left:${round(originLeft)}pt;top:${round(originTop)}pt;width:${round(bodyWidthPt)}pt;height:${round(bodyHeightPt)}pt">${overlays}</div>`
       : ''
-    const table = `<table>${colgroup}<thead>${head.join('')}</thead><tbody>${body.join('')}</tbody></table>`
+    // table-layout:fixed is ignored while the table's width is auto (CSS 2.1
+    // §17.5.2): without an explicit width Chromium falls back to content-based
+    // auto layout and the colgroup's saved column widths are lost (text-bearing
+    // columns inflate, empty ones shrink). The width is the colgroup sum.
+    const tableWidthPt = round(originLeft + bodyWidthPt)
+    const table = `<table style="width:${tableWidthPt}pt">${colgroup}<thead>${head.join('')}</thead><tbody>${body.join('')}</tbody></table>`
     return { body: table + overlayLayer, page }
   })
 
@@ -975,7 +990,7 @@ function cellCss(
     draw: boolean,
     offset: (width: number) => string,
   ): void => {
-    const border = style?.bd?.[key]
+    const border = borderEdge(style, key)
     if (border && draw) {
       shadows.push(
         `inset ${offset(printBorderWidthPt(border.s))} 0 ${cssColor(border.cl?.rgb ?? '#000000')}`,

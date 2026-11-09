@@ -31,7 +31,10 @@ export default defineConfig({
           '@genoffice/docx-engine',
           '@genoffice/electron-utils',
           '@genoffice/font-metrics',
+<<<<<<< ours
           '@genoffice/shortcuts',
+=======
+>>>>>>> theirs
           '@genoffice/xlsx-gateway',
         ],
       }),

@@ -711,7 +711,7 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
       '{op:"set_cell",sheetId,address,value} | {op:"set_formula",sheetId,address,formula(starts with =)} | ' +
       '{op:"clear_cell",sheetId,address} | {op:"rename_sheet",sheetId,name}. ' +
       'Field definitions for the remaining operations live in the guides — load_guide before using them: ' +
-      'writing(set_range/fill_range/copy_range/convert_to_values/clear_range/find_replace) | formatting(format_range) | ' +
+      'writing(set_range/fill_range/copy_range/move_range/convert_to_values/clear_range/find_replace) | formatting(format_range) | ' +
       'layout(sort_range/merge_cells/unmerge_cells/set_row_height/set_col_width/set_rows_hidden/set_cols_hidden/set_freeze/set_page_setup) | ' +
       'structure(insert_rows/delete_rows/insert_cols/delete_cols/add_sheet/delete_sheet/' +
       'duplicate_sheet/set_sheet_hidden/move_sheet/protect_sheet) | ' +
@@ -721,9 +721,9 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
       'data(set_hyperlink/set_filter/clear_filter/set_filter_criteria/add_conditional_format/' +
       'clear_conditional_formats/set_data_validation/set_note/add_defined_name/delete_defined_name). ' +
       'Limits: structural operations (row/column insert-delete, sheet add/delete/duplicate/move/hide) cannot share a batch with other classes; at most 2000 expanded cell changes — ' +
-      'except the range-level bulk ops fill_range / copy_range / convert_to_values / clear_range / find_replace / sort_range / format_range, which handle up to 200,000 cells in one op ' +
+      'except the range-level bulk ops fill_range / copy_range / move_range / convert_to_values / clear_range / find_replace / sort_range / format_range, which handle up to 200,000 cells in one op ' +
       '(use fill_range to fill a formula or pattern down a whole column instead of huge set_range batches, ' +
-      'copy_range to duplicate a large block once, convert_to_values to freeze formulas into their computed values); ' +
+      'copy_range to duplicate a large block once, move_range to move/cut a block — also to another sheet — instead of re-typing it cell by cell, convert_to_values to freeze formulas into their computed values); ' +
       'sheetId must be an id returned by get_workbook_context.',
     inputSchema: {
       type: 'object',
@@ -2223,10 +2223,15 @@ export function executeWorkbookTool(
         // that reaches a withheld cell has to withhold the result too — showing
         // `C10 = 42` when `B2` is the withheld number gives the number away
         // just as plainly as printing `B2`.
+<<<<<<< ours
         const aPrecedentIsWithheld = result.refs.some((ref) => {
           const projectRef = cellProjector(deps, ref.sheetId ?? parsed.sheetId)
           return ref.samples.some((s) => projectRef(s.address, s.value) !== s.value)
         })
+=======
+        const refValues = result.refs.flatMap((ref) => ref.samples)
+        const aPrecedentIsWithheld = refValues.some((s) => project(s.address, s.value) !== s.value)
+>>>>>>> theirs
         const lines = [
           `${parsed.address} = ${formatCellScalar({
             value: aPrecedentIsWithheld
@@ -2247,7 +2252,11 @@ export function executeWorkbookTool(
           const shown = ref.samples
             .map(
               (sample) =>
+<<<<<<< ours
                 `${sample.address}=${formatCellScalar({ ...sample, value: projectRef(sample.address, sample.value) })}`,
+=======
+                `${sample.address}=${formatCellScalar({ ...sample, value: project(sample.address, sample.value) })}`,
+>>>>>>> theirs
             )
             .join('; ')
           const rest = ref.cellCount - ref.samples.length
@@ -2337,6 +2346,7 @@ export function executeWorkbookTool(
         return fail(t('aiToolPropose'), describeOperationErrors(rawOps, parsedOps.error))
       }
       const operations: WorkbookOperation[] = parsedOps.data
+<<<<<<< ours
       const refusedImages = refusedLocalImagePaths(operations, deps)
       if (refusedImages.length > 0) {
         return fail(
@@ -2353,6 +2363,8 @@ export function executeWorkbookTool(
           `Rejected — none of the ${operations.length} operation(s) were applied: ${refusedUrl}`,
         )
       }
+=======
+>>>>>>> theirs
       // A cell the reader withheld still holds real data the model never saw,
       // so a write landing on one destroys something the user chose to keep —
       // silently, with the file still opening afterwards. Checked here, before
@@ -2361,6 +2373,11 @@ export function executeWorkbookTool(
         operations,
         deps.redactions?.() ?? NO_REDACTIONS,
         (sheetId) => deps.getActiveSheetInfo().sheets.find((sheet) => sheet.id === sheetId)?.name,
+<<<<<<< ours
+=======
+        (sheetName) =>
+          deps.getActiveSheetInfo().sheets.find((sheet) => sheet.name === sheetName)?.id,
+>>>>>>> theirs
       )
       if (refusal) {
         return fail(
@@ -2394,11 +2411,11 @@ export function executeWorkbookTool(
         const formulaCells: { sheetId: string; address: string }[] = outcome.plan.cellChanges
           .filter((c) => c.after.formula)
           .map((c) => ({ sheetId: c.sheetId, address: c.address }))
-        // fill_range / copy_range apply as range-level bulk writes (no
+        // fill_range / copy_range / move_range apply as range-level bulk writes (no
         // per-cell plan entries), so read back each target's corners to
         // confirm the write actually landed and its shifted formulas compute.
         for (const op of operations) {
-          if (op.op !== 'fill_range' && op.op !== 'copy_range') continue
+          if (op.op !== 'fill_range' && op.op !== 'copy_range' && op.op !== 'move_range') continue
           const bounds = op.op === 'fill_range' ? parseRange(op.target) : copyTargetBounds(op)
           const first = formatAddress(bounds.startRow, bounds.startColumn)
           formulaCells.push({ sheetId: op.sheetId, address: first })
@@ -2429,13 +2446,20 @@ export function executeWorkbookTool(
             const cells = deps.readCells(addresses, cellSheetId)
             const prefix = bySheet.size > 1 ? `${sheetNames.get(cellSheetId) ?? cellSheetId}!` : ''
             for (const addr of addresses) {
+<<<<<<< ours
               const cell = cells[addr]
               const raw = cell?.value
+=======
+              const raw = cells[addr]?.value
+>>>>>>> theirs
               const v =
                 raw === null || raw === undefined
                   ? raw
                   : modelCellValueAt(redactions, cellSheetId, addr, raw)
+<<<<<<< ours
               const unsupported = cell ? unsupportedNote(cell) : null
+=======
+>>>>>>> theirs
               lines.push(
                 `${prefix}${addr} = ${v === null || v === undefined ? (unsupported ? '(no result)' : '(still computing; verify with read_cells)') : String(v)}` +
                   (unsupported ? ` (${unsupported})` : ''),

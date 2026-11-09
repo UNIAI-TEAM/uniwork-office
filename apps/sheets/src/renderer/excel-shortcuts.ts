@@ -16,6 +16,7 @@
  *   used cell (content or formatting, like Excel); with Shift the selection
  *   grows to them (sheets-33..35)
  * - Home: start of the current row (first unfrozen column)
+<<<<<<< ours
  * - select the whole column / row / all / current region (sheets-24..27)
  * - hide / unhide the rows or columns the selection spans (sheets-22, -23)
  * - insert / delete cells: whole rows/columns act directly, otherwise the
@@ -24,6 +25,21 @@
  *   Control, ⌘Enter fills the selection like ⌃Enter, ⌃⌥Enter / ⌘⌥Enter break
  *   the line like ⌥Enter, ⌘T cycles the reference like F4, ⌘= recalculates,
  *   ⇧⌘H opens Replace like ⌃H
+=======
+ * - Ctrl+Space / Shift+Space: select the whole column / row of the
+ *   active cell (mac: ⌃Space — ⌘Space belongs to Spotlight)
+ * - Ctrl+Shift+= / Ctrl+Numpad+ and Ctrl+- / Ctrl+Numpad-: insert / delete
+ *   cells (whole rows/columns act directly, otherwise the dialog opens)
+ * - Shift+Home / Ctrl+Shift+Home / Ctrl+Shift+End: extend the selection from
+ *   the active cell to the row start / sheet origin / last used cell
+ * - Ctrl+Shift+8 (*): select the current region around the selection
+ * - Ctrl+2 / 3 / 4: bold / italic / underline (Excel's digit aliases)
+ * - Ctrl+Shift+Enter: commit the formula into every selected cell (legacy
+ *   array entry; results spill dynamically, so this is the Ctrl+Enter fill)
+ * - mac editing keys Excel-for-Mac accepts next to Univer's own: ⌘Enter
+ *   fills the selection like ⌃Enter, ⌃⌥Enter / ⌘⌥Enter break the line like
+ *   ⌥Enter, ⌘T cycles the reference like F4
+>>>>>>> theirs
  */
 import {
   CommandType,
@@ -41,6 +57,7 @@ import type { IAccessor, ICommand, IRange, Worksheet } from '@univerjs/core'
 import { IShortcutService, KeyCode, MetaKeys } from '@univerjs/ui'
 import type { IShortcutItem } from '@univerjs/ui'
 import {
+  ScrollToCellOperation,
   SelectionMoveType,
   SetColHiddenCommand,
   SetRowHiddenCommand,
@@ -51,12 +68,16 @@ import {
   SheetCopyDownCommand,
   SheetCopyRightCommand,
   SheetsSelectionsService,
+  alignToMergedCellsBorders,
   getCellAtRowCol,
   getSheetCommandTarget,
 } from '@univerjs/sheets'
 import {
   SelectAllCommand,
   SetCellEditVisibleOperation,
+  SetRangeBoldCommand,
+  SetRangeItalicCommand,
+  SetRangeUnderlineCommand,
   whenSheetEditorActivated,
   whenSheetEditorFocused,
 } from '@univerjs/sheets-ui'
@@ -76,6 +97,7 @@ import { sheetsShortcut } from '../shared/sheets-shortcuts'
 import type { UniverRuntime } from './univer-state'
 import { requestCellsAction } from './insert-delete-cells'
 import type { CellsMode } from './insert-delete-cells'
+<<<<<<< ours
 import {
   chordToUniverBinding,
   guardUniverDispatch,
@@ -83,6 +105,9 @@ import {
   sheetsKeyTarget,
   type SheetsKeyTarget,
 } from './sheets-keymap'
+=======
+import { excelCellHasValue } from './excel-jump-nav'
+>>>>>>> theirs
 
 // browser keycodes Univer's KeyCode enum doesn't name
 const KEY_HOME = 36
@@ -101,10 +126,17 @@ const HIDE_SELECTED_COLS_ID = 'genoffice.command.hide-selected-cols'
 const UNHIDE_SELECTED_COLS_ID = 'genoffice.command.unhide-selected-cols'
 const INSERT_CELLS_ID = 'genoffice.command.insert-cells'
 const DELETE_CELLS_ID = 'genoffice.command.delete-cells'
+<<<<<<< ours
 const EXTEND_TO_SHEET_HOME_ID = 'genoffice.command.extend-selection-sheet-home'
 const EXTEND_TO_SHEET_END_ID = 'genoffice.command.extend-selection-sheet-end'
 const RUN_APP_COMMAND_ID = 'genoffice.command.run-app-command'
 const RELEASED_SHORTCUT_ID = 'genoffice.command.released-shortcut'
+=======
+const EXPAND_ROW_HOME_ID = 'genoffice.command.expand-row-home'
+const EXPAND_SHEET_HOME_ID = 'genoffice.command.expand-sheet-home'
+const EXPAND_SHEET_END_ID = 'genoffice.command.expand-sheet-end'
+const SELECT_CURRENT_REGION_ID = 'genoffice.command.select-current-region'
+>>>>>>> theirs
 
 /** first visible line at or after `from` (hidden rows/columns are not landing spots) */
 function firstVisible(worksheet: Worksheet, axis: 'row' | 'column', from: number): number {
@@ -124,6 +156,88 @@ function unfrozenOrigin(worksheet: Worksheet): { row: number; column: number } {
   return {
     row: firstVisible(worksheet, 'row', row),
     column: firstVisible(worksheet, 'column', column),
+  }
+}
+
+/**
+ * Excel's current region: grow the selection's bounding box until the rows
+ * and columns bordering it are all empty.
+ */
+export function currentRegion(
+  seed: IRange,
+  hasValue: (row: number, column: number) => boolean,
+  rowCount: number,
+  columnCount: number,
+): IRange {
+  let { startRow, endRow, startColumn, endColumn } = seed
+  const rowHasValue = (row: number): boolean => {
+    for (let c = startColumn; c <= endColumn; c += 1) if (hasValue(row, c)) return true
+    return false
+  }
+  const columnHasValue = (column: number): boolean => {
+    for (let r = startRow; r <= endRow; r += 1) if (hasValue(r, column)) return true
+    return false
+  }
+  for (let grew = true; grew;) {
+    grew = false
+    if (startRow > 0 && rowHasValue(startRow - 1)) {
+      startRow -= 1
+      grew = true
+    }
+    if (endRow < rowCount - 1 && rowHasValue(endRow + 1)) {
+      endRow += 1
+      grew = true
+    }
+    if (startColumn > 0 && columnHasValue(startColumn - 1)) {
+      startColumn -= 1
+      grew = true
+    }
+    if (endColumn < columnCount - 1 && columnHasValue(endColumn + 1)) {
+      endColumn += 1
+      grew = true
+    }
+  }
+  return { startRow, endRow, startColumn, endColumn }
+}
+
+/**
+ * Shift+navigation keeps the active cell as the anchor and moves the opposite
+ * corner; `null` on an axis leaves that corner coordinate where it is.
+ */
+export function extendedRange(
+  range: IRange,
+  anchor: { row: number; column: number },
+  corner: { row: number | null; column: number | null },
+): IRange {
+  // an untouched axis keeps its span; the anchor can sit inside it after a
+  // current-region selection
+  const span = (lo: number, hi: number, at: number, to: number | null): [number, number] =>
+    to === null ? [lo, hi] : [Math.min(at, to), Math.max(at, to)]
+  const [startRow, endRow] = span(range.startRow, range.endRow, anchor.row, corner.row)
+  const [startColumn, endColumn] = span(
+    range.startColumn,
+    range.endColumn,
+    anchor.column,
+    corner.column,
+  )
+  return { startRow, endRow, startColumn, endColumn }
+}
+
+/**
+ * The cell to reveal after an extension: the far end of each axis the key
+ * moved; an untouched axis stays on the anchor so Shift+Home does not scroll
+ * vertically.
+ */
+export function farCorner(
+  range: IRange,
+  anchor: { row: number; column: number },
+  corner: { row: number | null; column: number | null },
+): { row: number; column: number } {
+  const far = (lo: number, hi: number, at: number, to: number | null): number =>
+    to === null ? at : hi - at >= at - lo ? hi : lo
+  return {
+    row: far(range.startRow, range.endRow, anchor.row, corner.row),
+    column: far(range.startColumn, range.endColumn, anchor.column, corner.column),
   }
 }
 
@@ -191,6 +305,16 @@ export function registerExcelShortcuts(
   const injector = runtime.univer.__getInjector()
   const commandService = injector.get(ICommandService)
   const shortcutService = injector.get(IShortcutService)
+
+  const usedEnd = (worksheet: Worksheet): { row: number; column: number } => {
+    const matrix = worksheet.getCellMatrix()
+    const loaded = matrix.getLength() === 0 ? null : matrix.getDataRange()
+    const fileEnd = usedEndOf?.(worksheet.getSheetId()) ?? null
+    return {
+      row: Math.max(loaded?.endRow ?? 0, fileEnd?.row ?? 0, 0),
+      column: Math.max(loaded?.endColumn ?? 0, fileEnd?.column ?? 0, 0),
+    }
+  }
 
   const activateAdjacentSheet: ICommand<{ step: number }> = {
     id: ACTIVATE_ADJACENT_SHEET_ID,
@@ -398,6 +522,7 @@ export function registerExcelShortcuts(
     handler: () => requestCellsAction(runtime, 'delete', openCellsDialog),
   }
 
+<<<<<<< ours
   // Ctrl+Shift+Home / End: grow the selection from the active cell to the
   // Ctrl+Home / Ctrl+End target, the active cell staying where it is
   const extendSelectionTo = (
@@ -459,9 +584,104 @@ export function registerExcelShortcuts(
     id: RELEASED_SHORTCUT_ID,
     type: CommandType.COMMAND,
     handler: () => true,
+=======
+  const setRange = async (
+    accessor: IAccessor,
+    next: IRange,
+    reveal?: { row: number; column: number },
+  ): Promise<boolean> => {
+    const target = getSheetCommandTarget(accessor.get(IUniverInstanceService))
+    const selection = accessor.get(SheetsSelectionsService).getCurrentLastSelection()
+    if (!target || !selection) return false
+    const { workbook, worksheet } = target
+    const unitId = workbook.getUnitId()
+    const subUnitId = worksheet.getSheetId()
+    const range = alignToMergedCellsBorders(next, worksheet, true)
+    const applied = await accessor.get(ICommandService).executeCommand(SetSelectionsOperation.id, {
+      unitId,
+      subUnitId,
+      selections: [{ range, primary: selection.primary }],
+      type: SelectionMoveType.MOVE_END,
+      reveal: !reveal,
+    })
+    // `reveal` scrolls to the unmoved anchor; bring the moving corner in instead
+    if (applied && reveal) {
+      accessor.get(ICommandService).syncExecuteCommand(ScrollToCellOperation.id, {
+        unitId,
+        subUnitId,
+        range: {
+          startRow: reveal.row,
+          endRow: reveal.row,
+          startColumn: reveal.column,
+          endColumn: reveal.column,
+          rangeType: RANGE_TYPE.NORMAL,
+        },
+      })
+    }
+    return applied
+  }
+
+  const extendTo = (
+    accessor: IAccessor,
+    cornerOf: (worksheet: Worksheet) => { row: number | null; column: number | null },
+  ): Promise<boolean> => {
+    const target = getSheetCommandTarget(accessor.get(IUniverInstanceService))
+    const selection = accessor.get(SheetsSelectionsService).getCurrentLastSelection()
+    if (!target || !selection) return Promise.resolve(false)
+    const { range, primary } = selection
+    const anchor = {
+      row: primary?.actualRow ?? range.startRow,
+      column: primary?.actualColumn ?? range.startColumn,
+    }
+    const corner = cornerOf(target.worksheet)
+    const next = extendedRange(range, anchor, corner)
+    return setRange(accessor, next, farCorner(next, anchor, corner))
+  }
+
+  const expandRowHome: ICommand = {
+    id: EXPAND_ROW_HOME_ID,
+    type: CommandType.COMMAND,
+    handler: (accessor) =>
+      extendTo(accessor, (worksheet) => ({ row: null, column: unfrozenOrigin(worksheet).column })),
+  }
+  const expandSheetHome: ICommand = {
+    id: EXPAND_SHEET_HOME_ID,
+    type: CommandType.COMMAND,
+    handler: (accessor) => extendTo(accessor, unfrozenOrigin),
+  }
+  const expandSheetEnd: ICommand = {
+    id: EXPAND_SHEET_END_ID,
+    type: CommandType.COMMAND,
+    handler: (accessor) => extendTo(accessor, usedEnd),
+  }
+
+  const selectCurrentRegion: ICommand = {
+    id: SELECT_CURRENT_REGION_ID,
+    type: CommandType.COMMAND,
+    handler: (accessor) => {
+      const target = getSheetCommandTarget(accessor.get(IUniverInstanceService))
+      const selection = accessor.get(SheetsSelectionsService).getCurrentLastSelection()
+      if (!target || !selection) return false
+      const { worksheet } = target
+      const matrix = worksheet.getCellMatrix()
+      return setRange(
+        accessor,
+        currentRegion(
+          selection.range,
+          (row, column) => excelCellHasValue(matrix.getValue(row, column) ?? null),
+          worksheet.getRowCount(),
+          worksheet.getColumnCount(),
+        ),
+      )
+    },
+>>>>>>> theirs
   }
 
   for (const command of [
+    expandRowHome,
+    expandSheetHome,
+    expandSheetEnd,
+    selectCurrentRegion,
     activateAdjacentSheet,
     selectSheetHome,
     selectSheetEnd,
@@ -571,6 +791,51 @@ export function registerExcelShortcuts(
       item: { id: BreakLineCommand.id, preconditions: whenSheetEditorActivated },
       univerOwns: { win: ['Alt+Enter'], mac: ['Alt+Enter'] },
     },
+    {
+      id: EXPAND_ROW_HOME_ID,
+      binding: KEY_HOME | MetaKeys.SHIFT,
+      preconditions: whenSheetEditorFocused,
+    },
+    {
+      id: EXPAND_SHEET_HOME_ID,
+      binding: KEY_HOME | MetaKeys.CTRL_COMMAND | MetaKeys.SHIFT,
+      preconditions: whenSheetEditorFocused,
+    },
+    {
+      id: EXPAND_SHEET_END_ID,
+      binding: KEY_END | MetaKeys.CTRL_COMMAND | MetaKeys.SHIFT,
+      preconditions: whenSheetEditorFocused,
+    },
+    {
+      id: SELECT_CURRENT_REGION_ID,
+      binding: KeyCode.Digit8 | MetaKeys.CTRL_COMMAND | MetaKeys.SHIFT,
+      preconditions: whenSheetEditorFocused,
+    },
+    {
+      id: SetRangeBoldCommand.id,
+      binding: KeyCode.Digit2 | MetaKeys.CTRL_COMMAND,
+      preconditions: whenSheetEditorFocused,
+    },
+    {
+      id: SetRangeItalicCommand.id,
+      binding: KeyCode.Digit3 | MetaKeys.CTRL_COMMAND,
+      preconditions: whenSheetEditorFocused,
+    },
+    {
+      id: SetRangeUnderlineCommand.id,
+      binding: KeyCode.Digit4 | MetaKeys.CTRL_COMMAND,
+      preconditions: whenSheetEditorFocused,
+    },
+    {
+      id: SetCellEditVisibleOperation.id,
+      binding: KeyCode.ENTER | MetaKeys.CTRL_COMMAND | MetaKeys.SHIFT,
+      preconditions: whenCellEditorNotFormulaActivated,
+      staticParameters: {
+        visible: false,
+        eventType: DeviceInputEventType.Keyboard,
+        keycode: KeyCode.ENTER | MetaKeys.CTRL_COMMAND,
+      },
+    },
     // Upstream's ⌃Enter precondition (whenEditorDidNotInputFormulaActivated)
     // is not exported; same context checks.
     {
@@ -669,9 +934,16 @@ export const _shortcutInternals = {
   KEY_NUMPAD_SUBTRACT,
   INSERT_CELLS_ID,
   DELETE_CELLS_ID,
+<<<<<<< ours
   EXTEND_TO_SHEET_HOME_ID,
   EXTEND_TO_SHEET_END_ID,
   RUN_APP_COMMAND_ID,
   RELEASED_SHORTCUT_ID,
+=======
+  EXPAND_ROW_HOME_ID,
+  EXPAND_SHEET_HOME_ID,
+  EXPAND_SHEET_END_ID,
+  SELECT_CURRENT_REGION_ID,
+>>>>>>> theirs
   unfrozenOrigin,
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { formatLength, parseCalibration } from '../src/renderer/measure'
 import { applySaveRequest } from '../src/main/save-pdf'
 import { AnnotationMode, OPS, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+<<<<<<< ours
 import {
   PDFArray,
   PDFDict,
@@ -11,6 +12,9 @@ import {
   PDFRawStream,
   StandardFonts,
 } from 'pdf-lib'
+=======
+import { PDFDocument } from 'pdf-lib'
+>>>>>>> theirs
 import type { SavePdfRequest } from '../src/shared/ipc'
 
 describe('formatLength', () => {
@@ -109,6 +113,7 @@ describe('the measure annotation in a save', () => {
     // in the file if the save embedded it for a document that draws no label
     expect(Buffer.from(plain.bytes).toString('latin1')).not.toContain('/BaseFont /Helvetica')
   })
+<<<<<<< ours
 
   it('grows /Rect and the appearance /BBox to contain the label box for any line angle', async () => {
     const cases: { from: [number, number]; to: [number, number]; label: string }[] = [
@@ -171,4 +176,6 @@ describe('the measure annotation in a save', () => {
       }
     }
   })
+=======
+>>>>>>> theirs
 })

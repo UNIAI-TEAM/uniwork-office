@@ -35,22 +35,30 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.4",
+<<<<<<< ours
     "electron": "43.8.3",
+=======
+    "electron": "^43.8.3",
+>>>>>>> theirs
     "electron-builder": "^26.0.12",
     "electron-vite": "^5.0.0",
     "jsdom": "^28.0.0",
     "marked": "^17.0.6",
-    "officecrypto-tool": "^0.0.19",
     "opentype.js": "^2.0.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "typescript": "^5.9.3",
+<<<<<<< ours
     "vite": "7.3.7",
     "vitest": "4.1.12"
   },
   "author": {
     "name": "UniWork",
     "email": "hello@uniwork.app"
+=======
+    "vite": "^7.3.7",
+    "vitest": "^4.1.12"
+>>>>>>> theirs
   },
   "build": {
     "appId": "com.uniwork.docs",
@@ -120,6 +128,11 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.2.108",
     "@genoffice/pptx-render": "*",
+<<<<<<< ours
     "@genoffice/xlsx-gateway": "*"
+=======
+    "@genoffice/xlsx-gateway": "*",
+    "@genoffice/agent-core": "*"
+>>>>>>> theirs
   }
 }

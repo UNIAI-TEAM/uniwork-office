@@ -38,7 +38,10 @@ const RELATIONSHIPS_NAMESPACE: &str =
 /// Imports the workbook at `path` into an IronCalc model, repairing absolute
 /// relationship targets first when the package uses them.
 pub(crate) fn load_model(path: &Path) -> Result<Model<'static>, SidecarError> {
+<<<<<<< ours
     require_style_parts(path)?;
+=======
+>>>>>>> theirs
     let Some(normalized) = normalized_package(path)? else {
         let path_text = path.to_str().ok_or_else(|| {
             SidecarError::InvalidRequest("Workbook path is not valid UTF-8.".into())
@@ -53,6 +56,7 @@ pub(crate) fn load_model(path: &Path) -> Result<Model<'static>, SidecarError> {
     Model::from_workbook(workbook, "en").map_err(import_error)
 }
 
+<<<<<<< ours
 /// The children of the style sheet IronCalc 0.9.1's importer takes the first
 /// of without checking that one exists (import/styles.rs).
 const REQUIRED_STYLE_PARTS: [&str; 6] = [
@@ -95,6 +99,8 @@ fn require_style_parts(path: &Path) -> Result<(), SidecarError> {
     }
 }
 
+=======
+>>>>>>> theirs
 fn import_error(error: impl std::fmt::Display) -> SidecarError {
     SidecarError::Workbook(format!("Formula engine import failed: {error}"))
 }
@@ -152,7 +158,11 @@ fn relationship_parts(
 ) -> Result<Vec<RelationshipPart>, SidecarError> {
     let mut parts = Vec::new();
     for index in 0..archive.len() {
+<<<<<<< ours
         let name = archive.by_index_raw(index)?.name().to_string();
+=======
+        let name = archive.by_index_raw(index)?.name()?.to_string();
+>>>>>>> theirs
         if name.ends_with('/') {
             continue;
         }
@@ -187,7 +197,11 @@ fn relationship_source_part(name: &str) -> Option<String> {
 
 fn read_part(archive: &mut ZipArchive<File>, index: usize) -> Result<String, SidecarError> {
     let mut entry = archive.by_index(index)?;
+<<<<<<< ours
     let name = entry.name().to_string();
+=======
+    let name = entry.name()?.to_string();
+>>>>>>> theirs
     let declared = entry.size();
     if declared > MAX_METADATA_PART_BYTES {
         return Err(SidecarError::Workbook(format!(
@@ -317,15 +331,24 @@ fn normalize_target(
         // stay the importer's business, exactly as before.
         Err(_) => return Ok(None),
     };
+<<<<<<< ours
+=======
+    if !absolute {
+        return Ok(None);
+    }
+>>>>>>> theirs
     if crate::zip_entry(archive, &resolved).is_err() {
         return Err(SidecarError::Workbook(format!(
             "workbook relationship target not found: {} -> {resolved} (resolved from {target})",
             source_label(source_part)
         )));
     }
+<<<<<<< ours
     if !absolute {
         return Ok(None);
     }
+=======
+>>>>>>> theirs
     let mut rewritten = relative_target(source_part, &resolved);
     if let Some((_, fragment)) = target.trim().split_once('#') {
         if !fragment.is_empty() {
@@ -383,7 +406,11 @@ fn write_package(
     for index in 0..archive.len() {
         match rewrites.get(&index) {
             Some(xml) => {
+<<<<<<< ours
                 let name = archive.by_index_raw(index)?.name().to_string();
+=======
+                let name = archive.by_index_raw(index)?.name()?.to_string();
+>>>>>>> theirs
                 writer.start_file(name, options)?;
                 writer.write_all(xml.as_bytes())?;
             }
@@ -492,6 +519,7 @@ mod tests {
     }
 
     #[test]
+<<<<<<< ours
     fn a_styles_part_missing_a_required_child_is_refused_instead_of_panicking_the_importer() {
         const ALL: &str = r#"<fonts count="1"/><fills count="1"/><borders count="1"/><cellStyleXfs count="1"/><cellXfs count="1"/><cellStyles count="1"/>"#;
         let styles = |body: &str| {
@@ -520,6 +548,8 @@ mod tests {
     }
 
     #[test]
+=======
+>>>>>>> theirs
     fn relative_only_packages_are_not_rewritten() {
         let (_dir, path) = relative_only_package();
         assert!(normalized_package(&path).unwrap().is_none());
@@ -553,6 +583,30 @@ mod tests {
     }
 
     #[test]
+<<<<<<< ours
+=======
+    fn a_dangling_relative_target_is_left_to_the_importer() {
+        let (_dir, path) = crate::tests::open_fixture(&[
+            (
+                "_rels/.rels",
+                r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#,
+            ),
+            (
+                "xl/_rels/workbook.xml.rels",
+                r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#,
+            ),
+            ("xl/workbook.xml", "<workbook/>"),
+            ("xl/worksheets/sheet1.xml", "<worksheet/>"),
+            (
+                "xl/worksheets/_rels/sheet1.xml.rels",
+                r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings" Target="../printerSettings/printerSettings1.bin"/></Relationships>"#,
+            ),
+        ]);
+        assert!(normalized_package(&path).unwrap().is_none());
+    }
+
+    #[test]
+>>>>>>> theirs
     fn a_missing_absolute_target_names_the_part() {
         let (_dir, path) = absolute_target_package(false);
         let error = normalized_package(&path).unwrap_err();

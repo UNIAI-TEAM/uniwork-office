@@ -6,7 +6,11 @@ const MAC = process.platform === 'darwin'
 const COMPACT_KEY = MAC ? 'Alt+Meta+KeyK' : 'Control+Alt+KeyK'
 
 /**
+<<<<<<< ours
  * The compact ribbon must fit what it holds (#1891).
+=======
+ * The compact ribbon must fit what it holds (genoffice#1891).
+>>>>>>> theirs
  *
  * `.ribbon-body` is a fixed-height band with `overflow-y: hidden`, and that is
  * deliberate: switching tabs must never resize the row. It is also a lid. The

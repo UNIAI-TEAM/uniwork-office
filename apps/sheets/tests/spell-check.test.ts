@@ -14,8 +14,11 @@ import {
   replaceInRichDoc,
   replaceSuggestion,
   runSheetSpellCheck,
+<<<<<<< ours
   SPELL_PROBE_WORD,
   spellEngineHasDictionary,
+=======
+>>>>>>> theirs
   tokenizeCellText,
   type SpellCellRef,
   type SpellEngine,
@@ -108,8 +111,13 @@ describe('collectWorkbookTextCells', () => {
 })
 
 describe('tokenizeCellText', () => {
+<<<<<<< ours
   it('splits on non-letters, lower-cases, and keeps first-seen order without repeats', () => {
     expect(tokenizeCellText('The the THE qick, qick! brown')).toEqual(['the', 'qick', 'brown'])
+=======
+  it('splits on non-letters, keeps the first-seen casing and order without repeats', () => {
+    expect(tokenizeCellText('The the THE qick, qick! brown')).toEqual(['The', 'qick', 'brown'])
+>>>>>>> theirs
   })
 
   it('keeps apostrophes and dashes inside a word, drops single letters and digits', () => {
@@ -239,6 +247,7 @@ describe('replaceInRichDoc', () => {
   })
 })
 
+<<<<<<< ours
 describe('spellEngineHasDictionary', () => {
   it('is true only when the engine flags the known-bad probe word', () => {
     const flags = (word: string) => word === SPELL_PROBE_WORD
@@ -261,6 +270,8 @@ describe('spellEngineHasDictionary', () => {
   })
 })
 
+=======
+>>>>>>> theirs
 describe('runSheetSpellCheck', () => {
   const ref = (address: string, text: string, sheetId = 'sheet-1'): SpellCellRef => ({
     sheetId,
@@ -284,13 +295,27 @@ describe('runSheetSpellCheck', () => {
   it('flags misspelled words per cell with as-written casing and capped suggestions', () => {
     const findings = runSheetSpellCheck(
       [ref('A1', 'the Qick fox'), ref('B1', 'all good')],
+<<<<<<< ours
       engineOf(['qick']),
+=======
+      engineOf(['Qick']),
+>>>>>>> theirs
       new Set(),
       new Set(),
     )
     expect(findings).toHaveLength(1)
     expect(findings[0]?.word).toBe('Qick')
+<<<<<<< ours
     expect(findings[0]?.suggestions).toEqual(['fix-qick', 'other'])
+=======
+    expect(findings[0]?.suggestions).toEqual(['fix-Qick', 'other'])
+  })
+
+  it('asks the engine with the spelling as written: a proper noun is not lower-cased', () => {
+    const calls: string[] = []
+    runSheetSpellCheck([ref('A1', 'to London')], engineOf(['london'], calls), new Set(), new Set())
+    expect(calls).toEqual(['to', 'London'])
+>>>>>>> theirs
   })
 
   it('asks the engine once per distinct word, not once per cell', () => {

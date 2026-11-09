@@ -32,6 +32,7 @@ const GLB_MAGIC = 0x46546c67
 const JSON_CHUNK = 0x4e4f534a
 const IDENTITY: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 
+<<<<<<< ours
 /** Whether `bytes` has a valid GLB 2.0 container header and initial JSON chunk inside the declared length. */
 export function isGlbContainer(bytes: Uint8Array): boolean {
   if (bytes.byteLength < 20) return false
@@ -54,6 +55,15 @@ export function glbJson(bytes: Uint8Array): GltfJson | null {
   if (!isGlbContainer(bytes)) return null
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const length = view.getUint32(12, true)
+=======
+/** The JSON chunk of a .glb, or null when the bytes are not glTF binary. */
+export function glbJson(bytes: Uint8Array): GltfJson | null {
+  if (bytes.byteLength < 20) return null
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  if (view.getUint32(0, true) !== GLB_MAGIC || view.getUint32(16, true) !== JSON_CHUNK) return null
+  const length = view.getUint32(12, true)
+  if (20 + length > bytes.byteLength) return null
+>>>>>>> theirs
   try {
     return JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + length))) as GltfJson
   } catch {

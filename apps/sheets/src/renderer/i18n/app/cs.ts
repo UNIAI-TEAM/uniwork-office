@@ -10,7 +10,11 @@ export const cs = {
   redactDialogPlaceholder: 'Název zástupného symbolu, např. telefon zákazníka',
   redactCancel: 'Zrušit',
   redactInsert: 'Skrýt',
+<<<<<<< ours
   redactEnable: 'Pravým klikem na výběr jej skryjete před AI.',
+=======
+  redactEnable: 'Pravým klikem na výběr jej skryjete před modelem.',
+>>>>>>> theirs
   redactNeedsSavedRow: 'Tento řádek zatím není v souboru. Nejprve uložte, pak buňku skryjte.',
   redactRecoveredFromNames:
     'Jiná aplikace tento soubor přepsala a zahodila záznam o tom, co je skrytoé. Skryté buňky byly obnoveny z názvů v sešitě; uložením se obnoví celý záznam.',
@@ -333,7 +337,9 @@ export const cs = {
   appFullLoadStart: 'Načíst vše',
   appFullLoadRunning: 'Načítá se celý sešit — řazení a filtrování se odemknou po dokončení…',
   appFullLoadTooLarge:
-    'Tento sešit je příliš velký na úplné načtení do paměti; řazení a filtrování nejsou pro tento soubor k dispozici.',
+    'Tento sešit je příliš velký na úplné načtení do paměti; řazení a přesouvání oblastí nejsou pro tento soubor k dispozici. Filtrování běží přímo nad souborem.',
+  appLargeFilterLoading: 'Čtení sloupce filtru ze souboru…',
+  appLargeFilterApplying: 'Použití filtru na soubor…',
   appSortValueModeFormulas:
     'Tato oblast obsahuje vzorce, které se v tomto velkém sešitu nepočítají živě — řazení nebo přesun by je uložily jako prosté hodnoty. Vyberte oblast bez vzorců.',
   appSortRangeTooLarge:
@@ -393,6 +399,8 @@ export const cs = {
   appTableNameUsed: 'Název tabulky „{name}“ už byl v této relaci použit.',
   appTableNameInFile: 'Název tabulky "{name}" již používá tabulka v souboru.',
   appTableOverlapsSession: 'Oblast se překrývá s tabulkou „{name}“ vytvořenou v této relaci.',
+  appTableOverlapsFile: 'Oblast se překrývá s tabulkou „{name}“ v souboru.',
+  appTableAlreadyInTable: 'Výběr už je v tabulce „{name}“ – styl změňte v Návrhu tabulky.',
   appTablesNeedFile: 'Nejprve otevřete soubor XLSX — tabulky se zapisují do souboru.',
   appTableSelectRange: 'Nejprve vyberte oblast dat — záhlaví v jejím prvním řádku.',
   appTableCreated: 'Tabulka vytvořena — uložte pomocí {saveKeys}.',
@@ -476,6 +484,7 @@ export const cs = {
   appGridlinesHidden: 'Mřížka skryta.',
   appGridlinesShown: 'Mřížka zobrazena.',
   appShowingFormulas: 'Zobrazeny vzorce — dalším přepnutím zobrazíte hodnoty.',
+  appShowingFormulasActive: 'Zobrazené vzorce',
   appShowingValues: 'Zobrazeny vypočítané hodnoty.',
   appTraceNoFormula: 'Předchůdci: aktivní buňka neobsahuje vzorec.',
   appTraceNoRefs: 'Předchůdci: tento vzorec neobsahuje žádné odkazy na buňky.',
@@ -522,6 +531,7 @@ export const cs = {
   appBridgeUnavailable:
     'Souborové rozhraní počítače není k dispozici. Restartujte aplikaci Electron.',
   appOpenCanceled: 'Výběr sešitu zrušen.',
+  appImportCanceled: 'Import zrušen.',
   appOpeningWorkbook: 'Otevírání sešitu…',
   appOpenStalled: 'Sešit se nepodařilo otevřít.',
   appOpenRetry: 'Zkusit znovu',
@@ -712,6 +722,7 @@ export const cs = {
   appExportPdfTitle: 'Exportovat do PDF',
   appSaveTitle: 'Uložit',
   appSaveAs: 'Uložit jako',
+  aiNameFile: 'Pojmenovat pomocí AI…',
   appUndo: 'Zpět',
   appRedo: 'Znovu',
   appUnsavedEditOne: '● {count} neuložená úprava',
@@ -743,7 +754,6 @@ export const cs = {
   appLinkPlaceholder: 'https://example.com nebo List1!A1',
   appRemoveLink: 'Odebrat odkaz',
   appNotAvailableYet: 'Zatím není k dispozici',
-  appComingSoon: 'Již brzy',
   appGroupChartLayouts: 'Rozložení grafu',
   appAddChartElement: 'Přidat prvek grafu',
   appAddChartElementTitle: 'Názvy, popisky dat, legenda',
@@ -1160,6 +1170,20 @@ export const cs = {
   appWatchCell: 'Buňka',
   appWatchValue: 'Hodnota',
   appWatchFormula: 'Vzorec',
+  appLinksPanel: 'Externí odkazy',
+  appLinksPanelDetail: 'Zobrazení, aktualizace a přerušení odkazů na jiné sešity',
+  appLinksUpdate: 'Aktualizovat hodnoty',
+  appLinksNone: 'Tento sešit neobsahuje odkazy na jiné sešity.',
+  appLinksUnsaved: 'Než vypíšete externí odkazy, uložte tento sešit.',
+  appLinksSource: 'Zdroj',
+  appLinksStatus: 'Stav',
+  appLinksSheets: 'Listy',
+  appLinksLocate: 'Zobrazit zdrojový soubor',
+  appLinksReachable: 'K dispozici',
+  appLinksBroken: 'Není k dispozici',
+  appLinksBreak: 'Přerušit odkaz',
+  appLinksBreakConfirm: 'Potvrdit přerušení',
+  appLinksChangeSource: 'Změnit zdroj',
   appGroupCalculation: 'Výpočet',
   appCalculationOptions: 'Možnosti výpočtů',
   appCalculationOptionsTitle: 'Automatický nebo ruční přepočet',
@@ -1176,8 +1200,16 @@ export const cs = {
   appGroupGetData: 'Načíst data',
   appFromTextCsv: 'Z textu/CSV',
   appRefreshAll: 'Aktualizovat vše',
+  appRefreshQuery: 'Obnovit dotaz',
+  appQueryConnectionsTitle: 'Aktualizovat dotazy sešita',
+  appQueryRefreshing: 'Obnovuji {name}…',
+  appQueryRefreshed: '{name} aktualizováno ({rows} řádků)',
+  appQueryRefreshedClipped: '{name} aktualizováno ({rows} řádků, {dropped} se nevešlo do rozsahu)',
+  appQueryRefreshFailed: '{name} se nepodařilo aktualizovat',
   appWorkbookNoPivot: 'V tomto sešitu nejsou žádné kontingenční tabulky.',
   appRefreshAllTitle: 'Aktualizovat všechny kontingenční tabulky',
+  appQueriesConnections: 'Dotazy a připojení',
+  appQueriesConnectionsTitle: 'Zobrazit dotazy a datová připojení sešitu',
   appErrorCheckingDetail: 'Prohledat list na chybové hodnoty',
   appErrorsFound: '{count} chyb — v {cell}: {value}',
   appCheckingErrors: 'Prohledává se celý list na chyby…',
@@ -1212,6 +1244,7 @@ export const cs = {
   appGroupForecast: 'Prognóza',
   appWhatIfAnalysis: 'Citlivostní analýza',
   appGoalSeek: 'Hledání řešení',
+  appDataTable: 'Datová tabulka',
   appWhatIfTitle: 'Najít vstup pro cílovou hodnotu',
   appGoalSeekNeedsFormula: 'Nastavená buňka musí obsahovat vzorec.',
   appGoalSeekByCellNotNumber: 'Měněná buňka musí obsahovat prosté číslo nebo být prázdná.',
@@ -1309,12 +1342,15 @@ export const cs = {
   appPasswordUpdating: 'Aktualizuje se…',
   appUpdatePassword: 'Aktualizovat heslo',
   appWorkbookNotPasswordProtected: 'Tento sešit není chráněn heslem pro otevření.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Sešit chráněný heslem nelze uložit do dokumentu UniWork. Pomocí Uložit jako ponechte šifrovanou kopii v tomto počítači.',
   appPasswordChangeUniwork: 'Heslo dokumentu UniWork zde nelze změnit.',
   appPasswordChangeReadOnly: 'Tento sešit je jen pro čtení, takže jeho heslo nelze změnit.',
   appEncryptedWrongPassword: 'Heslo není správné. Zkuste to znovu.',
   appPasswordChangeRestored: 'Nejprve uložte obnovený sešit a teprve poté změňte jeho heslo.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Povolit úpravy oblastí',
   appGroupClipboard: 'Schránka',
   appPaste: 'Vložit',
@@ -1576,6 +1612,7 @@ export const cs = {
   appVisualFlipV: 'Převrátit svisle',
   appVisualFlipH: 'Převrátit vodorovně',
   appCtxPasteVisual: 'Vložit obrázek nebo obrazec',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Tento sešit zatím nelze otevřít na webu',
   appWebEngineBody:
@@ -1603,6 +1640,8 @@ export const cs = {
   appWebSavedReopenFailed:
     'Vaše změny byly uloženy do UniWork, ale sešit se zde nepodařilo znovu otevřít. Chcete-li pokračovat, načtěte editor znovu.',
   appDataTable: 'Datová tabulka',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Pravopis',
@@ -1611,7 +1650,11 @@ export const cs = {
   appSpellToggleTip:
     'Zapne kontrolu pravopisu (F7 a tlačítko Revize); po vypnutí pole komentářů nezobrazují vlnkové podtržení',
   appSpellOn: 'Kontrola pravopisu zapnuta.',
+<<<<<<< ours
   appSpellOff: 'Kontrola pravopisu je vypnutá. Zapněte ji v Revize ▸ Kontrola pravopisu.',
+=======
+  appSpellOff: 'Kontrola pravopisu je vypnutá. Zapněte ji v Revize ▸ Kontrola.',
+>>>>>>> theirs
   appSpellRecheck: 'Zkontrolovat znovu',
   appSpellNone: 'Nenalezeny žádné podezřelé pravopisné chyby.',
   appSpellFindings: 'Podezřelých chyb: {count}. Kliknutím na řádek přejdete na buňku.',

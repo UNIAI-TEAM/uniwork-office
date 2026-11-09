@@ -1,10 +1,19 @@
-//! Legacy-format import: reads an .xls (or anything calamine understands)
+//! Legacy-format import: reads an .xls or .ods (anything calamine understands)
 //! and writes a minimal .xlsx with values, formulas, and date number formats.
 //! What the binary layer of an .xls holds beyond cells comes along too — the
 //! drawing group's embedded pictures with their anchors, merges, column
+<<<<<<< ours
 //! widths and hand-set row heights (see `xls_biff` and `escher`). Styles
 //! beyond date formats are not carried over — the converted file is a fresh
 //! workbook, not a byte-preserving edit.
+=======
+//! widths, hand-set row heights, and the cell formatting — fonts, fills,
+//! borders, alignment, number formats (see `xls_biff`, `xls_styles` and
+//! `escher`). Charts and conditional formats are not carried over — the
+//! converted file is a fresh workbook, not a byte-preserving edit. ODF arrives in its own reference
+//! dialect, so formulas go through `odf::translate_formula` first and any
+//! that cannot be proven correct keep only their cached result.
+>>>>>>> theirs
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -17,9 +26,24 @@ use crate::SidecarError;
 use crate::escher::{self, Blip, BlipKind};
 use crate::spreadsheetml;
 use crate::xls_biff::{self, XlsSheetBinary};
+<<<<<<< ours
 use crate::xlsx_package::{
     SheetArt, SheetSpec, cell_reference, escape_xml, worksheet_document, write_package,
 };
+=======
+use crate::xls_styles::XlsStyles;
+use crate::xlsx_package::{
+    STYLES_XML, SheetArt, SheetSpec, cell_reference, escape_xml, iso_serial, worksheet_document,
+    write_package,
+};
+
+/// `s` indices the converter wrote: per cell, per row, and the column spans.
+#[derive(Default)]
+struct SheetStyles {
+    cells: HashMap<(u32, u32), u16>,
+    rows: HashMap<u32, u16>,
+}
+>>>>>>> theirs
 
 pub struct ConvertResult {
     pub sheets: usize,
@@ -58,7 +82,11 @@ fn unreadable_container_hint(source: &Path) -> Option<String> {
     };
     Some(format!(
         "This file is not a workbook container: its content is text or XML rather than \
+<<<<<<< ours
          an Excel workbook package, and it begins with \"{first_line}\"."
+=======
+         an Excel/ODF package, and it begins with \"{first_line}\"."
+>>>>>>> theirs
     ))
 }
 
@@ -86,8 +114,13 @@ pub fn convert_to_xlsx(source: &Path, target: &Path) -> Result<ConvertResult, Si
     if names.is_empty() {
         return Err(SidecarError::Workbook("The workbook has no sheets.".into()));
     }
+<<<<<<< ours
     // The binary layer only exists for real .xls containers; XML spreadsheets
     // convert without it.
+=======
+    // The binary layer only exists for real .xls containers; ODF and XML
+    // spreadsheets convert without it.
+>>>>>>> theirs
     let binary = xls_biff::read_xls_binary(source);
 
     let is_xls = matches!(workbook, Sheets::Xls(_));
@@ -113,14 +146,50 @@ pub fn convert_to_xlsx(source: &Path, target: &Path) -> Result<ConvertResult, Si
         if let Some(formula_range) = formulas {
             let (start_row, start_col) = formula_range.start().unwrap_or((0, 0));
             for (row, column, formula) in formula_range.used_cells() {
-                if !formula.is_empty() {
-                    formula_map.insert(
-                        (start_row + row as u32, start_col + column as u32),
-                        formula.clone(),
-                    );
+                if formula.is_empty() {
+                    continue;
                 }
+                // An ODF formula with no provably-correct A1 spelling keeps only
+                // its cached result: `of:=[.A1]` is not an OOXML token sequence,
+                // and Excel answers one with a repair prompt.
+                let Some(translated) = crate::odf::translate_formula(formula) else {
+                    continue;
+                };
+                formula_map.insert(
+                    (start_row + row as u32, start_col + column as u32),
+                    translated,
+                );
             }
         }
+        let sheet_binary = binary.as_ref().and_then(|b| b.sheets.get(index));
+        let styles = binary.as_ref().map(|b| &b.styles);
+        let columns = match (sheet_binary, styles) {
+            (Some(sheet), Some(styles)) => cols_xml(sheet, styles),
+            _ => String::new(),
+        };
+        let sheet_styles = match (sheet_binary, styles) {
+            (Some(sheet), Some(styles)) => sheet_styles(sheet, styles),
+            _ => SheetStyles::default(),
+        };
+        let heights = match sheet_binary {
+            Some(sheet) => sheet
+                .row_heights
+                .iter()
+                .map(|(row, twips, custom)| (*row, (*twips, *custom)))
+                .collect(),
+            None => HashMap::new(),
+        };
+        let mut tail = match &mut workbook {
+            Sheets::Xls(reader) => {
+                merges_xml(&reader.merge_cells_by_sheet_name(name).unwrap_or_default())
+            }
+            _ => String::new(),
+        };
+        if sheet_binary.is_some_and(|sheet| sheet.drawing.is_some()) {
+            // the drawing part is written beside this sheet, always rId1 there
+            tail.push_str(r#"<drawing r:id="rId1"/>"#);
+        }
+<<<<<<< ours
         let sheet_binary = binary.as_ref().and_then(|b| b.sheets.get(index));
         let columns = sheet_binary.map(cols_xml).unwrap_or_default();
         let heights = match sheet_binary {
@@ -142,6 +211,16 @@ pub fn convert_to_xlsx(source: &Path, target: &Path) -> Result<ConvertResult, Si
             tail.push_str(r#"<drawing r:id="rId1"/>"#);
         }
         let (xml, sheet_cells) = worksheet_xml(&range, &formula_map, &columns, &tail, &heights);
+=======
+        let (xml, sheet_cells) = worksheet_xml(
+            &range,
+            &formula_map,
+            &columns,
+            &tail,
+            &heights,
+            &sheet_styles,
+        );
+>>>>>>> theirs
         cells += sheet_cells;
         sheet_xmls.push(xml);
     }
@@ -165,7 +244,15 @@ pub fn convert_to_xlsx(source: &Path, target: &Path) -> Result<ConvertResult, Si
             state: None,
         })
         .collect();
+<<<<<<< ours
     write_package(target, &sheets, "", &sheet_xmls, &art)?;
+=======
+    let styles_xml = match &binary {
+        Some(binary) if !binary.styles.is_empty() => binary.styles.styles_xml(),
+        _ => STYLES_XML.to_string(),
+    };
+    write_package(target, &sheets, "", &sheet_xmls, &art, &styles_xml)?;
+>>>>>>> theirs
     Ok(ConvertResult {
         sheets: names.len(),
         cells,
@@ -197,11 +284,19 @@ fn merges_xml(merges: &[Dimensions]) -> String {
 /// default width as one span covering every column; a span that wide is the
 /// default, not a custom width, and goes back out only through the anchor
 /// arithmetic.
+<<<<<<< ours
 fn cols_xml(sheet: &XlsSheetBinary) -> String {
     let custom: Vec<_> = sheet
         .col_infos
         .iter()
         .filter(|(first, last, _)| *first <= *last && *first < 16384 && *last < CUSTOM_COLUMN_LIMIT)
+=======
+fn cols_xml(sheet: &XlsSheetBinary, styles: &XlsStyles) -> String {
+    let custom: Vec<_> = sheet
+        .col_infos
+        .iter()
+        .filter(|(_, last, _)| *last < 100)
+>>>>>>> theirs
         .collect();
     if custom.is_empty() {
         return String::new();
@@ -209,8 +304,20 @@ fn cols_xml(sheet: &XlsSheetBinary) -> String {
     let entries: String = custom
         .iter()
         .map(|(first, last, width)| {
+<<<<<<< ours
             format!(
                 r#"<col min="{}" max="{}" width="{:.2}" customWidth="1"/>"#,
+=======
+            let style = sheet
+                .col_styles
+                .iter()
+                .find(|(f, l, _)| f == first && l == last)
+                .and_then(|(_, _, ixfe)| styles.cell_style(*ixfe))
+                .map(|s| format!(r#" style="{s}""#))
+                .unwrap_or_default();
+            format!(
+                r#"<col min="{}" max="{}" width="{:.2}" customWidth="1"{style}/>"#,
+>>>>>>> theirs
                 first + 1,
                 (*last).min(16383) + 1,
                 f64::from(*width) / 256.0,
@@ -220,6 +327,7 @@ fn cols_xml(sheet: &XlsSheetBinary) -> String {
     format!("<cols>{entries}</cols>")
 }
 
+<<<<<<< ours
 /// Column widths below this index can carry their own COLINFO width; a span
 /// reaching past it is the sheet's default echoed back (see `cols_xml`).
 const CUSTOM_COLUMN_LIMIT: u16 = 100;
@@ -303,6 +411,75 @@ fn edges(sizes: &[f64]) -> Vec<f64> {
         sum += size;
     }
     out
+=======
+/// Every `s` the sheet's records ask for, resolved against the XF table. The
+/// general XF (index 15 in a Excel-written file, 0 in a bare one) is the
+/// default and stays implicit, so untouched cells do not pick up an `s`.
+fn sheet_styles(sheet: &XlsSheetBinary, styles: &XlsStyles) -> SheetStyles {
+    let mut out = SheetStyles::default();
+    let default = default_xf(styles);
+    for (row, col, ixfe) in &sheet.cell_styles {
+        if *ixfe == default {
+            continue;
+        }
+        if let Some(s) = styles.cell_style(*ixfe) {
+            out.cells.insert((u32::from(*row), u32::from(*col)), s);
+        }
+    }
+    for (row, ixfe) in &sheet.row_styles {
+        if *ixfe == default {
+            continue;
+        }
+        if let Some(s) = styles.cell_style(*ixfe) {
+            out.rows.insert(u32::from(*row), s);
+        }
+    }
+    out
+}
+
+/// The cell XF Excel hands unformatted cells: the first XF that is not a
+/// style XF — index 15 in Excel's own files, where 0–14 are style XFs.
+fn default_xf(styles: &XlsStyles) -> u16 {
+    styles
+        .xfs
+        .iter()
+        .position(|xf| !xf.is_style)
+        .map_or(0, |index| index as u16)
+}
+
+/// The width of one column in characters of the default font, for the anchor
+/// arithmetic: a custom COLINFO entry when one covers it, else the wide
+/// default span, else the spec's 8.43.
+fn col_width_chars(sheet: &XlsSheetBinary, column: u16) -> f64 {
+    let mut default = 8.43;
+    for (first, last, width) in &sheet.col_infos {
+        let chars = f64::from(*width) / 256.0;
+        if *last >= 100 {
+            default = chars;
+        } else if column >= *first && column <= *last {
+            return chars;
+        }
+    }
+    default
+}
+
+/// Column width in pixels under Calibri-11 metrics — the same 7 px per
+/// character the workbook DSL's width ops use.
+fn col_px(sheet: &XlsSheetBinary, column: u16) -> f64 {
+    (col_width_chars(sheet, column) * 7.0).round() + 5.0
+}
+
+/// Row height in pixels: twips → points → pixels at 96 dpi. Rows the file
+/// describes carry their own height; the rest get the 12.75 pt default.
+fn row_px(sheet: &XlsSheetBinary, row: u16) -> f64 {
+    let twips = sheet
+        .row_heights
+        .iter()
+        .find(|(candidate, _, _)| *candidate == row)
+        .map(|(_, twips, _)| *twips)
+        .unwrap_or(255);
+    f64::from(twips) / 15.0
+>>>>>>> theirs
 }
 
 fn px_to_emu(px: f64) -> i64 {
@@ -320,13 +497,20 @@ fn sheet_art(
     media_names: &mut HashMap<usize, String>,
 ) -> Option<SheetArt> {
     let pictures = escher::parse_pictures(drawing);
+<<<<<<< ours
     let metrics = SheetMetrics::new(sheet);
+=======
+>>>>>>> theirs
     let mut anchors_xml = String::new();
     let mut rels_xml = String::new();
     let mut media: Vec<(String, Vec<u8>)> = Vec::new();
     let mut rel_count = 0usize;
     let mut rel_of_blip: HashMap<usize, usize> = HashMap::new();
+<<<<<<< ours
     for (position, picture) in pictures.iter().take(MAX_PICTURES_PER_SHEET).enumerate() {
+=======
+    for (position, picture) in pictures.iter().enumerate() {
+>>>>>>> theirs
         let [col_l, dx_l, row_t, dy_t, col_r, dx_r, row_b, dy_b] = picture.anchor;
         if col_r == u16::MAX || row_b == u16::MAX {
             // "runs to the sheet's edge" — an extent the cell grid cannot name
@@ -364,6 +548,7 @@ fn sheet_art(
                 rel
             }
         };
+<<<<<<< ours
         let from_x = metrics.column_span_px(col_l, dx_l);
         let from_y = metrics.row_span_px(row_t, dy_t);
         let to_x = metrics.column_span_px(col_r, dx_r);
@@ -374,6 +559,18 @@ fn sheet_art(
             px_to_emu(metrics.row_px[usize::from(row_t)] * f64::from(dy_t) / 1024.0),
             px_to_emu(metrics.col_px[usize::from(col_r)] * f64::from(dx_r) / 1024.0),
             px_to_emu(metrics.row_px[usize::from(row_b)] * f64::from(dy_b) / 1024.0),
+=======
+        let from_x = column_span_px(sheet, col_l, dx_l);
+        let from_y = row_span_px(sheet, row_t, dy_t);
+        let to_x = column_span_px(sheet, col_r, dx_r);
+        let to_y = row_span_px(sheet, row_b, dy_b);
+        anchors_xml.push_str(&format!(
+            r#"<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>{col_l}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{row_t}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:from><xdr:to><xdr:col>{col_r}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{row_b}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="{}" name="Picture {}"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId{rel}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="{}" y="{}"/><a:ext cx="{}" cy="{}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>"#,
+            px_to_emu(col_px(sheet, col_l) * f64::from(dx_l) / 1024.0),
+            px_to_emu(row_px(sheet, row_t) * f64::from(dy_t) / 1024.0),
+            px_to_emu(col_px(sheet, col_r) * f64::from(dx_r) / 1024.0),
+            px_to_emu(row_px(sheet, row_b) * f64::from(dy_b) / 1024.0),
+>>>>>>> theirs
             position + 1,
             position + 1,
             px_to_emu(from_x),
@@ -396,12 +593,31 @@ fn sheet_art(
     })
 }
 
+<<<<<<< ours
+=======
+/// The left edge of `column` plus `offset` 1024ths of its width, in pixels.
+fn column_span_px(sheet: &XlsSheetBinary, column: u16, offset: u16) -> f64 {
+    let full: f64 = (0..column).map(|step| col_px(sheet, step)).sum();
+    full + col_px(sheet, column) * f64::from(offset) / 1024.0
+}
+
+/// The top edge of `row` plus `offset` 1024ths of its height, in pixels.
+fn row_span_px(sheet: &XlsSheetBinary, row: u16, offset: u16) -> f64 {
+    let full: f64 = (0..row).map(|step| row_px(sheet, step)).sum();
+    full + row_px(sheet, row) * f64::from(offset) / 1024.0
+}
+
+>>>>>>> theirs
 fn worksheet_xml(
     range: &calamine::Range<Data>,
     formulas: &HashMap<(u32, u32), String>,
     columns: &str,
     tail: &str,
     heights: &HashMap<u16, (u16, bool)>,
+<<<<<<< ours
+=======
+    styles: &SheetStyles,
+>>>>>>> theirs
 ) -> (String, usize) {
     // Rows carrying values plus rows carrying only formulas or a height.
     let mut rows: HashMap<u32, Vec<(u32, String)>> = HashMap::new();
@@ -410,7 +626,8 @@ fn worksheet_xml(
     for (row, column, value) in range.used_cells() {
         let absolute = (start_row + row as u32, start_col + column as u32);
         let formula = formulas.get(&absolute).map(String::as_str);
-        if let Some(cell) = cell_xml(absolute, value, formula) {
+        let style = styles.cells.get(&absolute).copied();
+        if let Some(cell) = cell_xml(absolute, value, formula, style) {
             cells += 1;
             rows.entry(absolute.0).or_default().push((absolute.1, cell));
         }
@@ -421,10 +638,15 @@ fn worksheet_xml(
             .is_some_and(|v| *v != Data::Empty);
         if !covered {
             cells += 1;
+            let style = styles
+                .cells
+                .get(position)
+                .map(|s| format!(r#" s="{s}""#))
+                .unwrap_or_default();
             rows.entry(position.0).or_default().push((
                 position.1,
                 format!(
-                    r#"<c r="{}"><f>{}</f></c>"#,
+                    r#"<c r="{}"{style}><f>{}</f></c>"#,
                     cell_reference(position.0, position.1),
                     escape_xml(formula),
                 ),
@@ -436,6 +658,29 @@ fn worksheet_xml(
             rows.insert(u32::from(*row), Vec::new());
         }
     }
+<<<<<<< ours
+=======
+    // A formatted empty cell (borders, a fill) has no value for calamine to
+    // report; it exists only through its style.
+    for (position, style) in &styles.cells {
+        let covered = range
+            .get_value((position.0, position.1))
+            .is_some_and(|v| *v != Data::Empty)
+            || formulas.contains_key(position);
+        if !covered {
+            rows.entry(position.0).or_default().push((
+                position.1,
+                format!(
+                    r#"<c r="{}" s="{style}"/>"#,
+                    cell_reference(position.0, position.1)
+                ),
+            ));
+        }
+    }
+    for row in styles.rows.keys() {
+        rows.entry(*row).or_default();
+    }
+>>>>>>> theirs
 
     let mut row_numbers: Vec<u32> = rows.keys().copied().collect();
     row_numbers.sort_unstable();
@@ -451,7 +696,15 @@ fn worksheet_xml(
             }
             _ => String::new(),
         };
+<<<<<<< ours
         body.push_str(&format!(r#"<row r="{}"{height}>"#, row + 1));
+=======
+        let row_style = match styles.rows.get(&row) {
+            Some(s) => format!(r#" s="{s}" customFormat="1""#),
+            None => String::new(),
+        };
+        body.push_str(&format!(r#"<row r="{}"{height}{row_style}>"#, row + 1));
+>>>>>>> theirs
         for (_, cell) in line {
             body.push_str(&cell);
         }
@@ -469,8 +722,17 @@ fn worksheet_xml(
     (worksheet_document(&dimension, columns, &body, tail), cells)
 }
 
-fn cell_xml(position: (u32, u32), value: &Data, formula: Option<&str>) -> Option<String> {
+fn cell_xml(
+    position: (u32, u32),
+    value: &Data,
+    formula: Option<&str>,
+    style: Option<u16>,
+) -> Option<String> {
     let reference = cell_reference(position.0, position.1);
+    let head = match style {
+        Some(s) => format!(r#"r="{reference}" s="{s}""#),
+        None => format!(r#"r="{reference}""#),
+    };
     let formula_xml = formula
         .map(|text| format!("<f>{}</f>", escape_xml(text)))
         .unwrap_or_default();
@@ -479,35 +741,53 @@ fn cell_xml(position: (u32, u32), value: &Data, formula: Option<&str>) -> Option
             if formula.is_none() {
                 return None;
             }
-            format!(r#"<c r="{reference}">{formula_xml}</c>"#)
+            format!(r#"<c {head}>{formula_xml}</c>"#)
         }
         Data::String(text) => format!(
-            r#"<c r="{reference}" t="inlineStr">{formula_xml}<is><t xml:space="preserve">{}</t></is></c>"#,
+            r#"<c {head} t="inlineStr">{formula_xml}<is><t xml:space="preserve">{}</t></is></c>"#,
             escape_xml(text),
         ),
-        Data::Float(number) => format!(r#"<c r="{reference}">{formula_xml}<v>{number}</v></c>"#),
-        Data::Int(number) => format!(r#"<c r="{reference}">{formula_xml}<v>{number}</v></c>"#),
+        Data::Float(number) => format!(r#"<c {head}>{formula_xml}<v>{number}</v></c>"#),
+        Data::Int(number) => format!(r#"<c {head}>{formula_xml}<v>{number}</v></c>"#),
         Data::Bool(flag) => format!(
-            r#"<c r="{reference}" t="b">{formula_xml}<v>{}</v></c>"#,
+            r#"<c {head} t="b">{formula_xml}<v>{}</v></c>"#,
             if *flag { 1 } else { 0 },
         ),
-        Data::DateTime(datetime) => {
-            let serial = datetime.as_f64();
-            let style = if serial.fract() == 0.0 { 1 } else { 2 };
-            format!(r#"<c r="{reference}" s="{style}">{formula_xml}<v>{serial}</v></c>"#)
-        }
+        Data::DateTime(datetime) => date_cell(&reference, &formula_xml, datetime.as_f64(), style),
         Data::Error(error) => format!(
-            r#"<c r="{reference}" t="e">{formula_xml}<v>{}</v></c>"#,
+            r#"<c {head} t="e">{formula_xml}<v>{}</v></c>"#,
             escape_xml(&error.to_string()),
         ),
-        Data::DateTimeIso(text) | Data::DurationIso(text) => format!(
-            r#"<c r="{reference}" t="inlineStr">{formula_xml}<is><t xml:space="preserve">{}</t></is></c>"#,
-            escape_xml(text),
-        ),
+        // ODF keeps a date as ISO text (`office:date-value="2026-03-05"`) rather
+        // than as a serial, so the text form is turned back into one here: left
+        // as text, every imported date would sort and calculate as a string.
+        Data::DateTimeIso(text) => match iso_serial(text) {
+            Some(serial) => date_cell(&reference, &formula_xml, serial, style),
+            None => text_cell(&head, &formula_xml, text),
+        },
+        Data::DurationIso(text) => text_cell(&head, &formula_xml, text),
     };
     Some(cell)
 }
 
+<<<<<<< ours
+=======
+/// A date cell keeps the file's own number format when it has one; otherwise
+/// whole serials take the short-date format, timed ones the date+time one
+/// (xf 1 / xf 2 of STYLES_XML).
+fn date_cell(reference: &str, formula_xml: &str, serial: f64, style: Option<u16>) -> String {
+    let style = style.unwrap_or(if serial.fract() == 0.0 { 1 } else { 2 });
+    format!(r#"<c r="{reference}" s="{style}">{formula_xml}<v>{serial}</v></c>"#)
+}
+
+fn text_cell(head: &str, formula_xml: &str, text: &str) -> String {
+    format!(
+        r#"<c {head} t="inlineStr">{formula_xml}<is><t xml:space="preserve">{}</t></is></c>"#,
+        escape_xml(text),
+    )
+}
+
+>>>>>>> theirs
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -563,6 +843,7 @@ mod tests {
         assert!(types.contains(r#"<Override PartName="/xl/drawings/drawing1.xml""#));
     }
 
+<<<<<<< ours
     fn sheet_binary(
         col_infos: Vec<(u16, u16, u16)>,
         row_heights: Vec<(u16, u16, bool)>,
@@ -644,6 +925,40 @@ mod tests {
             art.xml.matches("<xdr:twoCellAnchor ").count(),
             MAX_PICTURES_PER_SHEET
         );
+=======
+    #[test]
+    fn carries_cell_styles_from_a_legacy_workbook() {
+        // A BIFF8 file written by LibreOffice: a merged banner with a white
+        // bold Arial on navy, a bordered yellow header row, a custom number
+        // format, a thick red bottom border, a bordered empty cell, a percent,
+        // a rotated cell and a picture.
+        let fixture = Path::new("tests/fixtures/cell-styles.xls");
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("converted.xlsx");
+        convert_to_xlsx(fixture, &target).unwrap();
+
+        let styles = read_entry(&target, "xl/styles.xml");
+        let sheet = read_entry(&target, "xl/worksheets/sheet1.xml");
+        assert!(styles.contains(r#"<b/>"#));
+        assert!(styles.contains(r#"<name val="Arial"/>"#));
+        assert!(styles.contains(r#"<fgColor rgb="FF003366"/>"#));
+        assert!(styles.contains(r#"<fgColor rgb="FFFFFF99"/>"#));
+        assert!(styles.contains(r#"<bottom style="thick"><color rgb="FFFF0000"/></bottom>"#));
+        assert!(styles.contains(r##"formatCode="#,##0.00&quot; TL&quot;""##));
+        assert!(
+            styles.contains(r#"<alignment horizontal="center" vertical="center" wrapText="1"/>"#)
+        );
+        assert!(styles.contains(r#"textRotation="45""#));
+        assert!(styles.contains(r#"<strike/>"#));
+        assert!(styles.contains(r#"<u/>"#));
+        let percent = styles.find(r#"numFmtId="9""#).expect("the percent xf");
+        assert!(styles[percent..].starts_with(r#"numFmtId="9" fontId="#));
+        // the bordered empty cell exists only through its style
+        assert!(sheet.contains(r#"<c r="D3" s=""#));
+        assert!(sheet.contains(r#"<c r="A1" s=""#));
+        assert!(sheet.contains(r#"<col min="1" max="1" width="28"#));
+        assert!(sheet.contains(r#"<drawing r:id="rId1"/>"#));
+>>>>>>> theirs
     }
 
     #[test]
@@ -670,6 +985,7 @@ mod tests {
     }
 
     #[test]
+<<<<<<< ours
     fn biff8_xls_conversion_drops_corrupted_calamine_formulas_and_preserves_cached_values() {
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/vn-budget.xls");
         let dir = tempfile::tempdir().unwrap();
@@ -701,6 +1017,160 @@ mod tests {
         assert!(sheet2.contains(r#"<c r="B5"><v>415</v></c>"#));
         assert!(sheet2.contains(r#"<c r="D5"><v>900</v></c>"#));
         assert!(sheet3.contains(r#"<c r="B1"><v>990</v></c>"#));
+=======
+    fn iso_dates_become_serials_and_suspicious_ones_stay_text() {
+        assert_eq!(iso_serial("2026-03-05"), Some(46_086.0));
+        assert_eq!(iso_serial("1900-03-01"), Some(61.0));
+        assert_eq!(iso_serial("2026-03-05T12:00:00"), Some(46_086.5));
+        let timed = iso_serial("2026-03-05T06:30:15.5").unwrap();
+        assert!((timed - 46_086.271_012_731_48).abs() < 1e-9);
+        // Excel's phantom 1900 leap day sits under the 61 line.
+        assert_eq!(iso_serial("1900-02-28"), None);
+        assert_eq!(iso_serial("2026-02-30"), None);
+        assert_eq!(iso_serial("2026-13-01"), None);
+        assert_eq!(iso_serial("2026-03-05T1:2"), None);
+        assert_eq!(iso_serial("2026-03-05T10:20:30Z"), None);
+        assert_eq!(iso_serial("PT1H30M"), None);
+    }
+
+    #[test]
+    fn converts_an_odf_workbook_translating_formulas_and_dates() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("probe.ods");
+        ods_fixture(&source);
+        let target = dir.path().join("converted.xlsx");
+
+        let result = convert_to_xlsx(&source, &target).unwrap();
+        assert_eq!(result.sheets, 2);
+
+        let sheet = read_entry(&target, "xl/worksheets/sheet1.xml");
+        // the `of:` reference dialect comes back as A1 semantics
+        assert!(sheet.contains(r#"<c r="C1"><f>A1+B1*2</f><v>20</v></c>"#));
+        assert!(sheet.contains(r#"<c r="A2"><f>SUM(A1:B1)</f><v>15</v></c>"#));
+        assert!(sheet.contains(r#"<c r="B2"><f>Other!B1*2</f><v>100</v></c>"#));
+        // a construct with no OOXML spelling keeps its cached result only
+        assert!(sheet.contains(r#"<c r="D1"><v>7</v></c>"#));
+        assert!(!sheet.contains("$Sales"));
+        // office:date-value lands as a dated number, not the text it arrived as
+        assert!(sheet.contains(r#"<c r="A3" s="1"><v>46086</v></c>"#));
+        let workbook = read_entry(&target, "xl/workbook.xml");
+        assert!(workbook.contains(r#"<sheet name="Other" sheetId="2" r:id="rId2"/>"#));
+    }
+
+    // A workbook saved by LibreOffice itself, committed rather than generated
+    // because CI has no LibreOffice. Regenerate with
+    /// `soffice --headless --convert-to ods --outdir <dir> <repo>/apps/sheets/native/xlsx-engine/tests/fixtures/cross-sheet-references.fods`
+    /// from the committed `.fods` source next to it.
+    ///
+    /// It pins the dialect a real save produces: every other-sheet reference is
+    /// absolute-sheet and apostrophe-quoted (`[$Other.A1]`, `[$'My Sheet'.A1]`,
+    /// `SUM([$Data.A1:$Data.B2])`), which a hand-written fixture never produces.
+    #[test]
+    fn converts_a_libreoffice_saved_workbook_with_absolute_sheet_references() {
+        let dir = tempfile::tempdir().unwrap();
+        let source =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/cross-sheet-references.ods");
+        let target = dir.path().join("converted.xlsx");
+
+        let result = convert_to_xlsx(&source, &target).unwrap();
+        assert_eq!(result.sheets, 4);
+
+        let sheet = read_entry(&target, "xl/worksheets/sheet1.xml");
+        assert!(sheet.contains(r#"<c r="C1"><f>Other!A1*2</f><v>200</v></c>"#));
+        assert!(sheet.contains(r#"<c r="D1"><f>'My Sheet'!A1+1</f><v>11</v></c>"#));
+        assert!(sheet.contains(r#"<c r="E1"><f>SUM(Data!A1:B2)</f><v>30</v></c>"#));
+        assert!(sheet.contains(r#"<c r="F1"><f>SUM(Data!$A$1:$B$2)</f><v>30</v></c>"#));
+        // the self-sheet form LibreOffice shares with every other ODF writer
+        assert!(sheet.contains(r#"<c r="G1"><f>SUM(A1:B1)</f><v>15</v></c>"#));
+        // no reference keeps ODF's `$` sheet marker or its doubled quoting
+        assert!(!sheet.contains("'$"), "{sheet}");
+        let workbook = read_entry(&target, "xl/workbook.xml");
+        assert!(workbook.contains(r#"<sheet name="My Sheet""#));
+    }
+
+    /// A minimal ODF spreadsheet: the `mimetype` entry first, then a
+    /// `content.xml` kept free of inter-element whitespace, which the ODF
+    /// reader treats as cell text.
+    fn ods_fixture(path: &Path) {
+        ods_fixture_with_mimetype(path, "application/vnd.oasis.opendocument.spreadsheet");
+    }
+
+    /// `.ots` templates carry the base mimetype with a `-template` suffix; the
+    /// ODF reader compares only the first 46 bytes, which keeps accepting them —
+    /// this pins that behavior, the .ots import route depends on it.
+    #[test]
+    fn converts_an_odf_spreadsheet_template() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("probe.ots");
+        ods_fixture_with_mimetype(
+            &source,
+            "application/vnd.oasis.opendocument.spreadsheet-template",
+        );
+        let target = dir.path().join("converted.xlsx");
+
+        let result = convert_to_xlsx(&source, &target).unwrap();
+        assert_eq!(result.sheets, 2);
+        let sheet = read_entry(&target, "xl/worksheets/sheet1.xml");
+        assert!(sheet.contains(r#"<c r="C1"><f>A1+B1*2</f><v>20</v></c>"#));
+    }
+
+    fn ods_fixture_with_mimetype(path: &Path, mimetype: &str) {
+        const NAMESPACES: &str = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.2""#;
+        let cell = |attributes: &str, text: &str| {
+            format!(r#"<table:table-cell {attributes}><text:p>{text}</text:p></table:table-cell>"#)
+        };
+        let probe = [
+            "<table:table table:name=\"Probe\"><table:table-row>",
+            &cell(r#"office:value-type="float" office:value="10""#, "10"),
+            &cell(r#"office:value-type="float" office:value="5""#, "5"),
+            &cell(
+                r#"table:formula="of:=[.A1]+[.B1]*2" office:value-type="float" office:value="20""#,
+                "20",
+            ),
+            &cell(
+                r#"table:formula="of:=$Sales" office:value-type="float" office:value="7""#,
+                "7",
+            ),
+            "</table:table-row><table:table-row>",
+            &cell(
+                r#"table:formula="of:=SUM([.A1:.B1])" office:value-type="float" office:value="15""#,
+                "15",
+            ),
+            &cell(
+                r#"table:formula="of:=[Other.B1]*2" office:value-type="float" office:value="100""#,
+                "100",
+            ),
+            "</table:table-row><table:table-row>",
+            &cell(
+                r#"office:value-type="date" office:date-value="2026-03-05""#,
+                "2026-03-05",
+            ),
+            "</table:table-row></table:table>",
+        ]
+        .join("");
+        let other = format!(
+            r#"<table:table table:name="Other"><table:table-row>{}</table:table-row></table:table>"#,
+            cell(r#"office:value-type="float" office:value="50""#, "50"),
+        );
+        let content = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content {NAMESPACES}><office:body><office:spreadsheet>{probe}{other}</office:spreadsheet></office:body></office:document-content>"#
+        );
+
+        let file = File::create(path).unwrap();
+        let mut writer = ZipWriter::new(file);
+        let options = SimpleFileOptions::default();
+        let mut add = |name: &str, body: &str| {
+            writer.start_file(name, options).unwrap();
+            writer.write_all(body.as_bytes()).unwrap();
+        };
+        add("mimetype", mimetype);
+        add(
+            "META-INF/manifest.xml",
+            r#"<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#,
+        );
+        add("content.xml", &content);
+        writer.finish().unwrap();
+>>>>>>> theirs
     }
 
     fn convert_fixture(path: &Path) {

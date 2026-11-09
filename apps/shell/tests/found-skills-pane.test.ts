@@ -9,10 +9,17 @@ import type { IntegrationsApi } from '../src/shared/integrations-api'
 import type { FoundSkill, RecommendedSkill } from '../src/shared/found-skill'
 import { FoundSkills } from '../src/renderer/src/FoundSkills'
 import { LocaleProvider } from '../src/renderer/src/locale'
+<<<<<<< ours
 import { skillsStrings } from '../src/renderer/src/i18n/strings-skills'
 
 /** the real English text, so assertions read like what a user sees */
 const en = skillsStrings.en as Record<string, string>
+=======
+import { strings } from '../src/renderer/src/strings'
+
+/** the real English text, so assertions read like what a user sees */
+const en = strings.en as Record<string, string>
+>>>>>>> theirs
 const t = ((key: string, params?: Record<string, string>) =>
   (en[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => params?.[name] ?? `{${name}}`)) as never
 
@@ -33,7 +40,11 @@ const skill = (over: Partial<FoundSkill>): FoundSkill => ({
   name: 'pptx-builder',
   description: 'Build a pptx',
   path: '/app/skills/pptx-builder/SKILL.md',
+<<<<<<< ours
   relevance: { relevant: true, matched: ['pptx'] },
+=======
+  relevance: { relevant: true, formats: ['pptx'] },
+>>>>>>> theirs
   ...over,
 })
 
@@ -78,7 +89,11 @@ function mountApi(
 
 async function render(): Promise<void> {
   await act(async () => {
+<<<<<<< ours
     root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(FoundSkills, { t })))
+=======
+    root.render(createElement(LocaleProvider, { lang: 'en' }, createElement(FoundSkills, { t })))
+>>>>>>> theirs
   })
   await act(async () => {
     await Promise.resolve()
@@ -152,6 +167,7 @@ describe('FoundSkills', () => {
     expect(host.textContent).not.toContain('Import failed')
   })
 
+<<<<<<< ours
   it('maps a skill-import error code to its localized string', async () => {
     mountApi([])
     ;(window.aiOfficeIntegrations as IntegrationsApi).importSkillZip = async () => {
@@ -216,13 +232,27 @@ describe('FoundSkills', () => {
     await click(buttonWithText('Import skill package (zip / .md)…'))
     expect(host.textContent).toContain('Import failed: too big')
     expect(host.textContent).not.toContain('remote method')
+=======
+  it('shows the reason when an import is refused', async () => {
+    mountApi([])
+    ;(window.aiOfficeIntegrations as IntegrationsApi).importSkillZip = async () => {
+      throw new Error('the archive contains a symlink, and imports refuse those')
+    }
+    await render()
+    await click(buttonWithText('Import skill package (zip / .md)…'))
+    expect(host.textContent).toContain('Import failed: the archive contains a symlink')
+>>>>>>> theirs
   })
 
   it('shows a skill about another format like any other', async () => {
     mountApi([
       skill({
         description: 'Roll back a Kubernetes release',
+<<<<<<< ours
         relevance: { relevant: false, matched: [] },
+=======
+        relevance: { relevant: false, formats: [] },
+>>>>>>> theirs
       }),
     ])
     await render()
@@ -282,6 +312,7 @@ describe('FoundSkills', () => {
     ])
     await render()
     expect(host.textContent).toContain('Recommended')
+<<<<<<< ours
     // one tab per category in the fixed order; an unknown category lands under Other
     const tabs = () => [...host.querySelectorAll<HTMLButtonElement>('.set-intg-tab')]
     expect(tabs().map((e) => e.textContent)).toEqual(['Office', 'Finance', 'Other'])
@@ -291,6 +322,18 @@ describe('FoundSkills', () => {
     await click(tabs()[2])
     expect(host.textContent).toContain('Installed')
     await click(tabs()[1])
+=======
+    // the All tab leads, then one tab per category in the fixed order; an
+    // unknown category lands under Other
+    const tabs = () => [...host.querySelectorAll<HTMLButtonElement>('.set-intg-tab')]
+    expect(tabs().map((e) => e.textContent)).toEqual(['All', 'Office', 'Finance', 'Other'])
+    // All opens first: every recommended skill shows, installed ones included
+    expect(buttonWithText('Update')).toBeTruthy()
+    expect(buttonWithText('Install')).toBeTruthy()
+    await click(tabs()[3])
+    expect(host.textContent).toContain('Installed')
+    await click(tabs()[2])
+>>>>>>> theirs
     expect(buttonWithText('Install')).toBeTruthy()
     await click(buttonWithText('Install'))
     expect(imported).toEqual(['recommended:fresh'])

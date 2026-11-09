@@ -1,12 +1,23 @@
 import type { AiPanelPrefs } from '@genoffice/ui'
 import type { Lang } from '@genoffice/i18n'
 import type { AiSettings, AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
+import type { PrintDuplex, PrintJobOptions, PrinterInfo } from '@genoffice/electron-utils/print-job'
+import type { PrinterOption } from '@genoffice/electron-utils/printer-options'
+export type { PrintDuplex, PrintJobOptions, PrinterInfo }
+export type { PrinterOption }
+
+/** largest slice readFileChunk hands over IPC; the renderer loops over them */
+export const PDF_READ_CHUNK_BYTES = 8 * 1024 * 1024
 
 export const PDF_CHANNELS = {
   consumePending: 'pdf:consume-pending',
   consumeAiPreset: 'pdf:consume-ai-preset',
   readFile: 'pdf:read-file',
+  readFileChunk: 'pdf:read-file-chunk',
+  decryptPdf: 'pdf:decrypt',
   save: 'pdf:save',
+  pickAttachmentFile: 'pdf:pick-attachment-file',
+  exportAttachment: 'pdf:export-attachment',
   requestRedactionCopy: 'pdf:request-redaction-copy',
   autoRename: 'pdf:auto-rename',
   isUntitled: 'pdf:is-untitled',
@@ -25,8 +36,11 @@ export const PDF_CHANNELS = {
   compareReadPdf: 'pdf:compare-read-pdf',
   compareReadOpen: 'pdf:compare-read-open',
   reduceFileSize: 'pdf:reduce-file-size',
+<<<<<<< ours
   pickAttachmentFile: 'pdf:pick-attachment-file',
   exportAttachment: 'pdf:export-attachment',
+=======
+>>>>>>> theirs
   insertBlankPage: 'pdf:insert-blank-page',
   splitPdf: 'pdf:split-pdf',
   mergePdf: 'pdf:merge-pdf',
@@ -35,6 +49,7 @@ export const PDF_CHANNELS = {
   setPageSize: 'pdf:set-page-size',
   splitPages: 'pdf:split-pages',
   cropPages: 'pdf:crop-pages',
+  restoreFile: 'pdf:restore-file',
   exportImages: 'pdf:export-images',
   convertOffice: 'pdf:convert-office',
   convertProgress: 'pdf:convert-progress',
@@ -58,6 +73,10 @@ export const PDF_CHANNELS = {
   saveAsResult: 'pdf:save-as-result',
   saveAsFlow: 'pdf:save-as-flow',
   printRequest: 'pdf:print-request',
+  print: 'pdf:print',
+  printFile: 'pdf:print-file',
+  printerOptions: 'pdf:printer-options',
+  printers: 'pdf:printers',
   fileRenamed: 'pdf:file-renamed',
   getLanguage: 'app:get-language',
   languageChanged: 'app:language-changed',
@@ -65,6 +84,7 @@ export const PDF_CHANNELS = {
   themeChanged: 'app:theme-changed',
   getAiPanelPrefs: 'app:get-ai-panel-prefs',
   aiPanelPrefsChanged: 'app:ai-panel-prefs-changed',
+  authorNameChanged: 'app:author-name-changed',
 } as const
 
 export const VISUAL_SIGNATURE_CONTENT_PREFIX = 'GenOffice visual signature field: '
@@ -229,7 +249,7 @@ export interface SavedSignature {
   data: SignatureData
 }
 
-export type PdfConvertFormat = 'docx' | 'xlsx' | 'pptx'
+export type PdfConvertFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'html'
 
 /** Progress push from the shell's local PDF -> Office conversion (UNI-2167) */
 export interface PdfConvertProgressEvent {
@@ -383,7 +403,11 @@ export type DrawingInput =
       color: [number, number, number]
       at: [number, number]
       contents: string
+<<<<<<< ours
       /** Annotation author (/T); omitted → 'UniWork Office' */
+=======
+      /** Annotation author (/T); omitted → the request's annotationAuthor */
+>>>>>>> theirs
       author?: string
       /** Creation time (ms since epoch) → /CreationDate and /M; omitted → save time */
       createdMs?: number
@@ -678,6 +702,81 @@ export interface FormValueInput {
   checked?: boolean
 }
 
+export type FormFieldKind = 'text' | 'checkbox' | 'radio' | 'choice' | 'signature'
+
+/** A new AcroForm field authored in Form Design; becomes a real widget on save. PDF user space, y up. */
+export interface FormFieldInput {
+  name: string
+  kind: FormFieldKind
+  pageIndex: number
+  rect: [number, number, number, number]
+  required?: boolean
+  /** text only */
+  multiLine?: boolean
+  /** text only; 0 or absent = no limit */
+  maxLen?: number
+  /** text only; absent = auto size */
+  fontSize?: number
+  textAlignment?: 'left' | 'center' | 'right'
+  /** text: initial value; choice: selected option; checkbox/radio: initial state */
+  value?: string
+  checked?: boolean
+  /** radio only: this button's export value; buttons sharing a name form one group */
+  exportValue?: string
+  /** choice only */
+  options?: string[]
+  /** text only: Acrobat AFDate format (e.g. yyyy-mm-dd) installs date format/keystroke actions */
+  dateFormat?: string
+}
+
+/** Design-time change to an AcroForm widget already in the file, addressed by its pdf.js annotation id (object ref). */
+export interface FormWidgetEditInput {
+  widgetId: string
+  fieldName: string
+  rect?: [number, number, number, number]
+  required?: boolean
+  remove?: boolean
+}
+
+/** A blank page authored in the session. `pageIndex` is its virtual original index: the
+    document's page count plus its rank among the session's blank pages, so every other
+    pending edit can address it like a real page; the save appends it there first. */
+export interface BlankPageInput {
+  pageIndex: number
+  width: number
+  height: number
+}
+
+/** What a reader may do with a protected document (§7.6.3.2 Table 24, grouped) */
+export interface PdfPermissions {
+  printing: boolean
+  modifying: boolean
+  annotating: boolean
+  copying: boolean
+}
+
+/** Password protection carried on a save: the source is opened with the user
+    password and the output is written back under the same configuration. */
+export interface PdfEncryptionInput {
+  userPassword: string
+  /** who may lift the limits; defaults to the user password in the UI */
+  ownerPassword: string
+  permissions: PdfPermissions
+}
+
+/** An embedded file to add on the next save */
+export interface PdfAttachmentAdd {
+  name: string
+  bytesBase64: string
+  description?: string
+}
+
+/** Embedded-file edits for the next save: removals run first, then additions */
+export interface PdfAttachmentOps {
+  add?: PdfAttachmentAdd[]
+  remove?: string[]
+}
+
 export interface SavePdfRequest {
   path: string
   /**
@@ -686,7 +785,24 @@ export interface SavePdfRequest {
    * Must match the target granted to the view by the main process (save dialog pick).
    */
   targetPath?: string
+  /** Present while the session works on a password-protected document: the source
+      bytes are opened with the user password and the output is re-protected. */
+  encryption?: PdfEncryptionInput
+  /**
+   * true when this save writes the protection in `encryption` (a dialog change),
+   * false when the source file's own /Encrypt entries are kept: the session
+   * usually holds only one of the two passwords, and re-deriving the key would
+   * replace both. Omitted by callers that always write `encryption`.
+   */
+  protectionDirty?: boolean
+  /** Password of the file currently on disk, when it is protected — needed even when
+      this save writes plain (protection removed): a password change makes it differ
+      from `encryption.userPassword`. */
+  decryption?: { userPassword: string }
   markups: MarkupInput[]
+  /** Author (/T) of the markups and drawings this save adds; a note keeps its own
+      author when it has one. Omitted → 'GenOffice' */
+  annotationAuthor?: string
   /** Saved markup annotations to remove (applied before every other stage) */
   annotDeletes?: AnnotDeleteInput[]
   drawings: DrawingInput[]
@@ -705,6 +821,12 @@ export interface SavePdfRequest {
   redactions?: RedactionInput[]
   /** Complete resulting set; omitted means preserve existing embedded metadata. */
   staticFormFills?: StaticFormFillRecord[]
+  /** Moves/flag changes/removals of existing widgets, applied before formFields */
+  formWidgetEdits?: FormWidgetEditInput[]
+  /** New AcroForm fields, created after formValues (names must not collide with existing fields) */
+  formFields?: FormFieldInput[]
+  /** Blank pages appended (in pageIndex order) before every page-addressed stage runs */
+  blankPages?: BlankPageInput[]
   /** Page rotation deltas (original page index → multiple of 90 clockwise) */
   rotations?: { pageIndex: number; delta: number }[]
   /** Pages to delete (original page indices) */
@@ -717,11 +839,17 @@ export interface SavePdfRequest {
    * the writer cannot rebuild exactly make the save refuse the replacement
    * (the file's own /Outlines stay untouched). */
   outline?: OutlineEntryInput[]
+<<<<<<< ours
   /** Who asked: explicit Save (`user`), autosave (`auto`) or an app-internal flush
       (`internal`). Absent behaves as before (Save As never sets it). */
   /** Add or remove embedded files (/Names → /EmbeddedFiles) on this save */
   attachments?: PdfAttachmentOps
   origin?: 'user' | 'auto' | 'internal'
+=======
+
+  /** Embedded-file edits, applied after every content stage */
+  attachments?: PdfAttachmentOps
+>>>>>>> theirs
 }
 
 /** One bookmark of a replacement outline; children nest one level deeper */
@@ -732,6 +860,7 @@ export interface OutlineEntryInput {
   /** Vertical position on the page, PDF user space; null keeps the default */
   top?: number | null
   children?: OutlineEntryInput[]
+<<<<<<< ours
 }
 
 /** UniWork document state of the open file: bound working copy and/or view only */
@@ -764,6 +893,8 @@ export interface PdfCloseSaveRequest {
 export interface PdfUniworkState {
   bound: boolean
   readOnly: boolean
+=======
+>>>>>>> theirs
 }
 
 /** A text edit that could not be matched to the document at save time and was skipped */
@@ -881,6 +1012,14 @@ export type ReplacePagesResult =
   | { ok: true; canceled: true }
   | { ok: false; error: string }
 
+/** The file put back as it was around a change written in place (Undo and Redo of that change) */
+export interface RestoreFileRequest {
+  path: string
+  bytes: ArrayBuffer
+}
+
+export type RestoreFileResult = { ok: true } | { ok: false; error: string }
+
 /** Resize all pages to a target paper size (points), content scaled to fit; written back in place */
 export interface SetPageSizeRequest {
   path: string
@@ -911,13 +1050,15 @@ export interface CropPagesRequest {
 
 export type CropPagesResult = { ok: true } | { ok: false; error: string }
 
-/** Export pages as PNG: renderer rasterizes the bitmaps, main process shows a dialog and writes to disk */
+/** Export pages as PNG or JPEG: renderer rasterizes the bitmaps, main process shows a dialog and writes to disk */
 export interface ExportImagesRequest {
-  /** base64 PNGs (without the data: prefix), in page order */
+  /** base64 PNGs or JPEGs (without the data: prefix), in page order, matching format */
   images: string[]
   /** 1-based page numbers, same length as images, used for file names */
   pageNumbers: number[]
   baseName: string
+  /** Image encoding; anything other than 'jpg' falls back to png */
+  format: 'png' | 'jpg'
 }
 
 export type ExportImagesResult =
@@ -926,11 +1067,20 @@ export type ExportImagesResult =
   | { ok: false; error: string }
 
 /** AI channels are app-wide shared ipcMain handlers (shell registers via docs-main registerAiIpc); pass-through only */
+export interface UserSkillEntry {
+  name: string
+  description: string
+  relevant: boolean
+}
+
 export const AI_CHANNELS = {
   getSettings: 'ai:get-settings',
   setSettings: 'ai:set-settings',
   settingsChanged: 'ai:settings-changed',
   openModelSettings: 'ai:open-model-settings',
+  openSkillsSettings: 'ai:open-skills-settings',
+  skillsList: 'ai:skills-list',
+  skillText: 'ai:skill-text',
   gskStatus: 'ai:gsk-status',
   stream: 'ai:stream',
   streamChunk: 'ai:stream-chunk',
@@ -957,6 +1107,7 @@ export interface ImageSearchResponse {
 export interface PdfApi {
   /** Take the pdf path pending for this view (queued at tab creation); null if none */
   consumePending(): Promise<string | null>
+<<<<<<< ours
   /** Web frame only (UNI-1865): the renderer reports that the opened document finished
    *  mounting, so the passive lag detector's settle stamp starts at first paint. Absent
    *  on desktop. */
@@ -969,6 +1120,36 @@ export interface PdfApi {
   ): () => void
   /** Read pdf bytes. Only paths granted to this view are allowed */
   readFile(path: string): Promise<ArrayBuffer>
+=======
+  /** open any shell-routed document path (an AI answer's filenav citation) */
+  openSourcePath(path: string): Promise<void>
+  /** Read pdf bytes. Only paths granted to this view are allowed */
+  readFile(path: string): Promise<ArrayBuffer>
+  /** one slice of a granted file, with the file's size so the reader loop
+   *  needs no separate stat: a 42 MB one-shot ArrayBuffer over IPC has
+   *  killed renderers before first paint on Windows (genoffice#2366) */
+  readFileChunk(
+    path: string,
+    start: number,
+    end: number,
+  ): Promise<{ data: Uint8Array; fileSize: number }>
+  /** Open a password-protected document for editing: plain bytes, the /P the file
+      carried, whether a password was needed at all (false: owner-only file) and
+      which password opened it (the owner's ignores the /P limits) */
+  decryptPdf(
+    bytes: Uint8Array,
+    password: string,
+  ): Promise<
+    | {
+        ok: true
+        bytes: Uint8Array
+        permissions: PdfPermissions
+        neededPassword: boolean
+        unlockedAs: 'user' | 'owner'
+      }
+    | { ok: false; reason: 'wrong-password' | string }
+  >
+>>>>>>> theirs
   /** Pick a second document for Compare and read its per-page text (the pick is
       main-side; no grant and no bytes travel to the render side) */
   compareReadPdf(): Promise<
@@ -981,9 +1162,47 @@ export interface PdfApi {
       and the diff would report phantom changes on identical files */
   compareReadOpen(
     path: string,
+<<<<<<< ours
   ): Promise<
     { ok: true; name: string; pageCount: number; pages: string[] } | { ok: false; reason: string }
   >
+=======
+    password?: string,
+  ): Promise<
+    { ok: true; name: string; pageCount: number; pages: string[] } | { ok: false; reason: string }
+  >
+  /** Ask for a file to embed (open dialog); the bytes come back base64-encoded */
+  pickAttachmentFile(): Promise<
+    | { ok: true; name: string; bytesBase64: string }
+    | { ok: false; cancelled: true }
+    | { ok: false; reason: string }
+  >
+  /** Save an embedded file's bytes to a user-chosen path (save dialog defaults to its name) */
+  exportAttachment(
+    path: string,
+    name: string,
+    bytesBase64: string,
+  ): Promise<
+    | { ok: true; targetPath: string }
+    | { ok: false; cancelled: true }
+    | { ok: false; reason: string }
+  >
+  /** Reduce file size: re-compress streams and downsample oversized Flate images.
+      The picked save target (main-side dialog) receives the shrunk copy; the open
+      document is untouched and reloads from the target when the caller asks. */
+  reduceFileSize(path: string): Promise<
+    | {
+        ok: true
+        targetPath: string
+        bytesBefore: number
+        bytesAfter: number
+        streamsRecompressed: number
+        imagesDownsampled: number
+      }
+    | { ok: false; canceled: true }
+    | { ok: false; reason: string }
+  >
+>>>>>>> theirs
   /** Write markups/form values/page ops back to the original file (pdf-lib, content streams untouched); path grants same as readFile. With targetPath set (Save As), the original is only read and the result goes to targetPath */
   save(request: SavePdfRequest): Promise<SavePdfResult>
   /** Creates a redacted working copy on first apply; subsequent applies save that copy in place. */
@@ -1065,6 +1284,7 @@ export interface PdfApi {
   setPageSize(request: SetPageSizeRequest): Promise<SetPageSizeResult>
   splitPages(request: SplitPagesRequest): Promise<SplitPagesResult>
   cropPages(request: CropPagesRequest): Promise<CropPagesResult>
+  restoreFile(request: RestoreFileRequest): Promise<RestoreFileResult>
   exportImages(request: ExportImagesRequest): Promise<ExportImagesResult>
   /** Convert the current PDF to Word / Excel / PowerPoint via the shell's local conversion flows */
   convertOffice(format: PdfConvertFormat): Promise<void>
@@ -1105,6 +1325,7 @@ export interface PdfApi {
   addSavedSignature(data: SignatureData): Promise<SavedSignature[]>
   /** Delete one saved signature by id; returns the updated list */
   removeSavedSignature(id: string): Promise<SavedSignature[]>
+<<<<<<< ours
   /**
    * G8-02: author for new note comments — the signed-in UniWork display name
    * for a bound document, else the neutral constant "User". Never the OS
@@ -1121,6 +1342,16 @@ export interface PdfApi {
   setDirty(dirty: boolean): void
   /** Main process picked "Save" in the close prompt, or flushes before an export → renderer saves with that origin and replies via sendCloseSaveResult */
   onCloseSaveRequest(handler: (request: PdfCloseSaveRequest) => void): () => void
+=======
+  /** Settings → General user name (the OS account name when unset), used as the default author of new note comments */
+  getUsername(): Promise<string>
+  onUsernameChanged(handler: (name: string) => void): () => void
+  /** Mirror unsaved-changes state to the main process; drives the save prompt before closing a tab/window */
+  setDirty(dirty: boolean): void
+  /** Main process asks for a save (close prompt, menu Save, export flows) and waits for sendCloseSaveResult.
+   *  flushAll: success must mean everything on screen is in the file, including the form field whose card is open */
+  onCloseSaveRequest(handler: (opts: { flushAll: boolean }) => void): () => void
+>>>>>>> theirs
   sendCloseSaveResult(ok: boolean): void
   /** Shell menu Save As → renderer writes pending edits to targetPath only (original untouched) and replies via sendSaveAsResult */
   onSaveAsRequest(handler: (targetPath: string) => void): () => void
@@ -1129,6 +1360,21 @@ export interface PdfApi {
   onSaveAsFlow(handler: (inFlight: boolean) => void): () => void
   /** Shell menu Print → renderer runs its print flow (save, rasterize, system dialog) */
   onPrintRequest(handler: () => void): () => void
+  /** print this window's print stylesheet output on a named printer ('' = OS default)
+   *  without the system dialog; ok=false without error = canceled */
+  print(job: PrintJobOptions): Promise<{ ok: boolean; error?: string }>
+  /** macOS CUPS route: spool the flushed file itself through lp — the vector
+   *  original reaches the driver untouched (no rasterization pass). pages are
+   *  1-based file pages; undefined = the whole document. ok=false without
+   *  error = canceled (never happens on this route; both sides report). */
+  printFile(
+    job: PrintJobOptions & { path: string; pages?: number[] },
+  ): Promise<{ ok: boolean; error?: string }>
+  /** installed printers for the in-app print dialog */
+  listPrinters(): Promise<PrinterInfo[]>
+  /** the driver option groups a queue advertises (quality, color, media type),
+   *  for the print dialog's driver-options dropdowns; empty when none */
+  printerOptions(queue: string): Promise<PrinterOption[]>
   /** The file was renamed or moved from the shell (home Folders / Files pane); the viewer follows the new path */
   onFileRenamed(handler: (newPath: string) => void): () => void
   getLanguage(): Promise<Lang>
@@ -1148,7 +1394,17 @@ export interface PdfApi {
   onAiSettingsChanged(handler: () => void): () => void
   /** shell only: switch to Home and open Settings › Account, UniWork AI sign-in (rejects in standalone) */
   openAiModelSettings(): Promise<void>
+<<<<<<< ours
   /** UniWork cloud sign-in state (internal gsk name; loggedIn = signed in + entitled) */
+=======
+  /** shell only: switch to Home and open Settings › Integrations (the skills list) */
+  openSkillsSettings(): Promise<void>
+  /** the skills the user installed into GenOffice */
+  skillsList(): Promise<UserSkillEntry[]>
+  /** one installed skill's body, by name */
+  skillText(name: string): Promise<string>
+  /** Genspark login state (gsk); gates the cloud-only generate_image tool */
+>>>>>>> theirs
   gskStatus(): Promise<{ loggedIn: boolean }>
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>

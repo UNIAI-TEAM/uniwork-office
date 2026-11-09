@@ -11,7 +11,12 @@ export default defineConfig({
     alias: {
       '@genoffice/docx-engine/zip-splice': local('../../packages/docx-engine/src/zip-splice.ts'),
       '@genoffice/docx-engine/lazy-media': local('../../packages/docx-engine/src/lazy-media.ts'),
+      '@genoffice/docx-engine/zip-splice': local('../../packages/docx-engine/src/zip-splice.ts'),
       '@genoffice/docx-engine': local('../../packages/docx-engine/src/index.ts'),
+      '@genoffice/font-metrics/resolve': local('../../packages/font-metrics/src/resolve.ts'),
+      '@genoffice/font-metrics/word-faces.json': local(
+        '../../packages/font-metrics/word-faces.json',
+      ),
       '@genoffice/font-metrics': local('../../packages/font-metrics/src/index.ts'),
       // subpath before the bare name: string aliases are prefix replacements
       '@genoffice/electron-utils/headless-export': local(
@@ -23,6 +28,7 @@ export default defineConfig({
       '@genoffice/electron-utils/safe-external-url': local(
         '../../packages/electron-utils/src/safe-external-url.ts',
       ),
+<<<<<<< ours
       '@genoffice/electron-utils/ai-run-bridge': local(
         '../../packages/electron-utils/src/ai-run-bridge.ts',
       ),
@@ -57,6 +63,31 @@ export default defineConfig({
       ),
       '@genoffice/electron-utils': local('../../packages/electron-utils/src/index.ts'),
       '@genoffice/ai-provider/askuni': local('../../packages/ai-provider/src/askuni.ts'),
+=======
+      '@genoffice/electron-utils/print-cups': local(
+        '../../packages/electron-utils/src/print-cups.ts',
+      ),
+      '@genoffice/electron-utils/print-job': local(
+        '../../packages/electron-utils/src/print-job.ts',
+      ),
+      '@genoffice/electron-utils/generated-images': local(
+        '../../packages/electron-utils/src/generated-images.ts',
+      ),
+      '@genoffice/electron-utils/remote-image': local(
+        '../../packages/electron-utils/src/remote-image.ts',
+      ),
+      '@genoffice/electron-utils/safe-remote-url': local(
+        '../../packages/electron-utils/src/safe-remote-url.ts',
+      ),
+      '@genoffice/electron-utils': local('../../packages/electron-utils/src/index.ts'),
+      '@genoffice/ai-provider/codex-app-server': local(
+        '../../packages/ai-provider/src/codex-app-server.ts',
+      ),
+      '@genoffice/ai-provider/trace': local('../../packages/ai-provider/src/trace.ts'),
+      '@genoffice/ai-provider/custom-models': local(
+        '../../packages/ai-provider/src/custom-models.ts',
+      ),
+>>>>>>> theirs
       '@genoffice/ai-provider/browser': local('../../packages/ai-provider/src/browser.ts'),
       '@genoffice/ai-provider/settings-file': local(
         '../../packages/ai-provider/src/settings-file.ts',
@@ -78,6 +109,8 @@ export default defineConfig({
   },
   test: {
     include: ['tests/**/*.test.ts'],
+    // the engine's display-only `effective` keys stay out of saved-model toEqual
+    setupFiles: [local('../../packages/docx-engine/tests/setup-equality.ts')],
     environment: 'jsdom',
     testTimeout: 20000,
   },

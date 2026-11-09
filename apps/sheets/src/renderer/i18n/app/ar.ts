@@ -10,7 +10,11 @@ export const ar = {
   redactDialogPlaceholder: 'اسم العنصر، مثال: هاتف العميل',
   redactCancel: 'إلغاء',
   redactInsert: 'إخفاء',
+<<<<<<< ours
   redactEnable: 'انقر بزر الفأرة الأيمن على التحديد لإخفائه عن الذكاء الاصطناعي.',
+=======
+  redactEnable: 'انقر بزر الفأرة الأيمن على النص المحدد لإخفائه عن النموذج.',
+>>>>>>> theirs
   redactNeedsSavedRow: 'هذا الصف ليس في الملف بعد. احفظ الملف أولاً ثم أخفِ الخلية.',
   redactRecoveredFromNames:
     'أعاد تطبيق آخر كتابة هذا الملف وأسقط سجل ما هو مخفي. استُعيدت الخلايا المخفية من الأسماء في المصنف؛ ويؤدي الحفظ إلى استعادة السجل الكامل.',
@@ -321,7 +325,9 @@ export const ar = {
   appFullLoadStart: 'تحميل الكل',
   appFullLoadRunning: 'جارٍ تحميل المصنف بالكامل — سيتوفر الفرز والتصفية عند الانتهاء…',
   appFullLoadTooLarge:
-    'هذا المصنف كبير جدًا بحيث لا يمكن تحميله بالكامل في الذاكرة؛ الفرز والتصفية غير متاحين لهذا الملف.',
+    'هذا المصنف كبير جدًا بحيث لا يمكن تحميله بالكامل في الذاكرة؛ الفرز ونقل النطاقات غير متاحين لهذا الملف. تعمل التصفية مباشرة على الملف.',
+  appLargeFilterLoading: 'جارٍ قراءة عمود التصفية من الملف…',
+  appLargeFilterApplying: 'جارٍ تطبيق التصفية على الملف…',
   appSortValueModeFormulas:
     'يحتوي هذا النطاق على صيغ لا تُحسب مباشرةً في هذا المصنف الكبير — سيؤدي فرزه أو نقله إلى حفظها كقيم عادية. اختر نطاقًا بدون صيغ.',
   appSortRangeTooLarge:
@@ -376,6 +382,9 @@ export const ar = {
   appTableNameUsed: 'اسم الجدول «{name}» مستخدم بالفعل في هذه الجلسة.',
   appTableNameInFile: 'اسم الجدول "{name}" مستخدم بالفعل بواسطة جدول في الملف.',
   appTableOverlapsSession: 'يتداخل النطاق مع الجدول «{name}» الذي أُنشئ في هذه الجلسة.',
+  appTableOverlapsFile: 'يتداخل النطاق مع الجدول «{name}» الموجود في الملف.',
+  appTableAlreadyInTable:
+    'التحديد موجود بالفعل داخل الجدول «{name}» — غيّر النمط من «تصميم الجدول».',
   appTablesNeedFile: 'افتح ملف XLSX أولاً — تُكتب الجداول في الملف.',
   appTableSelectRange: 'حدد نطاق بيانات أولاً — الرؤوس في صفه الأول.',
   appTableCreated: 'تم إنشاء الجدول — احفظ بـ {saveKeys}.',
@@ -452,6 +461,7 @@ export const ar = {
   appGridlinesHidden: 'أُخفيت خطوط الشبكة.',
   appGridlinesShown: 'أُظهرت خطوط الشبكة.',
   appShowingFormulas: 'عرض الصيغ — بدّل مرة أخرى لعرض القيم.',
+  appShowingFormulasActive: 'عرض الصيغ',
   appShowingValues: 'عرض القيم المحسوبة.',
   appTraceNoFormula: 'تتبع السابقات: لا توجد صيغة في الخلية النشطة.',
   appTraceNoRefs: 'تتبع السابقات: لا تحتوي هذه الصيغة على مراجع خلايا.',
@@ -495,6 +505,7 @@ export const ar = {
   appColumnLabel: 'العمود {col}',
   appBridgeUnavailable: 'جسر ملفات سطح المكتب غير متوفر. أعد تشغيل تطبيق Electron.',
   appOpenCanceled: 'أُلغي اختيار المصنف.',
+  appImportCanceled: 'أُلغي الاستيراد.',
   appOpeningWorkbook: 'جارٍ فتح المصنف…',
   appOpenStalled: 'تعذّر فتح المصنف.',
   appOpenRetry: 'إعادة المحاولة',
@@ -677,6 +688,7 @@ export const ar = {
   appExportPdfTitle: 'تصدير إلى PDF',
   appSaveTitle: 'حفظ',
   appSaveAs: 'حفظ باسم',
+  aiNameFile: 'التسمية بالذكاء الاصطناعي…',
   appUndo: 'تراجع',
   appRedo: 'إعادة',
   appUnsavedEditOne: '● {count} تعديل غير محفوظ',
@@ -708,7 +720,6 @@ export const ar = {
   appLinkPlaceholder: 'مثل https://example.com أو Sheet1!A1',
   appRemoveLink: 'إزالة الارتباط',
   appNotAvailableYet: 'غير متوفر بعد',
-  appComingSoon: 'قريبًا',
   appGroupChartLayouts: 'تخطيطات المخططات',
   appAddChartElement: 'إضافة عنصر مخطط',
   appAddChartElementTitle: 'العناوين وتسميات البيانات ووسيلة الإيضاح',
@@ -1123,6 +1134,20 @@ export const ar = {
   appWatchCell: 'خلية',
   appWatchValue: 'قيمة',
   appWatchFormula: 'صيغة',
+  appLinksPanel: 'الارتباطات الخارجية',
+  appLinksPanelDetail: 'سرد الروابط وتحديثها وفصلها من المصنفات الأخرى',
+  appLinksUpdate: 'تحديث القيم',
+  appLinksNone: 'لا توجد روابط لهذا المصنف بمصنفات أخرى.',
+  appLinksUnsaved: 'احفظ هذا المصنف قبل سرد ارتباطاته الخارجية.',
+  appLinksSource: 'المصدر',
+  appLinksStatus: 'الحالة',
+  appLinksSheets: 'أوراق العمل',
+  appLinksLocate: 'فتح موقع الملف المصدر',
+  appLinksReachable: 'متاح',
+  appLinksBroken: 'غير متاح',
+  appLinksBreak: 'قطع الارتباط',
+  appLinksBreakConfirm: 'تأكيد القطع',
+  appLinksChangeSource: 'تغيير المصدر',
   appGroupCalculation: 'حساب',
   appCalculationOptions: 'خيارات الحساب',
   appCalculationOptionsTitle: 'إعادة حساب تلقائية أو يدوية',
@@ -1139,8 +1164,16 @@ export const ar = {
   appGroupGetData: 'إحضار البيانات',
   appFromTextCsv: 'من نص/CSV',
   appRefreshAll: 'تحديث الكل',
+  appRefreshQuery: 'تحديث الاستعلام',
+  appQueryConnectionsTitle: 'تحديث استعلامات المصنف',
+  appQueryRefreshing: 'جارٍ تحديث {name}…',
+  appQueryRefreshed: 'تمت تحديث {name} ({rows} صف)',
+  appQueryRefreshedClipped: 'تم تحديث {name} ({rows} صف، {dropped} لم يتسع في النطاق)',
+  appQueryRefreshFailed: 'تعذّر تحديث {name}',
   appWorkbookNoPivot: 'لا توجد جداول محورية في هذا المصنف.',
   appRefreshAllTitle: 'تحديث كل الجداول المحورية',
+  appQueriesConnections: 'الاستعلامات والاتصالات',
+  appQueriesConnectionsTitle: 'عرض استعلامات المصنف واتصالات البيانات',
   appErrorCheckingDetail: 'فحص الورقة بحثًا عن قيم الخطأ',
   appErrorsFound: '{count} من الأخطاء — في {cell}: {value}',
   appCheckingErrors: 'جارٍ فحص الورقة بالكامل بحثًا عن أخطاء…',
@@ -1175,6 +1208,7 @@ export const ar = {
   appGroupForecast: 'التنبؤ',
   appWhatIfAnalysis: 'تحليل ماذا-إذا',
   appGoalSeek: 'الاستهداف',
+  appDataTable: 'جدول البيانات',
   appWhatIfTitle: 'إيجاد مدخل لقيمة مستهدفة',
   appGoalSeekNeedsFormula: 'يجب أن تحتوي الخلية على صيغة.',
   appGoalSeekByCellNotNumber: 'يجب أن تحتوي الخلية المتغيرة على رقم أو أن تكون فارغة.',
@@ -1271,12 +1305,15 @@ export const ar = {
   appPasswordUpdating: 'جارٍ التحديث…',
   appUpdatePassword: 'تحديث كلمة المرور',
   appWorkbookNotPasswordProtected: 'هذا المصنف غير محمي بكلمة مرور للفتح.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'لا يمكن حفظ مصنف محمي بكلمة مرور في مستند UniWork. استخدم «حفظ باسم» للاحتفاظ بنسخة مشفرة على هذا الكمبيوتر.',
   appPasswordChangeUniwork: 'لا يمكن تغيير كلمة مرور مستند UniWork هنا.',
   appPasswordChangeReadOnly: 'هذا المصنف للعرض فقط، لذلك لا يمكن تغيير كلمة المرور الخاصة به.',
   appEncryptedWrongPassword: 'كلمة المرور غير صحيحة. حاول مرة أخرى.',
   appPasswordChangeRestored: 'احفظ المصنف المستعاد أولاً، ثم غيّر كلمة المرور الخاصة به.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'السماح بتحرير النطاقات',
   appGroupClipboard: 'الحافظة',
   appPaste: 'لصق',
@@ -1535,6 +1572,7 @@ export const ar = {
   appVisualFlipV: 'قلب رأسي',
   appVisualFlipH: 'قلب أفقي',
   appCtxPasteVisual: 'لصق صورة أو شكل',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'لا يمكن فتح هذا المصنف على الويب بعد',
   appWebEngineBody:
@@ -1561,6 +1599,8 @@ export const ar = {
   appWebSavedReopenFailed:
     'تم حفظ تغييراتك في UniWork، لكن تعذّرت إعادة فتح المصنف هنا. أعد تحميل المحرر لمتابعة العمل.',
   appDataTable: 'جدول البيانات',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'التدقيق الإملائي',

@@ -127,6 +127,7 @@ describe('a picture and the withhold mark — what sticks, what round-trips', ()
     expect(redactionCount(reloaded.getJSON() as never)).toBe(1)
   })
 
+<<<<<<< ours
   it('a formatted inline picture (<w:b/>) hidden via NodeSelection survives save and reopen', async () => {
     const formattedXml = INLINE_XML.replace(
       '<w:r><w:drawing>',
@@ -185,6 +186,8 @@ describe('a picture and the withhold mark — what sticks, what round-trips', ()
     expect(redactionCount(reloaded.getJSON() as never)).toBe(1)
   })
 
+=======
+>>>>>>> theirs
   it("and the load path rebuilds the mark from the file's element", async () => {
     // a file that really does carry the element on a picture run comes back
     // withholding the picture, not showing it to the model

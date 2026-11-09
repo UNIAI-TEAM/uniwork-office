@@ -9,6 +9,14 @@ export const ja = {
   redactDialogPlaceholder: 'プレースホルダー名（例：顧客電話）',
   redactCancel: 'キャンセル',
   redactInsert: '隠す',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'このファイルは他のプログラムによって変更されました。',
+  diskConflictMsg: 'このファイルはディスク上で変更されています。保存するとその変更を上書きします。',
+  diskReload: '再読み込み',
+  diskKeepMine: '自分の内容を保持',
+  diskOverwrite: '上書きする',
+>>>>>>> theirs
 
   loading: '読み込み中…',
   loadFailed: 'ファイルを開けませんでした',
@@ -78,6 +86,7 @@ export const ja = {
   linkNeedsSelection: '先にプレビューでテキストを選択してください',
   save: '上書き保存 (⌘S)',
   saveAs: '名前を付けて保存…',
+  aiNameFile: 'AI で名前を変更…',
   ribbonCollapse: 'リボンを折りたたむ',
   ribbonExpand: 'リボンを展開する',
   ribbonGroupInsert: '挿入',
@@ -108,6 +117,7 @@ export const ja = {
   alignLeft: '左揃え',
   alignCenter: '中央揃え',
   alignRight: '右揃え',
+  alignJustify: '両端揃え',
   fontSizeDec: 'フォントサイズを縮小',
   fontSizeInc: 'フォントサイズを拡大',
   typography: 'タイポグラフィ',

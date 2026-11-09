@@ -10,7 +10,11 @@ export const id = {
   redactDialogPlaceholder: 'Nama placeholder, mis. telepon pelanggan',
   redactCancel: 'Batal',
   redactInsert: 'Sembunyikan',
+<<<<<<< ours
   redactEnable: 'Klik kanan pada pilihan untuk menyembunyikannya dari AI.',
+=======
+  redactEnable: 'Klik kanan pada teks yang dipilih untuk menyembunyikannya dari model.',
+>>>>>>> theirs
   redactNeedsSavedRow: 'Baris ini belum ada di berkas. Simpan dulu, lalu sembunyikan selnya.',
   redactRecoveredFromNames:
     'Aplikasi lain menulis ulang berkas ini dan membuang catatan apa yang disembunyikan. Sel yang disembunyikan dipulihkan dari nama-nama di dalam buku kerja; menyimpan akan memulihkan catatan lengkapnya.',
@@ -330,7 +334,9 @@ export const id = {
   appFullLoadStart: 'Muat semua',
   appFullLoadRunning: 'Memuat seluruh buku kerja — pengurutan dan filter tersedia setelah selesai…',
   appFullLoadTooLarge:
-    'Buku kerja ini terlalu besar untuk dimuat sepenuhnya ke memori; pengurutan dan filter tidak tersedia untuk file ini.',
+    'Buku kerja ini terlalu besar untuk dimuat sepenuhnya ke memori; pengurutan dan pemindahan rentang tidak tersedia untuk file ini. Filter dijalankan langsung pada file.',
+  appLargeFilterLoading: 'Membaca kolom filter dari file…',
+  appLargeFilterApplying: 'Menerapkan filter pada file…',
   appSortValueModeFormulas:
     'Rentang ini berisi rumus yang tidak dihitung langsung di buku kerja besar ini — mengurutkan atau memindahkannya akan menyimpannya sebagai nilai biasa. Pilih rentang tanpa rumus.',
   appSortRangeTooLarge:
@@ -388,6 +394,9 @@ export const id = {
   appTableNameInFile: 'Nama tabel "{name}" sudah digunakan oleh tabel di dalam file.',
   appTableOverlapsSession:
     'Rentang tumpang-tindih dengan tabel "{name}" yang dibuat pada sesi ini.',
+  appTableOverlapsFile: 'Rentang tumpang tindih dengan tabel "{name}" di file.',
+  appTableAlreadyInTable:
+    'Pilihan sudah berada di tabel "{name}" — ubah gayanya dari Desain Tabel.',
   appTablesNeedFile: 'Buka file XLSX dahulu — tabel ditulis ke file.',
   appTableSelectRange: 'Pilih rentang data dahulu — header di baris pertamanya.',
   appTableCreated: 'Tabel dibuat — simpan dengan {saveKeys}.',
@@ -473,6 +482,7 @@ export const id = {
   appGridlinesHidden: 'Garis kisi disembunyikan.',
   appGridlinesShown: 'Garis kisi ditampilkan.',
   appShowingFormulas: 'Menampilkan rumus — alihkan lagi untuk melihat nilai.',
+  appShowingFormulasActive: 'Menampilkan rumus',
   appShowingValues: 'Menampilkan nilai hasil hitungan.',
   appTraceNoFormula: 'Lacak Presedan: sel aktif tidak memiliki rumus.',
   appTraceNoRefs: 'Lacak Presedan: rumus ini tidak memiliki referensi sel.',
@@ -519,6 +529,7 @@ export const id = {
   appColumnLabel: 'Kolom {col}',
   appBridgeUnavailable: 'Jembatan file desktop tidak tersedia. Mulai ulang aplikasi Electron.',
   appOpenCanceled: 'Pemilihan buku kerja dibatalkan.',
+  appImportCanceled: 'Impor dibatalkan.',
   appOpeningWorkbook: 'Membuka buku kerja…',
   appOpenStalled: 'Buku kerja tidak dapat dibuka.',
   appOpenRetry: 'Coba lagi',
@@ -711,6 +722,7 @@ export const id = {
   appExportPdfTitle: 'Ekspor sebagai PDF',
   appSaveTitle: 'Simpan',
   appSaveAs: 'Simpan Sebagai',
+  aiNameFile: 'Beri nama dengan AI…',
   appUndo: 'Urungkan',
   appRedo: 'Ulangi',
   appUnsavedEditOne: '● {count} pengeditan belum disimpan',
@@ -742,7 +754,6 @@ export const id = {
   appLinkPlaceholder: 'mis. https://example.com atau Sheet1!A1',
   appRemoveLink: 'Hapus Tautan',
   appNotAvailableYet: 'Belum tersedia',
-  appComingSoon: 'Segera hadir',
   appGroupChartLayouts: 'Tata letak bagan',
   appAddChartElement: 'Tambahkan Elemen Bagan',
   appAddChartElementTitle: 'Judul, label data, legenda',
@@ -1159,6 +1170,20 @@ export const id = {
   appWatchCell: 'Sel',
   appWatchValue: 'Nilai',
   appWatchFormula: 'Rumus',
+  appLinksPanel: 'Tautan eksternal',
+  appLinksPanelDetail: 'Menampilkan, memperbarui, dan memutus tautan ke buku kerja lain',
+  appLinksUpdate: 'Perbarui nilai',
+  appLinksNone: 'Buku kerja ini tidak memiliki tautan ke buku kerja lain.',
+  appLinksUnsaved: 'Simpan buku kerja ini sebelum menampilkan tautan eksternalnya.',
+  appLinksSource: 'Sumber',
+  appLinksStatus: 'Status',
+  appLinksSheets: 'Lembar',
+  appLinksLocate: 'Tampilkan lokasi file sumber',
+  appLinksReachable: 'Tersedia',
+  appLinksBroken: 'Tidak tersedia',
+  appLinksBreak: 'Putuskan Tautan',
+  appLinksBreakConfirm: 'Konfirmasi pemutusan',
+  appLinksChangeSource: 'Ubah Sumber',
   appGroupCalculation: 'Penghitungan',
   appCalculationOptions: 'Opsi Penghitungan',
   appCalculationOptionsTitle: 'Hitung ulang otomatis atau manual',
@@ -1175,8 +1200,16 @@ export const id = {
   appGroupGetData: 'Dapatkan Data',
   appFromTextCsv: 'Dari Teks/CSV',
   appRefreshAll: 'Refresh Semua',
+  appRefreshQuery: 'Segarkan kueri',
+  appQueryConnectionsTitle: 'Muat ulang kueri workbook',
+  appQueryRefreshing: 'Memuat ulang {name}…',
+  appQueryRefreshed: '{name} dimuat ulang ({rows} baris)',
+  appQueryRefreshedClipped: '{name} dimuat ulang ({rows} baris, {dropped} tidak muat di rentang)',
+  appQueryRefreshFailed: 'Gagal memuat ulang {name}',
   appWorkbookNoPivot: 'Tidak ada PivotTable di buku kerja ini.',
   appRefreshAllTitle: 'Segarkan semua PivotTable',
+  appQueriesConnections: 'Kueri & Koneksi',
+  appQueriesConnectionsTitle: 'Tampilkan kueri dan koneksi data buku kerja',
   appErrorCheckingDetail: 'Pindai nilai kesalahan di lembar',
   appErrorsFound: '{count} kesalahan — di {cell}: {value}',
   appCheckingErrors: 'Memindai kesalahan di seluruh lembar…',
@@ -1211,6 +1244,7 @@ export const id = {
   appGroupForecast: 'Prakiraan',
   appWhatIfAnalysis: 'Analisis Bagaimana-Jika',
   appGoalSeek: 'Pencarian Tujuan',
+  appDataTable: 'Tabel Data',
   appWhatIfTitle: 'Cari input untuk nilai target',
   appGoalSeekNeedsFormula: 'Sel target harus berisi rumus.',
   appGoalSeekByCellNotNumber: 'Sel yang diubah harus berisi angka atau kosong.',
@@ -1308,6 +1342,7 @@ export const id = {
   appPasswordUpdating: 'Memperbarui…',
   appUpdatePassword: 'Perbarui Kata Sandi',
   appWorkbookNotPasswordProtected: 'Buku kerja ini tidak dilindungi kata sandi pembuka.',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     'Buku kerja yang dilindungi kata sandi tidak dapat disimpan ke dokumen UniWork. Gunakan Simpan Sebagai untuk menyimpan salinan terenkripsi di komputer ini.',
   appPasswordChangeUniwork: 'Kata sandi dokumen UniWork tidak dapat diubah di sini.',
@@ -1315,6 +1350,8 @@ export const id = {
     'Buku kerja ini hanya dapat dilihat, sehingga kata sandinya tidak dapat diubah.',
   appEncryptedWrongPassword: 'Kata sandi salah. Coba lagi.',
   appPasswordChangeRestored: 'Simpan dulu buku kerja yang dipulihkan, lalu ubah kata sandinya.',
+=======
+>>>>>>> theirs
   appAllowEditRanges: 'Izinkan Edit Rentang',
   appGroupClipboard: 'Papan Klip',
   appPaste: 'Tempel',
@@ -1580,6 +1617,7 @@ export const id = {
   appVisualFlipV: 'Balik Vertikal',
   appVisualFlipH: 'Balik Horizontal',
   appCtxPasteVisual: 'Tempel Gambar atau Bentuk',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: 'Buku kerja ini belum dapat dibuka di web',
   appWebEngineBody:
@@ -1607,6 +1645,8 @@ export const id = {
   appWebSavedReopenFailed:
     'Perubahan Anda sudah disimpan ke UniWork, tetapi buku kerja tidak dapat dibuka ulang di sini. Muat ulang editor untuk melanjutkan.',
   appDataTable: 'Tabel Data',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Ejaan',

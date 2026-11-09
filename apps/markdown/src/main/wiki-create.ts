@@ -52,6 +52,7 @@ export interface CreatedNote {
   created: boolean
 }
 
+<<<<<<< ours
 /**
  * Whether a view holding `fromPath` may create notes. A bound UniWork working copy lives in a
  * hidden per-document folder, and a note created beside it would be a stray file there.
@@ -60,6 +61,8 @@ export function mayCreateWikiNote(fromPath: string, isBound: (path: string) => b
   return !fromPath || !isBound(fromPath)
 }
 
+=======
+>>>>>>> theirs
 async function fileExists(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isFile()
@@ -87,6 +90,10 @@ export async function createWikiNote(
     .split(/[\\/]/)
     .filter((segment) => segment !== '' && segment !== '.')
     .map(sanitizeSegment)
+<<<<<<< ours
+=======
+  if (segments.length === 0) return null
+>>>>>>> theirs
   const base = segments[segments.length - 1]!
   // resolution's own candidate rule, mirrored exactly: an extension is the
   // file as written, a bare stem stands for `<stem>.md`

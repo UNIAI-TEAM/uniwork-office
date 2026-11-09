@@ -15,6 +15,7 @@ export function createElectronTransport(getSettings: () => AiSettings): IpcTrans
     timeoutErrorText: () => t('aiErrStreamTimeout'),
     networkErrorText: () => t('aiErrNetwork'),
     overloadedErrorText: () => t('aiErrOverloaded'),
+<<<<<<< ours
     // a UniWork AI failure is worded by its code (S9), in the UI language, never by the chunk's text
     uniworkError: (code, retryAfterSec) => {
       const errorKey = uniworkErrorKey(code, 'desktop') as AiUniworkStringKey
@@ -23,5 +24,8 @@ export function createElectronTransport(getSettings: () => AiSettings): IpcTrans
         errorKey,
       }
     },
+=======
+    regionErrorText: () => t('aiErrRegion'),
+>>>>>>> theirs
   })
 }

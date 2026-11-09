@@ -9,7 +9,11 @@ export const zh = {
   redactDialogPlaceholder: '占位名称，例如：客户电话',
   redactCancel: '取消',
   redactInsert: '隐藏',
+<<<<<<< ours
   redactEnable: '选中单元格后右键，即可对 AI 隐藏。',
+=======
+  redactEnable: '选中文字后右键，即可对 AI 隐藏。',
+>>>>>>> theirs
   redactNeedsSavedRow: '这一行还没存进文件。请先存盘，再隐藏其中的单元格。',
   redactRecoveredFromNames:
     '这个文件被别的软件改写过，隐藏记录的部件被丢掉了。已从工作簿里的名称把隐藏单元格找回来；存一次盘就能恢复完整记录。',
@@ -294,7 +298,10 @@ export const zh = {
     '此工作簿较大，目前以流式方式仅加载了部分数据。排序、筛选和移动区域需要完整数据才能给出正确结果。要现在完整加载整个工作簿吗？',
   appFullLoadStart: '完整加载',
   appFullLoadRunning: '正在完整加载工作簿，完成后即可排序和筛选……',
-  appFullLoadTooLarge: '此工作簿过大，无法完整载入内存，排序和筛选在此文件上暂不可用。',
+  appFullLoadTooLarge:
+    '此工作簿过大，无法完整载入内存，排序和移动区域在此文件上暂不可用；筛选可直接在文件上进行。',
+  appLargeFilterLoading: '正在从文件读取筛选列……',
+  appLargeFilterApplying: '正在对文件应用筛选……',
   appSortValueModeFormulas:
     '所选区域含有公式，而此大型工作簿中公式不是实时计算的——排序或移动会把它们保存为纯数值。请选择不含公式的区域。',
   appSortRangeTooLarge: '所选区域过大，无法一次排序或移动，请减少选中的单元格。',
@@ -348,6 +355,8 @@ export const zh = {
   appTableNameUsed: '表名 "{name}" 本次会话已使用过。',
   appTableNameInFile: '表名 "{name}" 已被文件中的表使用。',
   appTableOverlapsSession: '该区域与本次会话创建的表格 "{name}" 重叠。',
+  appTableOverlapsFile: '该区域与文件中的表格 "{name}" 重叠。',
+  appTableAlreadyInTable: '所选区域已在表格 "{name}" 内——请到「表格设计」更改样式。',
   appTablesNeedFile: '请先打开 XLSX 文件——表格会写入文件。',
   appTableSelectRange: '请先选中数据区域——首行为表头。',
   appTableCreated: '表格已创建——{saveKeys} 保存。',
@@ -423,6 +432,7 @@ export const zh = {
   appGridlinesHidden: '网格线已隐藏。',
   appGridlinesShown: '网格线已显示。',
   appShowingFormulas: '正在显示公式——再次切换显示数值。',
+  appShowingFormulasActive: '正在显示公式',
   appShowingValues: '正在显示计算结果。',
   appTraceNoFormula: '追踪引用单元格：活动单元格没有公式。',
   appTraceNoRefs: '追踪引用单元格：该公式没有单元格引用。',
@@ -466,6 +476,7 @@ export const zh = {
   // Open / save / page setup
   appBridgeUnavailable: '桌面文件桥不可用。请重启 Electron 应用。',
   appOpenCanceled: '已取消选择工作簿。',
+  appImportCanceled: '导入已取消。',
   appOpeningWorkbook: '正在打开工作簿…',
   appOpenStalled: '工作簿未能打开。',
   appOpenRetry: '重试',
@@ -639,6 +650,7 @@ export const zh = {
   appExportPdfTitle: '导出为 PDF',
   appSaveTitle: '保存',
   appSaveAs: '另存为',
+  aiNameFile: '用 AI 命名…',
   appUndo: '撤销',
   appRedo: '重做',
   appUnsavedEditOne: '● {count} 处未保存的编辑',
@@ -674,7 +686,6 @@ export const zh = {
   appRemoveLink: '删除链接',
   // Ribbon common
   appNotAvailableYet: '暂不可用',
-  appComingSoon: '即将推出',
   // Chart Design tab
   appGroupChartLayouts: '图表布局',
   appAddChartElement: '添加图表元素',
@@ -1094,6 +1105,20 @@ export const zh = {
   appWatchCell: '单元格',
   appWatchValue: '值',
   appWatchFormula: '公式',
+  appLinksPanel: '外部链接',
+  appLinksPanelDetail: '列出、更新和断开到其他工作簿的链接',
+  appLinksUpdate: '更新值',
+  appLinksNone: '此工作簿没有指向其他工作簿的链接。',
+  appLinksUnsaved: '请先保存此工作簿，再列出它的外部链接。',
+  appLinksSource: '源',
+  appLinksStatus: '状态',
+  appLinksSheets: '工作表',
+  appLinksLocate: '定位源文件',
+  appLinksReachable: '可用',
+  appLinksBroken: '已断开',
+  appLinksBreak: '断开链接',
+  appLinksBreakConfirm: '确认断开',
+  appLinksChangeSource: '更改源',
   appGroupCalculation: '计算',
   appCalculationOptions: '计算选项',
   appCalculationOptionsTitle: '自动或手动重算',
@@ -1111,8 +1136,16 @@ export const zh = {
   appGroupGetData: '获取数据',
   appFromTextCsv: '从文本/CSV',
   appRefreshAll: '全部刷新',
+  appRefreshQuery: '刷新查询',
+  appQueryConnectionsTitle: '刷新工作簿里的查询',
+  appQueryRefreshing: '正在刷新 {name}…',
+  appQueryRefreshed: '{name} 已刷新（{rows} 行）',
+  appQueryRefreshedClipped: '{name} 已刷新（{rows} 行，{dropped} 行超出固定区域未写入）',
+  appQueryRefreshFailed: '无法刷新 {name}',
   appWorkbookNoPivot: '工作簿中没有透视表。',
   appRefreshAllTitle: '刷新全部透视表',
+  appQueriesConnections: '查询和连接',
+  appQueriesConnectionsTitle: '查看工作簿中的查询和数据连接',
   appErrorCheckingDetail: '扫描当前表中的错误值',
   appErrorsFound: '发现 {count} 个错误,已定位 {cell}:{value}',
   appCheckingErrors: '正在扫描整个工作表的错误…',
@@ -1147,6 +1180,7 @@ export const zh = {
   appGroupForecast: '预测',
   appWhatIfAnalysis: '模拟分析',
   appGoalSeek: '单变量求解',
+  appDataTable: '数据表',
   appWhatIfTitle: '对目标值反解输入',
   appGoalSeekNeedsFormula: '目标单元格需要包含公式。',
   appGoalSeekByCellNotNumber: '可变单元格需要是数字或空白。',
@@ -1245,12 +1279,15 @@ export const zh = {
   appPasswordUpdating: '正在更新…',
   appUpdatePassword: '更新密码',
   appWorkbookNotPasswordProtected: '此工作簿没有设置打开密码。',
+<<<<<<< ours
   appSaveErrEncryptedUniwork:
     '设有密码的工作簿无法保存到 UniWork 文档。请使用“另存为”在本机保留加密副本。',
   appPasswordChangeUniwork: '无法在此更改 UniWork 文档的密码。',
   appPasswordChangeReadOnly: '此工作簿为只读，无法更改密码。',
   appEncryptedWrongPassword: '密码不正确，请重试。',
   appPasswordChangeRestored: '请先保存已恢复的工作簿，然后再更改其密码。',
+=======
+>>>>>>> theirs
   appAllowEditRanges: '允许编辑区域',
   // Home tab
   appGroupClipboard: '剪贴板',
@@ -1508,6 +1545,7 @@ export const zh = {
   appVisualFlipV: '垂直翻转',
   appVisualFlipH: '水平翻转',
   appCtxPasteVisual: '粘贴图片/形状',
+<<<<<<< ours
   // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
   appWebEngineTitle: '此工作簿暂时无法在网页端打开',
   appWebEngineBody:
@@ -1532,14 +1570,22 @@ export const zh = {
   appWebSavedReopenFailed:
     '您的更改已保存到 UniWork，但此处无法重新打开工作簿。请重新加载编辑器后继续。',
   appDataTable: '数据表',
+=======
+>>>>>>> theirs
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: '拼写检查',
   appSpellBtnDetail: '检查工作表文本 (F7)',
   appSpellToggle: '检查拼写',
+<<<<<<< ours
   appSpellToggleTip: '开启拼写检查（F7 与审阅按钮）；关闭后批注输入框不再显示拼写波浪线',
   appSpellOn: '拼写检查已开启。',
   appSpellOff: '拼写检查已关闭，可在 审阅 ▸ 校对 中开启。',
+=======
+  appSpellToggleTip: '开启拼写检查（F7 与 Review 按钮）；关闭后批注输入框不再显示拼写波浪线',
+  appSpellOn: '拼写检查已开启。',
+  appSpellOff: '拼写检查已关闭，可在 Review ▸ 校对 中开启。',
+>>>>>>> theirs
   appSpellRecheck: '重新检查',
   appSpellNone: '未发现疑似拼写错误。',
   appSpellFindings: '{count} 处疑似拼写错误，点击行可定位。',

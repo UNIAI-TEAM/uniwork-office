@@ -12,6 +12,10 @@ import {
   mergeCells,
   splitCell,
 } from '@tiptap/pm/tables'
+<<<<<<< ours
+=======
+import { platformShortcuts } from '@genoffice/i18n'
+>>>>>>> theirs
 import { redactTextBetween, type RedactableNode } from '../ai/redact-view'
 import type { TextboxDisplay } from '@genoffice/docx-engine'
 
@@ -34,6 +38,7 @@ import {
   distributeRowsEvenly,
   inTableOrSelected,
   selectTablePart,
+  enterSelectedTable,
   setCellAlignment,
   setCellTextDirection,
   splitTableAtSelection,
@@ -44,7 +49,11 @@ import {
 } from '../editor/table-ops'
 import type { TableDialogKind } from './TableDialogs'
 import { IconSparkle } from './icons'
+<<<<<<< ours
 import { cap } from '../capabilities'
+=======
+import { IconCellAlign } from './table-icons'
+>>>>>>> theirs
 import { spellcheckEnabled } from '../spellcheck-pref'
 import { applySpellingSuggestion } from '../editor/spell-replace'
 import { requestRespellKick } from '../editor/respell-kick-gate'
@@ -53,6 +62,7 @@ import { fieldRangeAt, toggleFieldCodes, type FieldRange } from '../editor/field
 import { hasRedactionIn } from '../editor/redaction'
 import type { SpellLanguages } from '../../shared/ipc'
 import { TRANSLATE_LANGS, appLangKey } from './translate-langs'
+import type { RevisionRange } from '../editor/revisions'
 
 export { FontDialog } from './FontDialog'
 
@@ -74,6 +84,10 @@ export interface ContextMenuState {
   spell?: { word: string; suggestions: string[] } | null
   /** hyperlink under the pointer as rendered (a TOC line counts: Word treats its entries as links) */
   link?: { href: string; toc?: boolean; tocTitle?: string } | null
+  /** thread of the comment balloon the click landed on */
+  commentId?: string | null
+  /** opened from a margin balloon: `pos` is that item's anchor, not a pointer hit */
+  balloon?: boolean
 }
 
 interface EditorContextMenuProps {
@@ -109,8 +123,27 @@ interface EditorContextMenuProps {
   sectionContentWidthPx?: number
   /** re-mark existing text after the session dictionary or languages changed */
   onRespell?: () => void
+<<<<<<< ours
   /** whether adding comments is allowed when the document body is read-only */
   commentsAllowed?: boolean
+=======
+  /** tracked changes under the pointer; null while protection disables accept/reject */
+  revisions?: {
+    at: RevisionRange[]
+    any: boolean
+    onRange: (action: 'accept' | 'reject', target: RevisionRange) => void
+    onAll: (action: 'accept' | 'reject') => void
+  } | null
+  /** comment thread under the pointer (Word: Reply / Delete / Resolve stay listed, greyed off a comment) */
+  comment?: {
+    id: string | null
+    onReply: (id: string) => void
+    onDelete: (id: string) => void
+    onResolve: (id: string) => void
+  } | null
+  /** Track Changes toggle; null while protection or a forced lock removes the choice */
+  trackChanges?: { on: boolean; onToggle: () => void } | null
+>>>>>>> theirs
 }
 
 const MENU_WIDTH = 240
@@ -157,7 +190,13 @@ export function EditorContextMenu({
   onTableDialog,
   sectionContentWidthPx = 624,
   onRespell,
+<<<<<<< ours
   commentsAllowed = false,
+=======
+  revisions,
+  comment,
+  trackChanges,
+>>>>>>> theirs
 }: EditorContextMenuProps) {
   const { t, lang } = useI18n()
   const ref = useRef<HTMLDivElement>(null)
@@ -315,8 +354,20 @@ export function EditorContextMenu({
     enterFirstCell()
     command(editor.state, editor.view.dispatch)
   }
+  /** per-cell formatting: a whole-table selection means every cell, not the first one */
+  const runTableCells = (command: Command) => {
+    editor.view.focus()
+    enterSelectedTable(editor.state, editor.view.dispatch)
+    command(editor.state, editor.view.dispatch)
+  }
 
-  const protAttrs = editor.getAttributes('docProtected')
+  // only the object itself (right-click selects it as a node): a text range
+  // that merely spans a picture keeps the text menu
+  const protAttrs =
+    editor.state.selection instanceof NodeSelection &&
+    editor.state.selection.node.type.name === 'docProtected'
+      ? editor.state.selection.node.attrs
+      : null
   const isImage = protAttrs?.blockType === 'image'
   const isFloating =
     isImage ||
@@ -329,6 +380,11 @@ export function EditorContextMenu({
     !editor.state.selection.node.attrs.rule
       ? editor.state.selection.node
       : null
+<<<<<<< ours
+=======
+  // Word's picture menu: clipboard, the picture, wrap / arrange, link, comment
+  const onPicture = !!menu.imageSrc || !!runPicture || isImage
+>>>>>>> theirs
   const currentWrap = runPicture
     ? ((runPicture.attrs.wrap as string | null) ?? null)
     : boxes?.length
@@ -421,13 +477,6 @@ export function EditorContextMenu({
           <div className="ctx-sep" />
         </>
       )}
-      {menu.imageSrc && (
-        <>
-          {item(t('appViewImage'), { onClick: run(() => onViewImage(menu.imageSrc!)) })}
-          {item(t('appSaveImageAs'), { onClick: run(() => onSaveImageAs(menu.imageSrc!)) })}
-          <div className="ctx-sep" />
-        </>
-      )}
       {item(t('appCut'), {
         shortcut: 'cut',
         disabled: !hasSelection || !canEdit,
@@ -443,6 +492,7 @@ export function EditorContextMenu({
         disabled: !canEdit,
         onClick: run(() => void pasteFromClipboard(editor)),
       })}
+<<<<<<< ours
       {item(t('appPastePlain'), {
         shortcut: 'paste-plain',
         disabled: !canEdit,
@@ -452,6 +502,28 @@ export function EditorContextMenu({
       {item(t('appFontMenu'), { shortcut: 'font-dialog', onClick: run(onFontDialog) })}
       {item(t('appParagraphMenu'), { onClick: run(onParagraphDialog) })}
       {inTable && (
+=======
+      {!onPicture &&
+        item(t('appPastePlain'), {
+          disabled: !canEdit,
+          onClick: run(() => void pasteFromClipboard(editor, 'text')),
+        })}
+      {menu.imageSrc && (
+        <>
+          <div className="ctx-sep" />
+          {item(t('appViewImage'), { onClick: run(() => onViewImage(menu.imageSrc!)) })}
+          {item(t('appSaveImageAs'), { onClick: run(() => onSaveImageAs(menu.imageSrc!)) })}
+        </>
+      )}
+      {!onPicture && (
+        <>
+          <div className="ctx-sep" />
+          {item(t('appFontMenu'), { key: '⌘D', onClick: run(onFontDialog) })}
+          {item(t('appParagraphMenu'), { key: '⌥⌘M', onClick: run(onParagraphDialog) })}
+        </>
+      )}
+      {inTable && !onPicture && (
+>>>>>>> theirs
         <>
           <div className="ctx-sep" />
           <div className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)}>
@@ -578,8 +650,11 @@ export function EditorContextMenu({
                   <button
                     key={`${v}-${h}`}
                     className="ctx-item"
-                    onClick={run(() => runTable(setCellAlignment(v, h)))}
+                    onClick={run(() => runTableCells(setCellAlignment(v, h)))}
                   >
+                    <span className="ctx-ico">
+                      <IconCellAlign v={v} h={h} size={14} />
+                    </span>
                     <span className="ctx-label">{t(labelKey)}</span>
                   </button>
                 ))}
@@ -594,7 +669,7 @@ export function EditorContextMenu({
                   <button
                     key={dir}
                     className="ctx-item"
-                    onClick={run(() => runTable(setCellTextDirection(dir)))}
+                    onClick={run(() => runTableCells(setCellTextDirection(dir)))}
                   >
                     <span className="ctx-label">{t(labelKey)}</span>
                   </button>
@@ -634,7 +709,7 @@ export function EditorContextMenu({
             })}
         </>
       )}
-      {(field || editor.isActive('instrField')) && onUpdateFields && (
+      {!onPicture && (field || editor.isActive('instrField')) && onUpdateFields && (
         <>
           <div className="ctx-sep" />
           {item(t('appUpdateField'), {
@@ -655,53 +730,119 @@ export function EditorContextMenu({
           )}
         </>
       )}
-      {editor.isActive('docListItem') && !!editor.getAttributes('docListItem').numId && (
+      {!onPicture &&
+        editor.isActive('docListItem') &&
+        !!editor.getAttributes('docListItem').numId && (
+          <>
+            <div className="ctx-sep" />
+            {item(t('appRestartNumbering'), {
+              disabled: !onRestartNumbering,
+              onClick: run(() => onRestartNumbering?.()),
+            })}
+            {item(t('appContinueNumbering'), {
+              disabled: !onContinueNumbering,
+              onClick: run(() => onContinueNumbering?.()),
+            })}
+            {item(t('appSetNumberingValue'), {
+              disabled: !onSetNumberingValue || !canEdit,
+              onClick: run(() => onSetNumberingValue?.()),
+            })}
+            {item(t('appAdjustListIndents'), {
+              disabled: !onAdjustListIndents || !canEdit,
+              onClick: run(() => onAdjustListIndents?.()),
+            })}
+            <div className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)}>
+              {item(t('appChangeListLevel'), {
+                disabled: !onChangeListLevel || !canEdit,
+                submenuKey: 'listLevel',
+              })}
+              {submenu === 'listLevel' && onChangeListLevel && canEdit && (
+                <div className="ctx-submenu">
+                  {Array.from({ length: 9 }, (_, i) => (
+                    <button
+                      key={i}
+                      className="ctx-item"
+                      aria-current={
+                        (Number(editor.getAttributes('docListItem').ilvl) || 0) === i
+                          ? 'true'
+                          : undefined
+                      }
+                      onClick={run(() => onChangeListLevel(i))}
+                    >
+                      <span className="ctx-label" style={{ paddingLeft: i * 8 }}>
+                        {t('appParaOutlineLevelN', { n: String(i + 1) })}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      {!onPicture && (
         <>
           <div className="ctx-sep" />
-          {item(t('appRestartNumbering'), {
-            disabled: !onRestartNumbering,
-            onClick: run(() => onRestartNumbering?.()),
-          })}
-          {item(t('appContinueNumbering'), {
-            disabled: !onContinueNumbering,
-            onClick: run(() => onContinueNumbering?.()),
-          })}
-          {item(t('appSetNumberingValue'), {
-            disabled: !onSetNumberingValue || !canEdit,
-            onClick: run(() => onSetNumberingValue?.()),
-          })}
-          {item(t('appAdjustListIndents'), {
-            disabled: !onAdjustListIndents || !canEdit,
-            onClick: run(() => onAdjustListIndents?.()),
+          {item(t('appSynonyms'), {
+            disabled: !synonymText,
+            ai: true,
+            onClick: run(() => onAiPreset(t('appSynonymsPrompt', { text: synonymText }))),
           })}
           <div className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)}>
-            {item(t('appChangeListLevel'), {
-              disabled: !onChangeListLevel || !canEdit,
-              submenuKey: 'listLevel',
+            {item(t('appTranslate'), {
+              disabled: !hasSelection,
+              submenuKey: 'translate',
+              ai: true,
             })}
-            {submenu === 'listLevel' && onChangeListLevel && canEdit && (
+            {submenu === 'translate' && hasSelection && (
               <div className="ctx-submenu">
-                {Array.from({ length: 9 }, (_, i) => (
+                {TRANSLATE_LANGS.map(({ code }) => (
                   <button
-                    key={i}
+                    key={code}
                     className="ctx-item"
-                    aria-current={
-                      (Number(editor.getAttributes('docListItem').ilvl) || 0) === i
-                        ? 'true'
-                        : undefined
-                    }
-                    onClick={run(() => onChangeListLevel(i))}
+                    onClick={run(() =>
+                      onAiPreset(
+                        t('appTranslateSelectionPrompt', {
+                          lang: t(appLangKey(code)),
+                          text: selectedText,
+                        }),
+                      ),
+                    )}
                   >
-                    <span className="ctx-label" style={{ paddingLeft: i * 8 }}>
-                      {t('appParaOutlineLevelN', { n: String(i + 1) })}
+                    <span className="ctx-label">
+                      {t('appTranslateTo', { lang: t(appLangKey(code)) })}
                     </span>
                   </button>
                 ))}
               </div>
             )}
           </div>
+          {/* Withholding a span. No AI badge: the item spends the words rather
+          than using the model, and the badge would read "Uses AI".
+          Text only, deliberately. A picture alone in a paragraph is a *block*
+          node (docProtected), which takes no marks at all, and a picture
+          beside text is an inline atom whose mark is dropped by the docx save
+          (convert.ts reads the run's node attrs, never the node's marks) — so
+          offering it for a picture would hide it for one session and then lose
+          the decision on the next save, with nothing to tell the reader. */}
+          {onRedact &&
+            item(t('redactMenuLabel'), {
+              disabled: !canEdit || !hasSelection,
+              onClick: run(onRedact),
+            })}
+          {/* The other half of the item above, and its mirror: offered only when the
+          selection really carries the mark. Without this the sole way to stop
+          withholding a span was to delete the words, which loses the reader's
+          own text to undo a decision they made in the editor. Same reason as
+          the item beside it for no AI badge — this one only moves a mark. */}
+          {onUnredact &&
+            isRedactedSelection &&
+            item(t('redactShowLabel'), {
+              disabled: !canEdit,
+              onClick: run(onUnredact),
+            })}
         </>
       )}
+<<<<<<< ours
       {cap('ai') && (
         <>
           <div className="ctx-sep" />
@@ -765,6 +906,8 @@ export function EditorContextMenu({
             })}
         </>
       )}
+=======
+>>>>>>> theirs
       {(isFloating || runPicture) && (
         <>
           <div className="ctx-sep" />
@@ -832,11 +975,58 @@ export function EditorContextMenu({
           onClick: run(onLink),
         })
       )}
+<<<<<<< ours
       {item(t('appNewComment'), {
         shortcut: 'comment',
         disabled: !canComment || (!canEdit && !commentsAllowed),
         onClick: run(onNewComment),
       })}
+=======
+      {item(t('appNewComment'), { disabled: !canComment, onClick: run(onNewComment) })}
+      {comment && !onPicture && (
+        <>
+          <div className="ctx-sep" />
+          {item(t('appCtxReplyComment'), {
+            disabled: !comment.id,
+            onClick: run(() => comment.id && comment.onReply(comment.id)),
+          })}
+          {item(t('appCtxDeleteComment'), {
+            disabled: !comment.id,
+            onClick: run(() => comment.id && comment.onDelete(comment.id)),
+          })}
+          {item(t('appCtxResolveComment'), {
+            disabled: !comment.id,
+            onClick: run(() => comment.id && comment.onResolve(comment.id)),
+          })}
+        </>
+      )}
+      {!onPicture && (revisions?.any || trackChanges) && (
+        <>
+          <div className="ctx-sep" />
+          {revisions && revisions.at.length > 0 && (
+            <>
+              {item(t('appCtxAcceptChange'), {
+                onClick: run(() => revisions.onRange('accept', revisions.at[0])),
+              })}
+              {item(t('appCtxRejectChange'), {
+                onClick: run(() => revisions.onRange('reject', revisions.at[0])),
+              })}
+            </>
+          )}
+          {revisions?.any && (
+            <>
+              {item(t('ribbonAcceptAll'), { onClick: run(() => revisions.onAll('accept')) })}
+              {item(t('ribbonRejectAll'), { onClick: run(() => revisions.onAll('reject')) })}
+            </>
+          )}
+          {trackChanges &&
+            item(`${trackChanges.on ? '✓ ' : ''}${t('ribbonTrackChanges')}`, {
+              key: '⇧⌘E',
+              onClick: run(trackChanges.onToggle),
+            })}
+        </>
+      )}
+>>>>>>> theirs
     </div>
   )
 }
