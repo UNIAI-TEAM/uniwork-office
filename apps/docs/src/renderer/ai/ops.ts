@@ -235,8 +235,10 @@ function validateTarget(target: unknown, where: string): string | null {
     typeof tg.containsText === 'string' ||
     (Array.isArray(tg.blockIndexes) && tg.blockIndexes.length > 0) ||
     tg.scope === 'selection' ||
+    tg.scope === 'document' ||
     tg.range !== undefined
-  if (!hasCondition) return `${where}: target requires at least one condition`
+  if (!hasCondition)
+    return `${where}: target requires at least one condition (use {"scope":"document"} for the whole document)`
   return null
 }
 
