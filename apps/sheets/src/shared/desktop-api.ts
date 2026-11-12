@@ -2997,6 +2997,8 @@ export interface DesktopApi {
   onDocumentThemeChanged(handler: (theme: DocTheme) => void): () => void
   /** shell-wide AutoSave default (see useAutoSavePref) */
   getAutoSaveDefault(): Promise<AutoSaveDefault>
+  /** the ceiling a delimited import may reach, in MB (the user's setting) */
+  getCsvImportLimit(): Promise<number>
   onAutoSaveDefaultChanged(handler: (value: AutoSaveDefault) => void): () => void
   /** web only: opens the in-frame AI settings dialog (UniWork-stored provider keys) */
   openAiSettings?(): Promise<void>

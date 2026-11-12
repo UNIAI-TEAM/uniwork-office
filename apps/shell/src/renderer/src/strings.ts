@@ -146,6 +146,7 @@ export const strings = {
     setAutoSave: '所有文档自动保存',
     setAutoSaveDesc: '在每个编辑器中默认开启自动保存，仍可在单个窗口中关闭。',
     setAiPanelSide: 'AI 侧边栏位置',
+    csvImportLimit: 'CSV 导入上限',
     aiPanelSideLeft: '左侧',
     aiPanelSideRight: '右侧',
     setAiFontSize: 'AI 面板文字大小',
@@ -483,6 +484,7 @@ export const strings = {
     setAutoSaveDesc:
       'Turn on AutoSave by default in every editor. You can still switch it off for a single window.',
     setAiPanelSide: 'AI sidebar position',
+    csvImportLimit: 'CSV import limit',
     aiPanelSideLeft: 'Left',
     aiPanelSideRight: 'Right',
     setAiFontSize: 'AI panel text size',
@@ -839,6 +841,7 @@ export const strings = {
     setAutoSaveDesc:
       'すべてのエディターで自動保存をデフォルトでオンにします。個々のウィンドウでオフにすることもできます。',
     setAiPanelSide: 'AI サイドバーの位置',
+    csvImportLimit: 'CSV インポートの上限',
     aiPanelSideLeft: '左側',
     aiPanelSideRight: '右側',
     setAiFontSize: 'AI パネルの文字サイズ',
@@ -1205,6 +1208,7 @@ export const strings = {
     setAutoSave: '모든 문서 자동 저장',
     setAutoSaveDesc: '모든 편집기에서 자동 저장을 기본으로 켭니다. 개별 창에서는 끌 수 있습니다.',
     setAiPanelSide: 'AI 사이드바 위치',
+    csvImportLimit: 'CSV 가져오기 한도',
     aiPanelSideLeft: '왼쪽',
     aiPanelSideRight: '오른쪽',
     setAiFontSize: 'AI 패널 글자 크기',
@@ -1567,6 +1571,7 @@ export const strings = {
     setAutoSaveDesc:
       "Active l'enregistrement automatique par défaut dans chaque éditeur. Vous pouvez toujours le désactiver pour une fenêtre.",
     setAiPanelSide: 'Position de la barre latérale IA',
+    csvImportLimit: "Limite d'importation CSV",
     aiPanelSideLeft: 'Gauche',
     aiPanelSideRight: 'Droite',
     setAiFontSize: 'Taille du texte du panneau IA',
@@ -1942,6 +1947,7 @@ export const strings = {
     setAutoSaveDesc:
       'Aktiviert AutoSave standardmäßig in jedem Editor. Für ein einzelnes Fenster kann es weiterhin ausgeschaltet werden.',
     setAiPanelSide: 'Position der KI-Seitenleiste',
+    csvImportLimit: 'CSV-Importlimit',
     aiPanelSideLeft: 'Links',
     aiPanelSideRight: 'Rechts',
     setAiFontSize: 'Textgröße im KI-Bereich',
@@ -2313,6 +2319,7 @@ export const strings = {
     setAutoSaveDesc:
       'Activa el autoguardado de forma predeterminada en todos los editores. Aún puedes desactivarlo en una ventana concreta.',
     setAiPanelSide: 'Posición de la barra lateral de IA',
+    csvImportLimit: 'Límite de importación de CSV',
     aiPanelSideLeft: 'Izquierda',
     aiPanelSideRight: 'Derecha',
     setAiFontSize: 'Tamaño del texto del panel de IA',
@@ -2678,6 +2685,7 @@ export const strings = {
     setAutoSave: 'บันทึกอัตโนมัติทุกเอกสาร',
     setAutoSaveDesc: 'เปิดบันทึกอัตโนมัติเป็นค่าเริ่มต้นในทุกตัวแก้ไข คุณยังปิดได้ในแต่ละหน้าต่าง',
     setAiPanelSide: 'ตำแหน่งแถบด้านข้าง AI',
+    csvImportLimit: 'ขีดจำกัดการนำเข้า CSV',
     aiPanelSideLeft: 'ซ้าย',
     aiPanelSideRight: 'ขวา',
     setAiFontSize: 'ขนาดตัวอักษรในแผง AI',
@@ -3036,6 +3044,7 @@ export const strings = {
     setAutoSaveDesc:
       'Aktifkan Simpan Otomatis secara default di setiap editor. Anda masih dapat menonaktifkannya untuk satu jendela.',
     setAiPanelSide: 'Posisi bilah samping AI',
+    csvImportLimit: 'Batas impor CSV',
     aiPanelSideLeft: 'Kiri',
     aiPanelSideRight: 'Kanan',
     setAiFontSize: 'Ukuran teks panel AI',
@@ -3399,6 +3408,7 @@ export const strings = {
     setAutoSaveDesc:
       'Включает автосохранение по умолчанию во всех редакторах. Его по-прежнему можно выключить для отдельного окна.',
     setAiPanelSide: 'Положение боковой панели ИИ',
+    csvImportLimit: 'Ограничение импорта CSV',
     aiPanelSideLeft: 'Слева',
     aiPanelSideRight: 'Справа',
     setAiFontSize: 'Размер текста панели ИИ',
@@ -3762,6 +3772,7 @@ export const strings = {
     setAutoSaveDesc:
       'تشغيل الحفظ التلقائي افتراضيًا في كل محرر. لا يزال بإمكانك إيقافه لنافذة واحدة.',
     setAiPanelSide: 'موضع الشريط الجانبي للذكاء الاصطناعي',
+    csvImportLimit: 'حد استيراد CSV',
     aiPanelSideLeft: 'اليسار',
     aiPanelSideRight: 'اليمين',
     setAiFontSize: 'حجم نص لوحة الذكاء الاصطناعي',
@@ -4116,6 +4127,7 @@ export const strings = {
     setAutoSaveDesc:
       'Ativa o salvamento automático por padrão em todos os editores. Você ainda pode desativá-lo em uma janela específica.',
     setAiPanelSide: 'Posição da barra lateral de IA',
+    csvImportLimit: 'Limite de importação de CSV',
     aiPanelSideLeft: 'Esquerda',
     aiPanelSideRight: 'Direita',
     setAiFontSize: 'Tamanho do texto do painel de IA',
@@ -4476,6 +4488,7 @@ export const strings = {
     setAutoSaveDesc:
       'Attiva il salvataggio automatico per impostazione predefinita in ogni editor. Puoi comunque disattivarlo per una singola finestra.',
     setAiPanelSide: 'Posizione della barra laterale IA',
+    csvImportLimit: 'Limite di importazione CSV',
     aiPanelSideLeft: 'Sinistra',
     aiPanelSideRight: 'Destra',
     setAiFontSize: 'Dimensione del testo del pannello IA',
@@ -4834,6 +4847,7 @@ export const strings = {
     setAutoSaveDesc:
       'Włącza autozapis domyślnie w każdym edytorze. Nadal możesz go wyłączyć dla pojedynczego okna.',
     setAiPanelSide: 'Położenie panelu bocznego AI',
+    csvImportLimit: 'Limit importu CSV',
     aiPanelSideLeft: 'Lewa',
     aiPanelSideRight: 'Prawa',
     setAiFontSize: 'Rozmiar tekstu panelu AI',
@@ -5356,6 +5370,7 @@ export const strings = {
     setAutoSaveDesc:
       'Zapne automatické ukládání ve všech editorech jako výchozí. Pro jednotlivé okno ho lze stále vypnout.',
     setAiPanelSide: 'Pozice postranního panelu AI',
+    csvImportLimit: 'Limit importu CSV',
     aiPanelSideLeft: 'Vlevo',
     aiPanelSideRight: 'Vpravo',
     setAiFontSize: 'Velikost textu panelu AI',
@@ -5543,6 +5558,7 @@ export const strings = {
     setAutoSaveDesc:
       'Zet automatisch opslaan standaard aan in elke editor. Je kunt het nog steeds uitschakelen voor één venster.',
     setAiPanelSide: 'Positie AI-zijbalk',
+    csvImportLimit: 'CSV-importlimiet',
     aiPanelSideLeft: 'Links',
     aiPanelSideRight: 'Rechts',
     setAiFontSize: 'Tekstgrootte AI-paneel',
@@ -5901,6 +5917,7 @@ export const strings = {
     setAutoSaveDesc:
       'Hidupkan Simpan Automatik secara lalai dalam setiap editor. Anda masih boleh mematikannya untuk satu tetingkap.',
     setAiPanelSide: 'Kedudukan bar sisi AI',
+    csvImportLimit: 'Had import CSV',
     aiPanelSideLeft: 'Kiri',
     aiPanelSideRight: 'Kanan',
     setAiFontSize: 'Saiz teks panel AI',
@@ -6257,6 +6274,7 @@ export const strings = {
     setAutoSave: 'שמירה אוטומטית של כל המסמכים',
     setAutoSaveDesc: 'מפעיל שמירה אוטומטית כברירת מחדל בכל עורך. עדיין אפשר לכבות אותה בחלון בודד.',
     setAiPanelSide: 'מיקום סרגל הצד של הבינה המלאכותית',
+    csvImportLimit: 'מגבלת ייבוא CSV',
     aiPanelSideLeft: 'שמאל',
     aiPanelSideRight: 'ימין',
     setAiFontSize: 'גודל הטקסט בחלונית ה-AI',
@@ -6604,6 +6622,7 @@ export const strings = {
     setAutoSaveDesc:
       'हर संपादक में स्वतः सहेजना डिफ़ॉल्ट रूप से चालू करता है। आप इसे किसी एक विंडो के लिए अब भी बंद कर सकते हैं।',
     setAiPanelSide: 'AI साइडबार की स्थिति',
+    csvImportLimit: 'CSV आयात सीमा',
     aiPanelSideLeft: 'बाईं ओर',
     aiPanelSideRight: 'दाईं ओर',
     setAiFontSize: 'AI पैनल का टेक्स्ट आकार',
@@ -7092,6 +7111,7 @@ export const strings = {
     documentTheme: 'Chủ đề trang tài liệu',
     docThemeFollowApp: 'Theo chủ đề ứng dụng',
     setAiPanelSide: 'Vị trí thanh bên AI',
+    csvImportLimit: 'Giới hạn nhập CSV',
     aiPanelSideLeft: 'Trái',
     aiPanelSideRight: 'Phải',
     setDefaultApp: 'Ứng dụng mặc định cho tài liệu Office',
@@ -7299,6 +7319,7 @@ export const strings = {
     setAutoSave: '所有文件自動儲存',
     setAutoSaveDesc: '在每個編輯器中預設開啟自動儲存，仍可在單一視窗中關閉。',
     setAiPanelSide: 'AI 側邊欄位置',
+    csvImportLimit: 'CSV 匯入上限',
     aiPanelSideLeft: '左側',
     aiPanelSideRight: '右側',
     setAiFontSize: 'AI 面板文字大小',

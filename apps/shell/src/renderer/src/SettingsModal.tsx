@@ -9,7 +9,13 @@ import {
   clampAiCustomFontSize,
 } from '@genoffice/ui'
 import type { AiFontSize, AiPanelPrefs, AiPanelSide } from '@genoffice/ui'
-import type { CliLinkState, DefaultAppStatus, LegalDoc } from '../../shared/home-api'
+import {
+  CSV_IMPORT_DEFAULT_LIMIT_MB,
+  CSV_IMPORT_LIMIT_CHOICES_MB,
+  type CliLinkState,
+  type DefaultAppStatus,
+  type LegalDoc,
+} from '../../shared/home-api'
 import type { UpdateUiState } from '../../shared/update-api'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
@@ -356,6 +362,7 @@ export function SettingsModal({
   }
   const [theme, setTheme] = useState<UiTheme>('system')
   const [docTheme, setDocTheme] = useState<DocTheme>('follow')
+  const [csvLimitMb, setCsvLimitMb] = useState(CSV_IMPORT_DEFAULT_LIMIT_MB)
   const [saveDir, setSaveDir] = useState('')
   const [autoSaveOn, setAutoSaveOn] = useState(false)
   const [restoreSessionOn, setRestoreSessionOn] = useState(false)
@@ -402,6 +409,9 @@ export function SettingsModal({
     })
     void window.aiOffice.getAutoSaveDefault?.().then((v) => {
       if (alive) setAutoSaveOn(v.on)
+    })
+    void window.aiOffice.getCsvImportLimit?.().then((mb) => {
+      if (alive && mb > 0) setCsvLimitMb(mb)
     })
     void window.aiOffice.getRestoreLastSession?.().then((on) => {
       if (alive) setRestoreSessionOn(on)
@@ -684,6 +694,26 @@ export function SettingsModal({
                       label: t(opt.labelKey),
                     }))}
                     onPick={(v) => applyDocumentTheme(v as DocTheme)}
+                  />
+                </div>
+                <div className="set-field">
+                  <div className="set-field-text">
+                    <label className="set-field-label">{t('csvImportLimit')}</label>
+                  </div>
+                  <Dropdown
+                    className="set-dd"
+                    value={String(csvLimitMb)}
+                    ariaLabel={t('csvImportLimit')}
+                    options={CSV_IMPORT_LIMIT_CHOICES_MB.map((mb) => ({
+                      value: String(mb),
+                      label: `${mb} MB`,
+                    }))}
+                    onPick={(v) => {
+                      const mb = Number(v)
+                      if (!Number.isInteger(mb)) return
+                      setCsvLimitMb(mb)
+                      void window.aiOffice.setCsvImportLimit?.(mb)
+                    }}
                   />
                 </div>
                 <h4 className="set-pane-subtitle">{t('setGrpAiPanel')}</h4>
