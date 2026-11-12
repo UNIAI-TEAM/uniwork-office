@@ -19,9 +19,9 @@ const localAlias = {
     __dirname,
     '../../packages/font-metrics/src/resolve.ts',
   ),
-  '@genoffice/font-metrics/words': resolve(
+  '@genoffice/font-metrics/word-faces.json': resolve(
     __dirname,
-    '../../packages/font-metrics/words-faces.json',
+    '../../packages/font-metrics/word-faces.json',
   ),
   '@genoffice/font-metrics': resolve(__dirname, '../../packages/font-metrics/src/index.ts'),
   '@genoffice/shortcuts': resolve(__dirname, '../../packages/shortcuts/src/index.ts'),
