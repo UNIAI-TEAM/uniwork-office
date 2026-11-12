@@ -742,6 +742,29 @@ describe('RV-17: with no root row, the sidebar "+" creates at the workspace root
     expect(JSON.stringify(history.state)).not.toContain(NODE_ID)
   })
 
+  it('creating from the workspace folder node names the root in the title and hints the name, and still posts a null parent', async () => {
+    const createFolder = vi.fn(async (i: { parentId: string | null; title: string }) =>
+      ok(folder('f-new', i.title)),
+    )
+    api.uniworkCreateFolder = createFolder
+    await mount('workspace')
+
+    const entries = await openNodeMenu()
+    await click(entries[0])
+    expect(document.querySelector('.modal .uw-act-heading')?.textContent).toBe(
+      'Thư mục mới ở Tài liệu (gốc)',
+    )
+    expect(document.querySelector<HTMLInputElement>('.modal input')!.placeholder).toBe(
+      'Ví dụ: Hợp đồng 2026',
+    )
+    await submitNewFolder('Hợp đồng')
+    expect(createFolder).toHaveBeenLastCalledWith({
+      workspaceId: 'ws-1',
+      parentId: null,
+      title: 'Hợp đồng',
+    })
+  })
+
   it('the workspace folder node offers New folder to every role that sees the "+" beside it', async () => {
     for (const myRole of ['viewer', 'guest', 'owner']) {
       await mount('workspace', 'vi', { workspaces: [{ ...workspaces[0]!, myRole }] })

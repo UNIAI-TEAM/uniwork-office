@@ -17,6 +17,7 @@ export function FolderNameDialog({
   title,
   initial = '',
   submitLabel,
+  placeholder,
   workspaceNote = false,
   onSubmit,
   onCancel,
@@ -24,6 +25,8 @@ export function FolderNameDialog({
   title: string
   initial?: string
   submitLabel: string
+  /** hint in the empty name field (a create; web `documents.home.folders.name_placeholder`) */
+  placeholder?: string
   /** a new folder whose name shows to everyone in the workspace (UNI-2066): a note under the field */
   workspaceNote?: boolean
   onSubmit: (name: string) => Promise<FolderNameOutcome>
@@ -81,6 +84,7 @@ export function FolderNameDialog({
             type="text"
             value={name}
             required
+            placeholder={placeholder}
             aria-required="true"
             aria-invalid={error !== null}
             aria-describedby={workspaceNote ? `${id}-note ${id}-error` : `${id}-error`}

@@ -3764,8 +3764,11 @@ export function DocumentsHome({
               ? `${t('ufRename')} · ${nameDialog.title}`
               : nameDialog.sub
                 ? t('ufNewSubfolder')
-                : t('ufNewFolder')
+                : nameDialog.parentId === null
+                  ? t('ufNewFolderRoot')
+                  : t('ufNewFolder')
           }
+          placeholder={nameDialog.mode === 'create' ? t('ufFolderNamePlaceholder') : undefined}
           initial={nameDialog.mode === 'rename' ? nameDialog.title : (nameDialog.initial ?? '')}
           submitLabel={nameDialog.mode === 'rename' ? t('ufSave') : t('ufCreate')}
           workspaceNote={folderActions.workspaceNote}
