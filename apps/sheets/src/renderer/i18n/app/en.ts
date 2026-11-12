@@ -502,6 +502,7 @@ export const en = {
   appColumnLabel: 'Column {col}',
   appBridgeUnavailable: 'Desktop file bridge is unavailable. Restart the Electron app.',
   appOpenCanceled: 'Workbook selection canceled.',
+  appImportCanceled: 'Import canceled.',
   appOpeningWorkbook: 'Opening workbook…',
   appOpenStalled: 'The workbook could not be opened.',
   appOpenRetry: 'Retry',

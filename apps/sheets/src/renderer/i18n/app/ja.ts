@@ -555,6 +555,7 @@ export const ja = {
   appBridgeUnavailable:
     'デスクトップファイルブリッジが利用できません。Electron アプリを再起動してください。',
   appOpenCanceled: 'ブックの選択をキャンセルしました。',
+  appImportCanceled: 'インポートをキャンセルしました。',
   appOpeningWorkbook: 'ブックを開いています…',
   appOpenStalled: 'ブックを開けませんでした。',
   appOpenRetry: '再試行',

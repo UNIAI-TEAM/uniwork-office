@@ -552,6 +552,7 @@ export const nl = {
   appBridgeUnavailable:
     'De bestandsbridge van de desktop is niet beschikbaar. Start de Electron-app opnieuw.',
   appOpenCanceled: 'Werkmapselectie geannuleerd.',
+  appImportCanceled: 'Import geannuleerd.',
   appOpeningWorkbook: 'Werkmap openen…',
   appOpenStalled: 'De werkmap kon niet worden geopend.',
   appOpenRetry: 'Opnieuw proberen',

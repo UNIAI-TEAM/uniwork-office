@@ -467,6 +467,7 @@ export const zh = {
   // Open / save / page setup
   appBridgeUnavailable: '桌面文件桥不可用。请重启 Electron 应用。',
   appOpenCanceled: '已取消选择工作簿。',
+  appImportCanceled: '导入已取消。',
   appOpeningWorkbook: '正在打开工作簿…',
   appOpenStalled: '工作簿未能打开。',
   appOpenRetry: '重试',

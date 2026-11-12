@@ -477,6 +477,7 @@ export const he = {
   appColumnLabel: 'עמודה {col}',
   appBridgeUnavailable: 'גשר הקבצים של שולחן העבודה אינו זמין. הפעל מחדש את אפליקציית Electron.',
   appOpenCanceled: 'בחירת חוברת העבודה בוטלה.',
+  appImportCanceled: 'הייבוא בוטל.',
   appOpeningWorkbook: 'פותח חוברת עבודה…',
   appOpenStalled: 'לא ניתן היה לפתוח את חוברת העבודה.',
   appOpenRetry: 'נסה שוב',

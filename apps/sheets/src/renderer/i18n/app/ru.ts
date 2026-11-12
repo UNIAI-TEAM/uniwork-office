@@ -532,6 +532,7 @@ export const ru = {
   appColumnLabel: 'Столбец {col}',
   appBridgeUnavailable: 'Мост файлов рабочего стола недоступен. Перезапустите приложение Electron.',
   appOpenCanceled: 'Выбор книги отменён.',
+  appImportCanceled: 'Импорт отменён.',
   appOpeningWorkbook: 'Открытие книги…',
   appOpenStalled: 'Не удалось открыть книгу.',
   appOpenRetry: 'Повторить',
