@@ -28,6 +28,7 @@ import { BrowserWindow, WebContentsView, app, dialog, ipcMain, shell } from 'ele
 import type { WebContents } from 'electron'
 import {
   buildPrintableHtml,
+  readPdfDefaultZoom,
   configuredDefaultSaveDir,
   contextMenuLabels,
   installContextMenu,
@@ -1237,6 +1238,10 @@ function registerPdfIpc(): void {
     pendingPdfAiPresets.delete(e.sender.id)
     return preset
   })
+
+  ipcMain.handle(PDF_CHANNELS.getDefaultZoom, () =>
+    readPdfDefaultZoom(join(app.getPath('userData'), 'app-settings.json')),
+  )
 
   // G8-02: the author written into new note comments. The shell's single source
   // answers with the signed-in account's display name for a bound document and

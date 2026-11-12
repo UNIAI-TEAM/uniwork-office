@@ -1156,6 +1156,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
     // ---- viewer identity, appearance
     getUsername: async () => author,
+    getDefaultZoom: async () => 'width',
     // the web host has no desktop account ping; the author comes from the frame's init only
     onCommentAuthorChanged: () => () => {},
     getLanguage: browser.getLanguage as PdfWebApi['getLanguage'],

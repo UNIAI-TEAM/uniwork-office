@@ -167,3 +167,11 @@ export {
 } from './comments-poll'
 export { newerCopyMtime } from './recovery-copy'
 export { RecoveryClearEpochs, recoveryEpochKey, type RecoveryWriteTicket } from './recovery-epochs'
+export {
+  PDF_DEFAULT_ZOOM_KEY,
+  PDF_DEFAULT_ZOOMS,
+  readPdfDefaultZoom,
+  sanitizePdfDefaultZoom,
+  writePdfDefaultZoom,
+  type PdfDefaultZoom,
+} from './pdf-zoom-prefs'
