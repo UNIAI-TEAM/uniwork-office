@@ -2851,7 +2851,7 @@ export function registerSheetsIpc(): void {
     }
     // G5-04g / declined import: a locked working copy or a declined .ods
     // conversion opens nothing
-    if (!prepared) return null
+    if (prepared === null) return null
     // The recovery prompt (or the file dialog / import conversion) can outlive
     // the tab: once the renderer is destroyed, its 'destroyed' handler has
     // already run closeAllSessions and dropped the tab entry, so a session
