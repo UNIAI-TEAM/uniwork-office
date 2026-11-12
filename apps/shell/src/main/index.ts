@@ -33,6 +33,7 @@ import {
 import type { MenuItemConstructorOptions, NativeImage, WebContents } from 'electron'
 import { atomicCopyFile, atomicWriteFile } from './atomic-write'
 import { tabStripOverlay } from './title-bar-overlay'
+import { shellWindowBackground } from './window-background'
 import { legalDocPath, openLegalDoc, type LegalDocEnv } from './legal-docs'
 import { isDraftPreviewPath } from './uniwork-sync/sync-center'
 import { applyUiScaleTo, applyUiScaleToAll, onUiScaleChanged, readUiScale } from './ui-scale'
@@ -3914,6 +3915,13 @@ function createShellWindow(): void {
     minHeight: SHELL_WINDOW_MIN_HEIGHT,
     title: 'UniWork Office',
     ...(icon ? { icon } : {}),
+    // Paint the theme's surface before the renderer's first frame so the window
+    // does not flash white in dark mode. nativeTheme.themeSource is already set
+    // from the saved theme in app.whenReady, before this window is created.
+    // macOS uses vibrancy below, which must stay transparent.
+    ...(process.platform === 'darwin'
+      ? {}
+      : { backgroundColor: shellWindowBackground(nativeTheme.shouldUseDarkColors) }),
     // vibrancy: editor modules punch translucent regions (e.g. the slides
     // thumbnail pane) through to the desktop
     ...(process.platform === 'darwin'
