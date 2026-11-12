@@ -18,8 +18,8 @@ export const RANGE_CHUNK_BYTES = 8 * 1024 * 1024
 /** tries per chunk (the first one included) */
 export const RANGE_CHUNK_ATTEMPTS = 3
 const RETRY_BASE_MS = 250
-/** default cap for callers that keep the assembled payload in memory */
-export const MAX_SMALL_DOWNLOAD_BYTES = 50 * 1024 * 1024
+/** default 256 MiB cap for callers that keep the assembled payload in memory */
+export const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 // cloud-sync folders, AV locks and fsync-less filesystems may refuse fsync after a write
 const TOLERATED_SYNC_CODES: Record<string, true> = {
   EPERM: true,
@@ -226,8 +226,9 @@ function createBytesSink(): ChunkSink<{ bytes: Uint8Array }> {
  * Reads the whole file in sequential Range windows. When `destinationPath` is
  * given, each verified window is written directly to a sibling `.uw-dl-*.tmp`
  * file, fsynced and atomically renamed onto `destinationPath` (peak memory = one
- * chunk). Otherwise, assembles `{ bytes }` under `maxBytes` (default
- * `MAX_SMALL_DOWNLOAD_BYTES`). One request when the file fits a chunk; a server
+ * chunk, with no default size cap unless `maxBytes` is given). Otherwise,
+ * assembles `{ bytes }` under `maxBytes` (default `MAX_DOWNLOAD_BYTES`). One
+ * request when the file fits a chunk; a server
  * that answers 200 to the Range request is written in that one piece; otherwise
  * each next window is a request of its own, retried alone. The assembled length
  * must equal the Content-Range total, else `malformed_response` (temp file
@@ -241,13 +242,13 @@ export async function downloadInChunks(
   input: RangedDownloadInput | RangedFileDownloadInput,
 ): Promise<{ path: string; bytes: number } | { bytes: Uint8Array }> {
   const chunkBytes = input.chunkBytes ?? RANGE_CHUNK_BYTES
-  const maxBytes = input.maxBytes ?? MAX_SMALL_DOWNLOAD_BYTES
+  const toDisk = 'destinationPath' in input && typeof input.destinationPath === 'string'
+  const maxBytes = input.maxBytes ?? (toDisk ? Infinity : MAX_DOWNLOAD_BYTES)
   const backoff = input.backoffMs ?? ((n: number) => RETRY_BASE_MS * 2 ** (n - 1))
   const { signal } = input
-  const sink: ChunkSink<{ path: string; bytes: number } | { bytes: Uint8Array }> =
-    'destinationPath' in input && typeof input.destinationPath === 'string'
-      ? createFileSink(input)
-      : createBytesSink()
+  const sink: ChunkSink<{ path: string; bytes: number } | { bytes: Uint8Array }> = toDisk
+    ? createFileSink(input)
+    : createBytesSink()
   let requests = 0
   let retries = 0
   let high = 0

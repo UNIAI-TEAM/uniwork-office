@@ -7255,8 +7255,8 @@ export class UniworkDocsService {
   /**
    * UNI-2068 (D4): the plain download of ONE document file when exactly one file of a bulk
    * selection is downloadable (no zip job, no job slot). The save dialog suggests the file's own
-   * name and opens first; a canceled dialog reads nothing. The read is the open flow's streamed
-   * download, so a file past its 256 MiB cap answers `too_large`.
+   * name and opens first; a canceled dialog reads nothing. The read streams verified Range
+   * windows to a sibling temp file and renames atomically onto the picked path.
    */
   async downloadDocumentFile(input: unknown): Promise<FileDownloadResult> {
     const fail = (code: NonNullable<FileDownloadResult['code']>): FileDownloadResult => ({

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  MAX_SMALL_DOWNLOAD_BYTES,
+  MAX_DOWNLOAD_BYTES,
   createUniworkDocsClient,
   type FetchLike,
 } from '../src/main/uniwork-docs/client'
@@ -517,15 +517,96 @@ describe('downloadStream in Range windows to disk (UNI-2518 / UNI-2525)', () => 
     expect(line).not.toContain('existing.bin')
   })
 
-  it('enforces MAX_SMALL_DOWNLOAD_BYTES on the single-GET in-memory download() path', async () => {
-    const fetch = vi.fn<FetchLike>(
+  it('enforces MAX_DOWNLOAD_BYTES (256 MiB) on the single-GET in-memory download() path and accepts > 50 MiB up to the cap', async () => {
+    const payload = new Uint8Array([1, 2, 3, 4])
+    for (const declared of [50 * 1024 * 1024 + 1, 200 * 1024 * 1024, MAX_DOWNLOAD_BYTES]) {
+      const okFetch = vi.fn<FetchLike>(
+        async () =>
+          new Response(payload, {
+            status: 200,
+            headers: { 'Content-Length': String(declared) },
+          }),
+      )
+      expect(await api(okFetch).download(DOC, 1)).toEqual({ bytes: payload })
+    }
+    const overFetch = vi.fn<FetchLike>(
       async () =>
-        new Response(new Uint8Array(4), {
+        new Response(payload, {
           status: 200,
-          headers: { 'Content-Length': String(MAX_SMALL_DOWNLOAD_BYTES + 1) },
+          headers: { 'Content-Length': String(MAX_DOWNLOAD_BYTES + 1) },
         }),
     )
-    expect(await ending(api(fetch).download(DOC, 1))).toBe('too_large')
+    expect(await ending(api(overFetch).download(DOC, 1))).toBe('too_large')
+  })
+
+  it('streamed-to-disk path accepts a declared total above MAX_DOWNLOAD_BYTES (256 MiB) while the bytes path refuses cap + 1', async () => {
+    const overCap = MAX_DOWNLOAD_BYTES + 1
+    const payload = new Uint8Array([9, 8, 7, 6])
+
+    // 1. Streamed path (destinationPath set) accepts declared Content-Range total > 256 MiB on 206
+    //    (writes window 0 and proceeds to request window 1 without throwing too_large)
+    const abortAfterFirstWindow = new AbortController()
+    const seenRanges: string[] = []
+    const seenTotals: Array<number | null> = []
+    const rangedOverCapFetch = vi.fn<FetchLike>(async (_url, init) => {
+      const range = ((init?.headers ?? {}) as Record<string, string>).Range ?? 'plain'
+      seenRanges.push(range)
+      if (seenRanges.length === 1) {
+        return new Response(payload, {
+          status: 206,
+          headers: {
+            'Content-Length': String(payload.byteLength),
+            'Content-Range': `bytes 0-${payload.byteLength - 1}/${overCap}`,
+          },
+        })
+      }
+      abortAfterFirstWindow.abort()
+      throw new Error('stopped after verifying window 0 accepted')
+    })
+    const rangedDest = join(dir, 'over-cap-ranged.bin')
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    expect(
+      await ending(
+        api(rangedOverCapFetch).downloadStream(DOC, 1, {
+          destinationPath: rangedDest,
+          signal: abortAfterFirstWindow.signal,
+          onProgress: (p) => seenTotals.push(p.totalBytes),
+        }),
+      ),
+    ).toBe('network')
+    expect(seenRanges).toEqual([`bytes=0-${CHUNK - 1}`, `bytes=4-${4 + CHUNK - 1}`])
+    expect(seenTotals).toContain(overCap)
+
+    // 2. Streamed path also accepts declared Content-Length > 256 MiB on 200 fallback and commits
+    const wholeDest = join(dir, 'over-cap-whole.bin')
+    const wholeOverCapFetch = vi.fn<FetchLike>(
+      async () =>
+        new Response(payload, {
+          status: 200,
+          headers: { 'Content-Length': String(overCap) },
+        }),
+    )
+    expect(
+      await api(wholeOverCapFetch).downloadStream(DOC, 1, { destinationPath: wholeDest }),
+    ).toEqual({
+      path: wholeDest,
+      bytes: payload.byteLength,
+    })
+    expect([...readFileSync(wholeDest)]).toEqual([9, 8, 7, 6])
+
+    // 3. Bytes path (no destinationPath) refuses MAX_DOWNLOAD_BYTES + 1 on both 206 and 200
+    const bytes206Fetch = vi.fn<FetchLike>(
+      async () =>
+        new Response(payload, {
+          status: 206,
+          headers: {
+            'Content-Length': String(payload.byteLength),
+            'Content-Range': `bytes 0-${payload.byteLength - 1}/${overCap}`,
+          },
+        }),
+    )
+    expect(await ending(api(bytes206Fetch).downloadStream(DOC, 1))).toBe('too_large')
+    expect(await ending(api(wholeOverCapFetch).downloadStream(DOC, 1))).toBe('too_large')
   })
 })
 

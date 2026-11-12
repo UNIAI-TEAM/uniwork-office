@@ -1318,7 +1318,7 @@ describe('document sources (UNI-1961)', () => {
     }
   })
 
-  it('enforces the 256 MiB source download cap incrementally and cancels oversized streams at the crossing (R1-4, R1-12, R1-15)', async () => {
+  it('enforces the 256 MiB cap on the bytes path and explicit maxBytes on disk while allowing uncapped disk streams above 256 MiB (R1-4, R1-12, R1-15)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'uw-client-cap-'))
     try {
       const maxBytes = 256 * 1024 * 1024
@@ -1328,7 +1328,8 @@ describe('document sources (UNI-1961)', () => {
           {
             pull(controller) {
               declaredPulls += 1
-              controller.enqueue(new Uint8Array(1024))
+              controller.enqueue(new Uint8Array([1, 2, 3, 4]))
+              controller.close()
             },
           },
           { highWaterMark: 0 },
@@ -1338,14 +1339,31 @@ describe('document sources (UNI-1961)', () => {
           headers: { 'Content-Length': String(maxBytes + 1) },
         })
       })
-      const declaredDest = join(dir, 'declared.bin')
+      // Bytes path refuses declared Content-Length > 256 MiB before pulling body
+      expect(await codeOf(declaredApi.downloadSource('ws_1', 'task:att_1'))).toBe('too_large')
+      expect(declaredPulls).toBe(0)
+
+      // Streamed-to-disk path with explicit maxBytes (e.g. source-view) also refuses before pulling
+      const cappedDest = join(dir, 'capped.bin')
       expect(
         await codeOf(
-          declaredApi.downloadSource('ws_1', 'task:att_1', { destinationPath: declaredDest }),
+          declaredApi.downloadSource('ws_1', 'task:att_1', {
+            destinationPath: cappedDest,
+            maxBytes,
+          }),
         ),
       ).toBe('too_large')
       expect(declaredPulls).toBe(0)
       expect(readdirSync(dir)).toEqual([])
+
+      // Streamed-to-disk path without maxBytes (service.downloadSource) accepts declared total > 256 MiB
+      const uncappedDest = join(dir, 'uncapped.bin')
+      expect(
+        await declaredApi.downloadSource('ws_1', 'task:att_1', {
+          destinationPath: uncappedDest,
+        }),
+      ).toEqual({ path: uncappedDest, bytes: 4 })
+      expect([...readFileSync(uncappedDest)]).toEqual([1, 2, 3, 4])
 
       const chunk = new Uint8Array(16 * 1024 * 1024)
       let pulls = 0
@@ -1369,15 +1387,9 @@ describe('document sources (UNI-1961)', () => {
         )
         return new Response(body, { status: 200 })
       })
-      const streamDest = join(dir, 'stream.bin')
-      expect(
-        await codeOf(
-          streamApi.downloadSource('ws_1', 'task:att_1', { destinationPath: streamDest }),
-        ),
-      ).toBe('too_large')
+      expect(await codeOf(streamApi.downloadSource('ws_1', 'task:att_1'))).toBe('too_large')
       expect(cancelled).toBe(true)
       expect(pulls).toBe(17)
-      expect(readdirSync(dir)).toEqual([])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

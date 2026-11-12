@@ -839,46 +839,48 @@ describe('the document sources IPC (UNI-1961)', () => {
     }
   })
 
-  it('cancels an oversized streamed source download at the cap and leaves an existing destination unchanged (R1-4, R1-12)', async () => {
+  it('accepts a declared source size above 256 MiB on the streamed-to-disk path and leaves an existing destination unchanged when the server refuses with too_large (R1-4, R1-12, UNI-2525)', async () => {
     const { handlers } = await setup()
     const target = join(dir, 'existing.docx')
     writeFileSync(target, new Uint8Array([1, 2, 3]))
     dialogs.save = { canceled: false, filePath: target }
-    const chunk = new Uint8Array(16 * 1024 * 1024)
-    let pulls = 0
-    let cancelled = false
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => {
-        const body = new ReadableStream<Uint8Array>(
-          {
-            pull(controller) {
-              pulls += 1
-              if (pulls > 20) {
-                controller.close()
-                return
-              }
-              controller.enqueue(chunk)
-            },
-            cancel() {
-              cancelled = true
-            },
-          },
-          { highWaterMark: 0 },
-        )
-        return new Response(body, { status: 200 })
-      }),
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: { code: 'file_too_large', message: 'x' } }), {
+            status: 413,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      ),
     )
     try {
+      const refused = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(refused).toEqual({ ok: false, error: 'too_large' })
+      expect([...readFileSync(target)]).toEqual([1, 2, 3])
+
+      dialogs.save = { canceled: false, filePath: target }
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          async () =>
+            new Response(new Uint8Array([7, 8, 9, 10]), {
+              status: 200,
+              headers: { 'Content-Length': String(300 * 1024 * 1024) },
+            }),
+        ),
+      )
       const res = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
         workspaceId: 'ws_1',
         sourceId: 'task:src_1',
         name: 'existing.docx',
       })
-      expect(res).toEqual({ ok: false, error: 'too_large' })
-      expect(cancelled).toBe(true)
-      expect(pulls).toBe(17)
-      expect([...readFileSync(target)]).toEqual([1, 2, 3])
+      expect(res).toEqual({ ok: true, value: { path: target } })
+      expect([...readFileSync(target)]).toEqual([7, 8, 9, 10])
     } finally {
       vi.unstubAllGlobals()
     }
@@ -891,12 +893,16 @@ describe('the document sources IPC (UNI-1961)', () => {
     const storeFile = join(storeDir, 'Protected.docx')
     writeFileSync(storeFile, new Uint8Array([10, 20, 30]))
 
-    const finalLink = join(dir, 'alias.docx')
-    symlinkSync(storeFile, finalLink)
     const parentLink = join(dir, 'linked-store')
-    symlinkSync(storeDir, parentLink)
+    symlinkSync(storeDir, parentLink, 'junction')
     const viaParentLink = join(parentLink, 'Protected.docx')
-
+    const finalLink = join(dir, 'alias.docx')
+    let canFileSymlink = true
+    try {
+      symlinkSync(storeFile, finalLink)
+    } catch {
+      canFileSymlink = false
+    }
     let fetches = 0
     vi.stubGlobal(
       'fetch',
@@ -906,7 +912,7 @@ describe('the document sources IPC (UNI-1961)', () => {
       }),
     )
     try {
-      for (const candidate of [storeFile, finalLink, viaParentLink]) {
+      for (const candidate of [storeFile, ...(canFileSymlink ? [finalLink] : []), viaParentLink]) {
         dialogs.save = { canceled: false, filePath: candidate }
         const res = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
           workspaceId: 'ws_1',
@@ -918,7 +924,10 @@ describe('the document sources IPC (UNI-1961)', () => {
       }
       expect(fetches).toBe(0)
 
-      const raceTarget = join(dir, 'race-target.docx')
+      const raceParent = join(dir, 'race-dir')
+      const raceTarget = canFileSymlink
+        ? join(dir, 'race-target.docx')
+        : join(raceParent, 'Protected.docx')
       let releaseFetch: ((res: Response) => void) | undefined
       let markFetchEntered: () => void = () => undefined
       const fetchEntered = new Promise<void>((resolve) => {
@@ -941,7 +950,11 @@ describe('the document sources IPC (UNI-1961)', () => {
         name: 'Protected.docx',
       })
       await fetchEntered
-      symlinkSync(storeFile, raceTarget)
+      if (canFileSymlink) {
+        symlinkSync(storeFile, raceTarget)
+      } else {
+        symlinkSync(storeDir, raceParent, 'junction')
+      }
       releaseFetch!(new Response(new Uint8Array([7, 8, 9]), { status: 200 }))
       expect(await pending).toEqual({ ok: false, error: 'forbidden' })
       expect([...readFileSync(storeFile)]).toEqual([10, 20, 30])
@@ -965,15 +978,16 @@ describe('the document sources IPC (UNI-1961)', () => {
       vi.fn(async () => new Response(new Uint8Array([7, 8, 9, 10]), { status: 200 })),
     )
     try {
-      const failed = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
-        workspaceId: 'ws_1',
-        sourceId: 'task:src_1',
-        name: 'existing.docx',
-      })
-      expect(failed).toEqual({ ok: false, error: 'server_error' })
-      expect([...readFileSync(target)]).toEqual([1, 2, 3, 4])
-      expect(readdirSync(subDir)).toEqual(['existing.docx'])
-
+      if (process.platform !== 'win32') {
+        const failed = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+          workspaceId: 'ws_1',
+          sourceId: 'task:src_1',
+          name: 'existing.docx',
+        })
+        expect(failed).toEqual({ ok: false, error: 'server_error' })
+        expect([...readFileSync(target)]).toEqual([1, 2, 3, 4])
+        expect(readdirSync(subDir)).toEqual(['existing.docx'])
+      }
       // R2-7: rename failure after the staged file has been written cleans up the staged sibling and leaves target unchanged
       chmodSync(subDir, 0o700)
       let stagedBytesAtRename: number[] = []
@@ -1001,7 +1015,9 @@ describe('the document sources IPC (UNI-1961)', () => {
       })
       expect(saved).toEqual({ ok: true, value: { path: target } })
       expect([...readFileSync(target)]).toEqual([7, 8, 9, 10])
-      expect(statSync(target).mode & 0o777).toBe(0o600)
+      if (process.platform !== 'win32') {
+        expect(statSync(target).mode & 0o777).toBe(0o600)
+      }
       expect(readdirSync(subDir)).toEqual(['existing.docx'])
 
       // R3-7: existing destination mode 0o660 also survives replacement under permissive umask
@@ -1015,7 +1031,9 @@ describe('the document sources IPC (UNI-1961)', () => {
       })
       expect(saved660).toEqual({ ok: true, value: { path: target } })
       expect([...readFileSync(target)]).toEqual([7, 8, 9, 10])
-      expect(statSync(target).mode & 0o777).toBe(0o660)
+      if (process.platform !== 'win32') {
+        expect(statSync(target).mode & 0o777).toBe(0o660)
+      }
       expect(readdirSync(subDir)).toEqual(['existing.docx'])
     } finally {
       downloadHooks.onRename = null

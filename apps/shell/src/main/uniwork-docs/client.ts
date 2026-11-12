@@ -17,7 +17,7 @@ import { UniworkDocError, errorFromResponse, parseRetryAfter } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
 import { isLegacyConversion, type LegacyConversion } from './legacy-cloud'
 import {
-  MAX_SMALL_DOWNLOAD_BYTES,
+  MAX_DOWNLOAD_BYTES,
   downloadInChunks,
   parseContentRange,
   type RangedChunk,
@@ -83,10 +83,8 @@ export const TRANSFER_TIMEOUT_MS = 120_000
  * an hour is ~75 KB/s on average).
  */
 export const STREAM_CEILING_MS = 60 * 60_000
-/** the server stages at most 50 MiB per single upload; in-memory `download()` caps there */
-export { MAX_SMALL_DOWNLOAD_BYTES }
-/** the 256 MiB cap of a streamed download (`offline-library` MAX_PIN_FILE_BYTES) */
-export const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
+/** the 256 MiB cap of an in-memory download (`offline-library` MAX_PIN_FILE_BYTES) */
+export { MAX_DOWNLOAD_BYTES }
 const ID = /^[A-Za-z0-9_-]{1,128}$/
 const SOURCE_ID = /^(?:chat|task|meeting|email):[A-Za-z0-9_-]{1,64}$/
 
@@ -382,7 +380,7 @@ export interface UniworkDocsClient {
    * copy of it shows to the comments seam
    */
   getVersionId(documentId: string, versionNo: number): Promise<string>
-  /** single-GET small-file bytes download (capped at MAX_SMALL_DOWNLOAD_BYTES) */
+  /** single-GET in-memory bytes download (capped at MAX_DOWNLOAD_BYTES) */
   download(documentId: string, version?: number): Promise<DownloadResult>
   /**
    * G5-05 / UNI-2518 / UNI-2525: the same download read in 8 MiB Range windows
@@ -902,7 +900,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     target: { route: string; query?: URLSearchParams; label: string },
     streamOptions: DownloadStreamOptions | DownloadStreamFileOptions,
   ): Promise<DownloadFileResult | DownloadResult> {
-    const { signal, onProgress, maxBytes = MAX_DOWNLOAD_BYTES } = streamOptions
+    const toDisk =
+      'destinationPath' in streamOptions && typeof streamOptions.destinationPath === 'string'
+    const { signal, onProgress, maxBytes = toDisk ? Infinity : MAX_DOWNLOAD_BYTES } = streamOptions
     const deadline = Date.now() + streamCeiling
     const readChunk = (
       range: { start: number; end: number } | undefined,
@@ -956,7 +956,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       ...(signal ? { signal } : {}),
       ...(onProgress ? { onProgress } : {}),
     }
-    if ('destinationPath' in streamOptions && typeof streamOptions.destinationPath === 'string') {
+    if (toDisk) {
       return downloadInChunks({
         ...common,
         destinationPath: streamOptions.destinationPath,
@@ -1614,9 +1614,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         timeoutMs: transferTimeout,
         async read(response) {
           const length = Number(response.headers.get('Content-Length') ?? '0')
-          if (length > MAX_SMALL_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
+          if (length > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
           const bytes = new Uint8Array(await response.arrayBuffer())
-          if (bytes.byteLength > MAX_SMALL_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
+          if (bytes.byteLength > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
           return { bytes }
         },
       })
