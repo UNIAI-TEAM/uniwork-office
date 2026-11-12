@@ -72,6 +72,19 @@ describe('uniwork queue record', () => {
     expect(readIntentRecord(stored, FACTS)).toEqual(stored)
   })
 
+  it('UNI-2510: reads the editor session id of a record: absent, malformed, valid', () => {
+    const ULID = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
+    // a record written by an older build has no field: read back with none
+    expect(readIntentRecord(v2(), FACTS)).not.toHaveProperty('editorSessionId')
+    // a malformed id is dropped, the record is kept
+    const malformed = readIntentRecord(v2({ editorSessionId: 'not-a-ulid' }), FACTS)
+    expect(malformed).not.toBeNull()
+    expect(malformed).not.toHaveProperty('editorSessionId')
+    expect(malformed?.intentId).toBe('intent_1')
+    // a valid id is kept
+    expect(readIntentRecord(v2({ editorSessionId: ULID }), FACTS)?.editorSessionId).toBe(ULID)
+  })
+
   it('reads malformed records as null', () => {
     expect(readIntentRecord(null, FACTS)).toBeNull()
     expect(readIntentRecord('nope', FACTS)).toBeNull()

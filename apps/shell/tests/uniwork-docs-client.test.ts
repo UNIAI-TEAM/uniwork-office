@@ -320,6 +320,21 @@ describe('UNI-2212 legacy conversion commit (c5 wire contract)', () => {
     })
   })
 
+  it('UNI-2510: an old server that ignores editor_session_id still completes the commit', async () => {
+    // `converted` is the whole answer of a server that knows nothing of editor sessions: no session fields
+    const fetch = vi.fn<FetchLike>(async () => json(200, converted))
+    const receipt = await client(fetch).commit({
+      ...input,
+      editorSessionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    })
+    expect(JSON.parse(String(fetch.mock.calls[0]![1].body))).toEqual({
+      upload_id: UPLOAD,
+      base_revision: '1',
+      editor_session_id: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    })
+    expect(receipt).toMatchObject({ documentId: DOC, revision: '2', version: 2 })
+  })
+
   it('refuses a cross-family or unknown pair before anything is sent', async () => {
     const fetch = vi.fn<FetchLike>(async () => json(200, converted))
     const api = client(fetch)

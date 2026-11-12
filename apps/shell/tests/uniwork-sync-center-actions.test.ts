@@ -767,6 +767,25 @@ describe('G5-10 Sync Center actions and change notifications', () => {
     expect(await h.draftStore.list('doc-1')).toHaveLength(0)
   })
 
+  it('UNI-2510: saveAgain keeps the editor session id of the failed intent, and adds none when it had none', async () => {
+    const ULID = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
+    const withId = withRecord(makeQueueDoc({ key: 'doc-1', state: 'failed' }), {
+      lastError: 'quota_exceeded',
+      editorSessionId: ULID,
+    })
+    const a = createHarness({ initialDocs: [withId] })
+    expect(await a.controller.saveAgain(withId.record.intentId)).toEqual({ ok: true })
+    expect(a.docs.get('doc-1')!.record.intentId).toBe('office-intent-new-1')
+    expect(a.docs.get('doc-1')!.record.editorSessionId).toBe(ULID)
+
+    const without = withRecord(makeQueueDoc({ key: 'doc-1', state: 'failed' }), {
+      lastError: 'quota_exceeded',
+    })
+    const b = createHarness({ initialDocs: [without] })
+    expect(await b.controller.saveAgain(without.record.intentId)).toEqual({ ok: true })
+    expect(b.docs.get('doc-1')!.record).not.toHaveProperty('editorSessionId')
+  })
+
   it('saveAgain refuses a row that is not failed or unknown, leaving the intent untouched', async () => {
     const states = ['queued', 'blocked', 'conflict', 'reconciling', 'reconciling-stuck'] as const
     for (const state of states) {

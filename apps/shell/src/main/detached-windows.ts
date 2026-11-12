@@ -168,6 +168,11 @@ export function isDetachedWebContents(wcId: number): boolean {
   return detached.has(wcId)
 }
 
+/** the document a detached editor window shows, by its view's webContents id */
+export function detachedFilePathFor(wcId: number): string | undefined {
+  return detached.get(wcId)?.filePath
+}
+
 /** editor kind of the focused detached window, if a detached window has focus */
 export function focusedDetachedKind(): TabKind | undefined {
   return focusedDetachedTab()?.kind

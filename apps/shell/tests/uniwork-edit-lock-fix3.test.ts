@@ -142,17 +142,30 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
+/** what the stub client of `setup` receives on a commit */
+interface CommitInput {
+  documentId: string
+  editorSessionId?: string
+}
+
+interface Harness {
+  service: UniworkDocsService
+  statuses: UniworkDocStatus[]
+  commits: CommitInput[]
+  lockCalls: string[]
+}
+
 function setup(opts: {
   acquire?: UniworkEditLockClient['acquire']
   release?: UniworkEditLockClient['release']
   getDocument?: () => Promise<DocumentDetail>
   createFile?: () => Promise<{ id: string; workspaceId: string; title: string }>
   sleep?: (ms: number) => Promise<void>
-  isPathOpen?: () => boolean
+  isPathOpen?: (path: string) => boolean
   requestModuleSave?: () => boolean
-}) {
+}): Harness {
   const statuses: UniworkDocStatus[] = []
-  const commits: unknown[] = []
+  const commits: CommitInput[] = []
   const lockCalls: string[] = []
   const ui: ConflictUi = {
     chooseConflict: vi.fn(async () => 'later'),
@@ -190,7 +203,7 @@ function setup(opts: {
     async upload() {
       return { uploadId: 'up_1', checksumSha256: hex(BYTES), sizeBytes: BYTES.byteLength }
     },
-    async commit(input: unknown) {
+    async commit(input: CommitInput) {
       commits.push(input)
       return {
         documentId: DOC,
@@ -981,21 +994,57 @@ describe('list-row parse still drops malformed edit_lock', () => {
   })
 })
 
-describe('UNI-2510: editor_session_id follows one opening of the editor in a window', () => {
+describe('UNI-2510: editor_session_id follows one opening of the editor', () => {
+  const OTHER = '01J8X4DOC0N1P2Q3R4S5T6U8'
+  const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/
+
+  /** one service, as the app has; `gone` = paths no view shows any more, `next` = the document opened next */
+  function lifecycle() {
+    const gone = new Set<string>()
+    const next = { id: DOC }
+    const h = setup({
+      isPathOpen: (path) => !gone.has(path),
+      getDocument: async () => ({
+        ...detail,
+        id: next.id,
+        file: { ...detail.file!, filename: `${next.id}.docx` },
+      }),
+    })
+    const open = async (id: string) => {
+      next.id = id
+      const opened = await h.service.openFromServer(id)
+      await drain()
+      return opened.path
+    }
+    /** the tab closes: no view shows the path, the shell tells the service */
+    const close = async (path: string) => {
+      gone.add(path)
+      await h.service.notePathsDropped([path])
+    }
+    return { h, open, close, reopen: (path: string) => gone.delete(path) }
+  }
+
+  /** the stub client of `setup`, whose upload and commit one save of a test replaces */
+  interface StubClient {
+    upload: () => Promise<{ uploadId: string; checksumSha256: string; sizeBytes: number }>
+    commit: (input: CommitInput) => Promise<unknown>
+  }
+
   /** one more save of this path: new bytes on disk, the staged upload matches them */
-  async function saveAnother(h: ReturnType<typeof setup>, path: string, text: string) {
+  async function saveAnother(h: Harness, path: string, text: string) {
     const bytes = enc(text)
     writeFileSync(path, bytes)
-    const deps = h.service['deps'] as unknown as { client: Record<string, unknown> }
-    deps.client.upload = async () => ({
+    // the service keeps the injected stub client in its deps
+    const client = h.service['deps'].client as unknown as StubClient
+    client.upload = async () => ({
       uploadId: 'up_1',
       checksumSha256: hex(bytes),
       sizeBytes: bytes.byteLength,
     })
-    deps.client.commit = async (input: unknown) => {
+    client.commit = async (input) => {
       h.commits.push(input)
       return {
-        documentId: DOC,
+        documentId: input.documentId,
         revision: String(10 + h.commits.length),
         versionId: `ver_${h.commits.length}`,
         version: 3 + h.commits.length,
@@ -1004,45 +1053,97 @@ describe('UNI-2510: editor_session_id follows one opening of the editor in a win
     }
     await h.service.save(path)
   }
-  const sessionIds = (h: ReturnType<typeof setup>) =>
-    (h.commits as Array<{ editorSessionId?: string }>).map((input) => input.editorSessionId)
+  const sessionIds = (h: Harness) => h.commits.map((input) => input.editorSessionId)
 
-  it('several saves of one opening share one id; reload and close each start a new one', async () => {
-    const h = setup({})
-    const opened = await h.service.openFromServer(DOC)
-    await drain()
+  it('open, save, drop, reopen, save: the drop ends the opening, the reopening mints a new id', async () => {
+    const { h, open, close, reopen } = lifecycle()
+    const path = await open(DOC)
 
-    await saveAnother(h, opened.path, 'first edit')
-    await saveAnother(h, opened.path, 'second edit')
+    await saveAnother(h, path, 'first edit')
+    await saveAnother(h, path, 'second edit')
     const [first, second] = sessionIds(h)
-    expect(first).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/)
+    expect(first).toMatch(ULID)
     expect(second).toBe(first)
 
-    // Reload latest of the same document in the same window: a new opening
-    h.service['reloadEditor'](opened.path)
-    await saveAnother(h, opened.path, 'after reload')
-    const afterReload = sessionIds(h)[2]
-    expect(afterReload).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/)
-    expect(afterReload).not.toBe(first)
-
-    // closing the tab and opening the document again: a new opening too
-    await expect(h.service.confirmClose(opened.path)).resolves.toBe(true)
-    await saveAnother(h, opened.path, 'after close')
-    const afterClose = sessionIds(h)[3]
-    expect(afterClose).not.toBe(afterReload)
-    expect(afterClose).not.toBe(first)
+    await close(path)
+    reopen(path)
+    await saveAnother(h, path, 'after reopen')
+    const third = sessionIds(h)[2]
+    expect(third).toMatch(ULID)
+    expect(third).not.toBe(first)
   })
 
-  it('another window (another service) mints its own id', async () => {
-    const a = setup({})
-    const b = setup({})
-    const openedA = await a.service.openFromServer(DOC)
-    const openedB = await b.service.openFromServer(DOC)
-    await drain()
-    await saveAnother(a, openedA.path, 'edit in a')
-    await saveAnother(b, openedB.path, 'edit in b')
-    expect(sessionIds(a)[0]).toBeDefined()
-    expect(sessionIds(b)[0]).toBeDefined()
-    expect(sessionIds(a)[0]).not.toBe(sessionIds(b)[0])
+  it('a confirmed close that the shell then cancels keeps the id (confirmClose does not end it)', async () => {
+    const { h, open, close, reopen } = lifecycle()
+    const path = await open(DOC)
+    await saveAnother(h, path, 'first edit')
+
+    // sign-out / window close confirm every document, then one cancels: the tab stays, no drop
+    await expect(h.service.confirmClose(path)).resolves.toBe(true)
+    await saveAnother(h, path, 'tab still open')
+    expect(sessionIds(h)[1]).toBe(sessionIds(h)[0])
+
+    // the tab really goes away: notePathsDropped is the teardown hook
+    await close(path)
+    reopen(path)
+    await saveAnother(h, path, 'next opening')
+    expect(sessionIds(h)[2]).not.toBe(sessionIds(h)[0])
+  })
+
+  it('a save with no view showing the path sends no id and leaves none for the next opening', async () => {
+    const { h, open, close, reopen } = lifecycle()
+    const path = await open(DOC)
+    await saveAnother(h, path, 'first edit')
+    const opening = sessionIds(h)[0]
+
+    await close(path)
+    await saveAnother(h, path, 'saved with the tab gone')
+    expect(sessionIds(h)[1]).toBeUndefined()
+
+    reopen(path)
+    await saveAnother(h, path, 'next opening')
+    const next = sessionIds(h)[2]
+    expect(next).toMatch(ULID)
+    expect(next).not.toBe(opening)
+  })
+
+  it('a view that is gone without the drop hook still mints nothing for a no-view save', async () => {
+    const { h, open } = lifecycle()
+    const path = await open(DOC)
+    await saveAnother(h, path, 'first edit')
+    h.service['deps'].isPathOpen = () => false
+    await saveAnother(h, path, 'no view')
+    expect(sessionIds(h)[1]).toBeUndefined()
+  })
+
+  it('Reload latest and a renderer load of the editor view each start a new opening', async () => {
+    const { h, open } = lifecycle()
+    const path = await open(DOC)
+    await saveAnother(h, path, 'first edit')
+
+    h.service['reloadEditor'](path)
+    await saveAnother(h, path, 'after Reload latest')
+
+    // crash reload / the module's own location.reload(): the view loads again
+    h.service.noteEditorLoaded(path)
+    await saveAnother(h, path, 'after the view loaded again')
+
+    const ids = sessionIds(h)
+    expect(new Set(ids).size).toBe(3)
+    for (const id of ids) expect(id).toMatch(ULID)
+  })
+
+  it('two documents open at once have two ids, each kept across its own saves', async () => {
+    const { h, open } = lifecycle()
+    const a = await open(DOC)
+    const b = await open(OTHER)
+    await saveAnother(h, a, 'edit in a')
+    await saveAnother(h, b, 'edit in b')
+    await saveAnother(h, a, 'another edit in a')
+    const [first, other, again] = sessionIds(h)
+    expect(first).toMatch(ULID)
+    expect(other).toMatch(ULID)
+    expect(other).not.toBe(first)
+    expect(again).toBe(first)
   })
 })

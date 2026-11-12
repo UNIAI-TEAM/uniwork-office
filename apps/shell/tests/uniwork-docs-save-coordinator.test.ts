@@ -2965,26 +2965,4 @@ describe('UNI-2510: commit carries the editor_session_id of the window that wrot
     expect(h.server.state.commitInputs).toHaveLength(1)
     expect(h.server.state.commitInputs[0]?.editorSessionId).toBe(WINDOW_A)
   })
-
-  it('"Save again" of a parked save keeps the stored id', async () => {
-    const h = await harness({ editorSessionId: () => WINDOW_A })
-    const doc = h.makeDoc()
-    await h.coordinator.save(doc.path, { forceOffline: true })
-    const parked = await stored(h.intents, doc)
-    const queued: QueueDoc = { ...doc, record: parked!.intent, payload: parked!.payload }
-    const replaced = await h.dispatcher.replace(queued, {
-      intentId: 'intent_again',
-      idempotencyKey: 'key_again',
-      documentId: queued.record.documentId,
-      orgId: queued.record.orgId,
-      workspaceId: queued.record.workspaceId,
-      baseRevision: queued.record.baseRevision,
-      baseVersion: queued.record.baseVersion,
-      checksum: queued.record.checksum,
-      length: queued.record.length,
-      ...(queued.record.editorSessionId ? { editorSessionId: queued.record.editorSessionId } : {}),
-    })
-    expect(replaced.kind).toBe('ok')
-    expect((await stored(h.intents, doc))?.intent.editorSessionId).toBe(WINDOW_A)
-  })
 })

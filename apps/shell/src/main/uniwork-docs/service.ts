@@ -1721,18 +1721,34 @@ export class UniworkDocsService {
   }
 
   /**
-   * UNI-2510: the `editor_session_id` of the document open at `path` in THIS window: minted when the
-   * first save of an opening needs it, kept for every later save, and dropped when the editor closes
-   * or reloads the document. One service = one window, so two windows never share an id.
+   * UNI-2510: the `editor_session_id` of the editor opening that shows `path`. The service is one per
+   * process and a path is shown in at most one view, so the id follows the opening of that path: minted
+   * by the first save made while a view shows the path, kept for every later save (a tear-off moves the
+   * live view and keeps it), and ended by `notePathsDropped` (the view is gone), `reloadEditor` (Reload
+   * latest) or `noteEditorLoaded` (the view loaded again). A save with no view showing the path gets no
+   * id and mints none, so a leftover id never reaches the next opening.
    */
-  private editorSessionIdOf(path: string): string {
+  private editorSessionIdOf(path: string): string | null {
     const key = pathKey(path)
+    if (!this.deps.isPathOpen(path)) {
+      this.editorSessionIds.delete(key)
+      return null
+    }
     let id = this.editorSessionIds.get(key)
     if (!id) {
       id = newEditorSessionId()
       this.editorSessionIds.set(key, id)
     }
     return id
+  }
+
+  /**
+   * UNI-2510: the editor view showing `path` finished loading (first open, crash reload, the module's
+   * own `location.reload()`): the document is mounted anew, as on the web, so its next save is a new
+   * editor session.
+   */
+  noteEditorLoaded(path: string): void {
+    this.editorSessionIds.delete(pathKey(path))
   }
 
   private editLockHolderOf(path: string): UniworkDocEditLock | null {
@@ -8402,13 +8418,6 @@ export class UniworkDocsService {
    * computer); "Cancel" keeps it open. True = may close.
    */
   async confirmClose(path: string): Promise<boolean> {
-    const closed = await this.confirmCloseFlow(path)
-    // the editor is gone: reopening this path in this window is a new opening, a new session id
-    if (closed) this.editorSessionIds.delete(pathKey(path))
-    return closed
-  }
-
-  private async confirmCloseFlow(path: string): Promise<boolean> {
     const release = async (): Promise<true> => {
       await this.stopEditLock(path, true)
       return true
