@@ -1179,6 +1179,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     requestRedactionCopy: async () => false,
     // certificate signing reads the file on disk and writes a signed copy next to it (desktop only;
     // the `certSign` capability hides the entries) - safe typed answers here
+    decryptPdf: async () => ({ ok: false, reason: NOT_AVAILABLE }),
     listDigitalSignatures: async () => [],
     pickCertificate: async () => null,
     listSystemCertificates: async () => ({ certs: [], issues: [] }),
