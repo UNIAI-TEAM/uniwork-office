@@ -145,17 +145,15 @@ function joinedToDigits(s: S, start: number, end: number): boolean {
   return false
 }
 
-const MAX_CCCD_BIRTH_YEAR = 2026
-
 /** Validate 12-digit Vietnamese CCCD: province 001..096, century/gender 0..9 + birth year. */
-export function cccdCheck(digits: string): boolean {
+export function cccdCheck(digits: string, maxYear = new Date().getFullYear()): boolean {
   if (digits.length !== 12 || ![...digits].every(isDigit)) return false
   const province = Number(digits.slice(0, 3))
   if (province < 1 || province > 96) return false
   const genderCentury = Number(digits[3])
   const yy = Number(digits.slice(4, 6))
   const birthYear = 1900 + Math.floor(genderCentury / 2) * 100 + yy
-  return birthYear >= 1900 && birthYear <= MAX_CCCD_BIRTH_YEAR
+  return birthYear >= 1900 && birthYear <= maxYear
 }
 
 function cccd(s: S, i: number): number | null {

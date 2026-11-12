@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   IBAN_LENGTHS,
   REDACT_PATTERNS,
@@ -439,6 +439,18 @@ describe('redact patterns — CCCD', () => {
       '0010 9001 2345 6789',
     ]) {
       expect(found('cccd', bad), bad).toEqual([])
+    }
+  })
+
+  it('matches birth year up to the current year at call time and rejects current year + 1', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2027-06-15T00:00:00Z'))
+      expect(cccdCheck('079227012345')).toBe(true)
+      expect(cccdCheck('079228012345')).toBe(false)
+      expect(found('cccd', 'CCCD 079227012345 vs 079228012345')).toEqual(['079227012345'])
+    } finally {
+      vi.useRealTimers()
     }
   })
 })
