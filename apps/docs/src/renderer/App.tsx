@@ -1722,7 +1722,6 @@ export function App() {
     editor.storage.trackChanges.trackMoves = tcOptions.trackMoves
     editor.storage.trackChanges.trackFormatting = tcOptions.trackFormatting
     editor.view.dispatch(editor.state.tr.setMeta('addToHistory', false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tcOptions, editor])
 
   // every header/footer consumer (strips, gaps, heights, preview, AI, save) reads

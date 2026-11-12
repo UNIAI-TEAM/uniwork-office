@@ -70,15 +70,14 @@ describe('PrintDialog printer, copies, collate, and duplex controls (FE-W1-02)',
     vi.useFakeTimers()
     act(() => {
       root.render(
-        createElement(
-          LocaleProvider,
-          { initial: 'en' },
-          createElement(PrintDialog, {
+        createElement(LocaleProvider, {
+          initial: 'en',
+          children: createElement(PrintDialog, {
             onClose,
             setStatus: vi.fn(),
             onSavePdf: vi.fn(async () => true),
           }),
-        ),
+        }),
       )
     })
     await act(async () => {
@@ -139,15 +138,14 @@ describe('PrintDialog printer, copies, collate, and duplex controls (FE-W1-02)',
 
     act(() => {
       root.render(
-        createElement(
-          LocaleProvider,
-          { initial: 'en' },
-          createElement(PrintDialog, {
+        createElement(LocaleProvider, {
+          initial: 'en',
+          children: createElement(PrintDialog, {
             onClose: vi.fn(),
             setStatus: vi.fn(),
             onSavePdf: vi.fn(async () => true),
           }),
-        ),
+        }),
       )
     })
     await act(async () => {
