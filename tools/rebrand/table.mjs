@@ -56,7 +56,7 @@ const DATA_MARKER = 'visual'
 
 export const NON_BRAND_TOKENS = [
   new RegExp(`GenOffice\\s+(?:${FONT_ALIAS}|${DATA_MARKER})\\b`, 'g'),
-  /GenOffice\s+\[/g, // font-alias matcher regex source
+  /GenOffice\s+[\[(]/g, // font-alias matcher regex source
   /\^GenOffice\s/g, // font-alias prefix regex source
   /webSearch\('GenOffice'/g, // search connectivity probe query
   /[A-Za-z0-9_]GenOffice|GenOffice[A-Za-z0-9_]/g,
