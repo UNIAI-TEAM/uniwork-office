@@ -1,6 +1,17 @@
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
+import type { FileHandle } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
+import v8 from 'node:v8'
+import vm from 'node:vm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   MAX_DOWNLOAD_BYTES,
@@ -14,14 +25,34 @@ import { zipErrorOf } from '../src/main/uniwork-docs/zip-download/runner'
 
 const renameHook = vi.hoisted(() => ({
   onRename: null as ((src: string, dest: string) => void) | null,
+  onBeforeWrite: null as ((buf: Uint8Array, length: number) => void) | null,
+  onAfterWrite: null as ((bytesWritten: number) => void) | null,
 }))
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<{
+    open: (path: string, flags?: string | number, mode?: number) => Promise<FileHandle>
     rename: (src: string, dest: string) => Promise<void>
   }>()
   return {
     ...actual,
+    open: async (path: string, flags?: string | number, mode?: number) => {
+      const handle = await actual.open(path, flags, mode)
+      const realWrite = handle.write.bind(handle)
+      handle.write = (async (
+        buf: Uint8Array,
+        offset?: number | null,
+        length?: number | null,
+        position?: number | null,
+      ) => {
+        const writeLen = typeof length === 'number' ? length : buf.byteLength
+        renameHook.onBeforeWrite?.(buf, writeLen)
+        const res = await realWrite(buf, offset, length, position)
+        renameHook.onAfterWrite?.(res.bytesWritten)
+        return res
+      }) as typeof handle.write
+      return handle
+    },
     rename: async (src: string, dest: string) => {
       if (renameHook.onRename) {
         renameHook.onRename(String(src), String(dest))
@@ -30,7 +61,6 @@ vi.mock('node:fs/promises', async (importOriginal) => {
     },
   }
 })
-
 // UNI-2518 / UNI-2525: the desktop download walks the file in 8 MiB Range windows
 // and streams each verified window to a sibling temp file (fsync + atomic rename)
 const ORIGIN = 'https://uniwork.example'
@@ -150,6 +180,8 @@ beforeEach(() => {
 
 afterEach(() => {
   renameHook.onRename = null
+  renameHook.onBeforeWrite = null
+  renameHook.onAfterWrite = null
   vi.restoreAllMocks()
   if (dir) rmSync(dir, { recursive: true, force: true })
 })
@@ -191,71 +223,122 @@ describe('downloadStream in Range windows to disk (UNI-2518 / UNI-2525)', () => 
     expect(line).not.toMatch(/https?:|\.docx|\.pdf|tok/)
   })
 
-  it('keeps memory bounded to one chunk: the chunk buffer, not the total file size, is the only allocation that scales', async () => {
-    const RealUint8Array = globalThis.Uint8Array
-    const RealArrayBuffer = globalThis.ArrayBuffer
+  it('keeps memory bounded to one chunk through the real client.ts multi-part stream reader across N=2 vs N=6 windows (T1-1)', async () => {
+    v8.setFlagsFromString('--expose_gc')
+    const gc = vm.runInNewContext('gc') as () => void
+    const subChunkBytes = Math.floor(CHUNK / 4)
 
-    async function measureMaxAllocation(totalSize: number, chunkBytes: number): Promise<number> {
-      const dest = join(dir, `bounded-${totalSize}.bin`)
-      let maxAllocated = 0
-      const note = (len: number): void => {
-        if (len > maxAllocated) maxAllocated = len
+    async function measureWalk(fullWindows: number): Promise<{
+      peakBufferedBytes: number
+      peakWriteBufferBytes: number
+      peakRetainedFromPriorWindows: number
+      windowsServed: number
+    }> {
+      const totalSize = fullWindows * CHUNK + 19
+      const dest = join(dir, `bounded-${fullWindows}.bin`)
+      let bufferedBytes = 0
+      let peakBufferedBytes = 0
+      let peakWriteBufferBytes = 0
+      let peakRetainedFromPriorWindows = 0
+      let windowsServed = 0
+      const liveBuffers: Array<WeakRef<Uint8Array>> = []
+
+      renameHook.onBeforeWrite = (buf, writeLen) => {
+        liveBuffers.push(new WeakRef(buf))
+        if (buf.byteLength > peakWriteBufferBytes) peakWriteBufferBytes = buf.byteLength
+        if (writeLen > peakWriteBufferBytes) peakWriteBufferBytes = writeLen
+        if (bufferedBytes > peakBufferedBytes) peakBufferedBytes = bufferedBytes
       }
-      const TrackedUint8Array = new Proxy(RealUint8Array, {
-        construct(target, args, newTarget) {
-          const instance = Reflect.construct(target, args, newTarget) as Uint8Array
-          note(instance.byteLength)
-          return instance
-        },
-      })
-      const TrackedArrayBuffer = new Proxy(RealArrayBuffer, {
-        construct(target, args, newTarget) {
-          const instance = Reflect.construct(target, args, newTarget) as ArrayBuffer
-          note(instance.byteLength)
-          return instance
-        },
-      })
-      globalThis.Uint8Array = TrackedUint8Array
-      globalThis.ArrayBuffer = TrackedArrayBuffer
-      try {
-        const out = await downloadInChunks({
-          destinationPath: dest,
-          chunkBytes,
-          maxBytes: totalSize + 1024,
-          label: `document=${DOC} version=live`,
-          async readChunk(range, onProgress) {
-            if (!range) return { kind: 'whole', bytes: new RealUint8Array(0) }
-            const start = range.start
-            const end = Math.min(range.end, totalSize - 1)
-            const bytes = sliceOf(start, end)
-            onProgress({ receivedBytes: bytes.byteLength, totalBytes: totalSize })
-            return {
-              kind: 'partial',
-              start,
-              end,
-              total: totalSize,
-              checksum: 'cc'.repeat(32),
-              bytes,
-            }
+      renameHook.onAfterWrite = (bytesWritten) => {
+        bufferedBytes -= bytesWritten
+      }
+
+      const fetch: FetchLike = async (_url, init) => {
+        const headers = (init?.headers ?? {}) as Record<string, string>
+        const match = /^bytes=(\d+)-(\d+)$/.exec(headers.Range ?? '')
+        if (!match) throw new Error(`expected Range header, got ${String(headers.Range)}`)
+        if (windowsServed > 0) {
+          // Yield a macrotask turn so V8 clears WeakRef keptObjects, then force GC to prove
+          // prior window sub-chunks and joined Uint8Array buffers are not retained in memory
+          await new Promise<void>((resolve) => setImmediate(resolve))
+          gc()
+          const retained = liveBuffers.reduce((sum, ref) => sum + (ref.deref()?.byteLength ?? 0), 0)
+          if (retained > peakRetainedFromPriorWindows) {
+            peakRetainedFromPriorWindows = retained
+          }
+        }
+        windowsServed += 1
+        const start = Number(match[1])
+        const end = Math.min(Number(match[2]), totalSize - 1)
+        const windowLen = end - start + 1
+        let cursor = start
+        const stream = new ReadableStream<Uint8Array>(
+          {
+            pull(controller) {
+              if (cursor > end) {
+                controller.close()
+                return
+              }
+              const subEnd = Math.min(cursor + subChunkBytes - 1, end)
+              const sub = sliceOf(cursor, subEnd)
+              cursor = subEnd + 1
+              liveBuffers.push(new WeakRef(sub))
+              bufferedBytes += sub.byteLength
+              if (bufferedBytes > peakBufferedBytes) peakBufferedBytes = bufferedBytes
+              controller.enqueue(sub)
+            },
+          },
+          { highWaterMark: 0 },
+        )
+        return new Response(stream, {
+          status: 206,
+          headers: {
+            'Content-Length': String(windowLen),
+            'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+            'X-Checksum-Sha256': 'cc'.repeat(32),
           },
         })
+      }
+
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      try {
+        const out = await api(fetch).downloadStream(DOC, 1, { destinationPath: dest })
         expect(out).toEqual({ path: dest, bytes: totalSize })
       } finally {
-        globalThis.Uint8Array = RealUint8Array
-        globalThis.ArrayBuffer = RealArrayBuffer
+        renameHook.onBeforeWrite = null
+        renameHook.onAfterWrite = null
       }
+
+      expect(bufferedBytes).toBe(0)
       const disk = readFileSync(dest)
       expect(disk.byteLength).toBe(totalSize)
-      expect(Buffer.compare(disk, Buffer.from(fileOf(totalSize)))).toBe(0)
-      return maxAllocated
+      for (let offset = 0; offset < totalSize; offset += CHUNK) {
+        const end = Math.min(offset + CHUNK, totalSize) - 1
+        expect(
+          Buffer.compare(disk.subarray(offset, end + 1), Buffer.from(sliceOf(offset, end))),
+        ).toBe(0)
+      }
+      unlinkSync(dest)
+      return {
+        peakBufferedBytes,
+        peakWriteBufferBytes,
+        peakRetainedFromPriorWindows,
+        windowsServed,
+      }
     }
 
-    const windowBytes = 512 * 1024
-    const twoChunkMax = await measureMaxAllocation(2 * windowBytes + 19, windowBytes)
-    const sixChunkMax = await measureMaxAllocation(6 * windowBytes + 19, windowBytes)
-    // Neither walk allocates a total-size buffer; both peak at a single chunk buffer
-    expect(twoChunkMax).toBe(windowBytes)
-    expect(sixChunkMax).toBe(windowBytes)
+    const twoChunk = await measureWalk(2)
+    const sixChunk = await measureWalk(6)
+    expect(twoChunk.windowsServed).toBe(3)
+    expect(sixChunk.windowsServed).toBe(7)
+    // Stream-to-disk buffered bytes peak at exactly one 8 MiB chunk for both N=2 and N=6
+    expect(twoChunk.peakBufferedBytes).toBe(CHUNK)
+    expect(sixChunk.peakBufferedBytes).toBe(CHUNK)
+    expect(twoChunk.peakWriteBufferBytes).toBe(CHUNK)
+    expect(sixChunk.peakWriteBufferBytes).toBe(CHUNK)
+    // Prior windows' sub-chunks and joined window buffers are unreachable once written to disk
+    expect(twoChunk.peakRetainedFromPriorWindows).toBe(0)
+    expect(sixChunk.peakRetainedFromPriorWindows).toBe(0)
   })
 
   it('re-requests only the chunk that was dropped mid-stream', async () => {

@@ -330,7 +330,7 @@ export async function downloadInChunks(
     let total = 0
     let got = 0
     {
-      let first: RangedChunk
+      let first: RangedChunk | undefined
       try {
         first = await attempt({ start: 0, end: chunkBytes - 1 }, null)
       } catch (error) {
@@ -351,17 +351,20 @@ export async function downloadInChunks(
       size = total
       got = first.bytes.byteLength
       await sink.write(first.bytes, total)
+      first = undefined
       done = got
     }
     if (got === total) return await sink.commit(total)
     while (got < total) {
       const range = { start: got, end: Math.min(got + chunkBytes, total) - 1 }
-      const next = await attempt(range, total)
+      let next: RangedChunk | undefined = await attempt(range, total)
       // a plain 200 in the middle of a ranged walk cannot be placed in the file
       if (next.kind !== 'partial') throw new UniworkDocError('malformed_response')
       chunks++
+      const nextLen = next.bytes.byteLength
       await sink.write(next.bytes, total)
-      got += next.bytes.byteLength
+      next = undefined
+      got += nextLen
       done = got
       report(0, total)
     }
