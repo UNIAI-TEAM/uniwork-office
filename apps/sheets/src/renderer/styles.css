@@ -1916,6 +1916,16 @@ button.check-item:hover {
 
 .workbook-opening-cancel {
   margin-top: 4px;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.workbook-opening-cancel:hover {
+  background: var(--surface-hover);
 }
 
 .csv-empty-notice {
