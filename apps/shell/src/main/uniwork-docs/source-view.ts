@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { rmSync } from 'node:fs'
-import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathKey } from '../../shared/path-key'
 import {
@@ -12,6 +12,8 @@ import {
   type SourceViewResult,
   type SourceViewState,
 } from '../../shared/source-view'
+import type { DownloadFileResult, DownloadStreamFileOptions } from './client'
+import { UniworkDocError } from './errors'
 import type { UniworkModuleSeam } from './modules'
 
 /*
@@ -137,7 +139,6 @@ const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i
 /** the injected file operations; defaults are node's, tests inject faults */
 export interface SourceViewFs {
   mkdir(path: string, options: { recursive: true; mode: number }): Promise<unknown>
-  writeFile(path: string, bytes: Uint8Array): Promise<void>
   chmod(path: string, mode: number): Promise<void>
   rm(path: string, options: { recursive: true; force: true }): Promise<void>
   rmSync(path: string, options: { recursive: true; force: true }): void
@@ -157,8 +158,12 @@ export interface SourceViewOpenerDeps {
   storeLocked(): boolean
   /** `documentLimits.max_bytes` of the connected server */
   documentMaxBytes(): number
-  /** UNI-1961's client call: `GET /workspaces/{ws}/documents/sources/{id}/download` */
-  downloadSource(workspaceId: string, sourceId: string): Promise<{ bytes: Uint8Array }>
+  /** UNI-1961 / UNI-2525: `GET /workspaces/{ws}/documents/sources/{id}/download` streamed to disk */
+  downloadSource(
+    workspaceId: string,
+    sourceId: string,
+    options: DownloadStreamFileOptions,
+  ): Promise<DownloadFileResult>
   /** the shell's open router (`routeDocumentPath`) */
   openPath(path: string): boolean | Promise<boolean>
   /**
@@ -276,7 +281,7 @@ interface OpenEntry {
 }
 
 export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOpener {
-  const fs: SourceViewFs = { mkdir, writeFile, chmod, rm, rmSync, ...deps.fs }
+  const fs: SourceViewFs = { mkdir, chmod, rm, rmSync, ...deps.fs }
   const now = () => deps.now?.() ?? Date.now()
   const newSession = () => deps.newSession?.() ?? randomUUID()
   let session = newSession()
@@ -312,31 +317,43 @@ export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOp
     key: string,
   ): Promise<SourceViewResult<OpenSourceValue>> => {
     const startedAt = epoch
-    let bytes: Uint8Array
-    try {
-      bytes = (await deps.downloadSource(input.workspaceId, input.sourceId)).bytes
-    } catch (error) {
-      return fail(mapDownloadError(error))
-    }
-    // the row's size is the renderer's word: the editors refuse anything over the max
-    if (bytes.byteLength > deps.documentMaxBytes()) return fail('too_large')
-    // the sweep removes the whole preview root: write only after it is done
-    await Promise.resolve(deps.startupSweep).catch(() => undefined)
-    if (epoch !== startedAt) return fail('not_signed_in')
-
     const hash = createHash('sha256').update(key).digest('hex').slice(0, 16)
     const dir = join(sessionDir(), hash)
     const path = join(dir, safeFileName(input.name, extension))
-    try {
+    let dirCreated = false
+    const ensureDir = async (): Promise<void> => {
+      // the sweep removes the whole preview root: write only after it is done
+      await Promise.resolve(deps.startupSweep).catch(() => undefined)
+      if (epoch !== startedAt) throw new UniworkDocError('not_signed_in')
+      if (dirCreated) return
       // owner-only: the plaintext of an attachment must not be readable by other users
       await fs.mkdir(dir, { recursive: true, mode: 0o700 })
-      await fs.writeFile(path, bytes)
-      // a courtesy only: the registry, not the file mode, is what makes the view read-only
-      await fs.chmod(path, 0o400).catch(() => undefined)
-    } catch {
-      await removeDir(dir)
-      return fail('open_failed')
+      dirCreated = true
     }
+    let downloaded: DownloadFileResult
+    try {
+      downloaded = await deps.downloadSource(input.workspaceId, input.sourceId, {
+        destinationPath: path,
+        maxBytes: deps.documentMaxBytes(),
+        beforeOpen: ensureDir,
+        beforeRename: async () => {
+          if (epoch !== startedAt) throw new UniworkDocError('not_signed_in')
+        },
+      })
+    } catch (error) {
+      if (dirCreated) await removeDir(dir)
+      return fail(mapDownloadError(error))
+    }
+    if (epoch !== startedAt) {
+      if (dirCreated) await removeDir(dir)
+      return fail('not_signed_in')
+    }
+    if (downloaded.bytes > deps.documentMaxBytes()) {
+      if (dirCreated) await removeDir(dir)
+      return fail('too_large')
+    }
+    // a courtesy only: the registry, not the file mode, is what makes the view read-only
+    await fs.chmod(path, 0o400).catch(() => undefined)
     if (epoch !== startedAt) {
       await removeDir(dir)
       return fail('not_signed_in')

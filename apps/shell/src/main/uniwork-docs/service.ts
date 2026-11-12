@@ -1,16 +1,6 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import {
-  lstat,
-  open,
-  readdir,
-  readFile,
-  realpath,
-  rename,
-  stat,
-  unlink,
-  writeFile,
-} from 'node:fs/promises'
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { lstat, open, readdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   RecentUniworkSource,
@@ -1552,7 +1542,8 @@ export class UniworkDocsService {
       profile: () => this.deps.profile(),
       storeLocked: () => this.storeLocked(),
       documentMaxBytes: () => this.limitsCache.peek().max_bytes,
-      downloadSource: (workspaceId, sourceId) => this.api().downloadSource(workspaceId, sourceId),
+      downloadSource: (workspaceId, sourceId, options) =>
+        this.api().downloadSource(workspaceId, sourceId, options),
       openPath: (path) => this.deps.openPath(path),
       closePath: (path) => this.deps.closePathNow?.(path),
       isPathOpen: (path) => this.deps.isPathOpen(path),
@@ -7284,48 +7275,25 @@ export class UniworkDocsService {
       uniworkSourceId(input.sourceId)
       const target = (await this.deps.pickDownloadPath?.(sourceFileName(input.name))) ?? null
       if (!target) return { path: null }
+      const guardTarget = async (): Promise<void> => {
+        if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
+      }
       // A106 (UNI-1362) + R1-6: the working-copy root is the app's own folder
-      if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
-      const { bytes } = await this.api().downloadSource(input.workspaceId, input.sourceId)
-      if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
-      await this.writeBytesViaTemp(target, bytes)
+      await guardTarget()
+      await this.api().downloadSource(input.workspaceId, input.sourceId, {
+        destinationPath: target,
+        beforeOpen: guardTarget,
+        beforeRename: guardTarget,
+      })
       return { path: target }
     })
   }
 
   /**
-   * A downloaded file's bytes onto `target`: a `.uw-dl-*.tmp` beside it (exclusive, 0600), the
-   * target's own mode restored, a last forbidden-target check, then one rename. The temp file is
-   * removed on any failure, so no half file is left. Shared by the source and document downloads.
-   */
-  private async writeBytesViaTemp(target: string, bytes: Uint8Array): Promise<void> {
-    const resolvedTarget = resolve(target)
-    const tmp = join(dirname(resolvedTarget), `.uw-dl-${randomBytes(8).toString('hex')}.tmp`)
-    let createdTmp = false
-    try {
-      const existingStat = await lstat(resolvedTarget).catch(() => null)
-      const targetMode = existingStat?.isFile() ? existingStat.mode & 0o777 : 0o600
-      const handle = await open(tmp, 'wx', 0o600)
-      createdTmp = true
-      try {
-        await handle.writeFile(bytes)
-        await handle.chmod(targetMode)
-      } finally {
-        await handle.close()
-      }
-      if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
-      await rename(tmp, resolvedTarget)
-    } catch (error) {
-      if (createdTmp) await unlink(tmp).catch(() => undefined)
-      throw error
-    }
-  }
-
-  /**
    * UNI-2068 (D4): the plain download of ONE document file when exactly one file of a bulk
    * selection is downloadable (no zip job, no job slot). The save dialog suggests the file's own
-   * name and opens first; a canceled dialog reads nothing. The read is the open flow's streamed
-   * download, so a file past its 256 MiB cap answers `too_large`.
+   * name and opens first; a canceled dialog reads nothing. The read streams verified Range
+   * windows to a sibling temp file and renames atomically onto the picked path.
    */
   async downloadDocumentFile(input: unknown): Promise<FileDownloadResult> {
     const fail = (code: NonNullable<FileDownloadResult['code']>): FileDownloadResult => ({
@@ -7345,9 +7313,14 @@ export class UniworkDocsService {
       const target = (await this.deps.pickDownloadPath?.(sourceFileName(raw.suggestedName))) ?? null
       if (!target) return fail('dialog_canceled')
       if (await this.isForbiddenDownloadTarget(target)) return fail('forbidden_target')
-      const { bytes } = await this.api().downloadStream(raw.documentId, undefined)
-      if (await this.isForbiddenDownloadTarget(target)) return fail('forbidden_target')
-      await this.writeBytesViaTemp(target, bytes)
+      const guardTarget = async (): Promise<void> => {
+        if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
+      }
+      await this.api().downloadStream(raw.documentId, undefined, {
+        destinationPath: target,
+        beforeOpen: guardTarget,
+        beforeRename: guardTarget,
+      })
       return { ok: true, path: target }
     } catch (error) {
       if (
@@ -7384,10 +7357,15 @@ export class UniworkDocsService {
         throw error
       })
     if (await forbidden()) return 'forbidden_target'
-    const { bytes } = await this.api().downloadStream(documentId, versionNo)
-    if (await forbidden()) return 'forbidden_target'
+    const guardTarget = async (): Promise<void> => {
+      if (await forbidden()) throw new UniworkDocError('forbidden')
+    }
     try {
-      await this.writeBytesViaTemp(target, bytes)
+      await this.api().downloadStream(documentId, versionNo, {
+        destinationPath: target,
+        beforeOpen: guardTarget,
+        beforeRename: guardTarget,
+      })
     } catch (error) {
       // the last target check inside the write carries no status; same mapping as the file download
       if (

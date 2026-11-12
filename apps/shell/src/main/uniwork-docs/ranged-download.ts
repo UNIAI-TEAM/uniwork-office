@@ -1,12 +1,16 @@
+import { randomBytes } from 'node:crypto'
+import { lstat, open, rename, unlink, type FileHandle } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
 import { UniworkDocError } from './errors'
 
 /**
- * UNI-2518: a document download as sequential Range requests, so a connection that
- * drops mid-body costs one chunk instead of the whole file. The transport (auth,
- * timeouts, error mapping) stays with the caller: it hands in `readChunk`, one
- * request-and-read, and this module owns the chunk walk, the per-chunk retry and the
- * integrity checks. Only the documents client uses it; the offline library reaches it
- * through `downloadStream`.
+ * UNI-2518 / UNI-2525: a document download as sequential Range requests, so a
+ * connection that drops mid-body costs one chunk instead of the whole file, and
+ * verified chunks stream directly to a sibling temp file (fsync + atomic rename)
+ * so peak memory is one chunk. The transport (auth, timeouts, error mapping)
+ * stays with the caller: it hands in `readChunk`, one request-and-read, and this
+ * module owns the chunk walk, the per-chunk retry, the integrity checks and the
+ * temp-file lifecycle.
  */
 
 /** bytes per Range request */
@@ -14,7 +18,23 @@ export const RANGE_CHUNK_BYTES = 8 * 1024 * 1024
 /** tries per chunk (the first one included) */
 export const RANGE_CHUNK_ATTEMPTS = 3
 const RETRY_BASE_MS = 250
-
+/** default 256 MiB cap for callers that keep the assembled payload in memory */
+export const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
+const RETRYABLE_RENAME_CODES: Record<string, true> = {
+  EPERM: true,
+  EACCES: true,
+  EBUSY: true,
+}
+const RENAME_RETRIES = 4
+const RENAME_BACKOFF_BASE_MS = 50
+// cloud-sync folders, AV locks and fsync-less filesystems may refuse fsync after a write
+const TOLERATED_SYNC_CODES: Record<string, true> = {
+  EPERM: true,
+  EACCES: true,
+  EBUSY: true,
+  EINVAL: true,
+  ENOSYS: true,
+}
 export interface ContentRange {
   start: number
   end: number
@@ -56,7 +76,7 @@ export interface RangedDownloadInput {
     onProgress: (progress: ChunkProgress) => void,
   ): Promise<RangedChunk>
   /** a file whose Content-Range total passes this is refused as too_large */
-  maxBytes: number
+  maxBytes?: number
   signal?: AbortSignal
   onProgress?: (progress: ChunkProgress) => void
   /** one line per download that used more than one request or failed; ids only */
@@ -68,6 +88,20 @@ export interface RangedDownloadInput {
   deadline?: number
   /** test seam: the wait before try n+1 (n >= 1) */
   backoffMs?: (failedAttempt: number) => number
+}
+
+export interface RangedFileDownloadInput extends RangedDownloadInput {
+  /**
+   * UNI-2525: destination file path. Each verified chunk is written to a sibling
+   * `.uw-dl-*.tmp` in `dirname(resolve(destinationPath))` (same volume), fsynced
+   * and atomically renamed onto the destination; any failure removes the temp
+   * file and leaves nothing at the destination.
+   */
+  destinationPath: string
+  /** optional guard run before creating the sibling temp file */
+  beforeOpen?: () => Promise<void>
+  /** optional guard run after flushing/closing the temp file, immediately before rename */
+  beforeRename?: () => Promise<void>
 }
 
 function transient(error: unknown): boolean {
@@ -98,18 +132,140 @@ function wait(ms: number, signal: AbortSignal | undefined): Promise<void> {
   })
 }
 
+interface ChunkSink<T> {
+  write(bytes: Uint8Array, totalBytes: number): Promise<void>
+  commit(totalBytes: number): Promise<T>
+  abort(): Promise<void>
+}
+
+function createFileSink(
+  input: RangedFileDownloadInput,
+): ChunkSink<{ path: string; bytes: number }> {
+  const { destinationPath, signal } = input
+  const resolvedTarget = resolve(destinationPath)
+  const tmp = join(dirname(resolvedTarget), `.uw-dl-${randomBytes(8).toString('hex')}.tmp`)
+  let handle: FileHandle | null = null
+  let createdTmp = false
+  let targetMode = 0o600
+
+  const ensureOpen = async (): Promise<FileHandle> => {
+    if (handle) return handle
+    await input.beforeOpen?.()
+    if (signal?.aborted) throw new UniworkDocError('network')
+    const existingStat = await lstat(resolvedTarget).catch(() => null)
+    targetMode = existingStat?.isFile() ? existingStat.mode & 0o777 : 0o600
+    handle = await open(tmp, 'wx', 0o600)
+    createdTmp = true
+    if (signal?.aborted) throw new UniworkDocError('network')
+    return handle
+  }
+
+  return {
+    async write(bytes) {
+      const fd = await ensureOpen()
+      let offset = 0
+      while (offset < bytes.byteLength) {
+        if (signal?.aborted) throw new UniworkDocError('network')
+        const { bytesWritten } = await fd.write(bytes, offset, bytes.byteLength - offset)
+        if (bytesWritten <= 0) throw new Error('short write')
+        offset += bytesWritten
+      }
+    },
+    async commit(totalBytes) {
+      const fd = await ensureOpen()
+      await fd.chmod(targetMode)
+      try {
+        await fd.sync()
+      } catch (error) {
+        if (!TOLERATED_SYNC_CODES[(error as NodeJS.ErrnoException | null)?.code ?? '']) {
+          throw error
+        }
+      }
+      handle = null
+      await fd.close()
+      if (signal?.aborted) throw new UniworkDocError('network')
+      await input.beforeRename?.()
+      if (signal?.aborted) throw new UniworkDocError('network')
+      const renameBackoff =
+        input.backoffMs ?? ((n: number) => RENAME_BACKOFF_BASE_MS * 2 ** (n - 1))
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          await rename(tmp, resolvedTarget)
+          break
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException | null)?.code ?? ''
+          if (!RETRYABLE_RENAME_CODES[code] || attempt >= RENAME_RETRIES) throw error
+          await wait(renameBackoff(attempt + 1), signal)
+        }
+      }
+      createdTmp = false
+      return { path: destinationPath, bytes: totalBytes }
+    },
+    async abort() {
+      if (handle) {
+        const fd = handle
+        handle = null
+        await fd.close().catch(() => undefined)
+      }
+      if (createdTmp) {
+        createdTmp = false
+        await unlink(tmp).catch(() => undefined)
+      }
+    },
+  }
+}
+
+function createBytesSink(): ChunkSink<{ bytes: Uint8Array }> {
+  let buffer: Uint8Array | null = null
+  let offset = 0
+  return {
+    async write(bytes, totalBytes) {
+      if (bytes.byteLength === totalBytes && offset === 0) {
+        buffer = bytes
+        offset = bytes.byteLength
+        return
+      }
+      if (!buffer) buffer = new Uint8Array(totalBytes)
+      buffer.set(bytes, offset)
+      offset += bytes.byteLength
+    },
+    async commit(totalBytes) {
+      if (!buffer) return { bytes: new Uint8Array(0) }
+      return { bytes: offset === totalBytes ? buffer : buffer.subarray(0, totalBytes) }
+    },
+    async abort() {
+      buffer = null
+    },
+  }
+}
+
 /**
- * Reads the whole file. One request when the file fits a chunk; a server that answers
- * 200 to the Range request is read in that one piece; otherwise each next window is a
- * request of its own, retried alone. The assembled length must equal the Content-Range
- * total, else `malformed_response` (nothing partial is returned). The last error of an
- * exhausted chunk is thrown as it came, so the user-facing copy is the one a cut
- * download had before chunking.
+ * Reads the whole file in sequential Range windows. When `destinationPath` is
+ * given, each verified window is written directly to a sibling `.uw-dl-*.tmp`
+ * file, fsynced and atomically renamed onto `destinationPath` (peak memory = one
+ * chunk, with no default size cap unless `maxBytes` is given). Otherwise,
+ * assembles `{ bytes }` under `maxBytes` (default `MAX_DOWNLOAD_BYTES`). One
+ * request when the file fits a chunk; a server
+ * that answers 200 to the Range request is written in that one piece; otherwise
+ * each next window is a request of its own, retried alone. The assembled length
+ * must equal the Content-Range total, else `malformed_response` (temp file
+ * removed, nothing left at the destination).
  */
-export async function downloadInChunks(input: RangedDownloadInput): Promise<{ bytes: Uint8Array }> {
+export function downloadInChunks(
+  input: RangedFileDownloadInput,
+): Promise<{ path: string; bytes: number }>
+export function downloadInChunks(input: RangedDownloadInput): Promise<{ bytes: Uint8Array }>
+export async function downloadInChunks(
+  input: RangedDownloadInput | RangedFileDownloadInput,
+): Promise<{ path: string; bytes: number } | { bytes: Uint8Array }> {
   const chunkBytes = input.chunkBytes ?? RANGE_CHUNK_BYTES
+  const toDisk = 'destinationPath' in input && typeof input.destinationPath === 'string'
+  const maxBytes = input.maxBytes ?? (toDisk ? Infinity : MAX_DOWNLOAD_BYTES)
   const backoff = input.backoffMs ?? ((n: number) => RETRY_BASE_MS * 2 ** (n - 1))
   const { signal } = input
+  const sink: ChunkSink<{ path: string; bytes: number } | { bytes: Uint8Array }> = toDisk
+    ? createFileSink(input)
+    : createBytesSink()
   let requests = 0
   let retries = 0
   let high = 0
@@ -171,46 +327,52 @@ export async function downloadInChunks(input: RangedDownloadInput): Promise<{ by
   let chunks = 0
   let size = 0
   try {
-    let first: RangedChunk
-    try {
-      first = await attempt({ start: 0, end: chunkBytes - 1 }, null)
-    } catch (error) {
-      // an empty file has no satisfiable range: it is read plainly
-      if (!(error instanceof UniworkDocError && error.status === 416)) throw error
-      first = await attempt(undefined, null)
+    let total = 0
+    let got = 0
+    {
+      let first: RangedChunk | undefined
+      try {
+        first = await attempt({ start: 0, end: chunkBytes - 1 }, null)
+      } catch (error) {
+        // an empty file has no satisfiable range: it is read plainly
+        if (!(error instanceof UniworkDocError && error.status === 416)) throw error
+        first = await attempt(undefined, null)
+      }
+      chunks = 1
+      if (first.kind === 'whole') {
+        size = first.bytes.byteLength
+        if (size > maxBytes) throw new UniworkDocError('too_large')
+        await sink.write(first.bytes, size)
+        return await sink.commit(size)
+      }
+      total = first.total
+      pinned = first.checksum
+      if (total > maxBytes) throw new UniworkDocError('too_large')
+      size = total
+      got = first.bytes.byteLength
+      await sink.write(first.bytes, total)
+      first = undefined
+      done = got
     }
-    chunks = 1
-    if (first.kind === 'whole') {
-      size = first.bytes.byteLength
-      if (size > input.maxBytes) throw new UniworkDocError('too_large')
-      return { bytes: first.bytes }
-    }
-    const { total } = first
-    pinned = first.checksum
-    if (total > input.maxBytes) throw new UniworkDocError('too_large')
-    size = total
-    if (first.bytes.byteLength === total) return { bytes: first.bytes }
-    // one buffer of the file's size, filled window by window: the chunk arrays are never
-    // kept side by side with a joined copy
-    const bytes = new Uint8Array(total)
-    bytes.set(first.bytes, 0)
-    let got = first.bytes.byteLength
-    done = got
+    if (got === total) return await sink.commit(total)
     while (got < total) {
       const range = { start: got, end: Math.min(got + chunkBytes, total) - 1 }
-      const next = await attempt(range, total)
+      let next: RangedChunk | undefined = await attempt(range, total)
       // a plain 200 in the middle of a ranged walk cannot be placed in the file
       if (next.kind !== 'partial') throw new UniworkDocError('malformed_response')
       chunks++
-      bytes.set(next.bytes, got)
-      got += next.bytes.byteLength
+      const nextLen = next.bytes.byteLength
+      await sink.write(next.bytes, total)
+      next = undefined
+      got += nextLen
       done = got
       report(0, total)
     }
     if (got !== total) throw new UniworkDocError('malformed_response')
-    return { bytes }
+    return await sink.commit(total)
   } catch (error) {
     outcome = error instanceof UniworkDocError ? error.code : 'error'
+    await sink.abort()
     throw error
   } finally {
     if (chunks > 1 || retries > 0 || outcome !== 'ok') {

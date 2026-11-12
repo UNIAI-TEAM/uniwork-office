@@ -340,22 +340,30 @@ describe('the single file download (D4)', () => {
     expect(readdirSync(dir)).toEqual([])
   })
 
-  it('a file past the in-memory cap answers too_large and leaves nothing', async () => {
+  it('accepts a declared size past 256 MiB on the streamed file path and maps a server 413 to too_large leaving nothing', async () => {
     const { call } = await setup()
     dialogs.save = { canceled: false, filePath: join(dir, 'Big.docx') }
-    stubNetwork(
-      () =>
-        new Response(new Uint8Array(4), {
-          status: 200,
-          headers: { 'Content-Length': String(300 * 1024 * 1024) },
-        }),
-    )
+    stubNetwork(() => json(413, { error: { code: 'file_too_large', message: 'x' } }))
     expect(await call(ZIP_DOWNLOAD_CHANNELS.downloadFile, file)).toEqual({
       ok: false,
       path: null,
       code: 'too_large',
     })
     expect(readdirSync(dir)).toEqual([])
+
+    dialogs.save = { canceled: false, filePath: join(dir, 'Big.docx') }
+    stubNetwork(
+      () =>
+        new Response(new Uint8Array([4, 5, 6, 7]), {
+          status: 200,
+          headers: { 'Content-Length': String(300 * 1024 * 1024) },
+        }),
+    )
+    expect(await call(ZIP_DOWNLOAD_CHANNELS.downloadFile, file)).toEqual({
+      ok: true,
+      path: join(dir, 'Big.docx'),
+    })
+    expect([...readFileSync(join(dir, 'Big.docx'))]).toEqual([4, 5, 6, 7])
   })
 
   it('refuses a signed-out call and malformed ids before the dialog', async () => {

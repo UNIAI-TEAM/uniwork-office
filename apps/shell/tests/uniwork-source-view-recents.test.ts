@@ -5,7 +5,7 @@
  * existing recents guards (shell index.ts, docs-main, slides-main) all test
  * `isDraftPreviewPath`, so they apply with no change to any editor.
  */
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -29,7 +29,12 @@ async function openOne(name: string, extension: string): Promise<string> {
     profile: () => ({ deploymentId: 'd' }),
     storeLocked: () => false,
     documentMaxBytes: () => 1e9,
-    downloadSource: async () => ({ bytes: new Uint8Array([1]) }),
+    downloadSource: async (_ws, _id, options) => {
+      await options.beforeOpen?.()
+      writeFileSync(options.destinationPath, new Uint8Array([1]))
+      await options.beforeRename?.()
+      return { path: options.destinationPath, bytes: 1 }
+    },
     openPath: () => true,
     isPathOpen: () => false,
   })

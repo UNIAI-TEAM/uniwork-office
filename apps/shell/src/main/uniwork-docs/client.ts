@@ -17,7 +17,12 @@ import { UniworkDocError, errorFromResponse, parseRetryAfter } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
 import { isEditorSessionId } from './editor-session-id'
 import { isLegacyConversion, type LegacyConversion } from './legacy-cloud'
-import { downloadInChunks, parseContentRange, type RangedChunk } from './ranged-download'
+import {
+  MAX_DOWNLOAD_BYTES,
+  downloadInChunks,
+  parseContentRange,
+  type RangedChunk,
+} from './ranged-download'
 import { DEFAULT_DOCUMENT_LIMITS, parseDocumentLimits, type DocumentLimits } from './limits'
 import {
   documentRevisionOf,
@@ -79,8 +84,8 @@ export const TRANSFER_TIMEOUT_MS = 120_000
  * an hour is ~75 KB/s on average).
  */
 export const STREAM_CEILING_MS = 60 * 60_000
-/** the server stages at most 50 MiB per upload; a download far past that is refused */
-const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
+/** the 256 MiB cap of an in-memory download (`offline-library` MAX_PIN_FILE_BYTES) */
+export { MAX_DOWNLOAD_BYTES }
 const ID = /^[A-Za-z0-9_-]{1,128}$/
 const SOURCE_ID = /^(?:chat|task|meeting|email):[A-Za-z0-9_-]{1,64}$/
 
@@ -101,12 +106,28 @@ export interface DownloadResult {
   bytes: Uint8Array
 }
 
+export interface DownloadFileResult {
+  path: string
+  bytes: number
+}
+
 /** G5-05: what a streamed download reports and how it is cancelled */
 export interface DownloadStreamOptions {
   /** aborts the request, and the body read once the server answered */
   signal?: AbortSignal
   /** after every received chunk; `totalBytes` is the Content-Length when sent */
   onProgress?(progress: { receivedBytes: number; totalBytes: number | null }): void
+  /** overrides MAX_DOWNLOAD_BYTES when a caller enforces a stricter cap (e.g. documentMaxBytes) */
+  maxBytes?: number
+}
+
+/** UNI-2525: a streamed download written chunk-by-chunk to a sibling temp file then renamed */
+export interface DownloadStreamFileOptions extends DownloadStreamOptions {
+  destinationPath: string
+  /** optional guard run before creating the sibling temp file */
+  beforeOpen?: () => Promise<void>
+  /** optional guard run after flushing/closing the temp file, immediately before rename */
+  beforeRename?: () => Promise<void>
 }
 
 /**
@@ -189,8 +210,17 @@ export interface UniworkDocsClient {
    * (`GET /workspaces/{ws}/documents/sources`, paged like the web's list)
    */
   listSources(input: UniworkSourceListQuery): Promise<UniworkSourceListPage>
-  /** UNI-1961: one source file's bytes through its download proxy */
-  downloadSource(workspaceId: string, sourceId: string): Promise<DownloadResult>
+  /** UNI-1961 / UNI-2525: stream one source file through its download proxy to disk */
+  downloadSource(
+    workspaceId: string,
+    sourceId: string,
+    options: DownloadStreamFileOptions,
+  ): Promise<DownloadFileResult>
+  downloadSource(
+    workspaceId: string,
+    sourceId: string,
+    options?: DownloadStreamOptions,
+  ): Promise<DownloadResult>
   /** DESKTOP-HOME: workspace members (`GET /workspaces/{ws}/members`) for row updater names */
   listWorkspaceMembers(workspaceId: string): Promise<OrgMemberName[]>
   /** the properties panel of one document (ids/times/level/version, no names) */
@@ -351,12 +381,20 @@ export interface UniworkDocsClient {
    * copy of it shows to the comments seam
    */
   getVersionId(documentId: string, versionNo: number): Promise<string>
+  /** single-GET in-memory bytes download (capped at MAX_DOWNLOAD_BYTES) */
   download(documentId: string, version?: number): Promise<DownloadResult>
   /**
-   * G5-05: the same download read chunk by chunk, with progress and cancel.
-   * Same route and the same 256 MiB cap, checked from Content-Length and again
-   * while the body streams. A cancel or a broken body is `network`.
+   * G5-05 / UNI-2518 / UNI-2525: the same download read in 8 MiB Range windows
+   * with progress and cancel. With `destinationPath`, verified chunks stream to a
+   * sibling temp file in the destination folder, fsync and atomically rename onto
+   * `destinationPath` (peak memory = one chunk). Without `destinationPath`,
+   * returns `{ bytes }` for the encrypted offline-library staging path.
    */
+  downloadStream(
+    documentId: string,
+    version: number | undefined,
+    options: DownloadStreamFileOptions,
+  ): Promise<DownloadFileResult>
   downloadStream(
     documentId: string,
     version: number | undefined,
@@ -789,15 +827,22 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     progress?: () => void,
     streamOptions: {
       signal?: AbortSignal
+      maxBytes?: number
+      overCapCode?: 'too_large' | 'malformed_response'
       onProgress?: (progress: { receivedBytes: number; totalBytes: number | null }) => void
     } = {},
   ): Promise<{ bytes: Uint8Array }> => {
-    const { signal, onProgress } = streamOptions
+    const {
+      signal,
+      maxBytes = MAX_DOWNLOAD_BYTES,
+      overCapCode = 'too_large',
+      onProgress,
+    } = streamOptions
     const header = response.headers.get('Content-Length')
     const declared = header === null ? NaN : Number(header)
-    if (declared > MAX_DOWNLOAD_BYTES) {
+    if (declared > maxBytes) {
       void response.body?.cancel().catch(() => undefined)
-      throw new UniworkDocError('too_large')
+      throw new UniworkDocError(overCapCode)
     }
     const totalBytes = Number.isSafeInteger(declared) && declared >= 0 ? declared : null
     // R5BE-8: a 200 with no readable body is refused, never buffered
@@ -822,9 +867,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         if (signal?.aborted) throw new UniworkDocError('network')
         if (step.done) break
         receivedBytes += step.value.byteLength
-        if (receivedBytes > MAX_DOWNLOAD_BYTES) {
+        if (receivedBytes > maxBytes) {
           stop()
-          throw new UniworkDocError('too_large')
+          throw new UniworkDocError(overCapCode)
         }
         chunks.push(step.value)
         progress?.()
@@ -833,6 +878,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     } finally {
       signal?.removeEventListener('abort', stop)
     }
+    if (chunks.length === 1) return { bytes: chunks[0]! }
     const bytes = new Uint8Array(receivedBytes)
     let offset = 0
     for (const chunk of chunks) {
@@ -843,15 +889,26 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
   }
 
   /**
-   * UNI-2518: read a download in 8 MiB Range windows so a cut costs one window, not the
-   * file. The whole transfer still answers to the one streamCeiling it had as a single GET.
+   * UNI-2518 / UNI-2525: read a download in 8 MiB Range windows so a cut costs one window,
+   * not the file, and stream each verified window to a temp file when `destinationPath` is
+   * given. The whole transfer still answers to the one streamCeiling it had as a single GET.
    * A route that ignores Range answers 200 and is read in that one piece.
    */
-  const downloadRanged = (
+  function downloadRanged(
+    target: { route: string; query?: URLSearchParams; label: string },
+    streamOptions: DownloadStreamFileOptions,
+  ): Promise<DownloadFileResult>
+  function downloadRanged(
     target: { route: string; query?: URLSearchParams; label: string },
     streamOptions: DownloadStreamOptions,
-  ): Promise<DownloadResult> => {
-    const { signal, onProgress } = streamOptions
+  ): Promise<DownloadResult>
+  function downloadRanged(
+    target: { route: string; query?: URLSearchParams; label: string },
+    streamOptions: DownloadStreamOptions | DownloadStreamFileOptions,
+  ): Promise<DownloadFileResult | DownloadResult> {
+    const toDisk =
+      'destinationPath' in streamOptions && typeof streamOptions.destinationPath === 'string'
+    const { signal, onProgress, maxBytes = toDisk ? Infinity : MAX_DOWNLOAD_BYTES } = streamOptions
     const deadline = Date.now() + streamCeiling
     const readChunk = (
       range: { start: number; end: number } | undefined,
@@ -867,37 +924,53 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         idle: { ceilingMs: Math.max(1, deadline - Date.now()) },
         ...(signal ? { signal } : {}),
         async read(response, progress) {
-          const streamed = { signal, onProgress: chunkProgress }
+          const streamed = { signal, maxBytes, onProgress: chunkProgress }
           if (response.status !== 206) {
             return { kind: 'whole', ...(await readBoundedStream(response, progress, streamed)) }
           }
           const window = parseContentRange(response.headers.get('Content-Range'))
-          if (!window || window.total > MAX_DOWNLOAD_BYTES) {
+          if (!window || window.total > maxBytes) {
             void response.body?.cancel().catch(() => undefined)
             throw new UniworkDocError(window ? 'too_large' : 'malformed_response')
+          }
+          const windowBytes = window.end - window.start + 1
+          if (windowBytes <= 0 || window.end >= window.total) {
+            void response.body?.cancel().catch(() => undefined)
+            throw new UniworkDocError('malformed_response')
           }
           return {
             kind: 'partial',
             ...window,
             checksum: response.headers.get('X-Checksum-Sha256'),
-            // a window's Content-Length is not the file's size
+            // a window's Content-Length is not the file's size; bound the buffer to this window
             ...(await readBoundedStream(response, progress, {
               signal,
+              maxBytes: windowBytes,
+              overCapCode: 'malformed_response',
               onProgress: ({ receivedBytes }) =>
                 chunkProgress({ receivedBytes, totalBytes: window.total }),
             })),
           }
         },
       })
-    return downloadInChunks({
+    const common = {
       readChunk,
-      maxBytes: MAX_DOWNLOAD_BYTES,
+      maxBytes,
       deadline,
       label: target.label,
-      log: (line) => console.warn(line),
+      log: (line: string) => console.warn(line),
       ...(signal ? { signal } : {}),
       ...(onProgress ? { onProgress } : {}),
-    })
+    }
+    if (toDisk) {
+      return downloadInChunks({
+        ...common,
+        destinationPath: streamOptions.destinationPath,
+        ...(streamOptions.beforeOpen ? { beforeOpen: streamOptions.beforeOpen } : {}),
+        ...(streamOptions.beforeRename ? { beforeRename: streamOptions.beforeRename } : {}),
+      })
+    }
+    return downloadInChunks(common)
   }
 
   return {
@@ -1083,15 +1156,19 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       return parseSourceList(raw)
     },
 
-    async downloadSource(workspaceId, sourceId) {
+    async downloadSource(
+      workspaceId: string,
+      sourceId: string,
+      streamOptions: DownloadStreamOptions | DownloadStreamFileOptions = {},
+    ): Promise<DownloadFileResult & DownloadResult> {
       const source = uniworkSourceId(sourceId)
       return downloadRanged(
         {
           route: `/workspaces/${id(workspaceId)}/documents/sources/${source}/download`,
           label: `source=${source}`,
         },
-        {},
-      )
+        streamOptions as DownloadStreamFileOptions,
+      ) as Promise<DownloadFileResult & DownloadResult>
     },
 
     async listWorkspaceMembers(workspaceId) {
@@ -1551,7 +1628,11 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       })
     },
 
-    async downloadStream(documentId, version, streamOptions = {}) {
+    async downloadStream(
+      documentId: string,
+      version: number | undefined,
+      streamOptions: DownloadStreamOptions | DownloadStreamFileOptions = {},
+    ): Promise<DownloadFileResult & DownloadResult> {
       const query = new URLSearchParams()
       if (version !== undefined && version > 0) query.set('version', String(Math.floor(version)))
       return downloadRanged(
@@ -1560,8 +1641,8 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           query,
           label: `document=${id(documentId)} version=${version !== undefined && version > 0 ? Math.floor(version) : 'live'}`,
         },
-        streamOptions,
-      )
+        streamOptions as DownloadStreamFileOptions,
+      ) as Promise<DownloadFileResult & DownloadResult>
     },
 
     async upload(input) {
