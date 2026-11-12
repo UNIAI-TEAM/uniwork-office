@@ -8,6 +8,7 @@ export const hi = {
   ufRecent: 'हाल के',
   ufShared: 'मेरे साथ साझा',
   ufNewFolder: 'नया फ़ोल्डर',
+  ufCreateFolder: 'फ़ोल्डर बनाएँ',
   ufNewSubfolder: 'नया सबफ़ोल्डर',
   ufRename: 'नाम बदलें',
   ufMoveTo: 'यहाँ ले जाएँ…',

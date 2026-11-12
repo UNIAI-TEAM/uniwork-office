@@ -76,11 +76,7 @@ import {
 } from '../uniwork-folders/uniwork-folders-model'
 import { useFolderActions } from '../uniwork-folders/use-folder-actions'
 import { useFolderLevels } from '../uniwork-folders/use-folder-levels'
-import {
-  canCreateInsideFolder,
-  isHumanMemberRole,
-  type WorkspaceFolderCandidate,
-} from '../uniwork-folders/ws-folder'
+import { canCreateInsideFolder, type WorkspaceFolderCandidate } from '../uniwork-folders/ws-folder'
 import {
   canPurgeDocuments,
   cancelUploadDocument,
@@ -2790,6 +2786,13 @@ export function DocumentsHome({
     />
   ) : null
 
+  // the tree has no root row (and so no root menu): as on the web, the "+" and the workspace folder
+  // node's "New folder" both make a top-level folder, for every role that sees them
+  function createFolderAtRoot(): void {
+    onSidebarNavigate?.()
+    folderActions.openCreate(null, false)
+  }
+
   const sidebarContent = (
     <div className="dh-sidebar-wrap">
       <nav className="dh-subnav home-area-nav" aria-label={t('ufAreaUniwork')}>
@@ -2823,11 +2826,7 @@ export function DocumentsHome({
             className="dh-sidebar-add"
             aria-label={t('uhNewFolder')}
             title={t('uhNewFolder')}
-            onClick={() => {
-              onSidebarNavigate?.()
-              // the tree has no root row (and so no root menu): as on the web, "+" makes a top-level folder
-              folderActions.openCreate(null, false)
-            }}
+            onClick={createFolderAtRoot}
           >
             <svg
               width="14"
@@ -2885,20 +2884,8 @@ export function DocumentsHome({
               hideRoot
               afterFirstRootRow={hasMyFolderNode ? driveSidebarRows : undefined}
               workspaceNode={{
-                // the node's only entry: a new folder at the workspace root (the "+" above does the same)
-                menu:
-                  myRole === null || isHumanMemberRole(myRole)
-                    ? [
-                        {
-                          id: 'new',
-                          label: t('ufNewFolder'),
-                          onSelect: () => {
-                            onSidebarNavigate?.()
-                            folderActions.openCreate(null, false)
-                          },
-                        },
-                      ]
-                    : [],
+                // the node's only entry, offered wherever the "+" above is (as the web at the root)
+                menu: [{ id: 'new', label: t('ufCreateFolder'), onSelect: createFolderAtRoot }],
               }}
               nodes={tree.nodes}
               label={t('ufTreeLabel')}

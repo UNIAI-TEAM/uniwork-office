@@ -7,6 +7,7 @@ export const zh = {
   ufRecent: '最近',
   ufShared: '与我共享',
   ufNewFolder: '新建文件夹',
+  ufCreateFolder: '创建文件夹',
   ufNewSubfolder: '新建子文件夹',
   ufRename: '重命名',
   ufMoveTo: '移动到…',

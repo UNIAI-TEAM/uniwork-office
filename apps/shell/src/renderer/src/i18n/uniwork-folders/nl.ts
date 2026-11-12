@@ -9,6 +9,7 @@ export const nl = {
   ufRecent: 'Recent',
   ufShared: 'Gedeeld met mij',
   ufNewFolder: 'Nieuwe map',
+  ufCreateFolder: 'Map maken',
   ufNewSubfolder: 'Nieuwe submap',
   ufRename: 'Naam wijzigen',
   ufMoveTo: 'Verplaatsen naar…',

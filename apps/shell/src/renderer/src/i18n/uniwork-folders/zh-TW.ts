@@ -8,6 +8,7 @@ export const zhTW = {
   ufRecent: '最近',
   ufShared: '與我共用',
   ufNewFolder: '新增資料夾',
+  ufCreateFolder: '建立資料夾',
   ufNewSubfolder: '新增子資料夾',
   ufRename: '重新命名',
   ufMoveTo: '移動到…',

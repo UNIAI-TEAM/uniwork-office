@@ -8,6 +8,7 @@ export const cs = {
   ufRecent: 'Nedávné',
   ufShared: 'Sdíleno se mnou',
   ufNewFolder: 'Nová složka',
+  ufCreateFolder: 'Vytvořit složku',
   ufNewSubfolder: 'Nová podsložka',
   ufRename: 'Přejmenovat',
   ufMoveTo: 'Přesunout do…',

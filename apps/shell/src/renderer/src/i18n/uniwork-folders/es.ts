@@ -8,6 +8,7 @@ export const es = {
   ufRecent: 'Recientes',
   ufShared: 'Compartidos conmigo',
   ufNewFolder: 'Nueva carpeta',
+  ufCreateFolder: 'Crear carpeta',
   ufNewSubfolder: 'Nueva subcarpeta',
   ufRename: 'Cambiar nombre',
   ufMoveTo: 'Mover a…',

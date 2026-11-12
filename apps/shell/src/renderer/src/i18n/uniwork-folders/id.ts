@@ -8,6 +8,7 @@ export const id = {
   ufRecent: 'Terbaru',
   ufShared: 'Dibagikan dengan saya',
   ufNewFolder: 'Folder baru',
+  ufCreateFolder: 'Buat folder',
   ufNewSubfolder: 'Subfolder baru',
   ufRename: 'Ganti nama',
   ufMoveTo: 'Pindahkan ke…',

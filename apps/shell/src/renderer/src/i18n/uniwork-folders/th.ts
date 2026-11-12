@@ -9,6 +9,7 @@ export const th = {
   ufRecent: 'ล่าสุด',
   ufShared: 'แชร์กับฉัน',
   ufNewFolder: 'โฟลเดอร์ใหม่',
+  ufCreateFolder: 'สร้างโฟลเดอร์',
   ufNewSubfolder: 'โฟลเดอร์ย่อยใหม่',
   ufRename: 'เปลี่ยนชื่อ',
   ufMoveTo: 'ย้ายไปที่…',

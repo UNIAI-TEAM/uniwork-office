@@ -8,6 +8,7 @@ export const ja = {
   ufRecent: '最近',
   ufShared: '共有アイテム',
   ufNewFolder: '新しいフォルダー',
+  ufCreateFolder: 'フォルダーを作成',
   ufNewSubfolder: '新しいサブフォルダー',
   ufRename: '名前を変更',
   ufMoveTo: '移動先…',

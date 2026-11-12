@@ -8,6 +8,7 @@ export const en = {
   ufRecent: 'Recent',
   ufShared: 'Shared with me',
   ufNewFolder: 'New folder',
+  ufCreateFolder: 'New folder',
   ufNewSubfolder: 'New subfolder',
   ufRename: 'Rename',
   ufMoveTo: 'Move to…',

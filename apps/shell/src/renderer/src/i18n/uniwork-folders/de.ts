@@ -8,6 +8,7 @@ export const de = {
   ufRecent: 'Zuletzt',
   ufShared: 'Für mich freigegeben',
   ufNewFolder: 'Neuer Ordner',
+  ufCreateFolder: 'Ordner erstellen',
   ufNewSubfolder: 'Neuer Unterordner',
   ufRename: 'Umbenennen',
   ufMoveTo: 'Verschieben nach…',

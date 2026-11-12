@@ -337,7 +337,7 @@ export function UniworkFolderTree({
               ) : isMyFolder(row) ? (
                 <MyFolderGlyph />
               ) : (
-                <FolderGlyph open={row.expanded} />
+                <FolderGlyph open={!workspace && row.expanded} />
               )}
               {editing && onRenameSave ? (
                 <RenameField

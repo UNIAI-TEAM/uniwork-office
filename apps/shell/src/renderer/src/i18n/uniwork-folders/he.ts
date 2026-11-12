@@ -8,6 +8,7 @@ export const he = {
   ufRecent: 'אחרונים',
   ufShared: 'שותפו איתי',
   ufNewFolder: 'תיקייה חדשה',
+  ufCreateFolder: 'יצירת תיקייה',
   ufNewSubfolder: 'תיקיית משנה חדשה',
   ufRename: 'שינוי שם',
   ufMoveTo: 'העברה אל…',

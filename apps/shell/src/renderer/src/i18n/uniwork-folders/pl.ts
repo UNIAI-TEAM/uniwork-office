@@ -9,6 +9,7 @@ export const pl = {
   ufRecent: 'Ostatnie',
   ufShared: 'Udostępnione mi',
   ufNewFolder: 'Nowy folder',
+  ufCreateFolder: 'Utwórz folder',
   ufNewSubfolder: 'Nowy podfolder',
   ufRename: 'Zmień nazwę',
   ufMoveTo: 'Przenieś do…',

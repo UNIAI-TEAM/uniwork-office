@@ -679,44 +679,80 @@ describe('RV-17: with no root row, the sidebar "+" creates at the workspace root
     })
   })
 
-  it('New folder on the workspace folder node creates at the workspace root: no parent id goes to the server', async () => {
-    const createFolder = vi.fn(async (i: { parentId: string | null; title: string }) =>
-      ok(folder('f-new', i.title)),
-    )
-    api.uniworkCreateFolder = createFolder
-    await mount('workspace')
+  /** the display id of the workspace folder node: it must never leave the tree */
+  const NODE_ID = 'ui:workspace-root'
+  const submitNewFolder = async (title: string) => {
+    const input = document.querySelector<HTMLInputElement>('.modal input')!
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      set.call(input, title)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(document.querySelector('.modal button[type="submit"]'))
+  }
+  const openNodeMenu = async () => {
     await act(async () => {
       rowOf(WORKSPACE_FOLDER)!.dispatchEvent(
         new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
       )
     })
-    const entries = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+    return Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+  }
+
+  it('driving the workspace folder node (fold, unfold, New folder) never sends or stores its id and creates at the root', async () => {
+    const createFolder = vi.fn(async (i: { parentId: string | null; title: string }) =>
+      ok(folder('f-new', i.title)),
+    )
+    api.uniworkCreateFolder = createFolder
+    await mount('workspace')
+    const asked = api.uniworkListChildren.mock.calls.length
+
+    await key(rowOf(WORKSPACE_FOLDER), 'Enter')
+    expect(rowOf(WORKSPACE_FOLDER)!.getAttribute('aria-expanded')).toBe('false')
+    expect(rowOf('Alpha')).toBeUndefined()
+    await click(rowOf(WORKSPACE_FOLDER))
+    expect(rowOf('Alpha')).toBeDefined()
+    // folding opens no page: the root stays the current folder
+    expect(workspaceNav()?.getAttribute('aria-current')).toBe('page')
+    expect(api.uniworkListChildren.mock.calls.length).toBe(asked)
+
+    const entries = await openNodeMenu()
     expect(entries.map((e) => e.dataset.folderAction)).toEqual(['new'])
+    expect(entries[0]!.textContent).toContain('Tạo thư mục')
     await click(entries[0])
-    const input = document.querySelector<HTMLInputElement>('.modal input')!
-    await act(async () => {
-      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
-      set.call(input, 'Hợp đồng')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-    })
-    await click(document.querySelector('.modal button[type="submit"]'))
+    await submitNewFolder('Hợp đồng')
     expect(createFolder).toHaveBeenLastCalledWith({
       workspaceId: 'ws-1',
       parentId: null,
       title: 'Hợp đồng',
     })
+
+    // no bridge call, stored value, URL or history entry carries the display id
+    for (const [name, fn] of Object.entries(api)) {
+      expect(JSON.stringify(fn.mock.calls), name).not.toContain(NODE_ID)
+    }
+    for (const store of [localStorage, sessionStorage]) {
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i)!
+        expect(k).not.toContain(NODE_ID)
+        expect(store.getItem(k)).not.toContain(NODE_ID)
+      }
+    }
+    expect(location.href).not.toContain(NODE_ID)
+    expect(JSON.stringify(history.state)).not.toContain(NODE_ID)
   })
 
-  it('the workspace folder node folds on Enter and on click, and never asks the server for it', async () => {
-    await mount('workspace')
-    const asked = api.uniworkListChildren.mock.calls.length
-    await key(rowOf(WORKSPACE_FOLDER), 'Enter')
-    expect(rowOf('Alpha')).toBeUndefined()
-    expect(rowOf(WORKSPACE_FOLDER)!.getAttribute('aria-expanded')).toBe('false')
-    await click(rowOf(WORKSPACE_FOLDER))
-    expect(rowOf('Alpha')).toBeDefined()
-    expect(api.uniworkListChildren.mock.calls.length).toBe(asked)
-    expect(workspaceNav()?.getAttribute('aria-current')).toBe('page')
+  it('the workspace folder node offers New folder to every role that sees the "+" beside it', async () => {
+    for (const myRole of ['viewer', 'guest', 'owner']) {
+      await mount('workspace', 'vi', { workspaces: [{ ...workspaces[0]!, myRole }] })
+      expect(sidebarSlot.querySelector('.dh-sidebar-add'), myRole).not.toBeNull()
+      const entries = await openNodeMenu()
+      expect(
+        entries.map((e) => e.dataset.folderAction),
+        myRole,
+      ).toEqual(['new'])
+      await key(document.activeElement, 'Escape')
+    }
   })
 })
 

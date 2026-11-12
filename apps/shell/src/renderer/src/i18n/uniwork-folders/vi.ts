@@ -8,6 +8,7 @@ export const vi = {
   ufRecent: 'Gần đây',
   ufShared: 'Được chia sẻ với tôi',
   ufNewFolder: 'Thư mục mới',
+  ufCreateFolder: 'Tạo thư mục',
   ufNewSubfolder: 'Thư mục con mới',
   ufRename: 'Đổi tên',
   ufMoveTo: 'Di chuyển tới…',

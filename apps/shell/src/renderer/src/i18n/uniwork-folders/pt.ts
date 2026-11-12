@@ -9,6 +9,7 @@ export const pt = {
   ufRecent: 'Recentes',
   ufShared: 'Compartilhados comigo',
   ufNewFolder: 'Nova pasta',
+  ufCreateFolder: 'Criar pasta',
   ufNewSubfolder: 'Nova subpasta',
   ufRename: 'Renomear',
   ufMoveTo: 'Mover para…',

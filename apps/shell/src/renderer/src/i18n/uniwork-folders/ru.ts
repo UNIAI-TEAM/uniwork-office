@@ -9,6 +9,7 @@ export const ru = {
   ufRecent: 'Недавние',
   ufShared: 'Доступные мне',
   ufNewFolder: 'Новая папка',
+  ufCreateFolder: 'Создать папку',
   ufNewSubfolder: 'Новая вложенная папка',
   ufRename: 'Переименовать',
   ufMoveTo: 'Переместить в…',

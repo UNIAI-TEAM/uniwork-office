@@ -9,6 +9,7 @@ export const ko = {
   ufRecent: '최근',
   ufShared: '공유 문서',
   ufNewFolder: '새 폴더',
+  ufCreateFolder: '폴더 만들기',
   ufNewSubfolder: '새 하위 폴더',
   ufRename: '이름 바꾸기',
   ufMoveTo: '이동할 위치…',

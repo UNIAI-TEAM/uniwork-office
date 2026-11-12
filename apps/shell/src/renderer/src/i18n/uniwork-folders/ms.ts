@@ -9,6 +9,7 @@ export const ms = {
   ufRecent: 'Terkini',
   ufShared: 'Dikongsi dengan saya',
   ufNewFolder: 'Folder baharu',
+  ufCreateFolder: 'Cipta folder',
   ufNewSubfolder: 'Subfolder baharu',
   ufRename: 'Namakan semula',
   ufMoveTo: 'Alih ke…',

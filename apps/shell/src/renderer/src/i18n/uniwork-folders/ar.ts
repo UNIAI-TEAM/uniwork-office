@@ -8,6 +8,7 @@ export const ar = {
   ufRecent: 'الأخيرة',
   ufShared: 'تمت مشاركتها معي',
   ufNewFolder: 'مجلد جديد',
+  ufCreateFolder: 'إنشاء مجلد',
   ufNewSubfolder: 'مجلد فرعي جديد',
   ufRename: 'إعادة تسمية',
   ufMoveTo: 'نقل إلى…',
