@@ -1198,6 +1198,7 @@ export function createWebSlidesApi(
     masterEditFill: engine('slides:master-edit-fill'),
     masterEditStroke: engine('slides:master-edit-stroke'),
     masterDeleteElement: engine('slides:master-delete-element'),
+    masterAddElement: engine('slides:master-add-element'),
 
     // engine: tables, charts, links, header/footer, themes
     editTableCell: engine('slides:edit-table-cell'),
