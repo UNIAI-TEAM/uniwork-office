@@ -229,7 +229,7 @@ export const zh = {
   fuRepUploadMissing: '文件未能到达存储。',
   fuRepSizeMismatch: '已上传的大小与原文件不符。',
   fuRepUnsupportedMedia: '文件内容与其格式不符。',
-  fuRepStorageQuota: '存储空间已满，请释放空间。',
+  fuRepStorageQuota: '存储空间已满，请释放空间。如果你刚上传了另一个版本，请几分钟后重试。',
   fuRepNotFound: '在本次上传中找不到该文件。',
   fuRepPartsInvalid: '大文件的各部分不匹配。',
   fuRepMissingEtag: '无法确认文件已到达存储。',

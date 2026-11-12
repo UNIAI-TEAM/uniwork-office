@@ -52,6 +52,16 @@ export const pt = {
   vhsReasonRestore: 'restauração',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'outra',
+  vhsCoalescedGroupOne: '{n} salvamento nesta sessão',
+  vhsCoalescedGroupOther: '{n} salvamentos nesta sessão',
+  vhsCoalescedOrphanOne: '{n} salvamento foi mesclado na última versão da sua sessão de edição',
+  vhsCoalescedOrphanOther:
+    '{n} salvamentos foram mesclados na última versão da sua sessão de edição',
+  vhsReleasedNoContent: 'Esta versão não tem mais conteúdo para abrir ou baixar.',
+  vhsErrVersionCoalesced:
+    'Esta versão foi mesclada na última versão da sua sessão de edição e por isso não tem conteúdo próprio. Abra essa última versão.',
+  vhsErrFileChunkMissing:
+    'Não foi possível ler este arquivo porque falta uma parte dos dados armazenados. Tente novamente em alguns minutos; se continuar falhando, avise um administrador.',
   vhsClose: 'Fechar',
   vhsCancel: 'Cancelar',
 } satisfies Record<keyof typeof zh, string>

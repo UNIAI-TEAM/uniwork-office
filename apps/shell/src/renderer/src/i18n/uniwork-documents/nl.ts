@@ -36,7 +36,8 @@ export const nl = {
   uwErrNotFound: 'Dit document bestaat niet meer.',
   uwErrDeleted: 'Dit document is verwijderd in UniWork.',
   uwErrConflict: 'Iemand heeft eerder al een nieuwere versie opgeslagen.',
-  uwErrQuotaExceeded: 'Je UniWork-opslag is vol.',
+  uwErrQuotaExceeded:
+    'Je UniWork-opslag is vol. Als je zojuist een andere versie hebt geüpload, probeer het over een paar minuten opnieuw.',
   uwErrTooLarge: 'Dit bestand is te groot voor UniWork.',
   uwErrUnsupportedFormat: 'Dit bestandstype wordt niet ondersteund in UniWork Office.',
   uwErrEngineIncompatible: 'Deze versie van UniWork Office kan dit document niet openen.',

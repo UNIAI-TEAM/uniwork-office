@@ -54,6 +54,17 @@ export const nl = {
   vhsReasonRestore: 'herstel',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'overig',
+  vhsCoalescedGroupOne: '{n} keer opgeslagen in deze sessie',
+  vhsCoalescedGroupOther: '{n} keer opgeslagen in deze sessie',
+  vhsCoalescedOrphanOne:
+    '{n} keer opslaan is samengevoegd in de laatste versie van de bewerkingssessie',
+  vhsCoalescedOrphanOther:
+    '{n} keer opslaan is samengevoegd in de laatste versie van de bewerkingssessie',
+  vhsReleasedNoContent: 'Deze versie heeft geen inhoud meer om te openen of te downloaden.',
+  vhsErrVersionCoalesced:
+    'Deze versie is samengevoegd in de laatste versie van haar bewerkingssessie en heeft daarom geen eigen inhoud. Open in plaats daarvan die laatste versie.',
+  vhsErrFileChunkMissing:
+    'Dit bestand kon niet worden gelezen omdat een deel van de opgeslagen gegevens ontbreekt. Probeer het over een paar minuten opnieuw; blijft het mislukken, meld het dan aan een beheerder.',
   vhsClose: 'Sluiten',
   vhsCancel: 'Annuleren',
 } satisfies Record<keyof typeof zh, string>

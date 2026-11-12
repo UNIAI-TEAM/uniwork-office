@@ -36,7 +36,8 @@ export const ja = {
   uwErrNotFound: 'このドキュメントは存在しなくなりました。',
   uwErrDeleted: 'このドキュメントは UniWork で削除されました。',
   uwErrConflict: '先に新しいバージョンが保存されています。',
-  uwErrQuotaExceeded: 'UniWork のストレージがいっぱいです。',
+  uwErrQuotaExceeded:
+    'UniWork のストレージがいっぱいです。別のバージョンをアップロードしたばかりの場合は、数分後にもう一度お試しください。',
   uwErrTooLarge: 'このファイルは UniWork には大きすぎます。',
   uwErrUnsupportedFormat: 'このファイルの種類は UniWork Office ではサポートされていません。',
   uwErrEngineIncompatible: 'この版の UniWork Office ではこのドキュメントを開けません。',

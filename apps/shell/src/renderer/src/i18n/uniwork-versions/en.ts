@@ -51,6 +51,15 @@ export const en = {
   vhsReasonRestore: 'restore',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'other',
+  vhsCoalescedGroupOne: '{n} save in this session',
+  vhsCoalescedGroupOther: '{n} saves in this session',
+  vhsCoalescedOrphanOne: '{n} save was merged into the last version of its editing session',
+  vhsCoalescedOrphanOther: '{n} saves were merged into the last version of their editing session',
+  vhsReleasedNoContent: 'This version has no content left to open or download.',
+  vhsErrVersionCoalesced:
+    'This version was merged into the last version of its editing session, so it has no content of its own. Open that last version instead.',
+  vhsErrFileChunkMissing:
+    'Couldn’t read this file because part of its stored data is missing. Try again in a few minutes; if it keeps failing, tell an admin.',
   vhsClose: 'Close',
   vhsCancel: 'Cancel',
 } satisfies Record<keyof typeof zh, string>

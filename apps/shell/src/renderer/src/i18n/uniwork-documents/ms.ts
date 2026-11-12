@@ -36,7 +36,8 @@ export const ms = {
   uwErrNotFound: 'Dokumen ini tidak wujud lagi.',
   uwErrDeleted: 'Dokumen ini telah dipadamkan dalam UniWork.',
   uwErrConflict: 'Seseorang telah menyimpan versi yang lebih baharu dahulu.',
-  uwErrQuotaExceeded: 'Storan UniWork anda penuh.',
+  uwErrQuotaExceeded:
+    'Storan UniWork anda penuh. Jika anda baru sahaja memuat naik versi lain, cuba lagi dalam beberapa minit.',
   uwErrTooLarge: 'Fail ini terlalu besar untuk UniWork.',
   uwErrUnsupportedFormat: 'Jenis fail ini tidak disokong dalam UniWork Office.',
   uwErrEngineIncompatible: 'Versi UniWork Office ini tidak dapat membuka dokumen ini.',

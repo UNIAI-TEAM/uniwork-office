@@ -50,6 +50,15 @@ export const vi = {
   vhsReasonRestore: 'khôi phục',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'khác',
+  vhsCoalescedGroupOne: '{n} lần lưu trong phiên này',
+  vhsCoalescedGroupOther: '{n} lần lưu trong phiên này',
+  vhsCoalescedOrphanOne: '{n} lần lưu đã được gộp vào bản cuối của phiên sửa',
+  vhsCoalescedOrphanOther: '{n} lần lưu đã được gộp vào bản cuối của phiên sửa',
+  vhsReleasedNoContent: 'Bản này không còn nội dung để mở hay tải.',
+  vhsErrVersionCoalesced:
+    'Phiên bản này đã được gộp vào bản cuối của phiên sửa nên không còn nội dung riêng. Hãy mở bản cuối của phiên đó.',
+  vhsErrFileChunkMissing:
+    'Không đọc được tệp này vì thiếu một phần dữ liệu lưu trữ. Thử lại sau ít phút; nếu vẫn lỗi, báo quản trị viên.',
   vhsClose: 'Đóng',
   vhsCancel: 'Hủy',
 } satisfies Record<keyof typeof zh, string>

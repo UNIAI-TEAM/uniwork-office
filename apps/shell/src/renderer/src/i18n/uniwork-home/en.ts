@@ -233,7 +233,8 @@ export const en = {
   fuRepUploadMissing: 'The file never reached storage.',
   fuRepSizeMismatch: 'The uploaded size doesn’t match the original file.',
   fuRepUnsupportedMedia: 'The file content doesn’t match its format.',
-  fuRepStorageQuota: 'Storage is full. Free up space.',
+  fuRepStorageQuota:
+    'Storage is full. Free up space. If you just uploaded another version, try again in a few minutes.',
   fuRepNotFound: 'The file wasn’t found in this upload.',
   fuRepPartsInvalid: 'The parts of the large file don’t add up.',
   fuRepMissingEtag: 'Couldn’t confirm the file reached storage.',

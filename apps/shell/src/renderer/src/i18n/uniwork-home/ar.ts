@@ -232,7 +232,8 @@ export const ar = {
   fuRepUploadMissing: 'لم يصل الملف إلى التخزين أبدًا.',
   fuRepSizeMismatch: 'حجم الملف المرفوع لا يطابق حجم الملف الأصلي.',
   fuRepUnsupportedMedia: 'محتوى الملف لا يطابق تنسيقه.',
-  fuRepStorageQuota: 'مساحة التخزين ممتلئة. حرِّر بعض المساحة.',
+  fuRepStorageQuota:
+    'مساحة التخزين ممتلئة. حرِّر بعض المساحة. إذا كنت قد رفعت للتو إصدارًا آخر، فحاول مرة أخرى بعد بضع دقائق.',
   fuRepNotFound: 'لم يُعثر على الملف في هذا الرفع.',
   fuRepPartsInvalid: 'أجزاء الملف الكبير لا تتطابق.',
   fuRepMissingEtag: 'تعذّر التأكد من وصول الملف إلى التخزين.',

@@ -36,7 +36,8 @@ export const cs = {
   uwErrNotFound: 'Tento dokument již neexistuje.',
   uwErrDeleted: 'Tento dokument byl v UniWork smazán.',
   uwErrConflict: 'Někdo už uložil novější verzi.',
-  uwErrQuotaExceeded: 'Vaše úložiště UniWork je plné.',
+  uwErrQuotaExceeded:
+    'Vaše úložiště UniWork je plné. Pokud jste právě nahráli další verzi, zkuste to znovu za několik minut.',
   uwErrTooLarge: 'Tento soubor je pro UniWork příliš velký.',
   uwErrUnsupportedFormat: 'Tento typ souboru není v UniWork Office podporován.',
   uwErrEngineIncompatible: 'Tato verze UniWork Office nemůže tento dokument otevřít.',

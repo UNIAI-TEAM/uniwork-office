@@ -37,7 +37,8 @@ export const ru = {
   uwErrNotFound: 'Этот документ больше не существует.',
   uwErrDeleted: 'Этот документ был удалён в UniWork.',
   uwErrConflict: 'Кто-то уже сохранил более новую версию.',
-  uwErrQuotaExceeded: 'Хранилище UniWork заполнено.',
+  uwErrQuotaExceeded:
+    'Хранилище UniWork заполнено. Если вы только что загрузили другую версию, повторите попытку через несколько минут.',
   uwErrTooLarge: 'Этот файл слишком большой для UniWork.',
   uwErrUnsupportedFormat: 'Этот тип файла не поддерживается в UniWork Office.',
   uwErrEngineIncompatible: 'Эта версия UniWork Office не может открыть этот документ.',

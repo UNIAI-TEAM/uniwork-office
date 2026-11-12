@@ -36,7 +36,7 @@ export const he = {
   uwErrNotFound: 'המסמך הזה כבר לא קיים.',
   uwErrDeleted: 'המסמך הזה נמחק ב-UniWork.',
   uwErrConflict: 'מישהו שמר גרסה חדשה יותר קודם.',
-  uwErrQuotaExceeded: 'האחסון שלך ב-UniWork מלא.',
+  uwErrQuotaExceeded: 'האחסון שלך ב-UniWork מלא. אם הרגע העליתם גרסה אחרת, נסו שוב בעוד כמה דקות.',
   uwErrTooLarge: 'הקובץ גדול מדי עבור UniWork.',
   uwErrUnsupportedFormat: 'סוג קובץ זה אינו נתמך ב-UniWork Office.',
   uwErrEngineIncompatible: 'גרסה זו של UniWork Office לא יכולה לפתוח מסמך זה.',

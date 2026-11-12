@@ -235,7 +235,8 @@ export const ko = {
   fuRepUploadMissing: '파일이 저장소에 도달하지 않았습니다.',
   fuRepSizeMismatch: '업로드된 크기가 원본 파일과 일치하지 않습니다.',
   fuRepUnsupportedMedia: '파일 내용이 형식과 일치하지 않습니다.',
-  fuRepStorageQuota: '저장 공간이 가득 찼습니다. 공간을 확보하세요.',
+  fuRepStorageQuota:
+    '저장 공간이 가득 찼습니다. 공간을 확보하세요. 방금 다른 버전을 업로드했다면 몇 분 후에 다시 시도하세요.',
   fuRepNotFound: '이번 업로드에서 파일을 찾을 수 없습니다.',
   fuRepPartsInvalid: '큰 파일의 조각들이 맞지 않습니다.',
   fuRepMissingEtag: '파일이 저장소에 도달했는지 확인할 수 없습니다.',

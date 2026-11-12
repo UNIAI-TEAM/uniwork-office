@@ -36,7 +36,8 @@ export const th = {
   uwErrNotFound: 'เอกสารนี้ไม่มีอยู่แล้ว',
   uwErrDeleted: 'เอกสารนี้ถูกลบใน UniWork แล้ว',
   uwErrConflict: 'มีผู้อื่นบันทึกฉบับที่ใหม่กว่าไปก่อนแล้ว',
-  uwErrQuotaExceeded: 'พื้นที่จัดเก็บของ UniWork ของคุณเต็มแล้ว',
+  uwErrQuotaExceeded:
+    'พื้นที่จัดเก็บของ UniWork ของคุณเต็มแล้ว หากคุณเพิ่งอัปโหลดเวอร์ชันอื่น ให้ลองอีกครั้งในอีกไม่กี่นาที',
   uwErrTooLarge: 'ไฟล์นี้มีขนาดใหญ่เกินไปสำหรับ UniWork',
   uwErrUnsupportedFormat: 'ไม่รองรับไฟล์ประเภทนี้ใน UniWork Office',
   uwErrEngineIncompatible: 'UniWork Office เวอร์ชันนี้ไม่สามารถเปิดเอกสารนี้ได้',

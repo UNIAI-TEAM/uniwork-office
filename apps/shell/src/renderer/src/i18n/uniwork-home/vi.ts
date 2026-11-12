@@ -233,7 +233,8 @@ export const vi = {
   fuRepUploadMissing: 'Tệp chưa lên được kho lưu trữ.',
   fuRepSizeMismatch: 'Dung lượng tệp đã lên không khớp với tệp gốc.',
   fuRepUnsupportedMedia: 'Nội dung tệp không đúng định dạng.',
-  fuRepStorageQuota: 'Đã hết dung lượng lưu trữ. Hãy giải phóng dung lượng.',
+  fuRepStorageQuota:
+    'Đã hết dung lượng lưu trữ. Hãy giải phóng dung lượng. Nếu bạn vừa tải lên một phiên bản khác, thử lại sau vài phút.',
   fuRepNotFound: 'Không tìm thấy tệp trong lượt tải lên này.',
   fuRepPartsInvalid: 'Các phần của tệp lớn không khớp.',
   fuRepMissingEtag: 'Không xác nhận được tệp đã lên kho lưu trữ.',

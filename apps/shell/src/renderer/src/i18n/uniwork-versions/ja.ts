@@ -52,6 +52,16 @@ export const ja = {
   vhsReasonRestore: '復元',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'その他',
+  vhsCoalescedGroupOne: 'このセッションで {n} 回保存',
+  vhsCoalescedGroupOther: 'このセッションで {n} 回保存',
+  vhsCoalescedOrphanOne: '{n} 件の保存は、その編集セッションの最後のバージョンにまとめられました',
+  vhsCoalescedOrphanOther: '{n} 件の保存は、その編集セッションの最後のバージョンにまとめられました',
+  vhsReleasedNoContent:
+    'このバージョンには、開いたりダウンロードしたりできる内容が残っていません。',
+  vhsErrVersionCoalesced:
+    'このバージョンは編集セッションの最後のバージョンにまとめられたため、独自の内容がありません。代わりにその最後のバージョンを開いてください。',
+  vhsErrFileChunkMissing:
+    '保存データの一部が欠落しているため、このファイルを読み取れませんでした。数分後にもう一度お試しください。それでも解決しない場合は管理者に連絡してください。',
   vhsClose: '閉じる',
   vhsCancel: 'キャンセル',
 } satisfies Record<keyof typeof zh, string>

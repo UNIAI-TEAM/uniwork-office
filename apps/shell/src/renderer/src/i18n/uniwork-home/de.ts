@@ -242,7 +242,8 @@ export const de = {
   fuRepUploadMissing: 'Die Datei hat den Speicher nie erreicht.',
   fuRepSizeMismatch: 'Die hochgeladene Größe stimmt nicht mit der Originaldatei überein.',
   fuRepUnsupportedMedia: 'Der Dateiinhalt passt nicht zu ihrem Format.',
-  fuRepStorageQuota: 'Der Speicher ist voll. Geben Sie Speicherplatz frei.',
+  fuRepStorageQuota:
+    'Der Speicher ist voll. Geben Sie Speicherplatz frei. Wenn Sie gerade eine weitere Version hochgeladen haben, versuchen Sie es in ein paar Minuten erneut.',
   fuRepNotFound: 'Die Datei wurde in diesem Upload nicht gefunden.',
   fuRepPartsInvalid: 'Die Teile der großen Datei stimmen nicht überein.',
   fuRepMissingEtag: 'Es konnte nicht bestätigt werden, dass die Datei den Speicher erreicht hat.',

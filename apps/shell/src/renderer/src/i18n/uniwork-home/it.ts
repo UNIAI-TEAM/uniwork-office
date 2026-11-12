@@ -237,7 +237,8 @@ export const it = {
   fuRepUploadMissing: 'Il file non è mai arrivato allo spazio di archiviazione.',
   fuRepSizeMismatch: 'La dimensione caricata non corrisponde a quella del file originale.',
   fuRepUnsupportedMedia: 'Il contenuto del file non corrisponde al suo formato.',
-  fuRepStorageQuota: 'Lo spazio di archiviazione è pieno. Libera spazio.',
+  fuRepStorageQuota:
+    'Lo spazio di archiviazione è pieno. Libera spazio. Se hai appena caricato un’altra versione, riprova tra qualche minuto.',
   fuRepNotFound: 'Il file non è stato trovato in questo caricamento.',
   fuRepPartsInvalid: 'Le parti del file grande non corrispondono.',
   fuRepMissingEtag: 'Impossibile confermare che il file sia arrivato allo spazio di archiviazione.',

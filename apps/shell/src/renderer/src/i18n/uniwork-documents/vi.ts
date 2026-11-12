@@ -36,7 +36,8 @@ export const vi = {
   uwErrNotFound: 'Tài liệu này không còn tồn tại.',
   uwErrDeleted: 'Tài liệu này đã bị xóa trong UniWork.',
   uwErrConflict: 'Đã có người lưu phiên bản mới hơn trước bạn.',
-  uwErrQuotaExceeded: 'Dung lượng UniWork của bạn đã đầy.',
+  uwErrQuotaExceeded:
+    'Dung lượng UniWork của bạn đã đầy. Nếu bạn vừa tải lên một phiên bản khác, thử lại sau vài phút.',
   uwErrTooLarge: 'Tệp này quá lớn để lưu vào UniWork.',
   uwErrUnsupportedFormat: 'UniWork Office chưa hỗ trợ loại tệp này.',
   uwErrEngineIncompatible: 'Phiên bản UniWork Office này không mở được tài liệu này.',

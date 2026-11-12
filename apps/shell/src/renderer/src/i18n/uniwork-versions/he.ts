@@ -48,6 +48,15 @@ export const he = {
   vhsReasonRestore: 'שחזור',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'אחר',
+  vhsCoalescedGroupOne: 'שמירות בהפעלה הזו: {n}',
+  vhsCoalescedGroupOther: 'שמירות בהפעלה הזו: {n}',
+  vhsCoalescedOrphanOne: 'שמירות שמוזגו לגרסה האחרונה של הפעלת העריכה: {n}',
+  vhsCoalescedOrphanOther: 'שמירות שמוזגו לגרסה האחרונה של הפעלת העריכה: {n}',
+  vhsReleasedNoContent: 'לגרסה הזו לא נותר תוכן לפתיחה או להורדה.',
+  vhsErrVersionCoalesced:
+    'הגרסה הזו מוזגה לגרסה האחרונה של הפעלת העריכה שלה, ולכן אין לה תוכן משלה. פתחו במקומה את הגרסה האחרונה.',
+  vhsErrFileChunkMissing:
+    'לא ניתן היה לקרוא את הקובץ הזה כי חלק מהנתונים השמורים שלו חסר. נסו שוב בעוד כמה דקות; אם הבעיה נמשכת, ספרו למנהל.',
   vhsClose: 'סגור',
   vhsCancel: 'ביטול',
 } satisfies Record<keyof typeof zh, string>

@@ -242,7 +242,8 @@ export const fr = {
   fuRepUploadMissing: 'Le fichier n’a jamais atteint le stockage.',
   fuRepSizeMismatch: 'La taille téléversée ne correspond pas à celle du fichier d’origine.',
   fuRepUnsupportedMedia: 'Le contenu du fichier ne correspond pas à son format.',
-  fuRepStorageQuota: 'Le stockage est plein. Libérez de l’espace.',
+  fuRepStorageQuota:
+    'Le stockage est plein. Libérez de l’espace. Si vous venez de téléverser une autre version, réessayez dans quelques minutes.',
   fuRepNotFound: 'Le fichier est introuvable dans ce téléversement.',
   fuRepPartsInvalid: 'Les parties du gros fichier ne correspondent pas.',
   fuRepMissingEtag: 'Impossible de confirmer que le fichier a atteint le stockage.',

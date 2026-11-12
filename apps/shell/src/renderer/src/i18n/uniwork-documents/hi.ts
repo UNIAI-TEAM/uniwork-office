@@ -36,7 +36,8 @@ export const hi = {
   uwErrNotFound: 'यह दस्तावेज़ अब मौजूद नहीं है।',
   uwErrDeleted: 'यह दस्तावेज़ UniWork में हटा दिया गया था।',
   uwErrConflict: 'किसी ने पहले नया संस्करण सहेजा है।',
-  uwErrQuotaExceeded: 'आपका UniWork स्टोरेज भर गया है।',
+  uwErrQuotaExceeded:
+    'आपका UniWork स्टोरेज भर गया है। यदि आपने अभी-अभी कोई और संस्करण अपलोड किया है, तो कुछ मिनट बाद फिर कोशिश करें।',
   uwErrTooLarge: 'यह फ़ाइल UniWork के लिए बहुत बड़ी है।',
   uwErrUnsupportedFormat: 'यह फ़ाइल प्रकार UniWork Office में समर्थित नहीं है।',
   uwErrEngineIncompatible: 'UniWork Office का यह संस्करण यह दस्तावेज़ नहीं खोल सकता।',

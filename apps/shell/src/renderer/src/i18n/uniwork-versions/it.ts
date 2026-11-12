@@ -52,6 +52,17 @@ export const it = {
   vhsReasonRestore: 'ripristino',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'altro',
+  vhsCoalescedGroupOne: '{n} salvataggio in questa sessione',
+  vhsCoalescedGroupOther: '{n} salvataggi in questa sessione',
+  vhsCoalescedOrphanOne:
+    '{n} salvataggio è stato unito all’ultima versione della sua sessione di modifica',
+  vhsCoalescedOrphanOther:
+    '{n} salvataggi sono stati uniti all’ultima versione della loro sessione di modifica',
+  vhsReleasedNoContent: 'Questa versione non ha più contenuto da aprire o scaricare.',
+  vhsErrVersionCoalesced:
+    'Questa versione è stata unita all’ultima versione della sua sessione di modifica, quindi non ha un contenuto proprio. Apri invece quell’ultima versione.',
+  vhsErrFileChunkMissing:
+    'Impossibile leggere questo file perché manca una parte dei dati archiviati. Riprova tra qualche minuto; se l’errore persiste, avvisa un amministratore.',
   vhsClose: 'Chiudi',
   vhsCancel: 'Annulla',
 } satisfies Record<keyof typeof zh, string>

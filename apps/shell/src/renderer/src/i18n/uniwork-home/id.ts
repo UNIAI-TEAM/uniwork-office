@@ -236,7 +236,8 @@ export const id = {
   fuRepUploadMissing: 'File tidak pernah sampai ke penyimpanan.',
   fuRepSizeMismatch: 'Ukuran yang diunggah tidak sama dengan file asli.',
   fuRepUnsupportedMedia: 'Isi file tidak sesuai dengan formatnya.',
-  fuRepStorageQuota: 'Penyimpanan penuh. Kosongkan ruang.',
+  fuRepStorageQuota:
+    'Penyimpanan penuh. Kosongkan ruang. Jika Anda baru saja mengunggah versi lain, coba lagi dalam beberapa menit.',
   fuRepNotFound: 'File tidak ditemukan dalam unggahan ini.',
   fuRepPartsInvalid: 'Bagian-bagian file besar tidak cocok.',
   fuRepMissingEtag: 'Tidak dapat memastikan file sudah sampai ke penyimpanan.',

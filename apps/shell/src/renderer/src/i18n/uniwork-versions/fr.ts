@@ -54,6 +54,17 @@ export const fr = {
   vhsReasonRestore: 'restauration',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'autre',
+  vhsCoalescedGroupOne: '{n} enregistrement dans cette session',
+  vhsCoalescedGroupOther: '{n} enregistrements dans cette session',
+  vhsCoalescedOrphanOne:
+    '{n} enregistrement a été fusionné dans la dernière version de sa session d’édition',
+  vhsCoalescedOrphanOther:
+    '{n} enregistrements ont été fusionnés dans la dernière version de leur session d’édition',
+  vhsReleasedNoContent: 'Cette version n’a plus de contenu à ouvrir ou à télécharger.',
+  vhsErrVersionCoalesced:
+    'Cette version a été fusionnée dans la dernière version de sa session d’édition ; elle n’a donc plus de contenu propre. Ouvrez plutôt cette dernière version.',
+  vhsErrFileChunkMissing:
+    'Impossible de lire ce fichier, car une partie de ses données stockées est manquante. Réessayez dans quelques minutes ; si l’erreur persiste, prévenez un administrateur.',
   vhsClose: 'Fermer',
   vhsCancel: 'Annuler',
 } satisfies Record<keyof typeof zh, string>

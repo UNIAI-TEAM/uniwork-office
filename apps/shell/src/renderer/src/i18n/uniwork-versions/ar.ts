@@ -49,6 +49,15 @@ export const ar = {
   vhsReasonRestore: 'استعادة',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'أخرى',
+  vhsCoalescedGroupOne: 'عمليات الحفظ في هذه الجلسة: {n}',
+  vhsCoalescedGroupOther: 'عمليات الحفظ في هذه الجلسة: {n}',
+  vhsCoalescedOrphanOne: 'عمليات الحفظ المدمجة في آخر إصدار من جلسة التحرير: {n}',
+  vhsCoalescedOrphanOther: 'عمليات الحفظ المدمجة في آخر إصدار من جلسة التحرير: {n}',
+  vhsReleasedNoContent: 'لم يعد لهذا الإصدار محتوى يمكن فتحه أو تنزيله.',
+  vhsErrVersionCoalesced:
+    'تم دمج هذا الإصدار في آخر إصدار من جلسة التحرير الخاصة به، لذلك لا يملك محتوى خاصًا به. افتح ذلك الإصدار الأخير بدلًا منه.',
+  vhsErrFileChunkMissing:
+    'تعذّرت قراءة هذا الملف لأن جزءًا من بياناته المخزّنة مفقود. حاول مرة أخرى بعد بضع دقائق، وإذا استمر الفشل فأبلغ المسؤول.',
   vhsClose: 'إغلاق',
   vhsCancel: 'إلغاء',
 } satisfies Record<keyof typeof zh, string>

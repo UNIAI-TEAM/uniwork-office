@@ -239,7 +239,8 @@ export const pl = {
   fuRepUploadMissing: 'Plik nigdy nie dotarł do magazynu.',
   fuRepSizeMismatch: 'Rozmiar przesłanego pliku nie zgadza się z oryginałem.',
   fuRepUnsupportedMedia: 'Zawartość pliku nie odpowiada jego formatowi.',
-  fuRepStorageQuota: 'Magazyn jest pełny. Zwolnij miejsce.',
+  fuRepStorageQuota:
+    'Magazyn jest pełny. Zwolnij miejsce. Jeśli przed chwilą przesłałeś inną wersję, spróbuj ponownie za kilka minut.',
   fuRepNotFound: 'Nie znaleziono pliku w tym przesłaniu.',
   fuRepPartsInvalid: 'Części dużego pliku nie zgadzają się.',
   fuRepMissingEtag: 'Nie udało się potwierdzić, że plik dotarł do magazynu.',
