@@ -14,6 +14,7 @@ import { type TabStop } from '@genoffice/docx-engine'
 
 import { SearchHighlight, type ListNumberingStorage } from './extensions'
 import { revisionDisplayState } from './marks'
+import type { RevisionDisplayMode } from './revision-view'
 import {
   affectsBorderGroup,
   borderGroupKey,
@@ -195,7 +196,23 @@ function textDecorationState(
 
 // ---- tab stop rendering extension ----
 
-const tabStopPluginKey = new PluginKey<DecorationSet>('tabStops')
+export const tabStopPluginKey = new PluginKey<DecorationSet>('tabStops')
+/** transaction meta: the lowest doc position whose paragraph changed height
+ *  after a tab decoration landed; the paginator resumes a pass from there */
+export const tabReflowMeta = 'tabReflow'
+
+/** first paragraph whose height moved since the heights were taken, if any */
+export function tabReflowStart(
+  before: ReadonlyMap<number, number>,
+  heightOf: (pos: number) => number | null,
+): number | null {
+  let from: number | null = null
+  for (const [pos, h] of before) {
+    const now = heightOf(pos)
+    if (now !== null && Math.abs(now - h) > 0.5 && (from === null || pos < from)) from = pos
+  }
+  return from
+}
 
 const TWIPS_PER_PX = 15
 /** fallback when the document's settings.xml declares no w:defaultTabStop (Word: 0.5") */
@@ -227,9 +244,13 @@ interface MeasuredTab {
    *  white-space:pre glues the tab to the word after it so a rounding
    *  overflow cannot strand the segment on the next line */
   glue?: boolean
-  /** first-line tab inside the hanging area: rendered as a box of this width
-   *  (layout px) because no tab-size can express its advance (see measureParagraph) */
+  /** rendered as a box of this width (layout px) because no tab-size can
+   *  express the advance: a first-line tab inside the hanging area, or a stop
+   *  closer than Chromium's minimum tab advance (see measureParagraph) */
   fixed?: number
+  /** stop past the right edge with only whitespace behind it: the tab opens a
+   *  new (blank) line and advances to its first stop there */
+  wrap?: boolean
 }
 
 export interface TabTargetInput {
@@ -249,15 +270,33 @@ export interface TabTargetInput {
   /** the segment can wrap on its own (spaces / CJK): Word keeps the stop and
    *  wraps a segment overflowing the edge by more than a space (probe 2026-09-17) */
   segBreakable?: boolean
+  /** nothing but whitespace follows this tab up to the line end */
+  restBlank?: boolean
 }
 
 export interface TabTarget {
   target: number
+  /** where the text after the tab logically starts: the stop itself for a
+   *  collapsed tab short of its stop (the rendered advance is only a
+   *  Chromium-safe approximation), so a following tab chains from the stop */
+  start: number
   val: TabStop['val']
   leader?: string
   collapsed: boolean
+  /** stop closer than Chromium's minimum tab advance: rendered as a box of the
+   *  exact advance (tab-size would skip to the following stop) */
+  boxed: boolean
   glue: boolean
+  /** left stop past the edge with a blank rest: Word wraps the tab on to a
+   *  new line instead of packing it against the edge (corpus 2026-10-21) */
+  wrap: boolean
 }
+
+// Word takes any stop strictly ahead of the tab, however close (probe
+// 2026-10-22: one twip short of a default or custom stop still lands on it;
+// exactly on it goes to the next). The slack only absorbs LayoutUnit (1/64 px)
+// measurement noise for text ending exactly on a stop.
+const STOP_SLACK = 1 / 32
 
 /**
  * Where a tab at `x` lands: the next custom stop, else the default grid.
@@ -289,9 +328,8 @@ export interface TabTarget {
  */
 export function resolveTabTarget(input: TabTargetInput): TabTarget {
   const { x, minAdv, segWidth, restWidth, paraW, gridPx, hangingX } = input
-  // Word takes any custom stop strictly ahead, however close: a stop nearer
-  // than the minimum advance collapses below instead of being skipped
-  let next = input.stops.find((s) => s.x > x + 0.5)
+  // a stop nearer than the minimum advance collapses below instead of being skipped
+  let next = input.stops.find((s) => s.x > x + STOP_SLACK)
   const inHang = hangingX !== undefined && x < hangingX
   if (inHang && !(next && next.x <= hangingX)) next = { x: hangingX, val: 'left' }
   let target: number
@@ -302,7 +340,8 @@ export function resolveTabTarget(input: TabTargetInput): TabTarget {
     val = next.val
     leader = next.leader
   } else if (gridPx > 0) {
-    target = (Math.floor((x + minAdv) / gridPx) + 1) * gridPx
+    // same rule for the default grid: a stop barely ahead is taken, not skipped
+    target = (Math.floor((x + STOP_SLACK) / gridPx) + 1) * gridPx
   } else {
     // defaultTabStop 0: Word advances the caret imperceptibly (tdf#168607)
     target = x + minAdv
@@ -313,6 +352,17 @@ export function resolveTabTarget(input: TabTargetInput): TabTarget {
   // no flush-right pin inside the hanging area: Word wraps the first-line
   // text on to the left indent rather than stranding the label
   const overflow = target + segWidth - (paraW - 1)
+  if (val === 'left' && target > paraW - 1 && input.restBlank)
+    return {
+      target,
+      start: target,
+      val,
+      leader,
+      collapsed: false,
+      boxed: false,
+      glue: false,
+      wrap: true,
+    }
   if (
     overflow > 0 &&
     (val !== 'left' ||
@@ -321,18 +371,24 @@ export function resolveTabTarget(input: TabTargetInput): TabTarget {
   )
     target = paraW - 1 - restWidth
   let collapsed = false
+  let boxed = false
+  const start = Math.max(x, target)
   if (target < x + minAdv) {
-    // no room before the edge: Word collapses the tab to zero width. Chromium
-    // skips a tab whose distance to its stop is under half the paragraph
-    // font's space width to the *next* stop (a whole tab-size, pushing the
-    // segment onto the next line), so the smallest safe advance is half a
-    // space plus slack (minAdv = space + 1); font-size 0 does not lift it
-    collapsed = true
-    target = x + minAdv / 2 + 0.5
+    // Chromium skips a tab whose distance to its stop is under half the
+    // paragraph font's space width to the *next* stop (a whole tab-size,
+    // pushing the segment onto the next line). A stop barely ahead is Word's
+    // landing point, so it becomes a box of the exact advance; with no room
+    // before the edge Word collapses the tab to zero width, approximated by
+    // the smallest advance Chromium honours (minAdv = space + 1)
+    if (target > x) boxed = true
+    else {
+      collapsed = true
+      target = x + minAdv / 2 + 0.5
+    }
   }
   const glue =
     !collapsed && val !== 'left' && val !== 'bar' && segWidth > 0 && restWidth <= paraW / 2
-  return { target, val, leader, collapsed, glue }
+  return { target, start, val, leader, collapsed, boxed, glue, wrap: false }
 }
 
 /**
@@ -427,6 +483,9 @@ const MEASURE_RETRY_MAX = 10
  */
 const MEASURE_SIGS_MAX = 8
 
+/** times the tab measurer gave up converging (read by the pagination debug snapshot) */
+export const tabLayoutDiag = { freezes: 0 }
+
 class TabLayoutView {
   private lastSig = ''
   private seenSigs = new Set<string>()
@@ -435,6 +494,8 @@ class TabLayoutView {
   private retries = 0
   private resizeObserver?: ResizeObserver
   private lastDomWidth = -1
+  /** tab paragraph heights before the last decoration dispatch */
+  private heightsBefore = new Map<number, number>()
   // font swaps change text metrics, which shifts every tab's start x
   private onFontsLoaded = () => {
     this.invalidate()
@@ -483,8 +544,23 @@ class TabLayoutView {
       tabStopPluginKey.getState(view.state) === tabStopPluginKey.getState(prevState)
     ) {
       return
+    } else {
+      this.signalReflow()
     }
     this.measure()
+  }
+
+  private paraHeight(pos: number): number | null {
+    const el = this.view.nodeDOM(pos)
+    return el instanceof HTMLElement ? el.getBoundingClientRect().height : null
+  }
+
+  /** decorations are not doc updates: tell the paginator when they re-wrapped a paragraph */
+  private signalReflow() {
+    const from = tabReflowStart(this.heightsBefore, (pos) => this.paraHeight(pos))
+    if (from === null) return
+    const { view } = this
+    view.dispatch(view.state.tr.setMeta(tabReflowMeta, from).setMeta('addToHistory', false))
   }
 
   destroy() {
@@ -529,6 +605,12 @@ class TabLayoutView {
       return false
     })
 
+    this.heightsBefore = new Map()
+    for (const para of paras) {
+      const h = this.paraHeight(para.pos)
+      if (h !== null) this.heightsBefore.set(para.pos, h)
+    }
+
     const paraRanges: Array<{ from: number; to: number }> = []
     const tabs: MeasuredTab[] = []
     let measurable = false
@@ -562,6 +644,7 @@ class TabLayoutView {
       // oscillation: keep the current decorations until an edit/resize/font
       // load invalidates, instead of dispatching (and recursing) forever
       this.frozen = true
+      tabLayoutDiag.freezes++
       console.warn('[docs] tab-stop layout did not converge; keeping current tab decorations')
       return
     }
@@ -576,17 +659,25 @@ class TabLayoutView {
     for (const r of paraRanges)
       decos.push(Decoration.node(r.from, r.to, { class: 'has-tab-stops' }))
     for (const t of tabs) {
-      const leader = t.leader && t.leader !== 'none' ? ` doc-tab-leader-${t.leader}` : ''
+      // the wrap's forced break and a glyph leader share ::before; the blank
+      // line has no text to lead to, so the break wins
+      const leader = t.leader && t.leader !== 'none' && !t.wrap ? ` doc-tab-leader-${t.leader}` : ''
       const underline = t.underlined ? ' doc-tab-underline' : ''
       const fixed = t.fixed !== undefined
       const collapse = t.collapsed && !fixed ? ' doc-tab-collapse' : ''
       const glue = t.glue && !fixed ? ' doc-tab-glue' : ''
       const box = fixed ? ' doc-tab-fixed' : ''
+      const wrap = t.wrap ? ' doc-tab-wrap' : ''
       decos.push(
-        Decoration.inline(t.pos, t.pos + 1, {
-          class: `doc-tab${leader}${underline}${collapse}${glue}${box}`,
-          style: fixed ? `width:${t.fixed}px` : `tab-size:${t.cssSize}px`,
-        }),
+        Decoration.inline(
+          t.pos,
+          t.pos + 1,
+          {
+            class: `doc-tab${leader}${underline}${collapse}${glue}${box}${wrap}`,
+            style: fixed ? `width:${t.fixed}px` : `tab-size:${t.cssSize}px`,
+          },
+          { wrap: t.wrap },
+        ),
       )
     }
     view.dispatch(view.state.tr.setMeta(tabStopPluginKey, decos).setMeta('addToHistory', false))
@@ -706,6 +797,7 @@ class TabLayoutView {
     // re-measure never reaches a fixed point.
     const endsAtBreak: boolean[] = []
     const segBreakable: boolean[] = []
+    const restBlank: boolean[] = []
     const segWidths = tabPositions.map((tabPos, i) => {
       const segStart = tabPos + 1
       const nextTab = i + 1 < tabPositions.length ? tabPositions[i + 1] : paraEnd
@@ -713,6 +805,9 @@ class TabLayoutView {
       const nextBreak = breakPositions.find((b) => b >= segStart && b < nextTab)
       endsAtBreak[i] = nextBreak !== undefined
       const segEnd = nextBreak ?? nextTab
+      const lineEnd = breakPositions.find((b) => b >= segStart) ?? paraEnd
+      restBlank[i] =
+        node.textBetween(segStart - pos - 1, lineEnd - pos - 1, undefined, '\ufffc').trim() === ''
       if (segEnd <= segStart) return 0
       segBreakable[i] = SEG_BREAKABLE_RE.test(
         node.textBetween(segStart - pos - 1, segEnd - pos - 1).trim(),
@@ -741,30 +836,35 @@ class TabLayoutView {
     // a higher multiple once the line unwraps — a wrap/unwrap 2-cycle the
     // signature guard then freezes mid-flight). The chain removes that
     // dependence; a real line break between tabs resets to the measured x.
+    const current = tabStopPluginKey.getState(view.state)
     let prevLine: { top: number; bottom: number } | null = null
     let prevEnd = 0
     for (let i = 0; i < tabPositions.length; i++) {
       const tabPos = tabPositions[i]
+      // a tab this plugin already wrapped sits at the start of its own line;
+      // its Word position is the end of the text before it (previous line),
+      // or the wrap decision would flip on every re-measure
+      const wrapped = current?.find(tabPos, tabPos + 1).some((d) => d.spec.wrap === true)
       let coords: { left: number; top: number; bottom: number }
       try {
-        coords = view.coordsAtPos(tabPos, 1)
+        coords = view.coordsAtPos(tabPos, wrapped ? -1 : 1)
         // coordsAtPos measures whitespace with an empty-range caret rect, which
         // drifts inside line-height:0 runs (doc-ws-run); the glyph's own rect is exact
-        const glyphLeft = tabGlyphLeft(view, tabPos)
+        const glyphLeft = wrapped ? null : tabGlyphLeft(view, tabPos)
         if (glyphLeft !== null) coords = { ...coords, left: glyphLeft }
       } catch {
         continue
       }
       const measuredX = (coords.left - alignShiftAt(coords) - originX) / zoom
       const sameLine = prevLine != null && sameVisualLine(coords, prevLine)
-      const x = sameLine ? prevEnd : measuredX
+      let x = sameLine ? prevEnd : measuredX
       prevLine = { top: coords.top, bottom: coords.bottom }
 
       const segWidth = segWidths[i]
       const gridTwips = this.storage.defaultTabStopTwips ?? DEFAULT_TAB_TWIPS
       // first-line tab inside the hanging area (negative text-indent)
       const inHang = textIndent < 0 && x < contentEdge
-      const { target, leader, collapsed, glue } = resolveTabTarget({
+      const tabInput = {
         x,
         minAdv,
         segWidth,
@@ -774,16 +874,30 @@ class TabLayoutView {
         gridPx: gridTwips > 0 ? gridTwips / TWIPS_PER_PX : 0,
         hangingX: inHang ? contentEdge : undefined,
         segBreakable: segBreakable[i],
-      })
+        // a tab already at its line start has nowhere to wrap to
+        restBlank: restBlank[i] && x > contentEdge + STOP_SLACK,
+      }
+      let resolved = resolveTabTarget(tabInput)
+      const wrap = resolved.wrap
+      // the wrapped tab resolves again from the start of its new line, and
+      // its CSS size is relative to that line too
+      if (wrap) {
+        resolved = resolveTabTarget({ ...tabInput, x: contentEdge, restBlank: false })
+        x = contentEdge
+      }
+      const { target, start, leader, collapsed, boxed, glue } = resolved
       // convert the Word-space target to a CSS tab-size: the next multiple of
       // it past the tab's position must be the target itself, so it needs to
       // stay greater than the tab's content-edge-relative x (by the minimum
       // rendered advance, or Chromium skips to the following multiple).
       // Chromium counts 0 (the content edge) as a multiple too, so a tab left
       // of the edge can neither cross it nor reach an arbitrary point before
-      // it; such tabs become a box of the exact advance instead
+      // it; such tabs become a box of the exact advance instead. The box is
+      // sized to the stop reached (start), not the collapsed approximation:
+      // an inline-block width has no multiple to skip to, and a shorter box
+      // would leave the next tab short of the edge, on Chromium's 0 multiple
       const cssSize = inHang ? 0 : Math.max(target - contentEdge, x - contentEdge + 0.6, 0.5)
-      prevEnd = target + segWidth
+      prevEnd = start + segWidth
       // 0.5px rounding damps measure→decorate→re-measure oscillation
       out.push({
         pos: tabPos,
@@ -792,7 +906,12 @@ class TabLayoutView {
         underlined: tabUnderlined.get(tabPos),
         collapsed,
         glue,
-        fixed: inHang ? Math.round((target - x) * 2) / 2 : undefined,
+        wrap,
+        fixed: inHang
+          ? Math.round((start - x) * 2) / 2
+          : boxed
+            ? Math.round((target - x) * 64) / 64
+            : undefined,
       })
     }
     return out
@@ -1178,9 +1297,21 @@ export const MoveRevisionExtension = Extension.create({
           doc.forEach((node, offset) => {
             const rev = node.attrs?.moveRevision as string | null
             if (!rev) return
+            // the paragraph attr only says "moved"; the reviewer is on its run
+            // marks, and run marks that name their move render themselves
+            let author = ''
+            let runLevel = false
+            node.descendants((child) => {
+              if (!child.isText) return
+              const m = child.marks.find((x) => x.type.name === (rev === 'from' ? 'del' : 'ins'))
+              if (m?.attrs.move) runLevel = true
+              if (m && !author) author = String(m.attrs.author ?? '')
+            })
+            if (runLevel) return
             decos.push(
               Decoration.node(offset, offset + node.nodeSize, {
                 'data-move-revision': rev,
+                'data-rev-author': author,
                 class: rev === 'from' ? 'has-move-from' : 'has-move-to',
               }),
             )
@@ -1225,6 +1356,32 @@ export function paraDeletionClass(node: {
   return !visible && node.childCount > 0 ? 'doc-para-content-del' : null
 }
 
+/**
+ * No Markup / Simple Markup show the final text: a paragraph whose mark is a
+ * pending deletion runs on into the next one (Word joins them). Returns, per
+ * top-level child, the join role classes to add (display-time only).
+ */
+export function paraJoinClasses(
+  doc: ProseMirrorNode,
+  mode: RevisionDisplayMode,
+): Map<number, string> {
+  const out = new Map<number, string>()
+  if (mode !== 'none' && mode !== 'simple') return out
+  const collapsed = (n: ProseMirrorNode) =>
+    !!paraDeletionClass(n)?.includes('doc-para-del-collapse')
+  for (let i = 0; i + 1 < doc.childCount; i++) {
+    const head = doc.child(i)
+    if (!head.isTextblock || !head.attrs?.paraMarkDel || collapsed(head)) continue
+    // fully deleted paragraphs in between are hidden: the tail is the next live one
+    let j = i + 1
+    while (j < doc.childCount && doc.child(j).isTextblock && collapsed(doc.child(j))) j++
+    if (j >= doc.childCount || !doc.child(j).isTextblock) continue
+    out.set(i, `${out.get(i) ?? ''} doc-para-join-head`.trim())
+    out.set(j, 'doc-para-join-tail')
+  }
+  return out
+}
+
 export const ParaMarkDelExtension = Extension.create({
   name: 'paraMarkDel',
   addProseMirrorPlugins() {
@@ -1233,9 +1390,10 @@ export const ParaMarkDelExtension = Extension.create({
         key: paraMarkDelPluginKey,
         build(doc) {
           const decos: Decoration[] = []
-          doc.forEach((node, offset) => {
+          const joins = paraJoinClasses(doc, revisionDisplayState.mode)
+          doc.forEach((node, offset, index) => {
             if (!node.isTextblock && !node.attrs?.paraMarkDel) return
-            const cls = paraDeletionClass(node)
+            const cls = [paraDeletionClass(node), joins.get(index)].filter(Boolean).join(' ')
             if (cls) decos.push(Decoration.node(offset, offset + node.nodeSize, { class: cls }))
           })
           return decos
@@ -1243,6 +1401,7 @@ export const ParaMarkDelExtension = Extension.create({
         needsRecompute: (node) =>
           !!node.attrs?.paraMarkDel ||
           (node.isTextblock && node.childCount > 0 && paraDeletionClass(node) !== null),
+        signature: () => revisionDisplayState.mode,
       }),
     ]
   },

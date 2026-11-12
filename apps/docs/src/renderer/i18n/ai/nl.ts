@@ -225,4 +225,6 @@ export const nl = {
   aiMindMapReset: 'Weergave opnieuw instellen',
   aiMindMapExpand: 'Tak uitklappen',
   aiMindMapCollapse: 'Tak inklappen',
+  aiMindMapExportSvg: 'SVG exporteren',
+  aiMindMapInsert: 'In document invoegen',
 } satisfies Record<keyof typeof zh, string>

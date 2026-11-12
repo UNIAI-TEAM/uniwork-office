@@ -220,3 +220,4 @@ export {
   askUniText,
   type AskUniStringKey,
 } from './strings-ask-uni'
+export { useScrollWindow } from './scroll-window'

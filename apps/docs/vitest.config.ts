@@ -12,10 +12,17 @@ export default defineConfig({
       '@genoffice/docx-engine/zip-splice': local('../../packages/docx-engine/src/zip-splice.ts'),
       '@genoffice/docx-engine/lazy-media': local('../../packages/docx-engine/src/lazy-media.ts'),
       '@genoffice/docx-engine': local('../../packages/docx-engine/src/index.ts'),
+      '@genoffice/font-metrics/resolve': local('../../packages/font-metrics/src/resolve.ts'),
+      '@genoffice/font-metrics/word-faces.json': local(
+        '../../packages/font-metrics/word-faces.json',
+      ),
       '@genoffice/font-metrics': local('../../packages/font-metrics/src/index.ts'),
       // subpath before the bare name: string aliases are prefix replacements
       '@genoffice/electron-utils/headless-export': local(
         '../../packages/electron-utils/src/headless-export.ts',
+      ),
+      '@genoffice/electron-utils/print-job': local(
+        '../../packages/electron-utils/src/print-job.ts',
       ),
       '@genoffice/electron-utils/atomic-write': local(
         '../../packages/electron-utils/src/atomic-write.ts',
@@ -78,6 +85,8 @@ export default defineConfig({
   },
   test: {
     include: ['tests/**/*.test.ts'],
+    // the engine's display-only `effective` keys stay out of saved-model toEqual
+    setupFiles: [local('../../packages/docx-engine/tests/setup-equality.ts')],
     environment: 'jsdom',
     testTimeout: 20000,
   },

@@ -218,4 +218,6 @@ export const ar = {
   aiMindMapReset: 'إعادة ضبط العرض',
   aiMindMapExpand: 'توسيع الفرع',
   aiMindMapCollapse: 'طي الفرع',
+  aiMindMapExportSvg: 'تصدير SVG',
+  aiMindMapInsert: 'إدراج في المستند',
 } satisfies Record<keyof typeof zh, string>

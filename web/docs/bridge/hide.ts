@@ -91,6 +91,8 @@ export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.f
   print: false,
   exportPdf: false,
   exportHtml: false,
+  exportMarkdown: false,
+  exportImages: false,
   readOnlyProfile: false,
 })
 

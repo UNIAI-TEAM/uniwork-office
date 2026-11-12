@@ -99,6 +99,7 @@ import { currentDocGeneration } from '../file-actions'
 import { createFilesSkill } from './files-skill'
 import { boundChatHistory } from './chat-retention'
 import { createElectronTransport } from './transport'
+import { AI_REVISION_AUTHOR } from './revision-author'
 import { workedStepsLabel } from './worked-steps'
 import { docHasAiMarks } from '../editor/ai-marker'
 import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
@@ -414,8 +415,7 @@ function SentAttachments({
   )
 }
 
-/** author name on AI-generated tracked revisions (accept/reject via Review) */
-export const AI_REVISION_AUTHOR = 'AI Assistant'
+export { AI_REVISION_AUTHOR }
 
 interface AiPanelProps {
   editor: Editor

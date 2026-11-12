@@ -1,6 +1,8 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Lang } from '@genoffice/i18n'
+
+export type ConvertFormat = 'pdf' | 'html' | 'md' | 'images'
 import type {
   ChangeEvent,
   KeyboardEvent as ReactKeyboardEvent,
@@ -44,6 +46,7 @@ import {
   useDismissablePopover,
   useRibbonCollapse,
   UniAiMark,
+  useScrollWindow,
 } from '@genoffice/ui'
 import { HIGHLIGHT_CSS } from '../editor/extensions'
 import { applyCase, type CaseMode } from '../editor/case-transform'
@@ -80,6 +83,7 @@ import {
   deleteTableColumn,
   distributeRowsEvenly,
   enterSelectedTable,
+  inTableOrSelected,
   selectTablePart,
   tableCellsSelection,
   setCellAlignment,
@@ -148,6 +152,7 @@ import {
 } from '../font-sizes'
 import { useSystemFontFamilies } from '../system-fonts'
 import { cssFontFamily } from '../line-metrics'
+import type { RevisionFilter, RevisionScope } from '../editor/revision-filters'
 import {
   DesignTab,
   DrawTab,
@@ -159,12 +164,14 @@ import {
   ReviewTab,
   ViewTab,
   type InkPenSettings,
+  type BalloonMode,
   type RevisionDisplayMode,
   type ViewMode,
   applyGalleryStyle,
   setParaAttrs,
   toggleParaSpace as toggleParaSpaceImpl,
 } from './ribbon-tabs'
+import type { CommentsMode } from './comments-mode'
 import { WRAP_OPTIONS } from './ContextMenu'
 import { CropDialog, CutoutDialog } from './PictureDialogs'
 import {
@@ -187,6 +194,7 @@ import {
   IconBorderTop,
   IconBullets,
   IconCaret,
+  IconConvert,
   IconColDelete,
   IconColInsertLeft,
   IconColInsertRight,
@@ -237,6 +245,7 @@ import {
   IconBringToFront,
   IconSendBackward,
   IconSendToBack,
+  IconComments,
 } from './icons'
 interface RibbonProps {
   /** App keyboard shortcuts reuse ribbon closures through here (font-size stepping keeps its coalescing) */
@@ -287,6 +296,7 @@ interface RibbonProps {
   onSaveCopy?: () => void
   onExportPdf?: () => void
   onPrint?: () => void
+  onConvert: (format: ConvertFormat) => void
   showAi: boolean
   onToggleAi: () => void
   section: SectionSettings | null
@@ -331,7 +341,7 @@ interface RibbonProps {
   zoom: number
   onZoom: (zoom: number) => void
   /** compute zoom from the current window size (Word: page width / whole page) */
-  onZoomFit: (mode: 'width' | 'page') => void
+  onZoomFit: (mode: 'width' | 'page' | 'multi') => void
   onZoomDialog: () => void
   darkPage: boolean
   onDarkPage: (v: boolean) => void
@@ -365,6 +375,11 @@ interface RibbonProps {
   openCommentCount: number
   resolvedCommentCount: number
   onShowComments: () => void
+  /** Word-style top-right cluster: Show Comments toggle with its Contextual / List caret */
+  showComments: boolean
+  onToggleComments: () => void
+  commentsMode: CommentsMode
+  onCommentsMode: (mode: CommentsMode) => void
   /** Review → comments / revisions / compare / protection */
   canComment: boolean
   onNewComment: () => void
@@ -379,10 +394,18 @@ interface RibbonProps {
   onSpellcheck: (on: boolean) => void
   revisionDisplay: RevisionDisplayMode
   onRevisionDisplay: (mode: RevisionDisplayMode) => void
+  balloonMode: BalloonMode
+  onBalloonMode: (mode: BalloonMode) => void
+  onTrackChangesOptions: () => void
   revisionCount: number
-  onAcceptRevision: (all: boolean) => void
-  onRejectRevision: (all: boolean) => void
+  onAcceptRevision: (scope: RevisionScope) => void
+  onRejectRevision: (scope: RevisionScope) => void
   onGotoRevision: (dir: 1 | -1) => void
+  revisionFilter: RevisionFilter
+  onRevisionFilter: (filter: RevisionFilter) => void
+  revisionAuthors: string[]
+  showReviewPane: boolean
+  onToggleReviewPane: () => void
   isProtected: boolean
   /** comments restriction: adding comments stays allowed although the body is read-only */
   commentsAllowed: boolean
@@ -725,6 +748,17 @@ export const PICTURE_TWIPS_MAX = 31680
 export const clampPictureTwips = (twips: number) =>
   Math.min(PICTURE_TWIPS_MAX, Math.max(PICTURE_TWIPS_MIN, twips))
 
+/** Word's top-right document mode: Viewing wins over Reviewing (read mode hides editing state) */
+export type DocMode = 'editing' | 'reviewing' | 'viewing'
+export const docModeOf = (readMode: boolean, trackChanges: boolean): DocMode =>
+  readMode ? 'viewing' : trackChanges ? 'reviewing' : 'editing'
+
+const DOC_MODE_KEYS = {
+  editing: 'ribbonModeEditing',
+  reviewing: 'ribbonModeReviewing',
+  viewing: 'ribbonModeViewing',
+} as const
+
 /** swallows every command when the document is read-only (protected / read mode) */
 const NOOP_CHAIN = new Proxy(
   {},
@@ -834,6 +868,7 @@ function RibbonInner({
   onSaveCopy,
   onExportPdf,
   onPrint,
+  onConvert,
   showAi,
   onToggleAi,
   section,
@@ -896,6 +931,10 @@ function RibbonInner({
   openCommentCount,
   resolvedCommentCount,
   onShowComments,
+  showComments,
+  onToggleComments,
+  commentsMode,
+  onCommentsMode,
   canComment,
   onNewComment,
   commentAtCaret,
@@ -908,10 +947,18 @@ function RibbonInner({
   onSpellcheck,
   revisionDisplay,
   onRevisionDisplay,
+  balloonMode,
+  onBalloonMode,
+  onTrackChangesOptions,
   revisionCount,
   onAcceptRevision,
   onRejectRevision,
   onGotoRevision,
+  revisionFilter,
+  onRevisionFilter,
+  revisionAuthors,
+  showReviewPane,
+  onToggleReviewPane,
   isProtected,
   commentsAllowed,
   trackChangesForced,
@@ -1061,6 +1108,19 @@ function RibbonInner({
   // read-only (Restrict Editing / Read Mode): every edit command is fenced here,
   // button disabled states are only the visual layer on top
   const canEdit = hasDoc && fs.editable
+  const docMode = docModeOf(readMode, trackChanges)
+  const applyDocMode = (m: DocMode) => {
+    if (m === 'viewing') {
+      onReadMode(true)
+      return
+    }
+    if (readMode) onReadMode(false)
+    if (m === 'reviewing') {
+      if (!trackChanges) onTrackChanges(true)
+    } else if (trackChanges && !trackChangesForced) {
+      onTrackChanges(false)
+    }
+  }
   const chain = () => (canEdit ? ed.chain().focus() : NOOP_CHAIN)
   const inTable = fs.inTable
 
@@ -1434,6 +1494,26 @@ function RibbonInner({
     )
   }
 
+  // Word's Home ▸ Borders is the table gallery whenever the selection sits in a
+  // table: the lines go on the selected cells, not on their paragraphs. A
+  // focused textbox / header / footer sub-editor is never "in a table".
+  const HOME_BORDER_CELL_MODE: Record<string, TableBorderMode> = {
+    b: 'bottom',
+    t: 'top',
+    l: 'left',
+    r: 'right',
+    tblr: 'all',
+    none: 'none',
+  }
+  const applyHomeBorders = (borders: string | null) => {
+    if (!sub && inTableOrSelected(editor.state)) {
+      applyCellBorders(HOME_BORDER_CELL_MODE[borders ?? 'none'])
+      setDropdown(null)
+      return
+    }
+    setParaAttr({ borders })
+  }
+
   /** Set row height for selected rows (twips; null = auto) */
   const applyRowHeight = (height: number | null) => {
     if (!canEdit) return
@@ -1579,6 +1659,7 @@ function RibbonInner({
     ...fontFamilies.map((name) => ({ key: `b:${name}`, name, section: 'b' as const })),
     ...systemFontFamilies.map((name) => ({ key: `s:${name}`, name, section: 's' as const })),
   ]
+  const fontMenuWindow = useScrollWindow(dropdown === 'fontFamily')
   const openFontMenu = () => {
     if (dropdown === 'fontFamily') return
     loadSystemFonts()
@@ -2244,6 +2325,30 @@ function RibbonInner({
     </button>
   )
 
+  // each target needs the file system or the print engine: the web frame hides what its host
+  // did not grant (cap keys exportPdf / exportHtml / exportMarkdown / exportImages)
+  const convertItems = (
+    [
+      ['pdf', 'ribbonConvertPdf', 'exportPdf'],
+      ['html', 'ribbonConvertHtml', 'exportHtml'],
+      ['md', 'ribbonConvertMarkdown', 'exportMarkdown'],
+      ['images', 'ribbonConvertImages', 'exportImages'],
+    ] as const
+  )
+    .filter(([, , capKey]) => cap(capKey))
+    .map(([format, key]) => (
+      <button
+        key={format}
+        disabled={!hasDoc}
+        onClick={() => {
+          setDropdown(null)
+          onConvert(format)
+        }}
+      >
+        {t(key)}
+      </button>
+    ))
+
   return (
     <div
       className={`ribbon ${collapse.rootClass}`}
@@ -2336,6 +2441,12 @@ function RibbonInner({
                     {t('appFilePrint')} <FileMenuKey command="print" />
                   </button>
                 )}
+                {convertItems.length > 0 && (
+                  <>
+                    <div className="file-menu-sep" />
+                    {convertItems}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -2423,6 +2534,88 @@ function RibbonInner({
             </button>
           ))}
         <span className="ribbon-tabs-spacer" />
+        <div className="ribbon-mode-cluster">
+          <div className="ribbon-mode-split">
+            <button
+              type="button"
+              className={`ribbon-mode-btn ${showComments ? 'on' : ''}`}
+              disabled={!hasDoc}
+              aria-pressed={showComments}
+              data-tip={t('ribbonShowCommentsTip', { count: commentCount })}
+              onClick={onToggleComments}
+            >
+              <IconComments size={14} />
+              <span className="ribbon-mode-text">{t('ribbonShowComments')}</span>
+            </button>
+            <div className="mode-menu-wrap">
+              <button
+                type="button"
+                className={`ribbon-mode-btn ${dropdown === 'commentsMode' ? 'open' : ''}`}
+                disabled={!hasDoc}
+                aria-label={t('ribbonShowComments')}
+                aria-haspopup="menu"
+                aria-expanded={dropdown === 'commentsMode'}
+                onClick={() => setDropdown((v) => (v === 'commentsMode' ? null : 'commentsMode'))}
+              >
+                <span className="ribbon-mode-caret">▾</span>
+              </button>
+              {dropdown === 'commentsMode' && (
+                <div data-rb-panel="" className="file-menu mode-menu" role="menu">
+                  {(['contextual', 'list'] as const).map((m) => (
+                    <button
+                      key={m}
+                      role="menuitemradio"
+                      aria-checked={commentsMode === m}
+                      onClick={() => {
+                        setDropdown(null)
+                        onCommentsMode(m)
+                      }}
+                    >
+                      <span className="mode-menu-check">{commentsMode === m ? '✓' : ''}</span>
+                      {t(m === 'list' ? 'ribbonShowCommentsList' : 'ribbonShowCommentsContextual')}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="mode-menu-wrap">
+            <button
+              type="button"
+              className={`ribbon-mode-btn ${dropdown === 'docMode' ? 'open' : ''}`}
+              disabled={!hasDoc}
+              onClick={() => setDropdown((v) => (v === 'docMode' ? null : 'docMode'))}
+            >
+              <span className="ribbon-mode-text">{t(DOC_MODE_KEYS[docMode])}</span>
+              <span className="ribbon-mode-caret">▾</span>
+            </button>
+            {dropdown === 'docMode' && (
+              <div data-rb-panel="" className="file-menu mode-menu">
+                {(['editing', 'reviewing', 'viewing'] as const).map((m) => (
+                  <button
+                    key={m}
+                    // Editing needs the recorder off (impossible under forced track changes);
+                    // Reviewing records changes, so it needs an editable document
+                    disabled={
+                      m === 'editing'
+                        ? !fs.editable || trackChangesForced
+                        : m === 'reviewing'
+                          ? !fs.editable
+                          : false
+                    }
+                    onClick={() => {
+                      setDropdown(null)
+                      applyDocMode(m)
+                    }}
+                  >
+                    <span className="mode-menu-check">{docMode === m ? '✓' : ''}</span>
+                    {t(DOC_MODE_KEYS[m])}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
         {trailingActions}
       </div>
 
@@ -3618,6 +3811,38 @@ function RibbonInner({
               </>
             )}
 
+            {convertItems.length > 0 && (
+              <>
+                <div className="ribbon-group">
+                  <div className="ribbon-group-items">
+                    <div className="rb-split-wrap">
+                      <button
+                        className={`rb-big${dropdown === 'convert' ? ' active' : ''}`}
+                        disabled={!hasDoc}
+                        data-tip={t('ribbonConvertTip')}
+                        aria-expanded={dropdown === 'convert'}
+                        onClick={() => setDropdown((v) => (v === 'convert' ? null : 'convert'))}
+                      >
+                        <span className="rb-big-icon">
+                          <IconConvert size={22} />
+                          <IconCaret />
+                        </span>
+                        <span>{t('ribbonConvert')}</span>
+                      </button>
+                      {dropdown === 'convert' && (
+                        <div data-rb-panel="" className="spacing-menu paste-menu" role="menu">
+                          {convertItems}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="ribbon-group-label">{t('ribbonConvert')}</div>
+                </div>
+
+                <div className="ribbon-sep" />
+              </>
+            )}
+
             {/* ---- Clipboard ---- */}
             <div className="ribbon-group">
               <div className="ribbon-group-items">
@@ -3777,16 +4002,22 @@ function RibbonInner({
                       <IconCaret />
                     </button>
                     {dropdown === 'fontFamily' && (
-                      <div data-rb-panel="" className="spacing-menu rb-font-family-menu">
+                      <div
+                        data-rb-panel=""
+                        className="spacing-menu rb-font-family-menu"
+                        ref={fontMenuWindow.ref}
+                        onScroll={fontMenuWindow.onScroll}
+                      >
                         {(['b', 's'] as const).map((section) => {
                           const items = fontMenuItems.filter((it) => it.section === section)
                           if (items.length === 0) return null
+                          const offset = section === 'b' ? 0 : fontFamilies.length
                           return (
                             <div key={section}>
                               <div className="rb-menu-group-label">
                                 {t(section === 'b' ? 'ribbonFontsCommon' : 'ribbonFontsSystem')}
                               </div>
-                              {items.map((it) => (
+                              {items.map((it, i) => (
                                 <button
                                   key={it.key}
                                   data-font-key={it.key}
@@ -3795,9 +4026,11 @@ function RibbonInner({
                                   }`}
                                   // symbol fonts would render their own name as pictographs
                                   style={{
-                                    fontFamily: isSymbolFontFamily(it.name)
-                                      ? undefined
-                                      : cssFontFamily(it.name),
+                                    fontFamily:
+                                      isSymbolFontFamily(it.name) ||
+                                      !fontMenuWindow.inWindow(offset + i)
+                                        ? undefined
+                                        : cssFontFamily(it.name),
                                   }}
                                   onClick={() => setFont(it.name)}
                                 >
@@ -4505,22 +4738,22 @@ function RibbonInner({
                     </button>
                     {dropdown === 'borders' && (
                       <div data-rb-panel="" className="spacing-menu borders-menu">
-                        <button onClick={() => setParaAttr({ borders: 'b' })}>
+                        <button onClick={() => applyHomeBorders('b')}>
                           {t('ribbonBorderBottom')}
                         </button>
-                        <button onClick={() => setParaAttr({ borders: 't' })}>
+                        <button onClick={() => applyHomeBorders('t')}>
                           {t('ribbonBorderTop')}
                         </button>
-                        <button onClick={() => setParaAttr({ borders: 'l' })}>
+                        <button onClick={() => applyHomeBorders('l')}>
                           {t('ribbonBorderLeft')}
                         </button>
-                        <button onClick={() => setParaAttr({ borders: 'r' })}>
+                        <button onClick={() => applyHomeBorders('r')}>
                           {t('ribbonBorderRight')}
                         </button>
-                        <button onClick={() => setParaAttr({ borders: 'tblr' })}>
+                        <button onClick={() => applyHomeBorders('tblr')}>
                           {t('ribbonBorderBox')}
                         </button>
-                        <button onClick={() => setParaAttr({ borders: null })}>
+                        <button onClick={() => applyHomeBorders(null)}>
                           {t('ribbonNoBorders')}
                         </button>
                       </div>
@@ -4726,10 +4959,18 @@ function RibbonInner({
             onSpellcheck={onSpellcheck}
             revisionDisplay={revisionDisplay}
             onRevisionDisplay={onRevisionDisplay}
+            balloonMode={balloonMode}
+            onBalloonMode={onBalloonMode}
+            onTrackChangesOptions={onTrackChangesOptions}
             revisionCount={revisionCount}
             onAcceptRevision={onAcceptRevision}
             onRejectRevision={onRejectRevision}
             onGotoRevision={onGotoRevision}
+            revisionFilter={revisionFilter}
+            onRevisionFilter={onRevisionFilter}
+            revisionAuthors={revisionAuthors}
+            showReviewPane={showReviewPane}
+            onToggleReviewPane={onToggleReviewPane}
             isProtected={isProtected}
             commentsAllowed={commentsAllowed}
             trackChangesForced={trackChangesForced}
