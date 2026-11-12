@@ -4,7 +4,7 @@
  * placeholder (lstStyle defRPr default colors) to avoid a circular dependency.
  */
 import { type Theme, resolveSchemeColor, sysColorHex } from './theme'
-import { asXmlNode, type XmlNode } from './xml-utils'
+import { asXmlNode, percentFraction, srgbHexValue, type XmlNode } from './xml-utils'
 
 /**
  * Resolve a color node + modifiers: srgbClr/schemeClr/sysClr, supporting alpha
@@ -23,9 +23,9 @@ export function resolveColorNode(
     mods = asXmlNode(n['a:srgbClr'])
     // A missing val must stay unresolved: '#' + String(undefined) is the truthy string
     // '#UNDEFINED', which hexToRgb then reinterprets as an authored colour (an empty
-    // val yields '#000000'). Unresolvable is what the sibling branches already return.
-    const raw = String(mods['@_val'] ?? '')
-    if (raw) base = '#' + raw.toUpperCase()
+    // val yields '#000000'). A val that is not six hex digits is the same trap.
+    // Unresolvable is what the sibling branches already return.
+    base = srgbHexValue(mods['@_val'])
   } else if (n['a:schemeClr']) {
     mods = asXmlNode(n['a:schemeClr'])
     base = resolveSchemeColor(String(mods['@_val']), theme, phClr)
@@ -242,12 +242,12 @@ const PRESET_COLORS_LOWER = new Map<string, string>(
   Object.entries(PRESET_COLORS).map(([k, v]) => [k.toLowerCase(), v]),
 )
 
-/** Apply lumMod/lumOff/tint/shade/satMod/alpha modifiers (percentages, in units of 1/1000%). */
+/** Apply lumMod/lumOff/tint/shade/satMod/alpha modifiers (ST_Percentage: 1/1000 % or "50%"). */
 export function applyColorMods(hex: string, mods: XmlNode | undefined): string {
   let { r, g, b } = hexToRgb(hex)
   const pct = (k: string): number | undefined => {
     const v = asXmlNode(mods?.[k])['@_val']
-    return v != null ? (parseInt(String(v), 10) || 0) / 100000 : undefined
+    return v != null ? (percentFraction(v) ?? 0) : undefined
   }
   const lumMod = pct('a:lumMod')
   const lumOff = pct('a:lumOff')
@@ -309,10 +309,10 @@ export function applyColorMods(hex: string, mods: XmlNode | undefined): string {
       .toUpperCase()
   const alpha = pct('a:alpha')
   if (alpha != null && alpha < 1) {
-    out += Math.round(alpha * 255)
-      .toString(16)
-      .padStart(2, '0')
-      .toUpperCase()
+    // Broken input can carry a negative (or non-finite) alpha; clamping keeps the
+    // suffix two hex digits, where Math.round(-2.5 * 255) used to write "-27D".
+    const byte = Math.max(0, Math.min(255, Math.round(alpha * 255)))
+    out += byte.toString(16).padStart(2, '0').toUpperCase()
   }
   return out
 }

@@ -567,6 +567,10 @@ function placeCells(
       while (column < columnCount && slotRow[column]) column++
       if (column >= columnCount) break
       const colSpan = Math.max(1, Math.min(cell.colSpan, columnCount - column))
+      // spans are the file's word, but they cannot reach past the rows that
+      // exist: one cell claiming 200000 rows allocated that many empty ones
+      // (13.8 s), and "Infinity" never ended — a quarter-megabyte file could
+      // hang the import
       const rowSpan = Math.max(1, Math.min(cell.rowSpan, rows.length - rowIndex))
       for (let dr = 0; dr < rowSpan; dr++) {
         while (occupancy.length <= rowIndex + dr) occupancy.push(new Array(columnCount).fill(null))
@@ -712,7 +716,12 @@ async function resolveImage(ref: InlineImageRef, pack: OdfPackage): Promise<NewI
   let bytes: Uint8Array | null = null
   let path = ''
   if (ref.base64) {
-    bytes = Uint8Array.from(atob(ref.base64), (character) => character.charCodeAt(0))
+    try {
+      bytes = Uint8Array.from(atob(ref.base64), (character) => character.charCodeAt(0))
+    } catch {
+      // a payload that is not valid base64 is unrepresentable, not fatal
+      return null
+    }
   } else if (ref.href) {
     path = ref.href
     bytes = await pack.read(ref.href)
