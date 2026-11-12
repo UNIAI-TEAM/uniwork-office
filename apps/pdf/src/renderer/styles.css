@@ -5761,3 +5761,17 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   font-size: 0.85em;
   white-space: nowrap;
 }
+
+/* a page whose probe failed: same frame as a rendered page, an error line instead of a canvas */
+.pdf-page-broken {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  color: var(--danger);
+  font-size: 12px;
+}
