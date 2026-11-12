@@ -6493,7 +6493,8 @@ export function App() {
         'update-fields': () => !!editor?.isEditable && ifDoc(updateFields),
         'toggle-field-codes': () => !!editor && ifDoc(() => toggleAllFieldCodes(editor.view)),
         // forced by an editing restriction, track changes cannot be turned off
-        'track-changes': () => ifDoc(() => !trackChangesForced && setTrackChanges((v) => !v)),
+        'track-changes': () =>
+          ifDoc(() => !isProtected && !trackChangesForced && toggleTrackChangesByUser()),
         'word-count': () => ifDoc(openStats),
         // Word's spelling & grammar check
         proofread: () => ifDoc(runAiProofread),
