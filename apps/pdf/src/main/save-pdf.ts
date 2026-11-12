@@ -42,6 +42,7 @@ import { redactPdf } from './redaction'
 
 const num = (v: number) => Math.round(v * 100) / 100
 const STATIC_FORM_FILLS_KEY = PDFName.of('GenOfficeStaticFormFills')
+/** /T of a new annotation when the request names no author */
 const DEFAULT_PDF_AUTHOR = 'UniWork Office'
 
 const rectsIntersect = (a: readonly number[], b: readonly number[]): boolean =>
@@ -216,7 +217,7 @@ function validMarkup(m: MarkupInput): boolean {
   )
 }
 
-function addMarkup(pdfDoc: PDFDocument, page: PDFPage, m: MarkupInput): void {
+function addMarkup(pdfDoc: PDFDocument, page: PDFPage, m: MarkupInput, author: string): void {
   const xs = m.quads.flatMap((q) => [q[0]!, q[2]!, q[4]!, q[6]!])
   const ys = m.quads.flatMap((q) => [q[1]!, q[3]!, q[5]!, q[7]!])
   const rect = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
@@ -229,7 +230,7 @@ function addMarkup(pdfDoc: PDFDocument, page: PDFPage, m: MarkupInput): void {
     QuadPoints: m.quads.flat(),
     C: m.color,
     F: 4, // print
-    T: DEFAULT_PDF_AUTHOR,
+    T: PDFHexString.fromText(author),
     P: page.ref,
     AP: { N: apRef },
   })
@@ -312,6 +313,7 @@ async function addImageStamp(
   pdfDoc: PDFDocument,
   page: PDFPage,
   d: Extract<DrawingInput, { kind: 'image' }>,
+  author: string,
 ): Promise<void> {
   const png = await pdfDoc.embedPng(d.image)
   const [x1, y1, x2, y2] = d.rect
@@ -341,7 +343,7 @@ async function addImageStamp(
     P: page.ref,
     AP: { N: pdfDoc.context.register(ap) },
   })
-  annot.set(PDFName.of('T'), PDFHexString.fromText('UniWork Office'))
+  annot.set(PDFName.of('T'), PDFHexString.fromText(author))
   setVisualSignatureMetadata(annot, d.formFieldName)
   appendAnnot(pdfDoc, page, pdfDoc.context.register(annot))
 }
@@ -628,6 +630,7 @@ function addDrawing(
   noteRefs?: Map<string, PDFRef>,
   /** the label font for measure drawings (their appearance names /F1) */
   measureFont?: PDFFont,
+  author = DEFAULT_PDF_AUTHOR,
 ): void {
   if (d.kind === 'image') return // handled by addImageStamp (needs async embed)
   if (d.kind === 'link') return // handled by addLinkAnnot (needs the page list)
@@ -647,7 +650,7 @@ function addDrawing(
       AP: { N: pdfDoc.context.register(noteAppearance(pdfDoc, rect, d.color)) },
     })
     annot.set(PDFName.of('Contents'), PDFHexString.fromText(d.contents))
-    annot.set(PDFName.of('T'), PDFHexString.fromText(d.author || DEFAULT_PDF_AUTHOR))
+    annot.set(PDFName.of('T'), PDFHexString.fromText(d.author || author))
     const when = pdfDateString(d.createdMs ?? Date.now())
     annot.set(PDFName.of('CreationDate'), PDFString.of(when))
     annot.set(PDFName.of('M'), PDFString.of(when))
@@ -692,7 +695,7 @@ function addDrawing(
       C: d.color,
       AP: { N: pdfDoc.context.register(ap) },
     })
-    annot.set(PDFName.of('T'), PDFHexString.fromText('UniWork Office'))
+    annot.set(PDFName.of('T'), PDFHexString.fromText(author))
     appendAnnot(pdfDoc, page, pdfDoc.context.register(annot))
     return
   }
@@ -724,7 +727,7 @@ function addDrawing(
       BS: { W: d.width },
       AP: { N: pdfDoc.context.register(ap) },
     })
-    annot.set(PDFName.of('T'), PDFHexString.fromText('UniWork Office'))
+    annot.set(PDFName.of('T'), PDFHexString.fromText(author))
     appendAnnot(pdfDoc, page, pdfDoc.context.register(annot))
     return
   }
@@ -844,7 +847,7 @@ function addDrawing(
     annot.set(PDFName.of('L'), pdfDoc.context.obj([...d.from, ...d.to]))
     annot.set(PDFName.of('Contents'), PDFHexString.fromText(d.label))
   }
-  annot.set(PDFName.of('T'), PDFHexString.fromText('UniWork Office'))
+  annot.set(PDFName.of('T'), PDFHexString.fromText(author))
   if (d.kind === 'ink') setVisualSignatureMetadata(annot, d.formFieldName)
   appendAnnot(pdfDoc, page, pdfDoc.context.register(annot))
 }
@@ -1402,9 +1405,10 @@ export async function applySaveRequest(
     const page = pages[r.pageIndex]
     if (page) page.setRotation(degrees((page.getRotation().angle + r.delta) % 360))
   }
+  const author = request.annotationAuthor || DEFAULT_PDF_AUTHOR
   for (const m of request.markups) {
     const page = pages[m.pageIndex]
-    if (page && validMarkup(m)) addMarkup(pdfDoc, page, m)
+    if (page && validMarkup(m)) addMarkup(pdfDoc, page, m, author)
   }
   const noteRefs = new Map<string, PDFRef>()
   // the measure label's font: standard-14 Helvetica, no bytes to embed — but
@@ -1417,9 +1421,9 @@ export async function applySaveRequest(
   for (const d of drawings) {
     const page = pages[d.pageIndex]
     if (!page) continue
-    if (d.kind === 'image') await addImageStamp(pdfDoc, page, d)
+    if (d.kind === 'image') await addImageStamp(pdfDoc, page, d, author)
     else if (d.kind === 'link') addLinkAnnot(pdfDoc, pages, page, d)
-    else addDrawing(pdfDoc, page, d, noteRefs, measureFont)
+    else addDrawing(pdfDoc, page, d, noteRefs, measureFont, author)
   }
   // Note content edits go after the drawings: replies added above locate their /IRT
   // parent by its old contents, which an earlier in-place rewrite would break. An
