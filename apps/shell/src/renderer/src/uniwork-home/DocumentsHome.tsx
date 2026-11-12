@@ -134,6 +134,7 @@ import {
   docMatchesUpdated,
   hasActiveFilters,
   MAX_AUTO_SEARCH_PAGES,
+  moveStartFolder,
   rowsUnderTypePick,
   sourceAuthorsOf,
   sourceMatchesFilters,
@@ -2310,7 +2311,7 @@ export function DocumentsHome({
           folderActions.startMove({
             id: folder.id,
             kind: 'folder',
-            parentId: folder.parentId ?? folderId,
+            parentId: currentParentOf(folder),
             title: folder.title,
           }),
       },
@@ -2322,15 +2323,16 @@ export function DocumentsHome({
     return items
   }
 
-  // where Move says a row sits now: its own parent, else the folder this view lists. Only the
-  // workspace and My Folder views list a folder, so `folderId` (it outlives the view) is no
-  // answer elsewhere; a recipient's row is never inside the owner's folder (UNI-1974)
-  const currentParentOf = (doc: DocumentsHomeDoc): string | null => {
-    if (subView === 'shared-with-me') return null
-    if (doc.parentId) return doc.parentId
-    if (subView === 'workspace') return folderId
-    return subView === 'my-folder' ? resolvedMyFolderId : null
-  }
+  // where Move says a row sits now: its own parent, else the folder only an open folder view lists
+  // (moveStartFolder); `folderId` outlives the view, and a search hit from any depth is not inside it
+  const currentParentOf = (doc: DocumentsHomeDoc): string | null =>
+    moveStartFolder({
+      parentId: doc.parentId,
+      subView,
+      folderId,
+      myFolderId: resolvedMyFolderId,
+      query,
+    })
 
   // UNI-2078: Di chuyển of the bulk bar: one folder picker for the selection, then one batch
   const bulkMove = useBulkMove({

@@ -762,6 +762,30 @@ export function docMatchesQuery(doc: DocumentsHomeDoc, query: string): boolean {
   return foldSearchText(doc.title).includes(foldedQuery)
 }
 
+/**
+ * UNI-2513: the folder "Di chuyển tới" opens at for a row or folder card. The item's own parent wins;
+ * a recipient's row is never inside the owner's folder (UNI-1974). Only an open folder view (workspace
+ * or My Folder, no search) lists a parentless item inside that folder, so only there is the open folder
+ * an answer. Everywhere else (search hits from any depth, Starred, Recent, ...) a parentless item sits at
+ * the root, never the folder the view was left at.
+ */
+export function moveStartFolder(params: {
+  parentId: string | null | undefined
+  subView: DocumentsHomeSubViewId
+  /** the open folder of the workspace view; outlives the view */
+  folderId: string | null
+  myFolderId: string | null
+  /** the trimmed search query; empty = no search */
+  query: string
+}): string | null {
+  const { parentId, subView, folderId, myFolderId, query } = params
+  if (subView === 'shared-with-me') return null
+  if (parentId) return parentId
+  if (query.length > 0) return null
+  if (subView === 'workspace') return folderId
+  return subView === 'my-folder' ? myFolderId : null
+}
+
 /** Cap on automatic page fetches while a search query or client filter is narrowing paged results. */
 export const MAX_AUTO_SEARCH_PAGES = 10
 
