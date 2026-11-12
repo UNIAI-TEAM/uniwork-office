@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const fr = {
   ufRoot: 'Documents (racine)',
+  ufWorkspaceFolder: "Dossier de l'espace de travail",
   ufTreeLabel: 'Dossiers',
   ufContentsLabel: 'Contenu du dossier',
   ufRecent: 'Récents',
   ufShared: 'Partagés avec moi',
   ufNewFolder: 'Nouveau dossier',
+  ufCreateFolder: 'Créer un dossier',
   ufNewSubfolder: 'Nouveau sous-dossier',
+  ufNewFolderRoot: 'Nouveau dossier dans Documents (racine)',
   ufRename: 'Renommer',
   ufMoveTo: 'Déplacer vers…',
   ufMoveTitle: 'Déplacer « {name} » vers…',
@@ -15,6 +18,7 @@ export const fr = {
   ufCreate: 'Créer',
   ufSave: 'Enregistrer',
   ufFolderName: 'Nom du dossier',
+  ufFolderNamePlaceholder: 'ex. : Contrats 2026',
   ufNameEmpty: 'Saisissez un nom de dossier.',
   ufNameTooLong: 'Le nom est trop long (255 caractères au maximum).',
   ufFolderCreated: 'Dossier {name} créé',

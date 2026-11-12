@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const id = {
   ufRoot: 'Dokumen (akar)',
+  ufWorkspaceFolder: 'Folder ruang kerja',
   ufTreeLabel: 'Folder',
   ufContentsLabel: 'Isi folder',
   ufRecent: 'Terbaru',
   ufShared: 'Dibagikan dengan saya',
   ufNewFolder: 'Folder baru',
+  ufCreateFolder: 'Buat folder',
   ufNewSubfolder: 'Subfolder baru',
+  ufNewFolderRoot: 'Folder baru di Dokumen (akar)',
   ufRename: 'Ganti nama',
   ufMoveTo: 'Pindahkan ke…',
   ufMoveTitle: 'Pindahkan “{name}” ke…',
@@ -15,6 +18,7 @@ export const id = {
   ufCreate: 'Buat',
   ufSave: 'Simpan',
   ufFolderName: 'Nama folder',
+  ufFolderNamePlaceholder: 'mis. Kontrak 2026',
   ufNameEmpty: 'Masukkan nama folder.',
   ufNameTooLong: 'Nama terlalu panjang (maksimal 255 karakter).',
   ufFolderCreated: 'Folder {name} dibuat',

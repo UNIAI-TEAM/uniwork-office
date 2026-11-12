@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const cs = {
   ufRoot: 'Dokumenty (kořen)',
+  ufWorkspaceFolder: 'Složka pracovního prostoru',
   ufTreeLabel: 'Složky',
   ufContentsLabel: 'Obsah složky',
   ufRecent: 'Nedávné',
   ufShared: 'Sdíleno se mnou',
   ufNewFolder: 'Nová složka',
+  ufCreateFolder: 'Vytvořit složku',
   ufNewSubfolder: 'Nová podsložka',
+  ufNewFolderRoot: 'Nová složka v Dokumentech (kořen)',
   ufRename: 'Přejmenovat',
   ufMoveTo: 'Přesunout do…',
   ufMoveTitle: 'Přesunout „{name}“ do…',
@@ -15,6 +18,7 @@ export const cs = {
   ufCreate: 'Vytvořit',
   ufSave: 'Uložit',
   ufFolderName: 'Název složky',
+  ufFolderNamePlaceholder: 'např. Smlouvy 2026',
   ufNameEmpty: 'Zadejte název složky.',
   ufNameTooLong: 'Název je příliš dlouhý (nejvýše 255 znaků).',
   ufFolderCreated: 'Složka {name} byla vytvořena',

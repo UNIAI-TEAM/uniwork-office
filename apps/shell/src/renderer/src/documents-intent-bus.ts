@@ -1,6 +1,8 @@
+import type { UniworkDocErrorCode } from '../../shared/home-api'
+
 /**
- * A notice can send the person to three places inside the Documents home: a document's Share
- * dialog (on its access-requests or break-glass section), a row of the Trash and a folder. The inbox
+ * A notice can send the person to four places inside the Documents home: a document's Share
+ * dialog (on its access-requests or break-glass section), its Version history, a row of the Trash and a folder. The inbox
  * publishes the intent here; two kinds of subscriber answer it:
  * - a route subscriber (the app Home) switches the surface to the Documents home of the
  *   intent's workspace; it never takes the intent;
@@ -20,6 +22,7 @@ export type DocumentsIntent =
     }
   | { kind: 'trash'; documentId: string; workspaceId: string }
   | { kind: 'folder'; folderId: string; workspaceId: string }
+  | { kind: 'versions'; documentId: string; workspaceId: string }
 
 export type DocumentsIntentConsumer = (intent: DocumentsIntent) => boolean
 export type DocumentsIntentRouter = (intent: DocumentsIntent) => void
@@ -64,6 +67,11 @@ export function openFolderInDocuments(input: { folderId: string; workspaceId: st
   publish({ kind: 'folder', ...input })
 }
 
+/** Open the Version history sheet of a document (a save through an AI client names the old file's history). */
+export function openDocumentVersions(input: { documentId: string; workspaceId: string }): void {
+  publish({ kind: 'versions', ...input })
+}
+
 /** Subscribe as the one that does the work; returns the unsubscribe function. */
 export function onDocumentsIntent(handler: DocumentsIntentConsumer): () => void {
   consumers.add(handler)
@@ -82,9 +90,17 @@ export function onDocumentsIntentRoute(handler: DocumentsIntentRouter): () => vo
   }
 }
 
-/** The host could not route the intent (a workspace the person is not in): forget it. */
-export function dropDocumentsIntent(intent: DocumentsIntent): void {
+/**
+ * The host could not route the intent (a workspace the person is not in, or no sign-in): forget it.
+ * Returns the failure the person is told about, or null for a versions intent: that one follows an
+ * open that already succeeded, so a launch failure right after it would contradict the open.
+ */
+export function refuseDocumentsIntent(
+  intent: DocumentsIntent,
+  error: UniworkDocErrorCode,
+): UniworkDocErrorCode | null {
   if (pending === intent) pending = null
+  return intent.kind === 'versions' ? null : error
 }
 
 export function resetDocumentsIntentBusForTests(): void {

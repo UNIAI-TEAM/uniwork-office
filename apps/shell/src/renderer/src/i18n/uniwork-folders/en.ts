@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const en = {
   ufRoot: 'Documents (root)',
+  ufWorkspaceFolder: 'Workspace folder',
   ufTreeLabel: 'Folders',
   ufContentsLabel: 'Folder contents',
   ufRecent: 'Recent',
   ufShared: 'Shared with me',
   ufNewFolder: 'New folder',
+  ufCreateFolder: 'New folder',
   ufNewSubfolder: 'New subfolder',
+  ufNewFolderRoot: 'New folder in Documents (root)',
   ufRename: 'Rename',
   ufMoveTo: 'Move to…',
   ufMoveTitle: 'Move “{name}” to…',
@@ -15,6 +18,7 @@ export const en = {
   ufCreate: 'Create',
   ufSave: 'Save',
   ufFolderName: 'Folder name',
+  ufFolderNamePlaceholder: 'e.g. Contracts 2026',
   ufNameEmpty: 'Enter a folder name.',
   ufNameTooLong: 'The name is too long (255 characters at most).',
   ufFolderCreated: 'Folder {name} created',

@@ -55,7 +55,9 @@ import { FolderGlyph, MyFolderGlyph, UniworkFolderTree } from '../uniwork-folder
 import {
   MY_FOLDER_LABEL_KEY,
   ROOT_KEY,
+  WORKSPACE_NODE_ID,
   buildFolderIndex,
+  drawnUnderWorkspaceNode,
   entryTitleOf,
   expandKeysFor,
   expandParentAndAncestorsFor,
@@ -101,6 +103,10 @@ import { BulkShareDialog, type BulkShareDoc } from '../uniwork-share/BulkShareDi
 import { AccessLogSheet } from '../uniwork-doc-history/AccessLogSheet'
 import { getDocHistoryBridge } from '../uniwork-doc-history/bridge'
 import { VersionHistorySheet } from '../uniwork-doc-history/VersionHistorySheet'
+import {
+  versionsEntryAllowed,
+  type VersionHistoryTarget,
+} from '../uniwork-doc-history/version-history-model'
 import { ShareDialog } from '../uniwork-share/ShareDialog'
 import {
   FolderContentsAccessDialog,
@@ -128,6 +134,7 @@ import {
   docMatchesUpdated,
   hasActiveFilters,
   MAX_AUTO_SEARCH_PAGES,
+  moveStartFolder,
   rowsUnderTypePick,
   sourceAuthorsOf,
   sourceMatchesFilters,
@@ -507,7 +514,8 @@ export function DocumentsHome({
   // the Drive node remembers its chevron here beside the folders' (open by default, reset with them)
   // a restored Drive view opens its account's folder nodes, so the current node is visible
   const [expanded, setExpanded] = useState<Set<string>>(() => {
-    const keys = [ROOT_KEY, DRIVE_NODE_KEY]
+    // the workspace folder node starts open: it holds the folders that used to be the tree (never persisted)
+    const keys = [ROOT_KEY, DRIVE_NODE_KEY, WORKSPACE_NODE_ID]
     if (initialSubView === 'google-drive' && initialDriveView?.accountId) {
       keys.push(driveAccountKey(initialDriveView.accountId))
     }
@@ -656,7 +664,12 @@ export function DocumentsHome({
 
   const expandParent = useCallback(
     (parentId: string | null) => {
-      setExpanded((prev) => new Set([...prev, ...expandParentAndAncestorsFor(index, parentId)]))
+      setExpanded((prev) => {
+        const next = new Set([...prev, ...expandParentAndAncestorsFor(index, parentId)])
+        // a folder made or moved to the root lands under the workspace folder node
+        if (drawnUnderWorkspaceNode(index, parentId)) next.add(WORKSPACE_NODE_ID)
+        return next
+      })
     },
     [index],
   )
@@ -684,7 +697,7 @@ export function DocumentsHome({
     setFolderNotice(null)
     setMyFolderId(null)
     setElsewhereSource(null)
-    setExpanded(new Set([ROOT_KEY, DRIVE_NODE_KEY]))
+    setExpanded(new Set([ROOT_KEY, DRIVE_NODE_KEY, WORKSPACE_NODE_ID]))
     resetFilters()
     setSearchDraft('')
     setKnownAuthors([])
@@ -765,10 +778,22 @@ export function DocumentsHome({
       })
   }, [workspaceId, treeTick])
 
-  // Expand ancestors when initialFolderId or folderId is set
+  // Expand ancestors when initialFolderId or folderId is set. The workspace folder node is no ancestor in
+  // the index, so a folder under it opens it here, once per folder: folding it afterwards sticks.
+  const openedUnderWorkspaceRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!folderId || tree.nodes.length === 0) return
-    setExpanded((prev) => new Set([...prev, ...expandKeysFor(index, folderId)]))
+    if (!folderId) {
+      openedUnderWorkspaceRef.current = null
+      return
+    }
+    if (tree.nodes.length === 0) return
+    const keys = expandKeysFor(index, folderId)
+    if (!drawnUnderWorkspaceNode(index, folderId)) openedUnderWorkspaceRef.current = null
+    else if (openedUnderWorkspaceRef.current !== folderId) {
+      openedUnderWorkspaceRef.current = folderId
+      keys.push(WORKSPACE_NODE_ID)
+    }
+    setExpanded((prev) => new Set([...prev, ...keys]))
   }, [folderId, index, tree.nodes.length])
 
   // Notify host of open folder changes so area switches preserve open folder
@@ -1909,7 +1934,7 @@ export function DocumentsHome({
   const [logsRow, setLogsRow] = useState<DocumentsHomeDoc | null>(null)
   const docHistoryAvailable = getDocHistoryBridge() !== null
   // UNI-2077: the Version history sheet of a row (same bridge, same availability)
-  const [versionsRow, setVersionsRow] = useState<DocumentsHomeDoc | null>(null)
+  const [versionsRow, setVersionsRow] = useState<VersionHistoryTarget | null>(null)
   // UNI-2068: Tải xuống plans one file or one zip in main; the bar and the result live in the zip store
   const zipBusy = useZipDownloadBusy()
   const zipAvailable = zipDownloadBridge() !== null
@@ -1968,6 +1993,39 @@ export function DocumentsHome({
       resetFilters()
       selectSubView('trash')
       setTrashReveal({ documentId: intent.documentId, stalePage })
+      return true
+    }
+    // B7: a notice about a save through an AI client names the document's Version history
+    if (intent.kind === 'versions') {
+      // a stale preload has no history bridge: nothing to open
+      if (!docHistoryAvailable) return true
+      const listed = pageRef.current.items.find((d) => d.id === intent.documentId)
+      if (listed && versionsEntryAllowed(listed)) {
+        setVersionsRow(listed)
+        return true
+      }
+      void loadDocProperties(intent.documentId)
+        .then((res) => {
+          if (!res.ok) {
+            publishUniworkNotice({ phase: 'failed', error: res.error })
+            return
+          }
+          const { myLevel, shelvedAt, archivedAt } = res.value
+          setVersionsRow({
+            id: res.value.documentId,
+            workspaceId: res.value.workspaceId,
+            title: res.value.title,
+            ...(myLevel === 'view' ||
+            myLevel === 'comment' ||
+            myLevel === 'edit' ||
+            myLevel === 'manage'
+              ? { myLevel }
+              : {}),
+            ...(shelvedAt ? { shelvedAt } : {}),
+            ...(archivedAt ? { archived: true, archivedAt } : {}),
+          })
+        })
+        .catch(() => publishUniworkNotice({ phase: 'failed', error: 'network' }))
       return true
     }
     // a stale preload has no Share bridge: nothing to open
@@ -2253,7 +2311,7 @@ export function DocumentsHome({
           folderActions.startMove({
             id: folder.id,
             kind: 'folder',
-            parentId: folder.parentId ?? folderId,
+            parentId: currentParentOf(folder),
             title: folder.title,
           }),
       },
@@ -2265,15 +2323,16 @@ export function DocumentsHome({
     return items
   }
 
-  // where Move says a row sits now: its own parent, else the folder this view lists. Only the
-  // workspace and My Folder views list a folder, so `folderId` (it outlives the view) is no
-  // answer elsewhere; a recipient's row is never inside the owner's folder (UNI-1974)
-  const currentParentOf = (doc: DocumentsHomeDoc): string | null => {
-    if (subView === 'shared-with-me') return null
-    if (doc.parentId) return doc.parentId
-    if (subView === 'workspace') return folderId
-    return subView === 'my-folder' ? resolvedMyFolderId : null
-  }
+  // where Move says a row sits now: its own parent, else the folder only an open folder view lists
+  // (moveStartFolder); `folderId` outlives the view, and a search hit from any depth is not inside it
+  const currentParentOf = (doc: DocumentsHomeDoc): string | null =>
+    moveStartFolder({
+      parentId: doc.parentId,
+      subView,
+      folderId,
+      myFolderId: resolvedMyFolderId,
+      query,
+    })
 
   // UNI-2078: Di chuyển of the bulk bar: one folder picker for the selection, then one batch
   const bulkMove = useBulkMove({
@@ -2729,6 +2788,13 @@ export function DocumentsHome({
     />
   ) : null
 
+  // the tree has no root row (and so no root menu): as on the web, the "+" and the workspace folder
+  // node's "New folder" both make a top-level folder, for every role that sees them
+  function createFolderAtRoot(): void {
+    onSidebarNavigate?.()
+    folderActions.openCreate(null, false)
+  }
+
   const sidebarContent = (
     <div className="dh-sidebar-wrap">
       <nav className="dh-subnav home-area-nav" aria-label={t('ufAreaUniwork')}>
@@ -2762,11 +2828,7 @@ export function DocumentsHome({
             className="dh-sidebar-add"
             aria-label={t('uhNewFolder')}
             title={t('uhNewFolder')}
-            onClick={() => {
-              onSidebarNavigate?.()
-              // the tree has no root row (and so no root menu): as on the web, "+" makes a top-level folder
-              folderActions.openCreate(null, false)
-            }}
+            onClick={createFolderAtRoot}
           >
             <svg
               width="14"
@@ -2823,6 +2885,10 @@ export function DocumentsHome({
               idPrefix={`${uid}-tree`}
               hideRoot
               afterFirstRootRow={hasMyFolderNode ? driveSidebarRows : undefined}
+              workspaceNode={{
+                // the node's only entry, offered wherever the "+" above is (as the web at the root)
+                menu: [{ id: 'new', label: t('ufCreateFolder'), onSelect: createFolderAtRoot }],
+              }}
               nodes={tree.nodes}
               label={t('ufTreeLabel')}
               expanded={expanded}
@@ -3700,8 +3766,11 @@ export function DocumentsHome({
               ? `${t('ufRename')} · ${nameDialog.title}`
               : nameDialog.sub
                 ? t('ufNewSubfolder')
-                : t('ufNewFolder')
+                : nameDialog.parentId === null
+                  ? t('ufNewFolderRoot')
+                  : t('ufNewFolder')
           }
+          placeholder={nameDialog.mode === 'create' ? t('ufFolderNamePlaceholder') : undefined}
           initial={nameDialog.mode === 'rename' ? nameDialog.title : (nameDialog.initial ?? '')}
           submitLabel={nameDialog.mode === 'rename' ? t('ufSave') : t('ufCreate')}
           workspaceNote={folderActions.workspaceNote}

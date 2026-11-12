@@ -11,9 +11,11 @@ import {
   MY_FOLDER_LABEL_KEY,
   ROOT_KEY,
   isMyFolder,
+  isWorkspaceNode,
   treeKey,
   treeRows,
   withMyFolderLabel,
+  withWorkspaceNode,
   type MoveBlock,
   type TreeRow,
 } from './uniwork-folders-model'
@@ -131,6 +133,7 @@ export function UniworkFolderTree({
   idPrefix = 'uwf-tree',
   hideRoot = false,
   afterFirstRootRow,
+  workspaceNode,
 }: {
   nodes: UniworkFolderNode[]
   label: string
@@ -161,22 +164,33 @@ export function UniworkFolderTree({
   hideRoot?: boolean
   /** UNI-2195 (D2): rendered directly after the first top-level row (My Folder) inside the sidebar */
   afterFirstRootRow?: ReactNode
+  /**
+   * UNI-2509 (the web's F11): draw the display-only "workspace folder" node after My Folder, wrapping every
+   * other top-level folder (the Documents sidebar only; the picker and dialogs do not draw it). `menu` is
+   * the node's own menu (empty = none). The node starts folded or open as `expanded` says (the host opens
+   * it first), toggles on a click or Enter, never reaches `onOpen`, `menuFor`, `onMenuIntent` or `blockOf`,
+   * and is never selected.
+   */
+  workspaceNode?: { menu: FolderMenuItem[] }
 }) {
   const { t } = useI18n()
   // `t` is not referentially stable: the memo keys on the translated string
   const rootTitle = t('ufRoot')
   const myFolderLabel = t(MY_FOLDER_LABEL_KEY)
+  const workspaceTitle = t('ufWorkspaceFolder')
+  const drawWorkspaceNode = hideRoot && workspaceNode !== undefined
   const rows = useMemo(() => {
     const labelled = withMyFolderLabel(nodes, myFolderLabel)
     if (!hideRoot) return treeRows(labelled, expanded, rootTitle)
-    return treeRows(labelled, new Set([...expanded, ROOT_KEY]), rootTitle)
+    const drawn = drawWorkspaceNode ? withWorkspaceNode(labelled, workspaceTitle) : labelled
+    return treeRows(drawn, new Set([...expanded, ROOT_KEY]), rootTitle)
       .slice(1)
       .map((row) => ({
         ...row,
         level: row.level - 1,
         parentKey: row.parentKey === ROOT_KEY ? null : row.parentKey,
       }))
-  }, [nodes, expanded, rootTitle, myFolderLabel, hideRoot])
+  }, [nodes, expanded, rootTitle, myFolderLabel, workspaceTitle, hideRoot, drawWorkspaceNode])
   const [focusKey, setFocusKey] = useState(selectedKey)
   const [menuKey, setMenuKey] = useState<string | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -202,9 +216,13 @@ export function UniworkFolderTree({
       ?.focus()
   }, [tabKey])
 
+  /** the entries of a row's menu: the workspace folder node has its own, every other row asks the host */
+  const itemsFor = (row: TreeRow): FolderMenuItem[] =>
+    isWorkspaceNode(row) ? (workspaceNode?.menu ?? []) : (menuFor?.(row) ?? [])
+
   const openMenu = (row: TreeRow) => {
     setMenuKey(row.key)
-    onMenuIntent?.(row)
+    if (!isWorkspaceNode(row)) onMenuIntent?.(row)
   }
 
   const toggle = (key: string, open: boolean) => {
@@ -228,11 +246,13 @@ export function UniworkFolderTree({
     } else if ('expand' in result) toggle(result.expand, true)
     else if ('collapse' in result) toggle(result.collapse, false)
     else if ('open' in result) {
-      if (!blockOf?.(row.id)) onOpen(row.id)
+      // the workspace folder node opens no page: Enter folds it
+      if (isWorkspaceNode(row)) toggle(row.key, !row.expanded)
+      else if (!blockOf?.(row.id)) onOpen(row.id)
     } else if ('menu' in result) {
-      if (menuFor && menuFor(row).length > 0) openMenu(row)
+      if (itemsFor(row).length > 0) openMenu(row)
     } else if ('rename' in result) {
-      menuFor?.(row)
+      itemsFor(row)
         .find((item) => item.id === 'rename')
         ?.onSelect()
     }
@@ -249,11 +269,12 @@ export function UniworkFolderTree({
       ref={listRef}
     >
       {rows.map((row) => {
-        const block = blockOf?.(row.id) ?? null
+        const workspace = isWorkspaceNode(row)
+        const block = workspace ? null : (blockOf?.(row.id) ?? null)
         const selected = row.key === selectedKey
         const editing = rename && row.id === rename.id ? rename : null
         const reasonId = `${idPrefix}-reason-${row.key || 'root'}`
-        const items = menuFor?.(row) ?? []
+        const items = itemsFor(row)
         const tag = tagOf?.(row) ?? null
         const isFirstRootRow = hideRoot && row.level === 1 && row.posInSet === 1 && isMyFolder(row)
         return (
@@ -275,11 +296,12 @@ export function UniworkFolderTree({
               onFocus={(e) => {
                 if (e.target !== e.currentTarget) return
                 setFocusKey(row.key)
-                onMenuIntent?.(row, true)
+                if (!workspace) onMenuIntent?.(row, true)
               }}
               onClick={() => {
                 setFocusKey(row.key)
-                if (!block && !editing) onOpen(row.id)
+                if (workspace) toggle(row.key, !row.expanded)
+                else if (!block && !editing) onOpen(row.id)
               }}
               onContextMenu={(e) => {
                 if (items.length === 0) return
@@ -315,7 +337,7 @@ export function UniworkFolderTree({
               ) : isMyFolder(row) ? (
                 <MyFolderGlyph />
               ) : (
-                <FolderGlyph open={row.expanded} />
+                <FolderGlyph open={!workspace && row.expanded} />
               )}
               {editing && onRenameSave ? (
                 <RenameField

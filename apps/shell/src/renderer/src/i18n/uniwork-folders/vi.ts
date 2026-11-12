@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const vi = {
   ufRoot: 'Tài liệu (gốc)',
+  ufWorkspaceFolder: 'Thư mục của workspace',
   ufTreeLabel: 'Thư mục',
   ufContentsLabel: 'Nội dung thư mục',
   ufRecent: 'Gần đây',
   ufShared: 'Được chia sẻ với tôi',
   ufNewFolder: 'Thư mục mới',
+  ufCreateFolder: 'Tạo thư mục',
   ufNewSubfolder: 'Thư mục con mới',
+  ufNewFolderRoot: 'Thư mục mới ở Tài liệu (gốc)',
   ufRename: 'Đổi tên',
   ufMoveTo: 'Di chuyển tới…',
   ufMoveTitle: 'Di chuyển “{name}” tới…',
@@ -15,6 +18,7 @@ export const vi = {
   ufCreate: 'Tạo',
   ufSave: 'Lưu',
   ufFolderName: 'Tên thư mục',
+  ufFolderNamePlaceholder: 'Ví dụ: Hợp đồng 2026',
   ufNameEmpty: 'Hãy nhập tên thư mục.',
   ufNameTooLong: 'Tên thư mục quá dài (tối đa 255 ký tự).',
   ufFolderCreated: 'Đã tạo thư mục {name}',

@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const ar = {
   ufRoot: 'المستندات (الجذر)',
+  ufWorkspaceFolder: 'مجلد مساحة العمل',
   ufTreeLabel: 'المجلدات',
   ufContentsLabel: 'محتوى المجلد',
   ufRecent: 'الأخيرة',
   ufShared: 'تمت مشاركتها معي',
   ufNewFolder: 'مجلد جديد',
+  ufCreateFolder: 'إنشاء مجلد',
   ufNewSubfolder: 'مجلد فرعي جديد',
+  ufNewFolderRoot: 'مجلد جديد في المستندات (الجذر)',
   ufRename: 'إعادة تسمية',
   ufMoveTo: 'نقل إلى…',
   ufMoveTitle: 'نقل “{name}” إلى…',
@@ -15,6 +18,7 @@ export const ar = {
   ufCreate: 'إنشاء',
   ufSave: 'حفظ',
   ufFolderName: 'اسم المجلد',
+  ufFolderNamePlaceholder: 'مثال: عقود 2026',
   ufNameEmpty: 'أدخل اسم المجلد.',
   ufNameTooLong: 'الاسم طويل جدًا (255 حرفًا كحد أقصى).',
   ufFolderCreated: 'تم إنشاء المجلد {name}',

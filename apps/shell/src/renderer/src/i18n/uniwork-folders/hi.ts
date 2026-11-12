@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const hi = {
   ufRoot: 'दस्तावेज़ (रूट)',
+  ufWorkspaceFolder: 'वर्कस्पेस का फ़ोल्डर',
   ufTreeLabel: 'फ़ोल्डर',
   ufContentsLabel: 'फ़ोल्डर की सामग्री',
   ufRecent: 'हाल के',
   ufShared: 'मेरे साथ साझा',
   ufNewFolder: 'नया फ़ोल्डर',
+  ufCreateFolder: 'फ़ोल्डर बनाएँ',
   ufNewSubfolder: 'नया सबफ़ोल्डर',
+  ufNewFolderRoot: 'दस्तावेज़ (रूट) में नया फ़ोल्डर',
   ufRename: 'नाम बदलें',
   ufMoveTo: 'यहाँ ले जाएँ…',
   ufMoveTitle: '“{name}” को यहाँ ले जाएँ…',
@@ -15,6 +18,7 @@ export const hi = {
   ufCreate: 'बनाएँ',
   ufSave: 'सहेजें',
   ufFolderName: 'फ़ोल्डर का नाम',
+  ufFolderNamePlaceholder: 'उदा.: अनुबंध 2026',
   ufNameEmpty: 'फ़ोल्डर का नाम दर्ज करें।',
   ufNameTooLong: 'नाम बहुत लंबा है (अधिकतम 255 वर्ण)।',
   ufFolderCreated: 'फ़ोल्डर {name} बनाया गया',

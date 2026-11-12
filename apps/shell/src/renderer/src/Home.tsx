@@ -58,8 +58,8 @@ import { shortcutAria, shortcutHint, withShortcutHint } from './home-shortcut-hi
 import { UniworkOpenCard } from './UniworkOpenCard'
 import { publishUniworkNotice } from './uniwork-notice-bus'
 import {
-  dropDocumentsIntent,
   onDocumentsIntentRoute,
+  refuseDocumentsIntent,
   type DocumentsIntent,
 } from './documents-intent-bus'
 import { openRecentEntry, openUniworkDocument } from './uniwork-open'
@@ -1516,8 +1516,8 @@ export function Home() {
     if (!failed && workspaces === null) return
     setDocsRoute(null)
     if (failed || !workspaces?.some((w) => w.id === docsRoute.workspaceId)) {
-      dropDocumentsIntent(docsRoute)
-      publishUniworkNotice({ phase: 'failed', error: failed ? 'not_signed_in' : 'forbidden' })
+      const error = refuseDocumentsIntent(docsRoute, failed ? 'not_signed_in' : 'forbidden')
+      if (error) publishUniworkNotice({ phase: 'failed', error })
       return
     }
     selectArea('uniwork')

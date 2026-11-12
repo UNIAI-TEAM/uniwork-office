@@ -369,6 +369,7 @@ export const zh = {
   wbNotif_document_changed_version_created_many: '{actor} 为 {count} 个文档新增了版本',
   wbNotif_document_changed_version_created_one: '{actor} 为 “{document}” 新增了版本',
   wbNotif_document_changed_version_created_untitled: '{actor} 为一个文档新增了版本',
+  wbNotif_document_changed_version_created_via_one: '{actor} 通过 {client} 更新了文件 "{document}"',
   wbNotif_document_changed_relocated_many:
     '{actor} 将存放你 {count} 个文档的文件夹移入了回收站；这些文档已回到工作区根目录',
   wbNotif_document_changed_relocated_one:

@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const he = {
   ufRoot: 'מסמכים (שורש)',
+  ufWorkspaceFolder: 'תיקיית סביבת העבודה',
   ufTreeLabel: 'תיקיות',
   ufContentsLabel: 'תוכן התיקייה',
   ufRecent: 'אחרונים',
   ufShared: 'שותפו איתי',
   ufNewFolder: 'תיקייה חדשה',
+  ufCreateFolder: 'יצירת תיקייה',
   ufNewSubfolder: 'תיקיית משנה חדשה',
+  ufNewFolderRoot: 'תיקייה חדשה במסמכים (שורש)',
   ufRename: 'שינוי שם',
   ufMoveTo: 'העברה אל…',
   ufMoveTitle: 'העברת “{name}” אל…',
@@ -15,6 +18,7 @@ export const he = {
   ufCreate: 'יצירה',
   ufSave: 'שמירה',
   ufFolderName: 'שם התיקייה',
+  ufFolderNamePlaceholder: 'לדוגמה: חוזים 2026',
   ufNameEmpty: 'יש להזין שם תיקייה.',
   ufNameTooLong: 'השם ארוך מדי (עד 255 תווים).',
   ufFolderCreated: 'התיקייה {name} נוצרה',

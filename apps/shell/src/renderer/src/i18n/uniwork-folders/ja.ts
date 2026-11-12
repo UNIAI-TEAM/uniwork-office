@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const ja = {
   ufRoot: 'ドキュメント（ルート）',
+  ufWorkspaceFolder: 'ワークスペースのフォルダー',
   ufTreeLabel: 'フォルダー',
   ufContentsLabel: 'フォルダーの内容',
   ufRecent: '最近',
   ufShared: '共有アイテム',
   ufNewFolder: '新しいフォルダー',
+  ufCreateFolder: 'フォルダーを作成',
   ufNewSubfolder: '新しいサブフォルダー',
+  ufNewFolderRoot: 'ドキュメント（ルート）に新しいフォルダー',
   ufRename: '名前を変更',
   ufMoveTo: '移動先…',
   ufMoveTitle: '「{name}」の移動先…',
@@ -15,6 +18,7 @@ export const ja = {
   ufCreate: '作成',
   ufSave: '保存',
   ufFolderName: 'フォルダー名',
+  ufFolderNamePlaceholder: '例: 契約書 2026',
   ufNameEmpty: 'フォルダー名を入力してください。',
   ufNameTooLong: '名前が長すぎます（最大 255 文字）。',
   ufFolderCreated: 'フォルダー {name} を作成しました',

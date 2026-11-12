@@ -133,6 +133,8 @@ export const ja = {
     '{actor} さんが “{document}” に新しいバージョンを追加しました',
   wbNotif_document_changed_version_created_untitled:
     '{actor} さんがドキュメントに新しいバージョンを追加しました',
+  wbNotif_document_changed_version_created_via_one:
+    '{actor} さんが {client} 経由でファイル "{document}" を更新しました',
   wbNotif_document_changed_relocated_many:
     '{actor} さんがあなたの {count} 件のドキュメントを含むフォルダーをゴミ箱に移動しました。ドキュメントはワークスペースのルートに移されました',
   wbNotif_document_changed_relocated_one:

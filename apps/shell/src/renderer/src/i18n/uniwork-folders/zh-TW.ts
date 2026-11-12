@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const zhTW = {
   ufRoot: '文件（根目錄）',
+  ufWorkspaceFolder: '工作區資料夾',
   ufTreeLabel: '資料夾',
   ufContentsLabel: '資料夾內容',
   ufRecent: '最近',
   ufShared: '與我共用',
   ufNewFolder: '新增資料夾',
+  ufCreateFolder: '建立資料夾',
   ufNewSubfolder: '新增子資料夾',
+  ufNewFolderRoot: '在文件（根目錄）中新增資料夾',
   ufRename: '重新命名',
   ufMoveTo: '移動到…',
   ufMoveTitle: '將「{name}」移動到…',
@@ -15,6 +18,7 @@ export const zhTW = {
   ufCreate: '建立',
   ufSave: '儲存',
   ufFolderName: '資料夾名稱',
+  ufFolderNamePlaceholder: '例如：2026 年合約',
   ufNameEmpty: '請輸入資料夾名稱。',
   ufNameTooLong: '資料夾名稱過長（最多 255 個字元）。',
   ufFolderCreated: '已建立資料夾 {name}',

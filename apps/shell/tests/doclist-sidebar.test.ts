@@ -187,15 +187,18 @@ const sourceSection = () => sidebarSlot.querySelector<HTMLElement>('.dl-side-sou
 const sourceRows = () =>
   Array.from(sidebarSlot.querySelectorAll<HTMLElement>('.dl-side-sources [data-source]'))
 
+/** the display-only workspace folder node (UNI-2509): it wraps every top-level folder but My Folder */
+const WORKSPACE_FOLDER = 'Thư mục của workspace'
+
 describe('the Thư mục tree in the sidebar has no root row (web DocumentTree folders mode)', () => {
-  it('draws the top-level folders at the first level, My Folder first, and no root row', async () => {
+  it('draws My Folder and the workspace folder node at the first level, the node holding the other folders, and no root row', async () => {
     await mount('workspace')
     expect(sideTree()).not.toBeNull()
     expect(sideTree()!.querySelector(`[role="treeitem"][data-key="${ROOT_KEY}"]`)).toBeNull()
-    expect(rowTitles()).toEqual([MY_FOLDER, 'Alpha', 'Gamma'])
-    expect(treeRows().map((r) => r.getAttribute('aria-level'))).toEqual(['1', '1', '1'])
-    expect(treeRows().map((r) => r.getAttribute('aria-posinset'))).toEqual(['1', '2', '3'])
-    expect(treeRows().every((r) => r.getAttribute('aria-setsize') === '3')).toBe(true)
+    expect(rowTitles()).toEqual([MY_FOLDER, WORKSPACE_FOLDER, 'Alpha', 'Gamma'])
+    expect(treeRows().map((r) => r.getAttribute('aria-level'))).toEqual(['1', '1', '2', '2'])
+    expect(treeRows().map((r) => r.getAttribute('aria-posinset'))).toEqual(['1', '2', '1', '2'])
+    expect(treeRows().map((r) => r.getAttribute('aria-setsize'))).toEqual(['2', '2', '2', '2'])
     expect(sidebarSlot.textContent).not.toContain('Tài liệu (gốc)')
   })
 
@@ -208,7 +211,7 @@ describe('the Thư mục tree in the sidebar has no root row (web DocumentTree f
     expect(tabStops.map((r) => r.dataset.key)).toEqual(['f-mine'])
   })
 
-  it('keys walk the first level: arrows move, ArrowRight expands, ArrowLeft collapses then stays, Enter opens', async () => {
+  it('keys walk the tree: arrows move, ArrowRight expands, ArrowLeft collapses then goes to the parent, Enter opens a folder and folds the node', async () => {
     await mount('workspace')
     const first = rowOf(MY_FOLDER)!
     await act(async () => first.focus())
@@ -216,10 +219,12 @@ describe('the Thư mục tree in the sidebar has no root row (web DocumentTree f
     // nothing above the first row: focus stays on it, never on a hidden root
     expect(document.activeElement).toBe(rowOf(MY_FOLDER))
     await key(document.activeElement, 'ArrowDown')
+    expect(document.activeElement).toBe(rowOf(WORKSPACE_FOLDER))
+    await key(document.activeElement, 'ArrowDown')
     expect(document.activeElement).toBe(rowOf('Alpha'))
     await key(document.activeElement, 'ArrowRight')
     expect(rowOf('Alpha')!.getAttribute('aria-expanded')).toBe('true')
-    expect(rowOf('Beta')!.getAttribute('aria-level')).toBe('2')
+    expect(rowOf('Beta')!.getAttribute('aria-level')).toBe('3')
     await key(document.activeElement, 'ArrowRight')
     expect(document.activeElement).toBe(rowOf('Beta'))
     await key(document.activeElement, 'ArrowLeft')
@@ -227,9 +232,9 @@ describe('the Thư mục tree in the sidebar has no root row (web DocumentTree f
     await key(document.activeElement, 'ArrowLeft')
     expect(rowOf('Alpha')!.getAttribute('aria-expanded')).toBe('false')
     expect(rowOf('Beta')).toBeUndefined()
-    // a first-level row has no parent row to go to
+    // a folder under the node goes to the node, which is its parent row
     await key(document.activeElement, 'ArrowLeft')
-    expect(document.activeElement).toBe(rowOf('Alpha'))
+    expect(document.activeElement).toBe(rowOf(WORKSPACE_FOLDER))
     await key(document.activeElement, 'End')
     expect(document.activeElement).toBe(rowOf('Gamma'))
     await key(document.activeElement, 'Home')
@@ -673,6 +678,105 @@ describe('RV-17: with no root row, the sidebar "+" creates at the workspace root
       title: 'Hợp đồng',
     })
   })
+
+  /** the display id of the workspace folder node: it must never leave the tree */
+  const NODE_ID = 'ui:workspace-root'
+  const submitNewFolder = async (title: string) => {
+    const input = document.querySelector<HTMLInputElement>('.modal input')!
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      set.call(input, title)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(document.querySelector('.modal button[type="submit"]'))
+  }
+  const openNodeMenu = async () => {
+    await act(async () => {
+      rowOf(WORKSPACE_FOLDER)!.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+      )
+    })
+    return Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+  }
+
+  it('driving the workspace folder node (fold, unfold, New folder) never sends or stores its id and creates at the root', async () => {
+    const createFolder = vi.fn(async (i: { parentId: string | null; title: string }) =>
+      ok(folder('f-new', i.title)),
+    )
+    api.uniworkCreateFolder = createFolder
+    await mount('workspace')
+    const asked = api.uniworkListChildren.mock.calls.length
+
+    await key(rowOf(WORKSPACE_FOLDER), 'Enter')
+    expect(rowOf(WORKSPACE_FOLDER)!.getAttribute('aria-expanded')).toBe('false')
+    expect(rowOf('Alpha')).toBeUndefined()
+    await click(rowOf(WORKSPACE_FOLDER))
+    expect(rowOf('Alpha')).toBeDefined()
+    // folding opens no page: the root stays the current folder
+    expect(workspaceNav()?.getAttribute('aria-current')).toBe('page')
+    expect(api.uniworkListChildren.mock.calls.length).toBe(asked)
+
+    const entries = await openNodeMenu()
+    expect(entries.map((e) => e.dataset.folderAction)).toEqual(['new'])
+    expect(entries[0]!.textContent).toContain('Tạo thư mục')
+    await click(entries[0])
+    await submitNewFolder('Hợp đồng')
+    expect(createFolder).toHaveBeenLastCalledWith({
+      workspaceId: 'ws-1',
+      parentId: null,
+      title: 'Hợp đồng',
+    })
+
+    // no bridge call, stored value, URL or history entry carries the display id
+    for (const [name, fn] of Object.entries(api)) {
+      expect(JSON.stringify(fn.mock.calls), name).not.toContain(NODE_ID)
+    }
+    for (const store of [localStorage, sessionStorage]) {
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i)!
+        expect(k).not.toContain(NODE_ID)
+        expect(store.getItem(k)).not.toContain(NODE_ID)
+      }
+    }
+    expect(location.href).not.toContain(NODE_ID)
+    expect(JSON.stringify(history.state)).not.toContain(NODE_ID)
+  })
+
+  it('creating from the workspace folder node names the root in the title and hints the name, and still posts a null parent', async () => {
+    const createFolder = vi.fn(async (i: { parentId: string | null; title: string }) =>
+      ok(folder('f-new', i.title)),
+    )
+    api.uniworkCreateFolder = createFolder
+    await mount('workspace')
+
+    const entries = await openNodeMenu()
+    await click(entries[0])
+    expect(document.querySelector('.modal .uw-act-heading')?.textContent).toBe(
+      'Thư mục mới ở Tài liệu (gốc)',
+    )
+    expect(document.querySelector<HTMLInputElement>('.modal input')!.placeholder).toBe(
+      'Ví dụ: Hợp đồng 2026',
+    )
+    await submitNewFolder('Hợp đồng')
+    expect(createFolder).toHaveBeenLastCalledWith({
+      workspaceId: 'ws-1',
+      parentId: null,
+      title: 'Hợp đồng',
+    })
+  })
+
+  it('the workspace folder node offers New folder to every role that sees the "+" beside it', async () => {
+    for (const myRole of ['viewer', 'guest', 'owner']) {
+      await mount('workspace', 'vi', { workspaces: [{ ...workspaces[0]!, myRole }] })
+      expect(sidebarSlot.querySelector('.dh-sidebar-add'), myRole).not.toBeNull()
+      const entries = await openNodeMenu()
+      expect(
+        entries.map((e) => e.dataset.folderAction),
+        myRole,
+      ).toEqual(['new'])
+      await key(document.activeElement, 'Escape')
+    }
+  })
 })
 
 // ---- VS-8: My Folder stand-in lines up with the top-level folder rows ----
@@ -723,7 +827,7 @@ describe('VS-8: the My Folder stand-in lines up with the top-level rows when the
     expect(rule!.body).toContain(`padding-inline-start: ${FIRST_LEVEL_INDENT};`)
     // that is exactly the inline indent the tree draws on a level-1 row
     await mount('workspace')
-    expect(rowOf('Alpha')?.style.paddingInlineStart).toBe(FIRST_LEVEL_INDENT)
+    expect(rowOf(WORKSPACE_FOLDER)?.style.paddingInlineStart).toBe(FIRST_LEVEL_INDENT)
     // it must out-rank documents-home.css's own (reserved) 18px rule
     const base = cssRules(readSrc('uniwork-home/documents-home.css')).find((r) =>
       r.selectors.includes('.dh-my-folder-standin'),

@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const de = {
   ufRoot: 'Dokumente (Stammordner)',
+  ufWorkspaceFolder: 'Ordner des Arbeitsbereichs',
   ufTreeLabel: 'Ordner',
   ufContentsLabel: 'Ordnerinhalt',
   ufRecent: 'Zuletzt',
   ufShared: 'Für mich freigegeben',
   ufNewFolder: 'Neuer Ordner',
+  ufCreateFolder: 'Ordner erstellen',
   ufNewSubfolder: 'Neuer Unterordner',
+  ufNewFolderRoot: 'Neuer Ordner in Dokumente (Stammordner)',
   ufRename: 'Umbenennen',
   ufMoveTo: 'Verschieben nach…',
   ufMoveTitle: '„{name}“ verschieben nach…',
@@ -15,6 +18,7 @@ export const de = {
   ufCreate: 'Erstellen',
   ufSave: 'Speichern',
   ufFolderName: 'Ordnername',
+  ufFolderNamePlaceholder: 'z. B. Verträge 2026',
   ufNameEmpty: 'Gib einen Ordnernamen ein.',
   ufNameTooLong: 'Der Name ist zu lang (höchstens 255 Zeichen).',
   ufFolderCreated: 'Ordner {name} erstellt',

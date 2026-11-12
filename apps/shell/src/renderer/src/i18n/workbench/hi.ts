@@ -113,6 +113,8 @@ export const hi = {
   wbNotif_document_changed_version_created_one: '{actor} ने “{document}” में नया संस्करण जोड़ा',
   wbNotif_document_changed_version_created_untitled:
     '{actor} ने एक दस्तावेज़ में नया संस्करण जोड़ा',
+  wbNotif_document_changed_version_created_via_one:
+    '{actor} ने {client} के माध्यम से फ़ाइल "{document}" अपडेट की',
   wbNotif_document_changed_relocated_many:
     '{actor} ने आपके {count} दस्तावेज़ों वाला फ़ोल्डर ट्रैश में भेजा; दस्तावेज़ अब वर्कस्पेस के रूट में हैं',
   wbNotif_document_changed_relocated_one:

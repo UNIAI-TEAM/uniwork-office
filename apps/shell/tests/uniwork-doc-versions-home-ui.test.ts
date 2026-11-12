@@ -10,6 +10,11 @@ import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/documents-home-model'
 import { buildRowMenu, type RowMenuActionId } from '../src/renderer/src/doclist/row-menu'
 import { createFakeShareApi } from '../src/renderer/src/uniwork-share/fake-share-api'
+import {
+  openDocumentVersions,
+  resetDocumentsIntentBusForTests,
+} from '../src/renderer/src/documents-intent-bus'
+import { onUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 import { uniworkVersionStrings } from '../src/renderer/src/i18n/strings-uniwork-versions'
 import {
   createFakeDocHistoryBridge,
@@ -266,5 +271,72 @@ describe('DocumentsHome mounts the Version history sheet (UNI-2077 UI-V)', () =>
     await flush()
     expect(history.createVersion).toHaveBeenCalledTimes(1)
     expect(api.uniworkListChildren!.mock.calls.length - before).toBe(1)
+  })
+
+  describe('a notice names the history of a file saved through an AI client (UNI-2509)', () => {
+    let notices: unknown[]
+    let offNotice: () => void
+    beforeEach(() => {
+      resetDocumentsIntentBusForTests()
+      notices = []
+      offNotice = onUniworkNotice((event) => notices.push(event))
+      api.uniworkDocumentProperties = vi.fn(async (id: string) =>
+        id === 'doc-far'
+          ? ok({
+              documentId: 'doc-far',
+              workspaceId: 'ws-1',
+              title: 'Far away.docx',
+              myLevel: 'view',
+            })
+          : { ok: false, error: 'not_found' },
+      )
+    })
+    afterEach(() => {
+      offNotice()
+      resetDocumentsIntentBusForTests()
+    })
+    const publish = async (documentId: string) => {
+      await act(async () => openDocumentVersions({ documentId, workspaceId: 'ws-1' }))
+      await flush()
+    }
+
+    it('a listed document opens its sheet from the row, without a fetch', async () => {
+      await mount()
+      await publish('doc-a')
+      expect(api.uniworkDocumentProperties).not.toHaveBeenCalled()
+      expect(history.versions).toHaveBeenCalledWith({ documentId: 'doc-a' })
+      expect(dialog()!.querySelectorAll('[data-version-row]')).toHaveLength(2)
+      expect(dialog()!.querySelector('form')).not.toBeNull()
+      expect(onOpenDocument).not.toHaveBeenCalled()
+    })
+
+    it('a document outside the loaded page is read from its properties and gets the sheet at its own level', async () => {
+      await mount()
+      await publish('doc-far')
+      expect(api.uniworkDocumentProperties).toHaveBeenCalledWith('doc-far')
+      expect(history.versions).toHaveBeenCalledWith({ documentId: 'doc-far' })
+      expect(dialog()!.querySelectorAll('[data-version-row]')).toHaveLength(2)
+      // the level came from the properties (view): read-only
+      expect(dialog()!.querySelector('form')).toBeNull()
+      expect(notices).toEqual([])
+    })
+
+    it('a document that cannot be read says so on the launch notice and opens no sheet', async () => {
+      await mount()
+      await publish('doc-gone')
+      expect(dialog()).toBeNull()
+      expect(history.versions).not.toHaveBeenCalled()
+      expect(notices).toEqual([{ phase: 'failed', error: 'not_found' }])
+    })
+
+    it('a failed properties request says network and opens no sheet', async () => {
+      api.uniworkDocumentProperties = vi.fn(async () => {
+        throw new Error('offline')
+      })
+      await mount()
+      await publish('doc-far')
+      expect(dialog()).toBeNull()
+      expect(notices).toEqual([{ phase: 'failed', error: 'network' }])
+    })
   })
 })

@@ -2,12 +2,15 @@ import type { zh } from './zh'
 
 export const es = {
   ufRoot: 'Documentos (raíz)',
+  ufWorkspaceFolder: 'Carpeta del espacio de trabajo',
   ufTreeLabel: 'Carpetas',
   ufContentsLabel: 'Contenido de la carpeta',
   ufRecent: 'Recientes',
   ufShared: 'Compartidos conmigo',
   ufNewFolder: 'Nueva carpeta',
+  ufCreateFolder: 'Crear carpeta',
   ufNewSubfolder: 'Nueva subcarpeta',
+  ufNewFolderRoot: 'Nueva carpeta en Documentos (raíz)',
   ufRename: 'Cambiar nombre',
   ufMoveTo: 'Mover a…',
   ufMoveTitle: 'Mover «{name}» a…',
@@ -15,6 +18,7 @@ export const es = {
   ufCreate: 'Crear',
   ufSave: 'Guardar',
   ufFolderName: 'Nombre de la carpeta',
+  ufFolderNamePlaceholder: 'p. ej., Contratos 2026',
   ufNameEmpty: 'Escribe un nombre de carpeta.',
   ufNameTooLong: 'El nombre es demasiado largo (255 caracteres como máximo).',
   ufFolderCreated: 'Carpeta {name} creada',

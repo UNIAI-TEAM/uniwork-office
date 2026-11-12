@@ -3,6 +3,7 @@ import type { WorkNotification } from '../src/shared/uniwork-work-api'
 import {
   documentChangedFacts,
   documentChangedHasPage,
+  opensVersionHistory,
   documentChangedSentenceKey,
   documentChangedTitleParams,
   noticeState,
@@ -48,6 +49,7 @@ describe('documentChangedFacts', () => {
       count: 5,
       titles: ['A', 'B', 'C'],
       more: 2,
+      viaClient: '',
     })
   })
 
@@ -184,4 +186,83 @@ describe('noticeState', () => {
       'deleted',
     )
   })
+})
+
+// UNI-2501 B7 (the web's document-changed-kind.test.tsx cases): a save through an AI client names the client
+// and opens the version history.
+describe('version_created via an AI client (B7)', () => {
+  const via = (params: Record<string, string> = {}, over: Partial<WorkNotification> = {}) =>
+    change({
+      ...over,
+      params: {
+        actor: 'An',
+        verb: 'version_created',
+        document_count: '1',
+        via_client: 'ChatGPT',
+        ...params,
+      },
+    })
+  const withTitle = (n: WorkNotification) => ({ ...n, sample_documents: sample('Kế hoạch Q4') })
+  const say = (lang: 'vi' | 'en', n: WorkNotification) => {
+    const table = workbenchStrings[lang] as Record<string, string>
+    const params = documentChangedTitleParams(n)
+    return table[documentChangedSentenceKey(n)]!.replace(
+      /\{(\w+)\}/g,
+      (_, k: string) => params[k] ?? '',
+    )
+  }
+
+  it('says who updated which file through which client, in vi and en', () => {
+    expect(say('vi', withTitle(via()))).toBe('An đã cập nhật file "Kế hoạch Q4" qua ChatGPT')
+    expect(say('en', withTitle(via()))).toBe('An updated the file "Kế hoạch Q4" via ChatGPT')
+  })
+
+  it('trims the client', () => {
+    expect(documentChangedFacts(via({ via_client: '  Claude ' })).viaClient).toBe('Claude')
+  })
+
+  it('keeps the existing sentence without via_client, or with a blank one', () => {
+    for (const via_client of ['', '   ']) {
+      expect(say('vi', withTitle(via({ via_client })))).toBe(
+        'An đã tạo phiên bản mới cho tài liệu “Kế hoạch Q4”',
+      )
+    }
+    const plain = withTitle(change({ params: { actor: 'An', verb: 'version_created' } }))
+    expect(documentChangedSentenceKey(plain)).toBe('wbNotif_document_changed_version_created_one')
+    expect(say('en', plain)).toBe('An added a new version to “Kế hoạch Q4”')
+  })
+
+  it('keeps the existing sentence for several documents, an unreadable title, and any other verb', () => {
+    expect(documentChangedSentenceKey(via({ document_count: '5' }))).toBe(
+      'wbNotif_document_changed_version_created_many',
+    )
+    expect(documentChangedSentenceKey(via())).toBe(
+      'wbNotif_document_changed_version_created_untitled',
+    )
+    expect(documentChangedSentenceKey(withTitle(via({ verb: 'renamed' })))).toBe(
+      'wbNotif_document_changed_renamed_one',
+    )
+  })
+
+  it('opens the version history only for one file saved through a client', () => {
+    expect(opensVersionHistory(via())).toBe(true)
+    expect(opensVersionHistory(via({ via_client: '  ' }))).toBe(false)
+    expect(opensVersionHistory(change({ params: { verb: 'version_created' } }))).toBe(false)
+    expect(opensVersionHistory(via({ verb: 'renamed' }))).toBe(false)
+    expect(opensVersionHistory(via({ document_count: '4' }))).toBe(false)
+    expect(opensVersionHistory(via({}, { resource_deleted: true }))).toBe(false)
+    expect(opensVersionHistory(via({}, { kind: 'document_commented' }))).toBe(false)
+  })
+
+  it.each(Object.keys(workbenchStrings) as (keyof typeof workbenchStrings)[])(
+    'locale %s words the via-client sentence with the actor, the document and the client',
+    (lang) => {
+      const text = (workbenchStrings[lang] as Record<string, string>)[
+        'wbNotif_document_changed_version_created_via_one'
+      ]
+      expect(text).toContain('{actor}')
+      expect(text).toContain('{document}')
+      expect(text).toContain('{client}')
+    },
+  )
 })

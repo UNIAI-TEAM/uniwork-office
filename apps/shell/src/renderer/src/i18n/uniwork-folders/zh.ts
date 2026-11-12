@@ -1,12 +1,15 @@
 /** FD-11 UniWork folder tree: browser, tree, picker, folder actions; zh defines the key set */
 export const zh = {
   ufRoot: '文档（根目录）',
+  ufWorkspaceFolder: '工作区文件夹',
   ufTreeLabel: '文件夹',
   ufContentsLabel: '文件夹内容',
   ufRecent: '最近',
   ufShared: '与我共享',
   ufNewFolder: '新建文件夹',
+  ufCreateFolder: '创建文件夹',
   ufNewSubfolder: '新建子文件夹',
+  ufNewFolderRoot: '在文档（根目录）中新建文件夹',
   ufRename: '重命名',
   ufMoveTo: '移动到…',
   ufMoveTitle: '将“{name}”移动到…',
@@ -14,6 +17,7 @@ export const zh = {
   ufCreate: '创建',
   ufSave: '保存',
   ufFolderName: '文件夹名称',
+  ufFolderNamePlaceholder: '例如：2026 年合同',
   ufNameEmpty: '请输入文件夹名称。',
   ufNameTooLong: '文件夹名称过长（最多 255 个字符）。',
   ufFolderCreated: '已创建文件夹 {name}',
