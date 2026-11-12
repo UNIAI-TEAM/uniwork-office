@@ -67,12 +67,16 @@ async function bootstrap(): Promise<void> {
   window.desktop?.onDocumentThemeChanged?.(applyDocumentTheme)
   await window.desktop
     ?.getAiPanelPrefs?.()
-    .then(applyAiPanelPrefs)
+    .then((prefs) => {
+      if (prefs) applyAiPanelPrefs(prefs)
+    })
     .catch(() => {})
   window.desktop?.onAiPanelPrefsChanged?.(applyAiPanelPrefs)
   await window.desktop
     ?.getAuthorName?.()
-    .then(setAuthorName)
+    .then((name) => {
+      if (typeof name === 'string') setAuthorName(name)
+    })
     .catch(() => {})
   window.desktop?.onAuthorNameChanged?.(setAuthorName)
   createRoot(document.getElementById('root')!).render(

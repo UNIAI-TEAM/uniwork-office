@@ -8,8 +8,8 @@ export function authorName(): string {
   return current || t('editorDefaultAuthor')
 }
 
-export function setAuthorName(name: string): void {
-  const next = name.trim()
+export function setAuthorName(name?: string | null): void {
+  const next = typeof name === 'string' ? name.trim() : ''
   if (next === current) return
   current = next
   for (const listener of listeners) listener()
