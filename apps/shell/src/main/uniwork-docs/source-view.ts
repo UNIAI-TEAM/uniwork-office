@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { rmSync } from 'node:fs'
-import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathKey } from '../../shared/path-key'
 import {
@@ -12,7 +12,7 @@ import {
   type SourceViewResult,
   type SourceViewState,
 } from '../../shared/source-view'
-import type { DownloadFileResult, DownloadResult, DownloadStreamFileOptions } from './client'
+import type { DownloadFileResult, DownloadStreamFileOptions } from './client'
 import { UniworkDocError } from './errors'
 import type { UniworkModuleSeam } from './modules'
 
@@ -139,7 +139,6 @@ const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i
 /** the injected file operations; defaults are node's, tests inject faults */
 export interface SourceViewFs {
   mkdir(path: string, options: { recursive: true; mode: number }): Promise<unknown>
-  writeFile(path: string, bytes: Uint8Array): Promise<void>
   chmod(path: string, mode: number): Promise<void>
   rm(path: string, options: { recursive: true; force: true }): Promise<void>
   rmSync(path: string, options: { recursive: true; force: true }): void
@@ -164,7 +163,7 @@ export interface SourceViewOpenerDeps {
     workspaceId: string,
     sourceId: string,
     options: DownloadStreamFileOptions,
-  ): Promise<DownloadFileResult | DownloadResult>
+  ): Promise<DownloadFileResult>
   /** the shell's open router (`routeDocumentPath`) */
   openPath(path: string): boolean | Promise<boolean>
   /**
@@ -282,7 +281,7 @@ interface OpenEntry {
 }
 
 export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOpener {
-  const fs: SourceViewFs = { mkdir, writeFile, chmod, rm, rmSync, ...deps.fs }
+  const fs: SourceViewFs = { mkdir, chmod, rm, rmSync, ...deps.fs }
   const now = () => deps.now?.() ?? Date.now()
   const newSession = () => deps.newSession?.() ?? randomUUID()
   let session = newSession()
@@ -331,7 +330,7 @@ export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOp
       await fs.mkdir(dir, { recursive: true, mode: 0o700 })
       dirCreated = true
     }
-    let downloaded: DownloadFileResult | DownloadResult
+    let downloaded: DownloadFileResult
     try {
       downloaded = await deps.downloadSource(input.workspaceId, input.sourceId, {
         destinationPath: path,
@@ -349,28 +348,12 @@ export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOp
       if (dirCreated) await removeDir(dir)
       return fail('not_signed_in')
     }
-    try {
-      if ('bytes' in downloaded && downloaded.bytes instanceof Uint8Array) {
-        // fallback for test doubles returning in-memory bytes
-        if (downloaded.bytes.byteLength > deps.documentMaxBytes()) {
-          if (dirCreated) await removeDir(dir)
-          return fail('too_large')
-        }
-        await ensureDir()
-        await fs.writeFile(path, downloaded.bytes)
-      } else if (
-        typeof downloaded.bytes === 'number' &&
-        downloaded.bytes > deps.documentMaxBytes()
-      ) {
-        if (dirCreated) await removeDir(dir)
-        return fail('too_large')
-      }
-      // a courtesy only: the registry, not the file mode, is what makes the view read-only
-      await fs.chmod(path, 0o400).catch(() => undefined)
-    } catch {
-      await removeDir(dir)
-      return fail('open_failed')
+    if (downloaded.bytes > deps.documentMaxBytes()) {
+      if (dirCreated) await removeDir(dir)
+      return fail('too_large')
     }
+    // a courtesy only: the registry, not the file mode, is what makes the view read-only
+    await fs.chmod(path, 0o400).catch(() => undefined)
     if (epoch !== startedAt) {
       await removeDir(dir)
       return fail('not_signed_in')

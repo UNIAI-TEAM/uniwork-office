@@ -13,13 +13,16 @@ import {
   readdirSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs'
-import { rm } from 'node:fs/promises'
+import { rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DRAFT_PREVIEW_DIR } from '@genoffice/electron-utils/draft-preview'
 import type { OpenSourceInput } from '../src/shared/source-view'
+import type { DownloadFileResult, DownloadStreamFileOptions } from '../src/main/uniwork-docs/client'
+import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import {
   SOURCE_VIEW_CLOSE_GRACE_MS,
   SourceViewRegistry,
@@ -54,6 +57,19 @@ const input = (over: Partial<OpenSourceInput> = {}): OpenSourceInput => ({
   ...over,
 })
 
+async function stageDownload(
+  options: DownloadStreamFileOptions,
+  bytes: Uint8Array = BYTES,
+): Promise<DownloadFileResult> {
+  if (bytes.byteLength > (options.maxBytes ?? Infinity)) {
+    throw new UniworkDocError('too_large')
+  }
+  await options.beforeOpen?.()
+  await writeFile(options.destinationPath, bytes)
+  await options.beforeRename?.()
+  return { path: options.destinationPath, bytes: bytes.byteLength }
+}
+
 function harness(over: Partial<SourceViewOpenerDeps> = {}) {
   const root = join(userData, DRAFT_PREVIEW_DIR)
   const registry = new SourceViewRegistry()
@@ -65,7 +81,9 @@ function harness(over: Partial<SourceViewOpenerDeps> = {}) {
   }
   // the client is UNI-1961's; the document/binding calls must stay untouched
   const client = {
-    downloadSource: vi.fn(async (_ws: string, _id: string) => ({ bytes: BYTES })),
+    downloadSource: vi.fn(async (_ws: string, _id: string, options: DownloadStreamFileOptions) =>
+      stageDownload(options),
+    ),
     getDocument: vi.fn(),
     download: vi.fn(),
   }
@@ -87,7 +105,7 @@ function harness(over: Partial<SourceViewOpenerDeps> = {}) {
     profile: () => ({ deploymentId: 'dep1' }),
     storeLocked: () => false,
     documentMaxBytes: () => MAX,
-    downloadSource: (ws, id) => client.downloadSource(ws, id),
+    downloadSource: (ws, id, options) => client.downloadSource(ws, id, options),
     openPath,
     isPathOpen: (path) => openTabs.has(path),
     now: () => clock,
@@ -118,9 +136,18 @@ describe('openSource: what is downloaded and how', () => {
   it('downloads the one source through the injected client and never touches the document or binding APIs', async () => {
     const h = harness()
     const res = await h.opener.openSource(input())
-    expect(res.ok).toBe(true)
+    if (!res.ok) throw new Error(res.error)
     expect(h.client.downloadSource).toHaveBeenCalledTimes(1)
-    expect(h.client.downloadSource).toHaveBeenCalledWith('ws1', 'chat:msg-1')
+    expect(h.client.downloadSource).toHaveBeenCalledWith(
+      'ws1',
+      'chat:msg-1',
+      expect.objectContaining({
+        destinationPath: res.value.path,
+        maxBytes: MAX,
+        beforeOpen: expect.any(Function),
+        beforeRename: expect.any(Function),
+      }),
+    )
     expect(h.client.getDocument).not.toHaveBeenCalled()
     expect(h.client.download).not.toHaveBeenCalled()
   })
@@ -428,15 +455,12 @@ describe('openSource: refusals and error mapping', () => {
     expect(await h.opener.openSource(input())).toEqual({ ok: false, error: 'open_failed' })
   })
 
-  it('removes a half-written folder when the write fails after the folder exists', async () => {
-    const h = harness({
-      fs: {
-        writeFile: async (path) => {
-          const { writeFileSync } = await import('node:fs')
-          writeFileSync(path, 'par')
-          throw new Error('ENOSPC')
-        },
-      },
+  it('removes a half-written folder when downloadSource throws after beforeOpen created the folder', async () => {
+    const h = harness()
+    h.client.downloadSource.mockImplementationOnce(async (_ws, _id, options) => {
+      await options.beforeOpen?.()
+      writeFileSync(`${options.destinationPath}.uw-dl-partial.tmp`, 'par')
+      throw new Error('ENOSPC')
     })
     expect(await h.opener.openSource(input())).toEqual({ ok: false, error: 'open_failed' })
     expect(h.registry.paths()).toEqual([])
@@ -448,17 +472,17 @@ describe('openSource: refusals and error mapping', () => {
   it('does not write when the account changed while the download was running', async () => {
     let finish!: () => void
     const h = harness()
-    h.client.downloadSource.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = () => resolve({ bytes: BYTES })
-        }),
-    )
+    h.client.downloadSource.mockImplementationOnce(async (_ws, _id, options) => {
+      await new Promise<void>((resolve) => {
+        finish = resolve
+      })
+      return stageDownload(options)
+    })
     const pending = h.opener.openSource(input())
-    await new Promise((r) => setTimeout(r, 10))
+    await vi.waitFor(() => expect(h.client.downloadSource).toHaveBeenCalledTimes(1))
     await h.opener.dropAll()
     finish()
-    expect((await pending).ok).toBe(false)
+    expect(await pending).toEqual({ ok: false, error: 'not_signed_in' })
     expect(h.openPath).not.toHaveBeenCalled()
     expect(h.registry.paths()).toEqual([])
     expect(sourceDirs(h.root).flatMap((d) => readdirSync(join(h.root, d)))).toEqual([])
