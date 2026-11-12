@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import { IconEnter, IconSend, IconStop } from './icons'
 import { useAiPanelPrefs } from './ai-panel-prefs-store'
+import { useImeEnterGuard } from './ime-enter'
 import { useAiModelNeedAction, useAiModelNeedHint } from './ai-model-need'
 import {
   UniworkComposerNote,
@@ -107,6 +108,7 @@ export function AiComposer({
   const autoSentenceId = `ai-uniwork-disclosure-sentence-${autoId}`
   const autoNeedsAckId = `ai-uniwork-send-needs-ack-${autoId}`
 
+  const ime = useImeEnterGuard()
   // UniWork AI is not on here: send stays off and the hint says why
   const needModelHint = useAiModelNeedHint()
   const needModelAction = useAiModelNeedAction()
@@ -230,9 +232,12 @@ export function AiComposer({
         dir="auto"
         spellCheck={spellcheck}
         onChange={(e) => onChange(e.target.value)}
+        onCompositionStart={ime.handleCompositionStart}
+        onCompositionEnd={ime.handleCompositionEnd}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+          if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
+            if (ime.isImeConfirm(e.nativeEvent)) return
             if (unacked) {
               handleBlockedByAck()
               return

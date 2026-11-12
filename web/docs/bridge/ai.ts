@@ -68,6 +68,7 @@ export default {
     openInNewDocs: true,
     // the web frame has no AI sidebar to hide; keep the shipped default
     showAiSidebar: true,
+    showAiAskTrigger: true,
   }),
 
   // resolves after the one terminal chunk, like a real turn that failed to start
