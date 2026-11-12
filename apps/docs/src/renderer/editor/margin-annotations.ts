@@ -447,6 +447,18 @@ function colorName(hex: string): string {
   return key ? t(key) : `#${hex}`
 }
 
+function joinList(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? ''
+  try {
+    if (typeof Intl !== 'undefined' && typeof Intl.ListFormat === 'function') {
+      return new Intl.ListFormat(getLang(), { style: 'narrow', type: 'unit' }).format(items)
+    }
+  } catch {
+    /* fall back to comma separator */
+  }
+  return items.join(', ')
+}
+
 /** "Formatted:" balloon text: the changed run props' new values (Word describes what the run became) */
 function fmtDesc(old: Record<string, unknown>, marks: readonly PmMark[]): string {
   const ts = marks.find((m) => m.type.name === 'docTextStyle')
@@ -459,7 +471,7 @@ function fmtDesc(old: Record<string, unknown>, marks: readonly PmMark[]): string
   if (newFont && newFont !== oldFont) fontBits.push(newFont)
   const newSz = ts?.attrs.sizeHalfPoints as number | null | undefined
   if (newSz && newSz !== old.sizeHalfPoints) fontBits.push(`${newSz / 2} pt`)
-  if (fontBits.length > 0) parts.push(`${t('editorRevFont')}: ${fontBits.join(', ')}`)
+  if (fontBits.length > 0) parts.push(`${t('editorRevFont')}: ${joinList(fontBits)}`)
   if (bold !== !!old.bold) parts.push(t(bold ? 'editorRevBold' : 'editorRevNotBold'))
   if (italic !== !!old.italic) parts.push(t(italic ? 'editorRevItalic' : 'editorRevNotItalic'))
   const underline = marks.some((m) => m.type.name === 'underline')
@@ -478,7 +490,7 @@ function fmtDesc(old: Record<string, unknown>, marks: readonly PmMark[]): string
   if (newHl !== (((old.highlight as string | undefined) ?? null) as string | null)) {
     parts.push(t('editorRevHighlight'))
   }
-  return parts.join(', ') || t('editorFormatRevision')
+  return joinList(parts) || t('editorFormatRevision')
 }
 
 export type RevItem = {
