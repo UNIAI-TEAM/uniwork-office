@@ -20,6 +20,13 @@ export const RANGE_CHUNK_ATTEMPTS = 3
 const RETRY_BASE_MS = 250
 /** default 256 MiB cap for callers that keep the assembled payload in memory */
 export const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
+const RETRYABLE_RENAME_CODES: Record<string, true> = {
+  EPERM: true,
+  EACCES: true,
+  EBUSY: true,
+}
+const RENAME_RETRIES = 4
+const RENAME_BACKOFF_BASE_MS = 50
 // cloud-sync folders, AV locks and fsync-less filesystems may refuse fsync after a write
 const TOLERATED_SYNC_CODES: Record<string, true> = {
   EPERM: true,
@@ -28,7 +35,6 @@ const TOLERATED_SYNC_CODES: Record<string, true> = {
   EINVAL: true,
   ENOSYS: true,
 }
-
 export interface ContentRange {
   start: number
   end: number
@@ -180,7 +186,18 @@ function createFileSink(
       if (signal?.aborted) throw new UniworkDocError('network')
       await input.beforeRename?.()
       if (signal?.aborted) throw new UniworkDocError('network')
-      await rename(tmp, resolvedTarget)
+      const renameBackoff =
+        input.backoffMs ?? ((n: number) => RENAME_BACKOFF_BASE_MS * 2 ** (n - 1))
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          await rename(tmp, resolvedTarget)
+          break
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException | null)?.code ?? ''
+          if (!RETRYABLE_RENAME_CODES[code] || attempt >= RENAME_RETRIES) throw error
+          await wait(renameBackoff(attempt + 1), signal)
+        }
+      }
       createdTmp = false
       return { path: destinationPath, bytes: totalBytes }
     },

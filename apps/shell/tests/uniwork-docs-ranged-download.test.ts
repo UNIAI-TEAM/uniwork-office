@@ -24,9 +24,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
     ...actual,
     rename: async (src: string, dest: string) => {
       if (renameHook.onRename) {
-        const fn = renameHook.onRename
-        renameHook.onRename = null
-        fn(String(src), String(dest))
+        renameHook.onRename(String(src), String(dest))
       }
       return actual.rename(src, dest)
     },
@@ -515,6 +513,54 @@ describe('downloadStream in Range windows to disk (UNI-2518 / UNI-2525)', () => 
     expect(line).toContain('outcome=error')
     expect(line).not.toContain(dir)
     expect(line).not.toContain('existing.bin')
+  })
+
+  it('retries transient EPERM/EACCES/EBUSY on rename and removes the temp file when retries exhaust (R1-7)', async () => {
+    const file = fileOf(1024)
+    const dest = join(dir, 'transient-eperm.bin')
+    writeFileSync(dest, new Uint8Array([1, 2, 3, 4]))
+    let attempts = 0
+    renameHook.onRename = () => {
+      attempts += 1
+      if (attempts <= 2) {
+        throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' })
+      }
+    }
+    const out = await downloadInChunks({
+      destinationPath: dest,
+      label: `document=${DOC} version=live`,
+      backoffMs: () => 0,
+      async readChunk() {
+        return { kind: 'whole', bytes: file }
+      },
+    })
+    expect(out).toEqual({ path: dest, bytes: file.byteLength })
+    expect(attempts).toBe(3)
+    expect(Buffer.compare(readFileSync(dest), Buffer.from(file))).toBe(0)
+    expect(readdirSync(dir)).toEqual(['transient-eperm.bin'])
+
+    // When transient EPERM persists past all 4 retries (5 attempts total), temp is removed and dest kept
+    writeFileSync(dest, new Uint8Array([9, 9, 9]))
+    let exhaustedAttempts = 0
+    renameHook.onRename = () => {
+      exhaustedAttempts += 1
+      throw Object.assign(new Error('EPERM: locked by AV'), { code: 'EPERM' })
+    }
+    const caught = await downloadInChunks({
+      destinationPath: dest,
+      label: `document=${DOC} version=live`,
+      backoffMs: () => 0,
+      async readChunk() {
+        return { kind: 'whole', bytes: file }
+      },
+    }).then(
+      () => null,
+      (error: unknown) => error,
+    )
+    expect((caught as NodeJS.ErrnoException)?.code).toBe('EPERM')
+    expect(exhaustedAttempts).toBe(5)
+    expect(readdirSync(dir)).toEqual(['transient-eperm.bin'])
+    expect([...readFileSync(dest)]).toEqual([9, 9, 9])
   })
 
   it('enforces MAX_DOWNLOAD_BYTES (256 MiB) on the single-GET in-memory download() path and accepts > 50 MiB up to the cap', async () => {
