@@ -44,7 +44,11 @@ vi.mock('electron', () => ({
   },
 }))
 
-import { buildExportImagePaths } from '../src/main/export-images'
+import {
+  buildExportImagePaths,
+  encodeExportPage,
+  EXPORT_JPEG_QUALITY,
+} from '../src/main/export-images'
 import { createPdfView } from '../src/main/pdf-main'
 import { PDF_CHANNELS } from '../src/shared/ipc'
 import type { ExportImagesResult } from '../src/shared/ipc'
@@ -111,8 +115,88 @@ describe('PDF image export paths', () => {
   })
 
   it('rejects unsafe page values in the path builder', () => {
-    expect(() => buildExportImagePaths(resolve(dir), 'page', ['../escape'])).toThrow(
+    expect(() => buildExportImagePaths(resolve(dir), 'page', ['../escape'], 'png')).toThrow(
       /invalid page numbers/,
     )
+  })
+
+  it('writes jpg files when the request asks for jpg', async () => {
+    const result = await invoke({
+      images: ['YQ=='],
+      pageNumbers: [3],
+      baseName: 'page',
+      format: 'jpg',
+    })
+
+    expect(result).toEqual({ ok: true, savedDir: dir, count: 1 })
+    expect(readdirSync(dir)).toEqual(['page-p3.jpg'])
+    expect(readFileSync(join(dir, 'page-p3.jpg'), 'utf8')).toBe('a')
+    expect(state.showItemInFolder).toHaveBeenCalledWith(join(resolve(dir), 'page-p3.jpg'))
+  })
+
+  it('encodes JPG export bytes as a valid JPEG (SOI FFD8 / EOI FFD9) at the chosen quality', async () => {
+    const toDataURL = vi.fn((type?: string, quality?: unknown) => {
+      const q = typeof quality === 'number' ? Math.round(quality * 100) : 100
+      const jpeg = Buffer.from([
+        0xff,
+        0xd8, // SOI
+        0xff,
+        0xdb,
+        0x00,
+        0x04,
+        0x00,
+        q, // DQT marker with quality-derived quantizer byte
+        0xff,
+        0xd9, // EOI
+      ])
+      return `data:${type ?? 'image/png'};base64,${jpeg.toString('base64')}`
+    })
+    const b64 = encodeExportPage({ toDataURL }, 'jpg')
+    expect(toDataURL).toHaveBeenCalledWith('image/jpeg', EXPORT_JPEG_QUALITY)
+    expect(EXPORT_JPEG_QUALITY).toBe(0.92)
+
+    const result = await invoke({
+      images: [b64],
+      pageNumbers: [1],
+      baseName: 'page',
+      format: 'jpg',
+    })
+    expect(result).toEqual({ ok: true, savedDir: dir, count: 1 })
+    const written = readFileSync(join(dir, 'page-p1.jpg'))
+    expect(written[0]).toBe(0xff)
+    expect(written[1]).toBe(0xd8)
+    expect(written[written.length - 2]).toBe(0xff)
+    expect(written[written.length - 1]).toBe(0xd9)
+    expect(written[7]).toBe(Math.round(EXPORT_JPEG_QUALITY * 100))
+  })
+
+  it('builds jpg paths in the path builder', () => {
+    expect(buildExportImagePaths(resolve(dir), 'page', [3], 'jpg')).toEqual([
+      join(resolve(dir), 'page-p3.jpg'),
+    ])
+  })
+
+  it('treats any format other than jpg as png', async () => {
+    const result = await invoke({
+      images: ['Yg=='],
+      pageNumbers: [1],
+      baseName: 'page',
+      format: 'gif',
+    })
+
+    expect(result).toEqual({ ok: true, savedDir: dir, count: 1 })
+    expect(readdirSync(dir)).toEqual(['page-p1.png'])
+  })
+
+  it('rejects duplicate page numbers regardless of format', async () => {
+    const result = await invoke({
+      images: ['YQ==', 'Yg=='],
+      pageNumbers: [3, 3],
+      baseName: 'page',
+      format: 'jpg',
+    })
+
+    expect(result).toEqual({ ok: false, error: 'pdf: invalid page numbers' })
+    expect(state.showOpenDialog).not.toHaveBeenCalled()
   })
 })

@@ -1135,14 +1135,16 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       const { images, pageNumbers, baseName } = request ?? {}
       if (!Array.isArray(images) || images.length === 0) return fail('pdf: no images')
       try {
+        const ext = request?.format === 'jpg' ? 'jpg' : 'png'
+        const mime = ext === 'jpg' ? 'image/jpeg' : 'image/png'
         const base = safeBase(baseName || 'page')
         const files = images.map((b64, i) => {
           const bin = atob(b64)
           const data = new Uint8Array(bin.length)
           for (let j = 0; j < bin.length; j++) data[j] = bin.charCodeAt(j)
-          return { name: `${base}-p${pageNumbers?.[i] ?? i + 1}.png`, data }
+          return { name: `${base}-p${pageNumbers?.[i] ?? i + 1}.${ext}`, data }
         })
-        const savedDir = await downloadMany(`${base}-images.zip`, files, 'image/png')
+        const savedDir = await downloadMany(`${base}-images.zip`, files, mime)
         return { ok: true, savedDir, count: images.length }
       } catch (err) {
         return fail(describe(err))

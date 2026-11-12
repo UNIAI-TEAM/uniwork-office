@@ -964,13 +964,26 @@ export interface CropPagesRequest {
 
 export type CropPagesResult = { ok: true } | { ok: false; error: string }
 
-/** Export pages as PNG: renderer rasterizes the bitmaps, main process shows a dialog and writes to disk */
+/** Export pages as PNG or JPEG: renderer rasterizes the bitmaps, main process shows a dialog and writes to disk */
 export interface ExportImagesRequest {
-  /** base64 PNGs (without the data: prefix), in page order */
+  /** base64 PNGs or JPEGs (without the data: prefix), in page order, matching format */
   images: string[]
   /** 1-based page numbers, same length as images, used for file names */
   pageNumbers: number[]
   baseName: string
+  /** Image encoding; anything other than 'jpg' falls back to png */
+  format?: 'png' | 'jpg'
+}
+
+export const EXPORT_JPEG_QUALITY = 0.92
+
+export function encodeExportPage(
+  canvas: { toDataURL(type?: string, quality?: unknown): string },
+  format: 'png' | 'jpg' = 'png',
+): string {
+  return format === 'jpg'
+    ? (canvas.toDataURL('image/jpeg', EXPORT_JPEG_QUALITY).split(',')[1] ?? '')
+    : (canvas.toDataURL('image/png').split(',')[1] ?? '')
 }
 
 export type ExportImagesResult =

@@ -125,7 +125,7 @@ import { printPdf } from './print'
 import { readFileBytes } from './file-bytes'
 import type { PdfEncryptionInput, PdfPermissions } from '../shared/ipc'
 import { mayChangeProtection } from './protection-gate'
-import { MAX_REDACTION_REGIONS } from '../shared/ipc'
+import { encodeExportPage, MAX_REDACTION_REGIONS } from '../shared/ipc'
 import { PasswordDialog } from './PasswordDialog'
 import { StaticTextDialog } from './StaticTextDialog'
 import { PropertiesDialog } from './PropertiesDialog'
@@ -982,7 +982,7 @@ export default function App() {
   const [pendingSign, setPendingSign] = useState<SignatureData | null>(null)
   /** A /Sig widget selected from the form layer; confirmed signatures fit this rect directly. */
   const [signatureTarget, setSignatureTarget] = useState<FormWidget | null>(null)
-  const [exporting, setExporting] = useState(false)
+  const [exporting, setExporting] = useState<'png' | 'jpg' | null>(null)
   const [formCatalog, setFormCatalog] = useState<FormCatalog | null>(null)
   const [formHasXfa, setFormHasXfa] = useState(false)
   const [documentEncrypted, setDocumentEncrypted] = useState(false)
@@ -6000,11 +6000,11 @@ export default function App() {
     }
   }, [livePreviewRects, scale, pageGeom, rotDelta, filePath])
 
-  /** Export PNG: current page or all visible pages, 150dpi equivalent */
-  const exportImages = (allPages: boolean) =>
+  /** Export PNG or JPG: current page or all visible pages, 150dpi equivalent */
+  const exportImages = (allPages: boolean, format: 'png' | 'jpg' = 'png') =>
     flushThen(async () => {
       if (!doc || exporting) return
-      setExporting(true)
+      setExporting(format)
       try {
         const targets = allPages ? visList : [curOrigIdx].filter((i) => i >= 0)
         const images: string[] = []
@@ -6019,7 +6019,7 @@ export default function App() {
           canvas.width = Math.floor(viewport.width)
           canvas.height = Math.floor(viewport.height)
           await page.render({ canvas, viewport }).promise
-          images.push(canvas.toDataURL('image/png').split(',')[1] ?? '')
+          images.push(encodeExportPage(canvas, format))
           pageNumbers.push(visList.indexOf(origIdx) + 1)
         }
         canvas.width = 0
@@ -6028,12 +6028,13 @@ export default function App() {
           images,
           pageNumbers,
           baseName: fileName.replace(/\.pdf$/i, ''),
+          format,
         })
         if (!result.ok) opFailed(result.error)
       } catch (err) {
         opFailed(err instanceof Error ? err.message : String(err))
       } finally {
-        setExporting(false)
+        setExporting(null)
       }
     })
 
@@ -8221,17 +8222,30 @@ export default function App() {
                     </button>
                   )}
                   {cap('saveAs') && (
-                    <button
-                      className="rb-big"
-                      data-tip={t('exportImagesAll')}
-                      disabled={exporting}
-                      onClick={() => void exportImages(true)}
-                    >
-                      <span className="rb-big-icon">
-                        <IconExportImg />
-                      </span>
-                      <span>{exporting ? t('exporting') : t('exportImages')}</span>
-                    </button>
+                    <>
+                      <button
+                        className="rb-big"
+                        data-tip={t('exportImagesAll')}
+                        disabled={exporting !== null}
+                        onClick={() => void exportImages(true)}
+                      >
+                        <span className="rb-big-icon">
+                          <IconExportImg />
+                        </span>
+                        <span>{exporting === 'png' ? t('exporting') : t('exportImages')}</span>
+                      </button>
+                      <button
+                        className="rb-big"
+                        data-tip={t('exportImagesAllJpg')}
+                        disabled={exporting !== null}
+                        onClick={() => void exportImages(true, 'jpg')}
+                      >
+                        <span className="rb-big-icon">
+                          <IconExportImg />
+                        </span>
+                        <span>{exporting === 'jpg' ? t('exporting') : t('exportImagesJpg')}</span>
+                      </button>
+                    </>
                   )}
                   <button
                     className="rb-big"

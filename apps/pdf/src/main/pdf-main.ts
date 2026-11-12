@@ -2116,6 +2116,7 @@ function registerPdfIpc(): void {
       if (uniworkIsLocked(openPathByWc.get(e.sender.id) ?? null))
         return { ok: true, canceled: true }
       const { images, pageNumbers, baseName } = request ?? {}
+      const ext = request?.format === 'jpg' ? 'jpg' : 'png'
       if (!Array.isArray(images) || images.length === 0)
         return { ok: false, error: 'pdf: no images' }
       if (!hasValidExportPageNumbers(pageNumbers, images.length))
@@ -2129,7 +2130,7 @@ function registerPdfIpc(): void {
       const dir = picked.filePaths[0]
       if (picked.canceled || !dir) return { ok: true, canceled: true }
       try {
-        const outputPaths = buildExportImagePaths(dir, baseName, pageNumbers)
+        const outputPaths = buildExportImagePaths(dir, baseName, pageNumbers, ext)
         for (const [i, b64] of images.entries()) {
           await writeFile(outputPaths[i]!, Buffer.from(b64, 'base64'))
         }
