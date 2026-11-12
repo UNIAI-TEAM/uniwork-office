@@ -40,6 +40,7 @@ export {
   DEFAULT_SAVE_DIR_KEY,
   configuredDefaultSaveDir,
   isUsableSaveDir,
+  mkdirDirs,
   peekDefaultSaveDir,
   readDefaultSaveDirSetting,
   resolveDefaultSaveDir,
