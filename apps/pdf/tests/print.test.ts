@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
+import type { spawn } from 'node:child_process'
+import { printFileViaCups } from '@genoffice/electron-utils/print-cups'
+import { printJobOptions } from '@genoffice/electron-utils/print-job'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import {
   filterPageParity,
@@ -330,5 +335,58 @@ describe('maySpoolOriginal', () => {
   it('spools the original only when the file is not password-protected on disk', () => {
     expect(maySpoolOriginal(null)).toBe(true)
     expect(maySpoolOriginal('secret')).toBe(false)
+  })
+})
+
+describe('macOS lp printFile route with granted path', () => {
+  it('builds lp argv array with the granted path after -- and no shell string', async () => {
+    const calls: Array<{ cmd: string; args: readonly string[]; opts: unknown }> = []
+    const spawnFn = vi.fn((cmd: string, args: readonly string[], opts: unknown) => {
+      const child = Object.assign(new EventEmitter(), {
+        stdin: new PassThrough(),
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+      })
+      calls.push({ cmd, args, opts })
+      queueMicrotask(() => child.emit('close', 0))
+      return child
+    })
+
+    const grantedPath = '/Users/alice/Documents/Report (final).pdf'
+    const request = {
+      deviceName: 'Office_LaserJet',
+      copies: 2,
+      collate: true,
+      duplex: 'longEdge' as const,
+      pages: [1, 2, 3, 5],
+      path: grantedPath,
+    }
+    const opts = printJobOptions(request)
+    const result = await printFileViaCups(
+      request.path,
+      opts,
+      request.pages,
+      spawnFn as unknown as typeof spawn,
+    )
+
+    expect(result).toEqual({ ok: true })
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.cmd).toBe('/usr/bin/lp')
+    expect(Array.isArray(calls[0]!.args)).toBe(true)
+    expect(calls[0]!.args).toEqual([
+      '-d',
+      'Office_LaserJet',
+      '-n',
+      '2',
+      '-o',
+      'Collate=True',
+      '-o',
+      'sides=two-sided-long-edge',
+      '-P',
+      '1-3,5',
+      '--',
+      grantedPath,
+    ])
+    expect(calls[0]!.opts).toEqual({ stdio: ['pipe', 'pipe', 'pipe'] })
   })
 })
