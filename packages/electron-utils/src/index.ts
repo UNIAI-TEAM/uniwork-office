@@ -40,6 +40,7 @@ export {
   DEFAULT_SAVE_DIR_KEY,
   configuredDefaultSaveDir,
   isUsableSaveDir,
+  mkdirDirs,
   peekDefaultSaveDir,
   readDefaultSaveDirSetting,
   resolveDefaultSaveDir,
@@ -54,6 +55,14 @@ export {
   type OoxmlDecryptFailReason,
 } from './ooxml-encryption'
 export { installNavigationGuard } from './navigation-guard'
+export {
+  decodeChunks,
+  decodeChunksUtf8,
+  decodeCommandOutput,
+  decodeUtf8,
+  windowsOemCodePage,
+  type DecodeCommandOptions,
+} from './console-output'
 export {
   DROP_OPEN_CHANNEL,
   droppableFilePaths,

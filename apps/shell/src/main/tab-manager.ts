@@ -59,7 +59,7 @@ import {
   slidesIsDirty,
 } from '../../../slides/src/main/slides-main'
 import type { DocumentTabKind, OpenDocumentTab, TabKind, TabSummary } from '../shared/tabs-api'
-import { tabStripHeight } from '../shared/tab-drag-geometry'
+import { isSettledRect, tabStripHeight } from '../shared/tab-drag-geometry'
 import { clampDiscussionPanelWidth } from '@genoffice/electron-utils/comments-ipc'
 import { aiEpochOf, clearAiRun, isAiRunning, type EditorState } from './ai-run-registry'
 import { matchShellKey, shortcutPlatform } from './shell-shortcuts'
@@ -166,6 +166,15 @@ export class TabManager {
     })
     // the chrome (tab strip, Home, a dialog) can hold keyboard focus while a tab is active
     this.trackCloseChord(shellWindow.webContents)
+    // Windows fires `restore` when a minimized window comes back from the taskbar,
+    // sometimes before the client bounds have settled — the same stale-geometry
+    // race as Linux/X11 maximize (issue #15). Reconcile synchronously (the bounds
+    // are usually already right) and once more on the next tick. Bounded: exactly
+    // two layout passes per restore, no polling, no recurring timers.
+    shellWindow.on('restore', () => {
+      this.reconcileAfterWindowRestore()
+      setImmediate(() => this.reconcileAfterWindowRestore())
+    })
   }
 
   private scheduleSpareSheetsView(delayMs: number): void {
@@ -183,7 +192,10 @@ export class TabManager {
       this.trackCloseChord(view.webContents)
       this.shellWindow.contentView.addChildView(view)
       view.setVisible(false)
-      view.setBounds(this.contentBounds())
+      // the window may be minimized or mid-restore when the spare spawns; a
+      // degenerate rect would leave the spare zero-sized until its next layout
+      const bounds = this.contentBounds()
+      if (isSettledRect(bounds)) view.setBounds(bounds)
       // Chromium focuses a new webContents inside createSheetsView (its loadURL),
       // before any `focus` listener exists, and OS keys sent to a hidden view
       // reach no webContents at all (no before-input-event, no menu
@@ -402,8 +414,24 @@ export class TabManager {
   layout(): void {
     // Deferred resize layouts can land after the shell window was closed.
     if (this.shellWindow.isDestroyed()) return
+    const bounds = this.contentBounds()
+    // A minimized or mid-restore window can report a degenerate client rect;
+    // applying it would shrink the active view to nothing — the white screen
+    // after a Windows taskbar restore. Keep the last good layout instead.
+    if (!isSettledRect(bounds)) return
     const active = this.tabs.find((t) => t.id === this.activeId)
-    if (active?.view) active.view.setBounds(this.contentBounds())
+    if (active?.view) active.view.setBounds(bounds)
+  }
+
+  /**
+   * Re-fit the active view after the native window returns from the taskbar.
+   * Deliberately narrower than activateTab: no visibility toggles, no focus,
+   * no menu, no onChanged — the active tab, its WebContentsView and every
+   * other document stay exactly as they were.
+   */
+  reconcileAfterWindowRestore(): void {
+    if (this.shellWindow.isDestroyed() || this.shellWindow.isMinimized()) return
+    this.layout()
   }
 
   /** files open in any tab, for the open-documents registry */
@@ -742,7 +770,10 @@ export class TabManager {
     const target = this.tabs.find((t) => t.id === id)
     if (!target) return
     for (const t of this.tabs) t.view?.setVisible(t.id === id)
-    if (target.view) target.view.setBounds(this.contentBounds(id))
+    const bounds = this.contentBounds(id)
+    // a bring-forward while the window is minimized or mid-restore must not
+    // zero-size the view being activated (same guard as layout())
+    if (target.view && isSettledRect(bounds)) target.view.setBounds(bounds)
     this.activeId = id
     if (this.isOfficeTab(target)) this.lastOfficeId = id
     if (target.kind === 'sheets') this.scheduleSpareSheetsView(3000)

@@ -1,5 +1,5 @@
 import './stdio-guard'
-import { execSync, spawn } from 'node:child_process'
+import { execSync } from 'node:child_process'
 import {
   cpSync,
   existsSync,
@@ -32,7 +32,9 @@ import {
 } from 'electron'
 import type { MenuItemConstructorOptions, NativeImage, WebContents } from 'electron'
 import { atomicCopyFile, atomicWriteFile } from './atomic-write'
+import { openTrash } from './trash'
 import { tabStripOverlay } from './title-bar-overlay'
+import { shellWindowBackground } from './window-background'
 import { legalDocPath, openLegalDoc, type LegalDocEnv } from './legal-docs'
 import { isDraftPreviewPath } from './uniwork-sync/sync-center'
 import { applyUiScaleTo, applyUiScaleToAll, onUiScaleChanged, readUiScale } from './ui-scale'
@@ -378,7 +380,7 @@ import {
   pageRecentPaths,
   pageStarredPaths,
   type RecentUniworkLookup,
-  statPathEntries,
+  statPathEntriesAsync,
 } from './recent-files'
 import { isMoveSource, isUserVisibleFile, type FileTargetSources } from './file-targets'
 import {
@@ -3931,6 +3933,13 @@ function createShellWindow(): void {
     minHeight: SHELL_WINDOW_MIN_HEIGHT,
     title: 'UniWork Office',
     ...(icon ? { icon } : {}),
+    // Paint the theme's surface before the renderer's first frame so the window
+    // does not flash white in dark mode. nativeTheme.themeSource is already set
+    // from the saved theme in app.whenReady, before this window is created.
+    // macOS uses vibrancy below, which must stay transparent.
+    ...(process.platform === 'darwin'
+      ? {}
+      : { backgroundColor: shellWindowBackground(nativeTheme.shouldUseDarkColors) }),
     // vibrancy: editor modules punch translucent regions (e.g. the slides
     // thumbnail pane) through to the desktop
     ...(process.platform === 'darwin'
@@ -5090,8 +5099,8 @@ function startQueuedWorkbookNudge(): void {
 
 // ---- home IPC ----
 
-function statEntries(paths: string[]): RecentEntry[] {
-  return statPathEntries(paths, new Set(readStarredFiles()))
+function statEntries(paths: string[]): Promise<RecentEntry[]> {
+  return statPathEntriesAsync(paths, new Set(readStarredFiles()))
 }
 
 /** recents, starred and search share one rule for UniWork working copies */
@@ -5237,7 +5246,7 @@ function registerHomeIpc(): void {
     openLegalDoc(doc, legalDocEnv(), { openPath: (path) => shell.openPath(path) }),
   )
 
-  guardedIpc.handle(HOME_CHANNELS.recents, (_event, query: unknown): RecentPage =>
+  guardedIpc.handle(HOME_CHANNELS.recents, (_event, query: unknown): Promise<RecentPage> =>
     pageRecentPaths(readRecentFiles(), query, new Set(readStarredFiles()), uniworkRecentLookup),
   )
 
@@ -5271,7 +5280,7 @@ function registerHomeIpc(): void {
   // Starred files sort by mtime, which requires stat-ing them all first; they
   // are hand-picked and few, so this is fine. The Starred view's group pills
   // scope the whole query (totals included) through the group map.
-  guardedIpc.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage =>
+  guardedIpc.handle(HOME_CHANNELS.starred, (_event, query: unknown): Promise<RecentPage> =>
     pageStarredPaths(readStarredFiles(), query, uniworkRecentLookup, readStarredGroupMap()),
   )
 
@@ -5281,7 +5290,7 @@ function registerHomeIpc(): void {
     setStarredGroup(stringPaths(paths), typeof group === 'string' && group ? group : null)
   })
 
-  guardedIpc.handle(HOME_CHANNELS.statPaths, (_event, paths: unknown): RecentEntry[] =>
+  guardedIpc.handle(HOME_CHANNELS.statPaths, (_event, paths: unknown): Promise<RecentEntry[]> =>
     statEntries(capStatPaths(stringPaths(paths))),
   )
 
@@ -5634,14 +5643,8 @@ function registerHomeIpc(): void {
     removeStarredFiles(list)
   })
 
-  guardedIpc.handle(HOME_CHANNELS.openTrash, () => {
-    if (process.platform === 'darwin') {
-      void shell.openPath(join(app.getPath('home'), '.Trash'))
-    } else if (process.platform === 'win32') {
-      spawn('explorer.exe', ['shell:RecycleBin'], { detached: true }).unref()
-    } else {
-      void shell.openPath(join(app.getPath('home'), '.local', 'share', 'Trash', 'files'))
-    }
+  guardedIpc.handle(HOME_CHANNELS.openTrash, async () => {
+    await openTrash()
   })
 
   guardedIpc.handle(HOME_CHANNELS.getLanguage, (): Lang => currentLang())

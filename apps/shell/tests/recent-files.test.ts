@@ -109,8 +109,8 @@ describe('starred and search lists follow the UniWork lookup like recents', () =
 
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-  it('hides another account copy and enriches a bound one in starred', () => {
-    const page = pageStarredPaths([other, mine, local], {}, lookup)
+  it('hides another account copy and enriches a bound one in starred', async () => {
+    const page = await pageStarredPaths([other, mine, local], {}, lookup)
     expect(page.entries.map((e) => e.path)).toEqual([local, mine])
     expect(page.entries.find((e) => e.path === mine)?.uniwork).toEqual(source)
     expect(page.entries.find((e) => e.path === local)?.uniwork).toBeUndefined()
@@ -118,8 +118,8 @@ describe('starred and search lists follow the UniWork lookup like recents', () =
     expect(page.totalAll).toBe(2)
   })
 
-  it('keeps starred untouched without a lookup', () => {
-    const page = pageStarredPaths([other, mine, local], {})
+  it('keeps starred untouched without a lookup', async () => {
+    const page = await pageStarredPaths([other, mine, local], {})
     expect(page.entries).toHaveLength(3)
     expect(page.entries.every((e) => e.uniwork === undefined)).toBe(true)
   })
