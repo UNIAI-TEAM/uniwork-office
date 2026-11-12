@@ -1,3 +1,5 @@
+import type { UniworkDocErrorCode } from '../../shared/home-api'
+
 /**
  * A notice can send the person to four places inside the Documents home: a document's Share
  * dialog (on its access-requests or break-glass section), its Version history, a row of the Trash and a folder. The inbox
@@ -88,9 +90,17 @@ export function onDocumentsIntentRoute(handler: DocumentsIntentRouter): () => vo
   }
 }
 
-/** The host could not route the intent (a workspace the person is not in): forget it. */
-export function dropDocumentsIntent(intent: DocumentsIntent): void {
+/**
+ * The host could not route the intent (a workspace the person is not in, or no sign-in): forget it.
+ * Returns the failure the person is told about, or null for a versions intent: that one follows an
+ * open that already succeeded, so a launch failure right after it would contradict the open.
+ */
+export function refuseDocumentsIntent(
+  intent: DocumentsIntent,
+  error: UniworkDocErrorCode,
+): UniworkDocErrorCode | null {
   if (pending === intent) pending = null
+  return intent.kind === 'versions' ? null : error
 }
 
 export function resetDocumentsIntentBusForTests(): void {

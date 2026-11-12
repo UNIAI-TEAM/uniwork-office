@@ -9,10 +9,14 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import type { WorkNotification } from '../src/shared/uniwork-work-api'
 import {
   onDocumentsIntent,
+  onDocumentsIntentRoute,
+  openDocumentShare,
+  refuseDocumentsIntent,
   resetDocumentsIntentBusForTests,
 } from '../src/renderer/src/documents-intent-bus'
 import type { TFunc } from '../src/renderer/src/locale'
 import { noticeLine, openNotice } from '../src/renderer/src/notice-open'
+import { onUniworkNotice, publishUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 
 const change = (params: Record<string, string>, over: Partial<WorkNotification> = {}) =>
   ({
@@ -96,5 +100,34 @@ describe('openNotice: version_created', () => {
     expect(uniworkOpenDocument).not.toHaveBeenCalled()
     expect(intents).toEqual([])
     expect(markRead).toHaveBeenCalledWith('n1')
+  })
+})
+
+describe('a via-client notice for a workspace the person is not in', () => {
+  // the Home router's answer to an intent it cannot route (workspace outside the list)
+  let toasts: unknown[]
+  let unsubscribe: () => void
+  beforeEach(() => {
+    toasts = []
+    unsubscribe = onUniworkNotice((event) => toasts.push(event))
+    onDocumentsIntentRoute((intent) => {
+      const error = refuseDocumentsIntent(intent, 'forbidden')
+      if (error) publishUniworkNotice({ phase: 'failed', error })
+    })
+  })
+
+  afterEach(() => unsubscribe())
+
+  it('opens the document and shows no launch failure after it', async () => {
+    await click(viaClient({ workspace_id: 'elsewhere' }))
+    expect(uniworkOpenDocument).toHaveBeenCalledWith('d1')
+    expect(markRead).toHaveBeenCalledWith('n1')
+    // the open's own progress is the only thing on the launch notice
+    expect(toasts.map((e) => (e as { phase: string }).phase)).toEqual(['opening', 'opened'])
+  })
+
+  it('still tells the person when another intent cannot be routed', () => {
+    openDocumentShare({ documentId: 'd1', workspaceId: 'elsewhere', section: 'requests' })
+    expect(toasts).toEqual([{ phase: 'failed', error: 'forbidden' }])
   })
 })
