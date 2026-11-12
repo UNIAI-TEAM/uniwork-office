@@ -1,4 +1,5 @@
 import { isDecimalString } from '../../uniwork-docs/formats'
+import { isEditorSessionId } from '../../uniwork-docs/editor-session-id'
 import type { UniworkDocErrorCode } from '../../../shared/home-api'
 import type { SavedUploadSession } from '../../uniwork-docs/upload-session'
 import { isLegacyConversion, type LegacyConversion } from '../../uniwork-docs/legacy-cloud'
@@ -97,6 +98,13 @@ export interface IntentRecordV2 {
    * the same Idempotency-Key never carries another conversion.
    */
   conversion?: LegacyConversion | null
+  /**
+   * UNI-2510: ULID of the editor opening this save was made in, minted into the intent so an
+   * offline save pushed later (or retried by another poll pass) commits under the id of the window
+   * that wrote it. Absent = a record from before the field, or a save without an editor opening:
+   * the commit then omits `editor_session_id`.
+   */
+  editorSessionId?: string
 }
 
 /** what a caller knows about a legacy record's binding, used to upgrade v1 -> v2 */
@@ -250,6 +258,8 @@ function readV2(r: Record<string, unknown>): IntentRecordV2 | null {
     ...(r.cancelReason === undefined ? {} : { cancelReason: r.cancelReason }),
     ...(uploadSession === undefined ? {} : { uploadSession }),
     ...(r.conversion === undefined ? {} : { conversion: r.conversion as LegacyConversion | null }),
+    // a stored id that is not a ULID is dropped, never the whole record: the save still goes out
+    ...(isEditorSessionId(r.editorSessionId) ? { editorSessionId: r.editorSessionId } : {}),
   }
 }
 

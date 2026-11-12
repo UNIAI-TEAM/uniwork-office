@@ -68,6 +68,8 @@ export interface QueueClient {
     editLockId?: string
     /** UNI-2212: the staged OOXML converts the document's legacy live version; omitted otherwise */
     conversion?: LegacyConversion
+    /** UNI-2510: the editor opening this save was made in; omitted when the intent has none */
+    editorSessionId?: string
   }): Promise<{
     documentId: string
     versionId: string
@@ -232,6 +234,8 @@ export interface MintedIntent {
   length: number
   /** UNI-2212: the commit's conversion snapshot (null = ordinary; absent = read the binding) */
   conversion?: LegacyConversion | null
+  /** UNI-2510: the editor opening the save was made in (absent = the commit omits the field) */
+  editorSessionId?: string
 }
 
 export class QueueDispatcher {
@@ -927,6 +931,7 @@ export class QueueDispatcher {
           idempotencyKey: doc.record.idempotencyKey,
           ...(editLockId ? { editLockId } : {}),
           ...(conversion ? { conversion } : {}),
+          ...(doc.record.editorSessionId ? { editorSessionId: doc.record.editorSessionId } : {}),
         })
       } catch (error) {
         if (error instanceof UniworkDocError && error.code === 'edit_locked' && editLockId) {
@@ -1334,5 +1339,6 @@ function toNewIntent(intent: MintedIntent): NewIntentInput {
     checksum: intent.checksum,
     length: intent.length,
     ...(intent.conversion === undefined ? {} : { conversion: intent.conversion }),
+    ...(intent.editorSessionId === undefined ? {} : { editorSessionId: intent.editorSessionId }),
   }
 }

@@ -980,3 +980,69 @@ describe('list-row parse still drops malformed edit_lock', () => {
     expect(page.documents[0]?.editLock).toBeUndefined()
   })
 })
+
+describe('UNI-2510: editor_session_id follows one opening of the editor in a window', () => {
+  /** one more save of this path: new bytes on disk, the staged upload matches them */
+  async function saveAnother(h: ReturnType<typeof setup>, path: string, text: string) {
+    const bytes = enc(text)
+    writeFileSync(path, bytes)
+    const deps = h.service['deps'] as unknown as { client: Record<string, unknown> }
+    deps.client.upload = async () => ({
+      uploadId: 'up_1',
+      checksumSha256: hex(bytes),
+      sizeBytes: bytes.byteLength,
+    })
+    deps.client.commit = async (input: unknown) => {
+      h.commits.push(input)
+      return {
+        documentId: DOC,
+        revision: String(10 + h.commits.length),
+        versionId: `ver_${h.commits.length}`,
+        version: 3 + h.commits.length,
+        checksumSha256: hex(bytes),
+      }
+    }
+    await h.service.save(path)
+  }
+  const sessionIds = (h: ReturnType<typeof setup>) =>
+    (h.commits as Array<{ editorSessionId?: string }>).map((input) => input.editorSessionId)
+
+  it('several saves of one opening share one id; reload and close each start a new one', async () => {
+    const h = setup({})
+    const opened = await h.service.openFromServer(DOC)
+    await drain()
+
+    await saveAnother(h, opened.path, 'first edit')
+    await saveAnother(h, opened.path, 'second edit')
+    const [first, second] = sessionIds(h)
+    expect(first).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/)
+    expect(second).toBe(first)
+
+    // Reload latest of the same document in the same window: a new opening
+    h.service['reloadEditor'](opened.path)
+    await saveAnother(h, opened.path, 'after reload')
+    const afterReload = sessionIds(h)[2]
+    expect(afterReload).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/)
+    expect(afterReload).not.toBe(first)
+
+    // closing the tab and opening the document again: a new opening too
+    await expect(h.service.confirmClose(opened.path)).resolves.toBe(true)
+    await saveAnother(h, opened.path, 'after close')
+    const afterClose = sessionIds(h)[3]
+    expect(afterClose).not.toBe(afterReload)
+    expect(afterClose).not.toBe(first)
+  })
+
+  it('another window (another service) mints its own id', async () => {
+    const a = setup({})
+    const b = setup({})
+    const openedA = await a.service.openFromServer(DOC)
+    const openedB = await b.service.openFromServer(DOC)
+    await drain()
+    await saveAnother(a, openedA.path, 'edit in a')
+    await saveAnother(b, openedB.path, 'edit in b')
+    expect(sessionIds(a)[0]).toBeDefined()
+    expect(sessionIds(b)[0]).toBeDefined()
+    expect(sessionIds(a)[0]).not.toBe(sessionIds(b)[0])
+  })
+})
