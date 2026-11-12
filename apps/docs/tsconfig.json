@@ -13,8 +13,6 @@
       "@genoffice/electron-utils/headless-export": [
         "../../packages/electron-utils/src/headless-export.ts"
       ],
-      "@genoffice/electron-utils/print-cups": ["../../packages/electron-utils/src/print-cups.ts"],
-      "@genoffice/electron-utils/print-job": ["../../packages/electron-utils/src/print-job.ts"],
       "@genoffice/electron-utils/atomic-write": [
         "../../packages/electron-utils/src/atomic-write.ts"
       ],

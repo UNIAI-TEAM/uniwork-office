@@ -12,8 +12,7 @@ import { isHeadlessMode, showSaveDialogWithMemory } from '@genoffice/electron-ut
 
 import { atomicWriteFile } from './atomic-write'
 import { evenPageRanges, stitchPlan, type PageVariant } from './pdf-page-variants'
-import { CSS_PX_PER_INCH, MICRONS_PER_INCH, printOptionsFor } from './print-options'
-import { printPdfViaCups, printToPdfOptionsFor } from '@genoffice/electron-utils/print-cups'
+import { printOptionsFor } from './print-options'
 
 import type { IpcMainInvokeEvent, WebContents } from 'electron'
 import type { PDFDocument } from 'pdf-lib'
@@ -85,40 +84,8 @@ export async function printWorkbook(
       window.show()
       window.focus()
     }
-    const printOpts = printOptionsFor(request)
-    // A named printer prints silently, and Chromium's silent print on macOS
-    // can drop the job outright — no queue entry, no callback error
-    // (genoffice#2347). Route through CUPS instead: printToPDF bakes the
-    // pages at the request's paper size and margins (print() takes CSS
-    // pixels and microns, printToPDF inches), and lp spools a real,
-    // diagnosable job.
-    if (process.platform === 'darwin' && printOpts.silent) {
-      const printed = await window.webContents.printToPDF(
-        printToPdfOptionsFor({
-          ...(printOpts.margins?.marginType === 'custom'
-            ? {
-                marginsIn: {
-                  top: (printOpts.margins.top ?? 0) / CSS_PX_PER_INCH,
-                  bottom: (printOpts.margins.bottom ?? 0) / CSS_PX_PER_INCH,
-                  left: (printOpts.margins.left ?? 0) / CSS_PX_PER_INCH,
-                  right: (printOpts.margins.right ?? 0) / CSS_PX_PER_INCH,
-                },
-              }
-            : {}),
-          ...(printOpts.pageSize !== undefined && typeof printOpts.pageSize !== 'string'
-            ? {
-                widthIn: printOpts.pageSize.width / MICRONS_PER_INCH,
-                heightIn: printOpts.pageSize.height / MICRONS_PER_INCH,
-              }
-            : {}),
-          ...(printOpts.landscape ? { landscape: true } : {}),
-          ...(printOpts.scaleFactor ? { scale: printOpts.scaleFactor / 100 } : {}),
-        }),
-      )
-      return printPdfViaCups(printed, printOpts)
-    }
     const outcome = await new Promise<{ success: boolean; failureReason: string }>((resolve) => {
-      window.webContents.print(printOpts, (success, failureReason) =>
+      window.webContents.print(printOptionsFor(request), (success, failureReason) =>
         resolve({ success, failureReason }),
       )
     })
