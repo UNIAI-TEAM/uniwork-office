@@ -4245,6 +4245,7 @@ export default function App() {
     bake: readonly LocalTextInsert[],
   ) => ({
     markups: (pending?.markups ?? markups).map(({ id: _id, ...rest }) => rest),
+    ...(noteAuthor ? { annotationAuthor: noteAuthor } : {}),
     annotDeletes: (pending?.annotDeletes ?? annotDeletes).map((d): AnnotDeleteInput => ({
       pageIndex: d.annot.pageIndex,
       objNum: d.annot.objNum,
