@@ -594,6 +594,7 @@ describe('lag-detector module open-path wiring (docs, text, pdf, sheets, slides)
       readFormulaCells: async () => ({ cells: [] }) as never,
       readMedia: async () => ({ mediaType: 'image/png', base64: '' }),
       readPivotDefinition: async () => ({}) as never,
+      readSlicerState: async () => [],
       recalc: async () => ({ cells: [] }),
       serialize: async () => ({ data: payloadBytes.buffer, touchedEntries: [] }),
       replaceSession: async () => ({}) as never,

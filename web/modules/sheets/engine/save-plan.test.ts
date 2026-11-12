@@ -475,3 +475,109 @@ describe('save-plan: pivot Show Values As base field / item', () => {
     expect(save.args.pivotRefreshUpdates?.[0]?.relayout?.values).toEqual([value])
   })
 })
+
+async function pivotFixture(): Promise<Uint8Array> {
+  const ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+  const rel = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+  const zip = new JSZip()
+  zip.file(
+    '[Content_Types].xml',
+    `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+      `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+      `<Default Extension="xml" ContentType="application/xml"/></Types>`,
+  )
+  zip.file(
+    'xl/workbook.xml',
+    `<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="${ns}" xmlns:r="${rel}">` +
+      `<sheets><sheet name="Data" sheetId="1" r:id="rId1"/></sheets>` +
+      `<pivotCaches><pivotCache cacheId="7" r:id="rId2"/></pivotCaches>` +
+      `<calcPr fullCalcOnLoad="1"/></workbook>`,
+  )
+  zip.file(
+    'xl/_rels/workbook.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+      `<Relationship Id="rId1" Type="${rel}/worksheet" Target="worksheets/sheet1.xml"/>` +
+      `<Relationship Id="rId2" Type="${rel}/pivotCacheDefinition" Target="pivotCache/pivotCacheDefinition1.xml"/></Relationships>`,
+  )
+  zip.file(
+    'xl/worksheets/sheet1.xml',
+    `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="${ns}"><sheetData>` +
+      `<row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>`,
+  )
+  zip.file(
+    'xl/worksheets/_rels/sheet1.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+      `<Relationship Id="pRel1" Type="${rel}/pivotTable" Target="../pivotTables/pivotTable1.xml"/></Relationships>`,
+  )
+  zip.file(
+    'xl/pivotTables/pivotTable1.xml',
+    `<?xml version="1.0" encoding="UTF-8"?><pivotTableDefinition xmlns="${ns}" name="Pivot1" cacheId="7"/>`,
+  )
+  zip.file(
+    'xl/pivotCache/pivotCacheDefinition1.xml',
+    `<?xml version="1.0" encoding="UTF-8"?><pivotCacheDefinition xmlns="${ns}" xmlns:r="${rel}" r:id="rId1">` +
+      `<cacheSource type="worksheet"><worksheetSource ref="A1:C4" sheet="Data"/></cacheSource>` +
+      `<cacheFields count="1"><cacheField name="Region" numFmtId="0"><sharedItems count="3"><s v="East"/><s v="West"/><s v="North"/></sharedItems></cacheField></cacheFields>` +
+      `</pivotCacheDefinition>`,
+  )
+  return zip.generateAsync({ type: 'uint8array' })
+}
+
+describe('save-plan: slicers', () => {
+  const slicerInput = {
+    sheetId: 'sheet-1',
+    worksheetPath: 'xl/worksheets/sheet1.xml',
+    pivotPath: 'xl/pivotTables/pivotTable1.xml',
+    sourceName: 'Region',
+    caption: 'Region',
+    items: [
+      { x: 0, selected: true },
+      { x: 1, selected: false },
+      { x: 2, selected: true },
+    ],
+  }
+
+  it('maps slicerState sheetId to sheetName and writes the slicer parts into the saved archive', async () => {
+    expect(
+      resolveSaveRequest(new Map([['sheet-1', 'Data']]), request({})).args.slicerState,
+    ).toBeNull()
+    expect(
+      resolveSaveRequest(new Map([['sheet-1', 'Data']]), request({ slicerState: null })).args
+        .slicerState,
+    ).toBeNull()
+
+    const save = resolveSaveRequest(
+      new Map([['sheet-1', 'Data']]),
+      request({
+        slicerState: {
+          slicers: [slicerInput],
+          removals: [],
+        },
+      }),
+    )
+    const { sheetId: _sheetId, ...expectedSlicer } = slicerInput
+    expect(save.args.slicerState).toEqual({
+      slicers: [{ sheetName: 'Data', ...expectedSlicer }],
+      removals: [],
+    })
+
+    const source = await pivotFixture()
+    const { engine } = memoryEngine(source)
+    const { data, plan } = await saveWorkbookBytes({
+      engine,
+      sourcePath: '/work/Pivot.xlsx',
+      sourceBytes: source,
+      workDir: '/tmp/save',
+      save,
+    })
+    expect([...plan.added.keys()]).toContain('xl/slicers/slicer1.xml')
+    expect([...plan.added.keys()]).toContain('xl/slicerCaches/slicerCache1.xml')
+
+    const saved = await JSZip.loadAsync(data)
+    const slicerXml = await saved.file('xl/slicers/slicer1.xml')!.async('text')
+    expect(slicerXml).toContain('<slicer name="Region" cache="Slicer_Region" caption="Region"')
+    const cacheXml = await saved.file('xl/slicerCaches/slicerCache1.xml')!.async('text')
+    expect(cacheXml).toContain('name="Slicer_Region" sourceName="Region"')
+    expect(cacheXml).toContain('<pivotTable tabId="1" name="Pivot1"/>')
+  })
+})

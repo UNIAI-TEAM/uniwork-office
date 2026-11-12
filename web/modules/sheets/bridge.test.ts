@@ -76,6 +76,7 @@ function fakeTransport(features: Partial<SheetsEngineTransport['features']> = {}
     readFormulaCells: vi.fn(async () => ({ cells: [] }) as never),
     readMedia: vi.fn(async () => ({ mediaType: 'image/png', base64: 'AA==' })),
     readPivotDefinition: vi.fn(async () => ({}) as never),
+    readSlicerState: vi.fn(async () => []),
     recalc: vi.fn(async () => ({ cells: [] })),
     async serialize(request) {
       serialized.push(request)
@@ -1086,6 +1087,7 @@ describe('engine unavailable', () => {
       () => stub.readFormulaCells({} as never),
       () => stub.readMedia({} as never),
       () => stub.readPivotDefinition({} as never),
+      () => stub.readSlicerState({} as never),
       () => stub.recalc({} as never),
       () => stub.serialize({} as never),
     ]) {
@@ -1121,7 +1123,9 @@ describe('hidden and browser features', () => {
     await t.boot()
     await expect(t.desktop.recalcWorkbook({} as never)).rejects.toThrow(/not available/i)
     await expect(t.desktop.readPivotDefinition({} as never)).rejects.toThrow(/not available/i)
+    await expect(t.desktop.readSlicerState({} as never)).rejects.toThrow(/not available/i)
     expect(t.transport.recalc).not.toHaveBeenCalled()
+    expect(t.transport.readSlicerState).not.toHaveBeenCalled()
   })
 
   it('pivot refresh reaches the engine once it supports it', async () => {
@@ -1129,6 +1133,8 @@ describe('hidden and browser features', () => {
     await t.boot()
     await t.desktop.readPivotDefinition({} as never)
     expect(t.transport.readPivotDefinition).toHaveBeenCalledOnce()
+    await t.desktop.readSlicerState({} as never)
+    expect(t.transport.readSlicerState).toHaveBeenCalledOnce()
   })
 
   it('CSV export downloads UTF-8 with a BOM; print and PDF go through the print dialog', async () => {

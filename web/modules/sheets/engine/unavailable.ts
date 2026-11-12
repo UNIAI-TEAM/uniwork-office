@@ -17,6 +17,7 @@ export function createUnavailableTransport(): SheetsEngineTransport {
     readFormulaCells: fail('read_formula_cells'),
     readMedia: fail('read_media'),
     readPivotDefinition: fail('read_pivot_definition'),
+    readSlicerState: fail('read_slicer_state'),
     recalc: fail('recalc_cells'),
     serialize: fail('save'),
     replaceSession: fail('open'),

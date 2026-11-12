@@ -460,6 +460,104 @@ describe('with a mocked engine channel', () => {
       recalcFallback: false,
     })
   })
+
+  it('readSlicerState skips extraction when no slicer parts exist and parses slicer + pivotCacheDefinition parts when present', async () => {
+    const partContents: Record<string, string> = {
+      'xl/workbook.xml': `<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Data" sheetId="1" r:id="rId1"/></sheets><pivotCaches><pivotCache cacheId="1" r:id="rId2"/></pivotCaches></workbook>`,
+      'xl/_rels/workbook.xml.rels': `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="pivotCache/pivotCacheDefinition1.xml"/><Relationship Id="rId3" Type="http://schemas.microsoft.com/office/2007/relationships/slicerCache" Target="slicerCaches/slicerCache1.xml"/></Relationships>`,
+      'xl/worksheets/sheet1.xml': `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><extLst><ext uri="{A8765BA9-456A-4dab-B4F3-ACF838C121DE}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:slicerList><x14:slicer r:id="sRel1"/></x14:slicerList></ext></extLst></worksheet>`,
+      'xl/worksheets/_rels/sheet1.xml.rels': `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="pRel1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable" Target="../pivotTables/pivotTable1.xml"/><Relationship Id="sRel1" Type="http://schemas.microsoft.com/office/2007/relationships/slicer" Target="../slicers/slicer1.xml"/></Relationships>`,
+      'xl/pivotTables/pivotTable1.xml': `<?xml version="1.0" encoding="UTF-8"?><pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="Pivot1" cacheId="1"/>`,
+      'xl/pivotCache/pivotCacheDefinition1.xml': `<?xml version="1.0" encoding="UTF-8"?><pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1"><cacheSource type="worksheet"><worksheetSource ref="A1:C4" sheet="Data"/></cacheSource><cacheFields count="1"><cacheField name="Region" numFmtId="0"><sharedItems count="2"><s v="East"/><s v="West"/></sharedItems></cacheField></cacheFields><extLst><ext uri="{725AE2AE-9491-48be-B2B4-4EB974FC3084}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:pivotCacheDefinition pivotCacheId="7"/></ext></extLst></pivotCacheDefinition>`,
+      'xl/slicers/slicer1.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><slicers xmlns="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><slicer name="Region" cache="Slicer_Region" caption="Region" columnCount="1" rowHeight="228600"/></slicers>`,
+      'xl/slicerCaches/slicerCache1.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><slicerCacheDefinition xmlns="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" name="Slicer_Region" sourceName="Region"><pivotTables><pivotTable tabId="1" name="Pivot1"/></pivotTables><data><tabular pivotCacheId="7"><items count="2"><i x="0" s="1"/><i x="1"/></items></tabular></data></slicerCacheDefinition>`,
+    }
+    let includeSlicer = false
+    const m = mockChannel({
+      archive_manifest: () => ({
+        ok: true,
+        result: {
+          entries: Object.keys(partContents)
+            .filter((name) => includeSlicer || !name.includes('slicer'))
+            .map((name) => ({
+              name,
+              uncompressedSize: 100,
+              compressedSize: 50,
+              crc32: 1,
+            })),
+        },
+      }),
+      open: () => ({
+        ok: true,
+        result: {
+          sessionId: '00000000-0000-4000-8000-000000000009',
+          name: 'Slicers.xlsx',
+          entryCount: 1,
+          styles: [],
+          dxfStyles: [],
+          visuals: [],
+          definedNames: [],
+          sheets: [
+            {
+              id: 'sheet-1',
+              name: 'Data',
+              rowCount: 1,
+              columnCount: 1,
+              columnWidths: [],
+              defaultRowHeight: 20,
+              defaultColumnWidth: 72,
+              freeze: { frozenRows: 0, frozenColumns: 0 },
+              hidden: false,
+              tabColor: '',
+              showGridLines: true,
+              tables: [],
+              comments: [],
+              pivotRanges: [],
+            },
+          ],
+        },
+      }),
+      read_entries: (payload) => {
+        const requested = payload.entries as string[]
+        const outputDir = String(payload.outputDir)
+        const entries = requested.map((name, idx) => {
+          const path = `${outputDir}/entry-${idx}.bin`
+          m.files.set(path, new TextEncoder().encode(partContents[name] ?? '').buffer)
+          return { name, path }
+        })
+        return { ok: true, result: { entries } }
+      },
+    })
+    const transport = createWasmTransport({ connect: () => m.channel })
+    const opened = await transport.open({
+      name: 'Slicers.xlsx',
+      data: new ArrayBuffer(8),
+      locale: 'en',
+    })
+
+    m.calls.length = 0
+    expect(await transport.readSlicerState({ sessionId: opened.sessionId })).toEqual([])
+    expect(m.calls.map((c) => c.command)).toEqual(['archive_manifest'])
+
+    m.calls.length = 0
+    includeSlicer = true
+    const state = await transport.readSlicerState({ sessionId: opened.sessionId })
+    expect(m.calls.map((c) => c.command)).toEqual(['archive_manifest', 'read_entries'])
+    expect(state).toEqual([
+      expect.objectContaining({
+        partPath: 'xl/slicers/slicer1.xml',
+        cachePath: 'xl/slicerCaches/slicerCache1.xml',
+        cacheName: 'Slicer_Region',
+        worksheetPath: 'xl/worksheets/sheet1.xml',
+        pivotCacheDefinitionPath: 'xl/pivotCache/pivotCacheDefinition1.xml',
+        sheetId: 'sheet-1',
+        name: 'Region',
+        caption: 'Region',
+        sourceName: 'Region',
+        selectedItems: [0],
+      }),
+    ])
+  })
 })
 
 // The real engine tests build and recalculate 20k-row workbooks (about 2.4 s alone, over the 5 s

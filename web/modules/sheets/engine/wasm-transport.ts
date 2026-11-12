@@ -30,11 +30,14 @@ import {
   workbookPivotDefinitionSchema,
   workbookRangeResultSchema,
   workbookRowOutlineResultSchema,
+  workbookSlicerStateResultSchema,
   type WorkbookFile,
   type WorkbookSaveRequest,
 } from '../../../../apps/sheets/src/shared/desktop-api'
 import { allowsAutomaticWorkbookRecovery } from '../../../../apps/sheets/src/main/recovery-policy'
 import { parsePivotDefinition } from '../../../../packages/xlsx-gateway/src/gateway/xlsx-pivot'
+import { normalizeOoxmlPartPrefix } from '../../../../packages/xlsx-gateway/src/gateway/xlsx-namespace'
+import { parseSlicerState } from '../../../../packages/xlsx-gateway/src/gateway/xlsx-slicer'
 import type { ArchiveEntry } from '../../../../packages/xlsx-gateway/src/gateway/xlsx-package-io'
 import type { EngineChannel, EngineResponse } from './channel'
 import { blankWorkbook } from './blank'
@@ -426,6 +429,52 @@ export function createWasmTransport(options: WasmTransportOptions): SheetsEngine
       }
       const [pivotXml, cacheXml] = [await text(request.path), await text(request.cachePath)]
       return workbookPivotDefinitionSchema.parse(parsePivotDefinition(pivotXml, cacheXml))
+    },
+    async readSlicerState(request) {
+      const s = session(request.sessionId)
+      const manifest = await archive.manifest(s.path)
+      const names = manifest.map((entry) => entry.name)
+      const hasSlicerParts = names.some((name) =>
+        /^xl\/(?:slicers|timelines)\/[^/]+\.xml$/.test(name),
+      )
+      if (!hasSlicerParts) return []
+      const wanted = names.filter(
+        (name) =>
+          name === 'xl/workbook.xml' ||
+          name === 'xl/_rels/workbook.xml.rels' ||
+          /^xl\/(?:slicers|timelines|slicerCaches|timelineCaches|pivotTables)\/[^/]+\.xml$/.test(
+            name,
+          ) ||
+          /^xl\/pivotCache\/pivotCacheDefinition\d*\.xml$/.test(name) ||
+          /^xl\/worksheets\/(?:_rels\/)?[^/]+\.xml(?:\.rels)?$/.test(name),
+      )
+      const outputDir = `${WORK_DIR}/slicer-${uid()}`
+      await archive.writeFile(`${outputDir}/.dir`, new Uint8Array())
+      const extracted = (await call('read_entries', {
+        path: s.path,
+        entries: wanted,
+        outputDir,
+      })) as { entries: { name: string; path: string }[] }
+      const texts = new Map<string, string>()
+      const decoder = new TextDecoder()
+      for (const [index, entry] of extracted.entries.entries()) {
+        const name = entry.name ?? wanted[index]
+        if (name === undefined || !entry.path) continue
+        const bytes = await archive.readFile(entry.path)
+        await archive.remove(entry.path).catch(() => {})
+        texts.set(name, normalizeOoxmlPartPrefix(decoder.decode(bytes)))
+      }
+      await archive.remove(`${outputDir}/.dir`).catch(() => {})
+      return workbookSlicerStateResultSchema.parse(
+        await parseSlicerState({
+          paths: async () => names,
+          readText: async (path) => {
+            const text = texts.get(path)
+            if (text === undefined) throw new Error(`Workbook is missing ${path}.`)
+            return text
+          },
+        }),
+      )
     },
     recalc: () => Promise.reject(new Error('recalculation fallback is not available on the web')),
     async serialize(request) {

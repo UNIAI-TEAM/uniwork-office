@@ -33,6 +33,8 @@ import type {
   WorkbookRecalcRequest,
   WorkbookRecalcResult,
   WorkbookSaveRequest,
+  WorkbookSlicerState,
+  WorkbookSlicerStateRequest,
 } from '../../../../apps/sheets/src/shared/desktop-api'
 import { ENGINE_UNAVAILABLE } from '../../../../apps/sheets/src/renderer/web-engine'
 
@@ -96,6 +98,8 @@ export interface SheetsEngineTransport {
   readMedia(request: WorkbookMediaRequest): Promise<WorkbookMediaResult>
   /** sidecar `read_entries` + pivot parse (only when `features.pivotRefresh`) */
   readPivotDefinition(request: WorkbookPivotRequest): Promise<WorkbookPivotDefinition>
+  /** sidecar `read_entries` + slicer parse (only when `features.pivotRefresh`) */
+  readSlicerState(request: WorkbookSlicerStateRequest): Promise<WorkbookSlicerState>
   /** sidecar `recalc_cells` on the session's bytes (only when `features.recalcFallback`) */
   recalc(request: WorkbookRecalcRequest): Promise<WorkbookRecalcResult>
   /**
