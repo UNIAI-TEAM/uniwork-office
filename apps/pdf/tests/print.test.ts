@@ -549,18 +549,56 @@ describe('macOS lp printFile route with granted path', () => {
     ])
     expect(ipcState.spawnCalls[0]!.args.slice(-2)).toEqual(['--', grantedPath])
     expect(ipcState.spawnCalls[0]!.opts).toEqual({ stdio: ['pipe', 'pipe', 'pipe'] })
-    expect((ipcState.spawnCalls[0]!.opts as { shell?: unknown } | undefined)?.shell).toBeUndefined()
+    expect(ipcState.spawnCalls[0]!.opts).not.toHaveProperty('shell')
   })
 
-  it('round-trips chosen driver options into the print call and lp arguments', async () => {
-    const { doc } = fakeDoc(1)
-    const print = vi.fn(async () => ({ ok: true }))
-    ;(window as unknown as { pdfApi: unknown }).pdfApi = { print }
+  function invokePrinterOptions(queue: unknown): Promise<PrinterOption[]> {
+    return ipcHandlers.get(PDF_CHANNELS.printerOptions)!(
+      { sender: { id: ipcState.senderId } },
+      queue,
+    ) as Promise<PrinterOption[]>
+  }
 
-    const driverOptions = [
+  it('guards PDF_CHANNELS.printerOptions queue names and filters groups to DRIVER_OPTION_NAMES', async () => {
+    expect(await invokePrinterOptions('Office LaserJet; id')).toEqual([])
+    expect(await invokePrinterOptions('')).toEqual([])
+    expect(await invokePrinterOptions(123)).toEqual([])
+    expect(ipcState.execFileCalls).toHaveLength(0)
+
+    ipcState.lpOptionsStdout = [
+      'PageSize/Media Size: *Letter A4',
+      'cupsPrintQuality/Quality: Draft *Normal High',
+      'ColorModel/Color Mode: *RGB Gray',
+      'Duplex/2-Sided Printing: *None DuplexNoTumble',
+      'MediaType/Media Type: *Plain Glossy',
+    ].join('\n')
+
+    const groups = await invokePrinterOptions('Office_LaserJet')
+    expect(ipcState.execFileCalls).toEqual([
+      { cmd: '/usr/bin/lpoptions', args: ['-p', 'Office_LaserJet', '-l'] },
+    ])
+    expect(groups.map((g) => g.name)).toEqual(['cupsPrintQuality', 'ColorModel', 'MediaType'])
+  })
+
+  it('round-trips chosen driver options into the print call and lp arguments while dropping invalid ones', async () => {
+    const { doc } = fakeDoc(1)
+    const print = vi.fn(async (req: unknown) =>
+      invokePrintFile({
+        ...(req as Record<string, unknown>),
+        path: grantedPath,
+      }),
+    )
+    Object.assign(window, { pdfApi: { print } })
+
+    const validDriverOptions = [
       { name: 'cupsPrintQuality', value: 'High' },
       { name: 'ColorModel', value: 'Gray' },
       { name: 'MediaType', value: 'Plain' },
+    ]
+    const driverOptions = [
+      ...validDriverOptions,
+      { name: 'bad name', value: 'High' },
+      { name: 'ColorModel', value: 'Gray;rm -rf /' },
     ]
     const job = {
       deviceName: 'Office_LaserJet',
@@ -576,6 +614,26 @@ describe('macOS lp printFile route with granted path', () => {
       pageSizeIn: { width: 8.5, height: 11 },
     })
     const parsed = printJobOptions(job)
-    expect(parsed.driverOptions).toEqual(driverOptions)
+    expect(parsed.driverOptions).toEqual(validDriverOptions)
+    expect(ipcState.spawnCalls).toHaveLength(1)
+    expect(ipcState.spawnCalls[0]!.cmd).toBe('/usr/bin/lp')
+    expect(ipcState.spawnCalls[0]!.args).toEqual([
+      '-d',
+      'Office_LaserJet',
+      '-n',
+      '1',
+      '-o',
+      'Collate=True',
+      '-o',
+      'sides=one-sided',
+      '-o',
+      'cupsPrintQuality=High',
+      '-o',
+      'ColorModel=Gray',
+      '-o',
+      'MediaType=Plain',
+      '--',
+      grantedPath,
+    ])
   })
 })
