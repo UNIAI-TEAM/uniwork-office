@@ -19,7 +19,7 @@ import type {
   WorkbookVisualEdit,
 } from '../shared/edit-schemas'
 import { spillsDynamicArray, withFutureFunctionMarkers } from './future-functions'
-import { decodeXlsxEscapes, encodeXlsxEscapes } from './xlsx-escapes'
+import { decodeXlsxEscapes, decodeXmlText, encodeXlsxEscapes } from './xlsx-escapes'
 import { MINIMAL_STYLESHEET_XML } from './xlsx-default-styles'
 import { applyChartEdit } from './xlsx-chart'
 import { applyVisualEdits } from './xlsx-drawing-edit'
@@ -63,12 +63,14 @@ import {
   FilterEditError,
 } from './xlsx-filter'
 import { normalizeOoxmlPartPrefix } from './xlsx-namespace'
+import { resolvedStyleEntries } from './xlsx-style-entries'
 import { escapeRegExp } from './xlsx-sheets'
 import type { SheetAllocation, SheetEditPlan, SheetElement } from './xlsx-sheets'
 import {
   addWorksheetOverride,
   addWorksheetRelationship,
   applySheetPlanToWorkbookXml,
+  assertAddedSheetsKeepRenamedNames,
   assertNoSheetScopedDefinedNames,
   buildWorksheetPartXml,
   chartReferencesSheet,
@@ -137,6 +139,8 @@ import {
   applyStructuralOps,
   inferWorksheetAddresses,
   isShiftingOp,
+  materializeSharedFormulaGroups,
+  type SharedFormulaCell,
   shiftChartReferences,
   shiftCrossSheetFormulas,
   shiftDefinedNames,
@@ -145,7 +149,6 @@ import {
   shiftVmlObjectAnchors,
   StructuralShiftError,
   type TableColumnInsertion,
-  translateSharedFormula,
 } from './xlsx-structure'
 import { StylesheetEditor } from './xlsx-styles'
 
@@ -613,19 +616,22 @@ export function isDateFormatCode(code: string): boolean {
 
 /** the cellXfs indexes whose number format is a date or a time */
 export function dateStyleIndexes(stylesXml: string): Set<number> {
+  // Entries as the sidecar reads them: a wrapped (mc:AlternateContent) numFmt
+  // or xf is one entry, read through its Fallback — a Choice branch may give
+  // the same numFmtId another format code.
   const custom = new Set<number>()
-  for (const m of stylesXml.matchAll(/<numFmt\b([^>]*)\/?>/g)) {
-    const id = Number(readXmlAttribute(m[1] ?? '', 'numFmtId'))
-    const code = decodeXmlText(readXmlAttribute(m[1] ?? '', 'formatCode') ?? '')
+  const numFmts = /<numFmts\b[^>]*>([\s\S]*?)<\/numFmts>/.exec(stylesXml)?.[1] ?? ''
+  for (const numFmt of resolvedStyleEntries(numFmts, 'numFmt')) {
+    const attributes = /^<numFmt\b([^>]*?)\/?>/.exec(numFmt)?.[1] ?? ''
+    const id = Number(readXmlAttribute(attributes, 'numFmtId'))
+    const code = decodeXmlText(readXmlAttribute(attributes, 'formatCode') ?? '')
     if (Number.isFinite(id) && isDateFormatCode(code)) custom.add(id)
   }
   const out = new Set<number>()
   const cellXfs = /<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(stylesXml)?.[1] ?? ''
-  let index = 0
-  for (const m of cellXfs.matchAll(/<xf\b([^>]*)\/?>/g)) {
-    const id = Number(readXmlAttribute(m[1] ?? '', 'numFmtId'))
+  for (const [index, xf] of resolvedStyleEntries(cellXfs, 'xf').entries()) {
+    const id = Number(readXmlAttribute(/^<xf\b([^>]*?)\/?>/.exec(xf)?.[1] ?? '', 'numFmtId'))
     if (BUILTIN_DATE_FORMATS.has(id) || custom.has(id)) out.add(index)
-    index += 1
   }
   return out
 }
@@ -1017,6 +1023,33 @@ export async function planCellEditsToXlsx(
     throw new DefinedNameError(
       'Defined-name edits cannot be saved together with row/column or sheet ' +
         'changes — save one of them first.',
+    )
+  }
+  if (sheetPlan !== undefined) {
+    const sheetStates: readonly (readonly { readonly sheetName: string }[])[] = [
+      edits,
+      structuralOps,
+      filterStates,
+      hyperlinkEdits,
+      cfStates,
+      dvStates,
+      sheetProtections,
+      visualAdditions,
+      pageSetupStates,
+      noteStates,
+      tableAdditions,
+      pivotAdditions,
+      sparklineAdditions,
+      formulaValues,
+      protectedRangeStates,
+      bulkConstantFills,
+      tabColorStates,
+      tableEdits,
+      cellImageAdditions,
+    ]
+    assertAddedSheetsKeepRenamedNames(
+      sheetPlan,
+      new Set(sheetStates.flatMap((states) => states.map((state) => state.sheetName))),
     )
   }
   const pkg = new PackageEditor(source)
@@ -1674,11 +1707,15 @@ export async function planCellEditsToXlsx(
 
   // Print areas / title rows are sheet-scoped _xlnm names; they apply to the
   // final workbook.xml (post sheet-plan, post defined-names rewrite — which
-  // keeps _xlnm entries verbatim).
+  // keeps _xlnm entries verbatim). States name an existing sheet by its
+  // original file name, so one renamed in this save is looked up by its new
+  // name (an added sheet never takes a renamed sheet's old name — see
+  // assertAddedSheetsKeepRenamedNames).
+  const renamedTo = new Map(sheetPlan?.renames.map((rename) => [rename.sheetName, rename.newName]))
   const printAreas = pageSetupStates
     .filter((state) => state.printArea !== undefined || state.printTitles !== undefined)
     .map((state) => ({
-      sheetName: state.sheetName,
+      sheetName: renamedTo.get(state.sheetName) ?? state.sheetName,
       printArea: state.printArea,
       printTitles: state.printTitles,
     }))
@@ -2627,7 +2664,13 @@ function patchFormulaCachedValue(
   // no t (numeric default) otherwise; booleans use t="b" with 1/0. A null
   // result drops the cached value entirely.
   const numeric = typeof value === 'number' && Number.isFinite(value)
-  const stripped = attrs.replace(/\st="[^"]*"/g, '')
+  // Collapse the leftover whitespace too: group1's space before r= survives
+  // the strip, and re-splicing it per rewrite grew one blank per rewrite.
+  const stripped = attrs
+    .replace(/\st="[^"]*"/g, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(' ')
   let typeAttr = ''
   let valueXml = ''
   if (numeric) {
@@ -2644,7 +2687,7 @@ function patchFormulaCachedValue(
   }
   // Keep <f> (and any other children apart from the cached value) verbatim.
   const kept = body.replace(/<v\b[^>]*\/>|<v\b[^>]*>[\s\S]*?<\/v>/g, '')
-  const replacement = `<c r="${address}"${stripped}${typeAttr}>${kept}${valueXml}</c>`
+  const replacement = `<c r="${address}"${stripped ? ` ${stripped}` : ''}${typeAttr}>${kept}${valueXml}</c>`
   return worksheetXml.replace(cellPattern, () => replacement)
 }
 
@@ -2727,87 +2770,16 @@ function materializeEditedSharedFormulaGroups(
     }
   }
   if (rewritten.size === 0) return worksheetXml
-
-  interface SharedFragment {
-    start: number
-    end: number
-    address: string
-    row: number
-    column: number
-    si: string
-    isMaster: boolean
-    body: string
-  }
-  const fragments: SharedFragment[] = []
-  // Open tag matched alone: a greedy [^>]* would swallow the `/` of a
-  // self-closing follower and backtrack into pairing it with a later </f>.
-  const sharedOpen = /<f\b[^>]*?\bt="shared"[^>]*?(\/?)>/g
-  let match: RegExpExecArray | null
-  while ((match = sharedOpen.exec(worksheetXml)) !== null) {
-    const openTag = match[0]
-    const si = /\bsi="([^"]+)"/.exec(openTag)?.[1]
-    if (si === undefined) continue
-    const openEnd = match.index + openTag.length
-    let end = openEnd
-    let body = ''
-    if (match[1] !== '/') {
-      const close = worksheetXml.indexOf('</f>', openEnd)
-      if (close === -1) continue
-      body = worksheetXml.slice(openEnd, close)
-      end = close + '</f>'.length
-    }
-    const cellOpen = worksheetXml.lastIndexOf('<c', match.index)
-    const address = /\br="([A-Z]{1,3}[0-9]+)"/.exec(worksheetXml.slice(cellOpen, match.index))?.[1]
-    if (address === undefined) continue
-    const parsed = /^([A-Z]{1,3})([0-9]+)$/.exec(address)
-    if (!parsed) continue
-    fragments.push({
-      start: match.index,
-      end,
-      address,
-      row: Number(parsed[2]) - 1,
-      column: parseA1Column(address),
-      si,
-      isMaster: /\bref="/.test(openTag),
-      body,
-    })
-  }
-
-  const killedMasters = new Map<string, SharedFragment>()
-  for (const fragment of fragments) {
-    if (fragment.isMaster && fragment.body !== '' && rewritten.has(fragment.address)) {
-      killedMasters.set(fragment.si, fragment)
-    }
-  }
-  if (killedMasters.size === 0) return worksheetXml
-
-  const parts: string[] = []
-  let cursor = 0
-  for (const fragment of fragments) {
-    const master = killedMasters.get(fragment.si)
-    if (
-      master === undefined ||
-      fragment.isMaster ||
-      fragment.body !== '' ||
-      rewritten.has(fragment.address)
-    ) {
-      continue
-    }
-    const translated = translateSharedFormula(
-      decodeXmlText(master.body),
-      fragment.row - master.row,
-      fragment.column - master.column,
-    )
-    parts.push(worksheetXml.slice(cursor, fragment.start))
-    // Untranslatable follower (a shifted reference would leave the sheet —
-    // impossible for a group Excel itself wrote, but never leave a bare
-    // shared tag): degrade to its cached static value instead.
-    if (translated !== null) parts.push(`<f>${escapeXmlText(translated)}</f>`)
-    cursor = fragment.end
-  }
-  if (parts.length === 0) return worksheetXml
-  parts.push(worksheetXml.slice(cursor))
-  return parts.join('')
+  const isRewritten = (cell: SharedFormulaCell) => rewritten.has(toA1Address(cell.row, cell.column))
+  // Untranslatable follower (a shifted reference would leave the sheet —
+  // impossible for a group Excel itself wrote, but never leave a bare
+  // shared tag): degrade to its cached static value instead.
+  return materializeSharedFormulaGroups(
+    worksheetXml,
+    ({ anchor }) => isRewritten(anchor),
+    isRewritten,
+    'cached-value',
+  )
 }
 
 function groupCellMutations(
@@ -3467,27 +3439,6 @@ function escapeCellText(input: string): string {
 function decodeCellText(input: string): string {
   const text = decodeXmlText(input).replace(/\r\n?/g, '\n')
   return decodeXlsxEscapes(text).replace(/\r\n?/g, '\n')
-}
-
-const XML_NAMED_ENTITIES: Record<string, string> = {
-  quot: '"',
-  apos: "'",
-  lt: '<',
-  gt: '>',
-  amp: '&',
-}
-
-/// Single-pass decode of the XML named entities plus numeric character
-/// references (&#dd; / &#xhh;), which some producers use for non-ASCII text.
-function decodeXmlText(input: string): string {
-  return input.replace(
-    /&(?:#x([0-9A-Fa-f]+)|#([0-9]+)|(quot|apos|lt|gt|amp));/g,
-    (match, hex: string | undefined, dec: string | undefined, named: string | undefined) => {
-      if (named !== undefined) return XML_NAMED_ENTITIES[named] ?? match
-      const code = hex !== undefined ? Number.parseInt(hex, 16) : Number(dec)
-      return code <= 0x10ffff ? String.fromCodePoint(code) : match
-    },
-  )
 }
 
 function escapeXmlAttribute(input: string): string {

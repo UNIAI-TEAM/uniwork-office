@@ -367,6 +367,7 @@ import {
 } from './data-tools-actions'
 import { installTsvClipboardFix } from './clipboard-tsv'
 import { installFilteredCopyHook } from './filtered-copy'
+import { installSortFormulaRefs } from './sort-formula-refs'
 import { installFilterRangeOutlineSuppression } from './filter-range-outline'
 import { createSheetTabActions } from './sheet-tab-actions'
 import { installVeryHiddenSheetGuard } from './very-hidden-sheets'
@@ -374,6 +375,7 @@ import { installFormulaBarAutosize } from './formula-bar-autosize'
 import { createFunctionArgumentsHost, installFxButtonHook } from './function-arguments-runtime'
 import {
   applyShowFormulasView,
+  formulaViewSheets,
   installFormulaTextInterceptor,
   installFormulaViewInterceptor,
 } from './formula-view'
@@ -457,8 +459,9 @@ import { serverAnchorStore } from './server-comments/anchor-store'
 import { SheetsCommentsSurface } from './server-comments/CommentsSurface'
 import { serverComments } from './server-comments/SheetsServerComments'
 import { liveSheetNames } from './server-comments/univer-view'
-import { NotePicturesPane } from './NotePicturesPane'
-import type { PendingNotePicture } from './note-pictures'
+import { NotePictureHoverCard, NotePicturesPane } from './NotePicturesPane'
+import { installNotePopupCard, type NotePopupCard } from './note-hover-card'
+import { collectNotePictures, type NotePicture, type PendingNotePicture } from './note-pictures'
 import { handleRemoveNotePicture } from './note-picture-actions'
 import { installFormulaNullResultFix } from './formula-null-result'
 import { installNumberFormatFix } from './numfmt-fix'
@@ -679,6 +682,8 @@ export function App({
   /// Set once Univer boots; mounts the app's Excel-style Find & Replace panel.
   const [findReplaceService, setFindReplaceService] = useState<IFindReplaceService | null>(null)
   const [threadHover, setThreadHover] = useState<ThreadHover | null>(null)
+  /// The note popup that is up and carries a picture (see note-hover-card.ts).
+  const [notePopupCard, setNotePopupCard] = useState<NotePopupCard | null>(null)
   const getRuntime = useCallback(() => univerRef.current, [])
   /// True while Univer's in-cell editor is open (AutoSave must not save-reload then).
   const editingCellRef = useRef(false)
@@ -730,6 +735,21 @@ export function App({
   const [_revision, setRevision] = useState(0)
   const [workbookFile, setWorkbookFile] = useState<WorkbookFile | null>(null)
   const [pendingEdits, setPendingEdits] = useState(0)
+  /// The note-picture lookup reads the file through a ref: the hover-card
+  /// install lives once per runtime while the file changes across loads.
+  const workbookFileRef = useRef<WorkbookFile | null>(null)
+  useEffect(() => {
+    workbookFileRef.current = workbookFile
+  }, [workbookFile])
+  // The card follows the note it belongs to: a file reload that drops the
+  // picture (or drops the note) takes the card with it.
+  useEffect(() => {
+    setNotePopupCard((card) => {
+      if (!card) return null
+      const fresh = notePictureAt(card.sheetId, card.row, card.column)
+      return fresh ? { ...card, picture: fresh } : null
+    })
+  }, [workbookFile, pendingEdits])
   /// Whether any cell in the workbook has content — the ribbon's one-click AI
   /// action buttons are greyed out on a fully empty sheet.
   const [sheetHasContent, setSheetHasContent] = useState(false)
@@ -2460,6 +2480,8 @@ export function App({
     // Copying in a filtered sheet must skip hidden rows;
     // see filtered-copy.ts for why the built-in hook is not enough.
     const filteredCopyDisposable = installFilteredCopyHook(runtime)
+    // A sort that cuts a shared formula group keeps the rest of the group (sort-formula-refs.ts).
+    const sortFormulaRefsDisposable = installSortFormulaRefs(runtime)
     // Excel-compatible TSV plain text (TRUE/FALSE, quoted newlines).
     const tsvClipboardDisposable = installTsvClipboardFix(runtime)
     // Formula view: swap formula cells to their formula text per sheet.
@@ -2600,6 +2622,12 @@ export function App({
     const threadedCommentDisposable = installThreadedCommentAffordances(runtime, {
       theme: () => (isDarkTheme() ? 'dark' : 'light'),
       onHover: setThreadHover,
+    })
+    // A note that carries a picture shows it under Univer's note popup: the
+    // popup itself is text-only (see note-pictures.ts).
+    const notePopupCardDisposable = installNotePopupCard(runtime, {
+      picturesAt: notePictureAt,
+      onCard: setNotePopupCard,
     })
     threadStore.onChange = (sheetId) => {
       const state = lazyWorkbookRef.current
@@ -3890,6 +3918,7 @@ export function App({
       prefersDark.removeEventListener('change', applyUniverDark)
       dateTextDisposable.dispose()
       filteredCopyDisposable.dispose()
+      sortFormulaRefsDisposable.dispose()
       tsvClipboardDisposable.dispose()
       formulaViewDisposable.dispose()
       formulaTextDisposable.dispose()
@@ -3927,6 +3956,7 @@ export function App({
       dataValidationChromeDisposable.dispose()
       dataValidationMarkerDisposable.dispose()
       threadedCommentDisposable.dispose()
+      notePopupCardDisposable.dispose()
       threadStore.onChange = null
       ruleDetailDisposable()
       lazyFindDisposable.dispose()
@@ -4563,6 +4593,14 @@ export function App({
       column: entry.column,
       dataUrl: entry.picture?.dataUrl ?? null,
     }))
+  }
+
+  /** The note's picture at a cell — what the file has merged with what this
+   *  session's journal carries, the same merge the pictures pane shows. */
+  function notePictureAt(sheetId: string, row: number, column: number): NotePicture | undefined {
+    return collectNotePictures(workbookFileRef.current, pendingNotePictures()).find(
+      (entry) => entry.sheetId === sheetId && entry.row === row && entry.column === column,
+    )
   }
 
   /** App-scope refs/state bundle for the extracted ribbon dispatcher (ribbon-actions.ts). */
@@ -5686,6 +5724,16 @@ export function App({
     }
   })()
 
+  // Formula view is per sheet and persisted (sheetView/@showFormulas), so a
+  // sheet can open showing formulas instead of values. The status bar says so;
+  // without it the sheet reads as a broken one.
+  const activeShowFormulas = (() => {
+    const worksheet = univerRef.current?.univerAPI.getActiveWorkbook()?.getActiveSheet()
+    const state = lazyWorkbookRef.current
+    if (!worksheet || !state) return false
+    return formulaViewSheets(state).has(worksheet.getSheetId())
+  })()
+
   // Chart panels resolve their chart live (pending edits applied), so every
   // control reflects the state the next save would write.
   const visualDialogTarget = (() => {
@@ -5863,6 +5911,7 @@ export function App({
         printHost={printHost}
         onClosePrint={() => setPrintHost(null)}
         calcManual={calcManual}
+        showFormulas={activeShowFormulas}
         onGoalSeek={(setCell, toValue, byCell) => {
           const runtime = univerRef.current
           if (!runtime) return Promise.reject(new Error(t('appWorkbookNotReady')))
@@ -6044,6 +6093,15 @@ export function App({
         readOnly={workbookFile?.readOnly === true || isViewOnly()}
       />
       <ThreadHoverCard hover={threadHover} />
+      <NotePictureHoverCard
+        card={notePopupCard}
+        sessionId={workbookFile?.sessionId}
+        onRemove={(sheetId, row, column) => {
+          handleRemoveNotePicture(ribbonContext(), sheetId, row, column)
+          setNotePopupCard(null)
+        }}
+        readOnly={workbookFile?.readOnly === true || isViewOnly()}
+      />
       {redactDialog && (
         <RedactDialog
           seed={redactDialog.seed}
