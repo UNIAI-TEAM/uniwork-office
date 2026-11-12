@@ -3,7 +3,7 @@ import { handlePdfControl, type ControlRequest } from './control'
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 // legacy build: the modern build relies on new APIs like Math.sumPrecise that the current
 // Electron V8 lacks, making embedded font parsing fail and whole pages render as garbled raw char codes
-import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { AiPanel } from './ai/AiPanel'
@@ -243,7 +243,6 @@ import {
   SIDEBAR_CHROME,
   clampSidebarW,
   loadSidebarW,
-  DOC_OPTS,
   PAPER_SIZES,
   STROKE_WIDTH,
   NOTE_MARGIN_W,
@@ -252,7 +251,7 @@ import {
 import type { PageSize, FitMode } from './view-config'
 import { useVisibleSet, PdfPage, MarkupOverlay } from './PdfPage'
 import { probePageGeometry } from './page-probe'
-import { loadPdfForView } from './open-document'
+import { loadPdfForView, withLoadedPdf } from './open-document'
 import { PdfThumb, ThumbPendingOverlay } from './PdfThumb'
 import type { ThumbMenu } from './PdfThumb'
 import { SignDropOverlay, signPlaceK, imagePlaceK, staticFormFillPlaceK } from './SignDropOverlay'
@@ -6607,12 +6606,9 @@ export default function App() {
         setPrinting(true)
         try {
           const data = await readFileBytes(window.pdfApi, filePath)
-          const pdoc = await getDocument({ data, ...DOC_OPTS }).promise
-          try {
-            await printPdf(pdoc, pages)
-          } finally {
-            void pdoc.loadingTask.destroy()
-          }
+          await withLoadedPdf(data, diskPasswordRef.current ?? passwordRef.current, (pdoc) =>
+            printPdf(pdoc, pages),
+          )
         } catch (err) {
           opFailed(err instanceof Error ? err.message : String(err))
         } finally {
