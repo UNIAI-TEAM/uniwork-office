@@ -74,6 +74,10 @@ describe('ribbon File menu', () => {
       }),
     )
     act(() => buttonByText(t('ribbonTabFile'))!.click())
+    const pdfButtons = [...document.querySelectorAll('.file-menu button')].filter((b) =>
+      (b.textContent ?? '').includes(t('appFileExportPdf')),
+    )
+    expect(pdfButtons).toHaveLength(1)
     act(() => buttonByText(t('appFileExportPdf'))!.click())
     expect(onExportPdf).toHaveBeenCalledTimes(1)
     act(() => buttonByText(t('ribbonTabFile'))!.click())

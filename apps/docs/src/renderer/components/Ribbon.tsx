@@ -2340,16 +2340,16 @@ function RibbonInner({
 
   // each target needs the file system or the print engine: the web frame hides what its host
   // did not grant (cap keys exportPdf / exportHtml / exportMarkdown / exportImages)
-  const convertItems = (
+  const convertEntries = (
     [
       ['pdf', 'ribbonConvertPdf', 'exportPdf'],
       ['html', 'ribbonConvertHtml', 'exportHtml'],
       ['md', 'ribbonConvertMarkdown', 'exportMarkdown'],
       ['images', 'ribbonConvertImages', 'exportImages'],
     ] as const
-  )
-    .filter(([, , capKey]) => cap(capKey))
-    .map(([format, key]) => (
+  ).filter(([, , capKey]) => cap(capKey))
+  const renderConvertItems = (entries: typeof convertEntries) =>
+    entries.map(([format, key]) => (
       <button
         key={format}
         disabled={!hasDoc}
@@ -2361,6 +2361,11 @@ function RibbonInner({
         {t(key)}
       </button>
     ))
+  const convertItems = renderConvertItems(convertEntries)
+  // File menu already renders appFileExportPdf when onExportPdf is provided; avoid a duplicate PDF row
+  const fileMenuConvertItems = renderConvertItems(
+    onExportPdf ? convertEntries.filter(([format]) => format !== 'pdf') : convertEntries,
+  )
 
   return (
     <div
@@ -2454,10 +2459,10 @@ function RibbonInner({
                     {t('appFilePrint')} <FileMenuKey command="print" />
                   </button>
                 )}
-                {convertItems.length > 0 && (
+                {fileMenuConvertItems.length > 0 && (
                   <>
                     <div className="file-menu-sep" />
-                    {convertItems}
+                    {fileMenuConvertItems}
                   </>
                 )}
               </div>
