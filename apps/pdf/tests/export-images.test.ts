@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createCanvas } from '@napi-rs/canvas'
 
 type IpcHandler = (event: { sender: { id: number } }, request: unknown) => unknown
 const handlers = new Map<string, IpcHandler>()
@@ -135,25 +136,27 @@ describe('PDF image export paths', () => {
   })
 
   it('encodes JPG export bytes as a valid JPEG (SOI FFD8 / EOI FFD9) at the chosen quality', async () => {
-    const toDataURL = vi.fn((type?: string, quality?: unknown) => {
-      const q = typeof quality === 'number' ? Math.round(quality * 100) : 100
-      const jpeg = Buffer.from([
-        0xff,
-        0xd8, // SOI
-        0xff,
-        0xdb,
-        0x00,
-        0x04,
-        0x00,
-        q, // DQT marker with quality-derived quantizer byte
-        0xff,
-        0xd9, // EOI
-      ])
-      return `data:${type ?? 'image/png'};base64,${jpeg.toString('base64')}`
-    })
-    const b64 = encodeExportPage({ toDataURL }, 'jpg')
-    expect(toDataURL).toHaveBeenCalledWith('image/jpeg', EXPORT_JPEG_QUALITY)
+    const canvas = createCanvas(16, 16)
+    const ctx = canvas.getContext('2d')
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        ctx.fillStyle = `rgb(${(x * 37 + y * 13) % 256}, ${(x * 19 + y * 53) % 256}, ${(x * 71 + y * 29) % 256})`
+        ctx.fillRect(x, y, 1, 1)
+      }
+    }
+    const expected92 = Buffer.from(
+      canvas.toDataURL('image/jpeg', 0.92).split(',')[1] ?? '',
+      'base64',
+    )
+    const encoded50 = Buffer.from(
+      canvas.toDataURL('image/jpeg', 0.5).split(',')[1] ?? '',
+      'base64',
+    )
+    const toDataURLSpy = vi.spyOn(canvas, 'toDataURL')
+
+    const b64 = encodeExportPage(canvas, 'jpg')
     expect(EXPORT_JPEG_QUALITY).toBe(0.92)
+    expect(toDataURLSpy).toHaveBeenCalledWith('image/jpeg', 0.92)
 
     const result = await invoke({
       images: [b64],
@@ -167,7 +170,10 @@ describe('PDF image export paths', () => {
     expect(written[1]).toBe(0xd8)
     expect(written[written.length - 2]).toBe(0xff)
     expect(written[written.length - 1]).toBe(0xd9)
-    expect(written[7]).toBe(Math.round(EXPORT_JPEG_QUALITY * 100))
+    expect(written.includes(Buffer.from([0xff, 0xdb]))).toBe(true)
+    expect(written.includes(Buffer.from([0xff, 0xc0]))).toBe(true)
+    expect(written.equals(expected92)).toBe(true)
+    expect(written.equals(encoded50)).toBe(false)
   })
 
   it('builds jpg paths in the path builder', () => {
