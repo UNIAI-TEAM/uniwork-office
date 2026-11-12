@@ -101,11 +101,11 @@ import {
   type GenSparkAccountStatus,
 } from '@genoffice/ai-provider'
 import { saveAiSettingsFile, scrubAiSettingsFile } from '@genoffice/ai-provider/settings-file'
+import { decodeCsvBuffer } from '@genoffice/xlsx-gateway/gateway/csv-import'
 import {
   csvToXlsxBufferForOpen,
-  decodeCsvBuffer,
   sheetCsvToXlsxBuffer,
-} from '@genoffice/xlsx-gateway/gateway/csv-import'
+} from '@genoffice/xlsx-gateway/gateway/csv-import-xlsx'
 import {
   gskLoginInfo,
   hasGskAuth,
