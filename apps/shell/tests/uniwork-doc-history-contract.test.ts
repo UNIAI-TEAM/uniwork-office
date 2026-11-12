@@ -32,6 +32,12 @@ describe('asDocHistoryResult', () => {
     ).toEqual({ ok: false, error: 'conflict', currentRevision: '42', retryable: true })
   })
 
+  it('UNI-2502: the preload guard lets the released-version codes through', () => {
+    for (const error of ['version_coalesced', 'file_chunk_missing'] as const) {
+      expect(asDocHistoryResult({ ok: false, error })).toEqual({ ok: false, error })
+    }
+  })
+
   it('reads an unknown code as server_error and a non-result as malformed_response', () => {
     expect(asDocHistoryResult({ ok: false, error: 'whatever' })).toEqual({
       ok: false,

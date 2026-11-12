@@ -344,6 +344,28 @@ describe('docHistoryErrorOf', () => {
     })
   })
 
+  it('UNI-2502: a released version and a missing storage block have their own codes, never `conflict`', () => {
+    // the 409 of a released version arrives as the generic `conflict` class with its server code
+    expect(of('conflict', { status: 409, serverCode: 'version_coalesced' })).toEqual({
+      ok: false,
+      error: 'version_coalesced',
+      status: 409,
+    })
+    expect(of('server_error', { status: 500, serverCode: 'file_chunk_missing' })).toEqual({
+      ok: false,
+      error: 'file_chunk_missing',
+      status: 500,
+    })
+    // a real stale base still is the conflict
+    expect(
+      of('conflict', {
+        status: 409,
+        serverCode: 'document_version_conflict',
+        currentRevision: '9',
+      }),
+    ).toMatchObject({ error: 'conflict', currentRevision: '9' })
+  })
+
   it('keeps the transport codes and marks a throttle retryable', () => {
     expect(of('network')).toEqual({ ok: false, error: 'network' })
     expect(of('session_expired', { status: 401 })).toMatchObject({ error: 'session_expired' })

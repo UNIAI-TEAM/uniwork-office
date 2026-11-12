@@ -42,6 +42,13 @@ export interface DocVersion {
   checksum_sha256: string | null
   /** the version number a restore version points back to */
   restored_from: number | null
+  /**
+   * UNI-2502: the last version of the editing session this version was folded into once it gave its
+   * file back; null or absent = a normal row (an older server never sends it)
+   */
+  coalesced_into?: number | null
+  /** UNI-2502: false once the version has no file left to restore; absent reads true */
+  restorable?: boolean
   /** the author's user id ('' when the server sent none); names come from the workspace members */
   created_by: string
   /** 'human' | 'agent' | 'system' (open string) */
@@ -131,6 +138,13 @@ export type DocHistoryErrorCode =
   | 'document_shelved'
   /** 409 document_version_unchanged: nothing moved since the newest version (create) */
   | 'version_unchanged'
+  /**
+   * 409 version_coalesced (UNI-2502): the version gave its file back after its editing session
+   * settled, so it can neither be read, downloaded nor restored. Not the `conflict` of a stale base.
+   */
+  | 'version_coalesced'
+  /** a stored data block of the version's file is missing on the server (`file_chunk_missing`) */
+  | 'file_chunk_missing'
   /** 409 document_version_conflict: the base the restore named is stale (`currentRevision`) */
   | 'conflict'
   /** 423 document_locked: someone else (or another tab / device) holds the edit lock (`editLock`) */
@@ -277,6 +291,8 @@ const ERROR_CODES: ReadonlySet<string> = new Set<DocHistoryErrorCode>([
   'document_archived',
   'document_shelved',
   'version_unchanged',
+  'version_coalesced',
+  'file_chunk_missing',
   'conflict',
   'edit_locked',
   'edit_lock_lost',

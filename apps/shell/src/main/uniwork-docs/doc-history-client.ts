@@ -123,6 +123,9 @@ function parseVersion(raw: unknown): DocVersion {
     size_bytes: typeof size === 'number' && Number.isFinite(size) && size >= 0 ? size : 0,
     checksum_sha256: textOrNull(row.checksum_sha256),
     restored_from: intOrNull(row.restored_from),
+    // UNI-2502: a server that predates the fields reads as a normal, restorable row
+    coalesced_into: intOrNull(row.coalesced_into),
+    restorable: row.restorable !== false,
     created_by: textOr(row.created_by, ''),
     created_by_kind: textOr(row.created_by_kind, 'human'),
     created_at: textOr(row.created_at, ''),

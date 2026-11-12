@@ -110,6 +110,10 @@ export function docHistoryErrorOf(error: unknown): Failure {
   if (error.serverCode === 'invalid_input') return { ok: false, error: 'invalid_request' }
   if (error.serverCode === 'document_version_unchanged') return fail('version_unchanged')
   if (error.serverCode === 'document_shelved') return fail('document_shelved')
+  // UNI-2502: own codes, decided before the status-class mapping below (the 409 of a released
+  // version is not the stale-base `conflict`)
+  if (error.serverCode === 'version_coalesced') return fail('version_coalesced')
+  if (error.serverCode === 'file_chunk_missing') return fail('file_chunk_missing')
   if (error.code === 'edit_locked') {
     const lock = error.editLock
     return {

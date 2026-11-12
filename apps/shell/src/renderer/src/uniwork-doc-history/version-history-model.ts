@@ -144,5 +144,78 @@ export function restoreRefusal(failed: Failed): RestoreRefusal {
   if (failed.error === 'conflict') return { key: 'vhsRestoreConflict', dropKey: true }
   // a key is only valid for the lock id it was minted under (web: version-history-sheet)
   if (failed.error === 'edit_lock_lost') return { key: 'vhsRestoreFailed', dropKey: true }
+  // UNI-2502: a released version is answered with its own sentence and is never the stale-base
+  // conflict above; the key stays (web: documentErrorMessage on the coded error)
+  if (failed.error === 'version_coalesced') return { key: 'vhsErrVersionCoalesced', dropKey: false }
+  if (failed.error === 'file_chunk_missing')
+    return { key: 'vhsErrFileChunkMissing', dropKey: false }
   return { key: writeRefusalKey(failed.error) ?? 'vhsRestoreFailed', dropKey: false }
+}
+
+/**
+ * True when a version gave its file back after its editing session settled (UNI-2502): nothing can
+ * open, download, preview or restore it. A server that predates the fields never sends them, so a
+ * plain row is never released (web: isReleasedVersion).
+ */
+export function isReleasedVersion(
+  version: Pick<DocVersion, 'coalesced_into' | 'restorable'> | null | undefined,
+): boolean {
+  return !!version && (version.coalesced_into != null || version.restorable === false)
+}
+
+/**
+ * One line of the history list. A `version` row is a version of the list; `coalesced` are the
+ * versions of its editing session that gave their file back and show only as a count under it.
+ * An `orphan` is such a group whose last version is not in the loaded pages (web: VersionHistoryRow).
+ */
+export type VersionHistoryRow =
+  | { kind: 'version'; version: DocVersion; coalesced: DocVersion[] }
+  | { kind: 'orphan'; into: number; coalesced: DocVersion[] }
+
+/**
+ * Folds the versions that point at a session's last version (`coalesced_into`) under that version.
+ * The order of the rest is kept; a version with no pointer is never folded, even when the server
+ * says it is not restorable (web: groupVersionRows).
+ */
+export function groupVersionRows(versions: readonly DocVersion[]): VersionHistoryRow[] {
+  const folded = new Map<number, DocVersion[]>()
+  const kept = new Set<number>()
+  for (const version of versions) {
+    if (version.coalesced_into == null) {
+      kept.add(version.version)
+      continue
+    }
+    const group = folded.get(version.coalesced_into)
+    if (group) group.push(version)
+    else folded.set(version.coalesced_into, [version])
+  }
+  const rows: VersionHistoryRow[] = []
+  const orphaned = new Set<number>()
+  for (const version of versions) {
+    if (version.coalesced_into == null) {
+      rows.push({ kind: 'version', version, coalesced: folded.get(version.version) ?? [] })
+      continue
+    }
+    // the group of a last version that is not loaded surfaces where its first member sits
+    const into = version.coalesced_into
+    if (!kept.has(into) && !orphaned.has(into)) {
+      orphaned.add(into)
+      rows.push({ kind: 'orphan', into, coalesced: folded.get(into) ?? [] })
+    }
+  }
+  return rows
+}
+
+/** the sentence under a failed download: a released version and a missing storage block have their own */
+export function downloadErrorKey(failed: Failed): StringKey {
+  if (failed.error === 'version_coalesced') return 'vhsErrVersionCoalesced'
+  if (failed.error === 'file_chunk_missing') return 'vhsErrFileChunkMissing'
+  return 'vhsDownloadFailed'
+}
+
+/** the sentence under a failed open (file version) or preview (page version) of a row */
+export function openErrorKey(failed: Failed): StringKey {
+  if (failed.error === 'unsupported_format') return 'vhsOpenUnsupported'
+  if (failed.error === 'version_coalesced') return 'vhsErrVersionCoalesced'
+  return 'vhsPreviewError'
 }
