@@ -3,7 +3,7 @@ import { handlePdfControl, type ControlRequest } from './control'
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 // legacy build: the modern build relies on new APIs like Math.sumPrecise that the current
 // Electron V8 lacks, making embedded font parsing fail and whole pages render as garbled raw char codes
-import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { AiPanel } from './ai/AiPanel'
@@ -95,7 +95,9 @@ import { rowOfVisIdx, spreadRows, stepPage } from './spread'
 import {
   captureViewState,
   captureZoomAnchor,
+  loadLastZoom,
   loadViewState,
+  saveLastZoom,
   saveViewState,
   zoomAnchorY,
 } from './view-state'
@@ -120,11 +122,16 @@ import {
   remapOutlineTree,
 } from './heading-outline'
 import { printPdf } from './print'
+import { readFileBytes } from './file-bytes'
+import type { PdfEncryptionInput, PdfPermissions } from '../shared/ipc'
+import { mayChangeProtection } from './protection-gate'
+import { MAX_REDACTION_REGIONS } from '../shared/ipc'
 import { PasswordDialog } from './PasswordDialog'
 import { StaticTextDialog } from './StaticTextDialog'
 import { PropertiesDialog } from './PropertiesDialog'
 import { LinkDialog, type LinkDraft } from './LinkDialog'
 import { CertSignDialog } from './CertSignDialog'
+import { ProtectionDialog } from './ProtectionDialog'
 import { BatesDialog } from './BatesDialog'
 import { buildBatesInserts, type BatesConfig } from './bates'
 import { MeasureScaleDialog } from './MeasureScaleDialog'
@@ -141,7 +148,9 @@ import {
 import { StampDialog } from './StampDialog'
 import { buildStamps } from './stamps'
 import type { HeaderFooterConfig, WatermarkConfig } from './stamps'
-import { createSearchIndexCache, searchInIndex } from './search'
+import { createSearchIndexCache, findPatternsInIndex, patternMarks, searchInIndex } from './search'
+import { REDACT_PATTERNS } from './redact-patterns'
+import type { RedactPattern } from './redact-patterns'
 import type { SearchIndex, SearchMatch } from './search'
 import { mapDocFont, type DocFontStyle } from './doc-font'
 import { groupPageBlocks, reflowOverflows, type TextBlock } from './text-block'
@@ -175,6 +184,7 @@ import {
   useAiSidebarEnabled,
 } from '@genoffice/ui'
 import { useI18n } from './i18n/locale'
+import type { StringKey } from './i18n/locale'
 import { useAutosave } from './useAutosave'
 import {
   drainedOrigin,
@@ -233,7 +243,6 @@ import {
   SIDEBAR_CHROME,
   clampSidebarW,
   loadSidebarW,
-  DOC_OPTS,
   PAPER_SIZES,
   STROKE_WIDTH,
   NOTE_MARGIN_W,
@@ -241,6 +250,8 @@ import {
 } from './view-config'
 import type { PageSize, FitMode } from './view-config'
 import { useVisibleSet, PdfPage, MarkupOverlay } from './PdfPage'
+import { probePageGeometry } from './page-probe'
+import { loadPdfForView, withLoadedPdf } from './open-document'
 import { PdfThumb, ThumbPendingOverlay } from './PdfThumb'
 import type { ThumbMenu } from './PdfThumb'
 import { SignDropOverlay, signPlaceK, imagePlaceK, staticFormFillPlaceK } from './SignDropOverlay'
@@ -270,6 +281,8 @@ import {
   textEditPreviewParts,
   textEditPreviewContent,
   seedDraftColors,
+  draftOwnedEditIds,
+  previewsTextEdit,
   paperCss,
   textEraseKey,
   textEraseProbe,
@@ -310,6 +323,7 @@ import {
   IconSign,
   IconCertSign,
   IconSignatures,
+  IconProtect,
   IconBates,
   IconMeasure,
   IconPreviousField,
@@ -376,6 +390,15 @@ GlobalWorkerOptions.workerSrc = workerUrl
 const SERVER_COMMENTS_TOGGLE_ID = 'pdf-server-comments-toggle'
 const SERVER_COMMENTS_PANEL_ID = 'pdf-server-comments-panel'
 
+const REDACT_PATTERN_LABELS: Record<RedactPattern, StringKey> = {
+  phone: 'redactPatternPhone',
+  email: 'redactPatternEmail',
+  'credit-card': 'redactPatternCreditCard',
+  ssn: 'redactPatternSsn',
+  date: 'redactPatternDate',
+  iban: 'redactPatternIban',
+}
+
 const DRAW_TOOLS = [
   { tool: 'ink' as const, icon: IconInk, key: 'drawInk' as const },
   { tool: 'measure' as const, icon: IconMeasure, key: 'drawMeasure' as const },
@@ -397,6 +420,20 @@ const RIBBON_TABS = [
 ] as const
 type RibbonTab = (typeof RIBBON_TABS)[number]['id'] | 'fillForm'
 
+/** The file's bytes before and after a change written to it at once */
+interface WrittenStep {
+  before: Uint8Array
+  after: Uint8Array
+}
+interface WrittenSteps {
+  undo: WrittenStep[]
+  redo: WrittenStep[]
+}
+/** Each step holds the whole file twice: a long history of them would hold that much memory */
+const MAX_WRITTEN_STEPS = 10
+const EMPTY_WRITTEN_STEPS: WrittenSteps = { undo: [], redo: [] }
+const EMPTY_WRITTEN_COUNTS = { undo: 0, redo: 0 }
+
 export default function App() {
   const { lang, t } = useI18n()
   const collapse = useRibbonCollapse(
@@ -416,6 +453,10 @@ export default function App() {
     'loading',
   )
   const [sizes, setSizes] = useState<PageSize[]>([])
+  /** 1-based pages whose probe failed: they render as error tiles instead of canvases */
+  const [failedPages, setFailedPages] = useState<Set<number>>(new Set())
+  /** the message of a failed open, shown with the placeholder's loadError line */
+  const [openError, setOpenError] = useState<string | null>(null)
   const [pageOrigins, setPageOrigins] = useState<[number, number][]>([])
   const [pageUserUnits, setPageUserUnits] = useState<number[]>([])
   const [baseRots, setBaseRots] = useState<number[]>([])
@@ -430,6 +471,7 @@ export default function App() {
   const [compareName, setCompareName] = useState<string | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareSwapped, setCompareSwapped] = useState(false)
+  const compareSidesRef = useRef<{ mine: PageText[]; theirs: PageText[] } | null>(null)
   const [sidebarW, setSidebarW] = useState(loadSidebarW)
   /** raster width for thumbnails — only updated when a drag ends (re-rastering every frame would jank) */
   const [thumbRasterW, setThumbRasterW] = useState(() => loadSidebarW() - SIDEBAR_CHROME)
@@ -591,6 +633,10 @@ export default function App() {
   }, [drawTool])
   const [markupTool, setMarkupTool] = useState<MarkupType | null>(null)
   const [redactions, setRedactions] = useState<LocalRedaction[]>([])
+  const redactionsRef = useRef(redactions)
+  redactionsRef.current = redactions
+  const [redactFindOpen, setRedactFindOpen] = useState(false)
+  const redactFindWrapRef = useRef<HTMLDivElement | null>(null)
   const redactionApplyConfirmedRef = useRef(false)
   const redactionRequestInFlightRef = useRef(false)
   const [redactionCopyInFlight, setRedactionCopyInFlight] = useState(false)
@@ -940,6 +986,26 @@ export default function App() {
   const [formCatalog, setFormCatalog] = useState<FormCatalog | null>(null)
   const [formHasXfa, setFormHasXfa] = useState(false)
   const [documentEncrypted, setDocumentEncrypted] = useState(false)
+  /** false until a password-protected document has been opened for editing by the
+      session's own decryptor (pdf.js accepting the password is not the same claim) */
+  const [sessionUnlocked, setSessionUnlocked] = useState(false)
+  /** protection the next save writes; null while the document saves plain */
+  const [encryption, setEncryption] = useState<PdfEncryptionInput | null>(null)
+  /** password of the file on disk (null: it is plain) — a protection change makes it
+      differ from `encryption.userPassword` until the save lands */
+  const diskPasswordRef = useRef<string | null>(null)
+  /** the password the in-flight save is writing: it reaches diskPasswordRef
+      only once that save lands — the file on disk still carries the old one */
+  const pendingDiskPasswordRef = useRef<string | null | undefined>(undefined)
+  const [protectionDlg, setProtectionDlg] = useState(false)
+  /** the protection configuration differs from the file on disk (set, changed or
+      lifted since the last load); cleared by the post-save reload */
+  const [protectionDirty, setProtectionDirty] = useState(false)
+  /** what the file on disk allows this session: the /P limits bind a user
+      password (or the empty one of an owner-only file); the owner's ignore them */
+  const [diskLock, setDiskLock] = useState<{ unlockedAsOwner: boolean; modifying: boolean } | null>(
+    null,
+  )
   const [activeFormWidgetId, setActiveFormWidgetId] = useState<string | null>(null)
   const formControlRefs = useRef<Map<string, HTMLElement>>(new Map())
   const [formEdits, setFormEdits] = useState<Map<string, FormValueInput>>(new Map())
@@ -1048,6 +1114,16 @@ export default function App() {
   const history = historyRef.current
   // the name the ask-before-save card showed, applied by the save that follows its Save click
   const offeredNameRef = useRef<string | null>(null)
+  /** The file around each change written to it at once (Replace pages, Page size, Crop, Insert
+      PDF): Undo with no pending edit left writes it back as it was, Redo as the change left it */
+  const writtenRef = useRef<WrittenSteps>(EMPTY_WRITTEN_STEPS)
+  /** Their counts, for the Undo and Redo buttons */
+  const [written, setWrittenCounts] = useState(EMPTY_WRITTEN_COUNTS)
+  const setWritten = (steps: WrittenSteps) => {
+    writtenRef.current = steps
+    setWrittenCounts({ undo: steps.undo.length, redo: steps.redo.length })
+  }
+  const writtenStepBusyRef = useRef(false)
   const [pwInput, setPwInput] = useState('')
   const [pwWrong, setPwWrong] = useState(false)
   const [extractDlg, setExtractDlg] = useState(false)
@@ -1240,8 +1316,7 @@ export default function App() {
       saved?: SavedSnapshot,
       waitForPageNos: number[] = [],
     ) => {
-      const data = await window.pdfApi.readFile(path)
-      const bytes = new Uint8Array(data)
+      const bytes = await readFileBytes(window.pdfApi, path)
       setFormHasXfa(hasXfaMarker(bytes))
       if (!saved) {
         setFormCatalog(null)
@@ -1249,11 +1324,7 @@ export default function App() {
         setActiveFormWidgetId(null)
         formControlRefs.current.clear()
       }
-      const task = getDocument({
-        data: bytes,
-        password: passwordRef.current,
-        ...DOC_OPTS,
-      })
+      const task = loadPdfForView(bytes, passwordRef.current)
       let loaded: PDFDocumentProxy
       try {
         loaded = await task.promise
@@ -1286,15 +1357,58 @@ export default function App() {
         const formFeatures = documentFormFeatures(documentInfo, bytes)
         setFormHasXfa(formFeatures.hasXfa)
         setDocumentEncrypted(formFeatures.encrypted)
-        for (let i = 1; i <= loaded.numPages; i++) {
-          const page = await loaded.getPage(i)
-          // Unrotated size; display size is derived by geom from the total rotation
-          const vp = page.getViewport({ scale: 1, rotation: 0 })
-          all.push({ width: vp.width, height: vp.height })
-          rots.push(page.rotate ?? 0)
-          origins.push([page.view[0]!, page.view[1]!])
-          userUnits.push(page.userUnit ?? 1)
+        if (formFeatures.encrypted) {
+          // pdf.js already accepted this password for rendering; the session's own
+          // handler must accept it too before the document counts as editable
+          const password = passwordRef.current ?? ''
+          const outcome = await window.pdfApi.decryptPdf(bytes, password)
+          if (outcome.ok) {
+            setEncryption({
+              userPassword: password,
+              ownerPassword: password,
+              permissions: outcome.permissions,
+            })
+            setSessionUnlocked(true)
+            setDiskLock({
+              unlockedAsOwner: outcome.unlockedAs === 'owner',
+              modifying: outcome.permissions.modifying,
+            })
+          } else {
+            setEncryption(null)
+            setSessionUnlocked(false)
+            setDiskLock(null)
+          }
+          diskPasswordRef.current = password
+        } else {
+          setEncryption(null)
+          setSessionUnlocked(false)
+          setDiskLock(null)
+          diskPasswordRef.current = null
         }
+        setProtectionDirty(false)
+        const probe = await probePageGeometry(loaded)
+        for (const geo of probe.pages) {
+          all.push({ width: geo.width, height: geo.height })
+          rots.push(geo.rotate)
+          origins.push(geo.origin)
+          userUnits.push(geo.userUnit)
+        }
+        // A page that cannot be probed no longer destroys the document: the
+        // tile renders as an error placeholder and the rest of the book opens
+        // (genoffice#2366 — one broken page deep in a large file used to blank
+        // the whole viewer with the reason only in the console)
+        if (probe.failures.length > 0) {
+          setFailedPages(new Set(probe.failures.map((f) => f.page)))
+          showNotice(
+            t('pdfPagesFailed', {
+              count: probe.failures.length,
+              detail: probe.failures
+                .slice(0, 3)
+                .map((f) => `#${f.page} ${f.message}`)
+                .join(', '),
+            }),
+          )
+        } else setFailedPages(new Set())
       } catch (err) {
         // getMetadata/page probing failed after the document resolved but before
         // setDoc adopted it: destroy the half-open document (pdfjs-dist 6.x
@@ -1549,10 +1663,11 @@ export default function App() {
         setAddedAttachments([])
         setRemovedAttachments(new Set())
       }
-      setFileSize(data.byteLength)
+      setFileSize(bytes.byteLength)
       setSelected(null)
       setDeleteToast(false)
       history.clear()
+      setWritten({ undo: [], redo: [] })
       outlineDocRef.current = loaded
       // A save-reload keeps the current tree (page indices already remapped
       // above) visible while headings rescan
@@ -1580,13 +1695,22 @@ export default function App() {
       if (previous) void previous.loadingTask.destroy()
       return loaded.numPages
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is not referentially stable (CLAUDE.md)
     [history],
   )
+
+  /** A fit mode is recomputed at 'ready'; a custom zoom must be in place before it so
+   *  the initial fit-width recompute does not take over */
+  const applyOpeningZoom = useCallback((zoom: { scale: number; fitMode: FitMode }) => {
+    fitModeRef.current = zoom.fitMode
+    if (zoom.fitMode === null) setScale(Math.min(MAX_SCALE, Math.max(MIN_SCALE, zoom.scale)))
+  }, [])
 
   const openPath = useCallback(
     async (path: string) => {
       try {
         setFilePath(path)
+        setOpenError(null)
         // A newly opened file starts outside the autosave gate
         savedOnceRef.current = false
         await loadDoc(path, null)
@@ -1599,13 +1723,29 @@ export default function App() {
         const savedView = loadViewState(path)
         if (savedView) {
           pendingViewRestoreRef.current = savedView
-          fitModeRef.current = savedView.fitMode
-          if (savedView.fitMode === null)
-            setScale(Math.min(MAX_SCALE, Math.max(MIN_SCALE, savedView.scale)))
+          applyOpeningZoom(savedView)
+        } else {
+          const pref = await window.pdfApi.getDefaultZoom().catch(() => 'width' as const)
+          const zoom = pref === 'last' ? loadLastZoom() : null
+          applyOpeningZoom(zoom ?? { scale: 1, fitMode: pref === 'page' ? 'page' : 'width' })
         }
         setStatus('ready')
       } catch (err) {
         if ((err as Error | null)?.name === 'PasswordException') {
+          // a certificate-encrypted document has no password to type: pdf.js
+          // reports it like a password failure, and the answer has to name the
+          // real reason instead of looping the prompt
+          try {
+            const raw = await readFileBytes(window.pdfApi, path)
+            const probe = await window.pdfApi.decryptPdf(raw, '')
+            if (!probe.ok && probe.reason === 'certificate-encryption') {
+              showNotice(t('pwCertEncrypted'))
+              setStatus('error')
+              return
+            }
+          } catch {
+            /* classification is best-effort: the prompt still works without it */
+          }
           // like docs: a failed attempt clears the field alongside the error
           setPwWrong(passwordRef.current !== undefined)
           setPwInput('')
@@ -1613,10 +1753,12 @@ export default function App() {
           return
         }
         console.error('[pdf] open failed:', err)
+        setOpenError(err instanceof Error ? err.message : String(err))
         setStatus('error')
       }
     },
-    [loadDoc],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is not referentially stable (CLAUDE.md)
+    [loadDoc, applyOpeningZoom],
   )
 
   useEffect(() => {
@@ -1666,13 +1808,23 @@ export default function App() {
   const commentsBridge = useMemo(() => pdfCommentsBridge(), [])
   const serverComments = uniwork.bound && commentsBridge !== null && !!filePath
 
-  /** pdf-lib cannot write encrypted files, including owner-protected files that open without a password. */
+  /** Editable once the session can both read and write the document: password-opened
+      files count after our own decryptor accepted them (the save pipeline re-reads the
+      protected bytes from disk, which pdf-lib alone cannot). A session holding only
+      the user password — or the empty one of an owner-only file — is additionally
+      bound by the /P the file carries: modifying denied means read-only. */
   const encryptedReadOnly =
-    status === 'ready' && (passwordRef.current !== undefined || documentEncrypted)
+    status === 'ready' &&
+    documentEncrypted &&
+    (!sessionUnlocked || (diskLock !== null && !diskLock.unlockedAsOwner && !diskLock.modifying))
   /** View-only platform (web viewer without the save grant): the same read-only mode */
   const viewOnly = !cap('edit')
   /** View-only UniWork documents reuse the same read-only mode (edit tools and Save off) */
   const readOnly = viewOnly || encryptedReadOnly || uniwork.readOnly
+  /** Only the owner password may change or lift protection: a user-password
+      session, even one allowed to modify the content, must not be able to strip
+      the owner's password. A plain document has no protection to lose. */
+  const protectionEditable = mayChangeProtection(readOnly, diskLock)
   /** The bake a save writes: never for a document the user cannot edit (view-only, encrypted,
       bound read-only), which would otherwise gain a text layer through a plain Save */
   const ocrBakeInserts = useMemo(
@@ -1869,6 +2021,7 @@ export default function App() {
           fitMode: fitModeRef.current,
         }),
       )
+      saveLastZoom({ scale, fitMode: fitModeRef.current })
     }
     const schedule = () => {
       window.clearTimeout(timer)
@@ -2170,6 +2323,7 @@ export default function App() {
     order !== null ||
     metadata !== null ||
     recovered ||
+    protectionDirty ||
     (pendingOutline?.edited ?? false) ||
     addedAttachments.length > 0 ||
     removedAttachments.size > 0
@@ -2235,6 +2389,7 @@ export default function App() {
     coalesceKeyRef.current = coalesceKey ?? null
     // inside an AI run the tools push nothing: the run leaves one entry when it ends
     history.push(snapshot())
+    if (writtenRef.current.redo.length > 0) setWritten({ ...writtenRef.current, redo: [] })
   }
 
   const newId = () => `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
@@ -2406,14 +2561,14 @@ export default function App() {
   const undo = () => {
     // The current state is taken before applySnapshot rewrites the refs
     const restore = history.undo(snapshot())
-    if (!restore) return
+    if (!restore) return void stepWritten('undo')
     applySnapshot(restore)
     coalesceKeyRef.current = null
   }
 
   const redo = () => {
     const restore = history.redo(snapshot())
-    if (!restore) return
+    if (!restore) return void stepWritten('redo')
     applySnapshot(restore)
     coalesceKeyRef.current = null
   }
@@ -3962,8 +4117,10 @@ export default function App() {
     if (!doc || compareBusy) return
     // Both sides must come from the same extraction engine — pdf.js and pdfium
     // break lines differently, and a cross-engine diff reports phantom changes
-    // on identical files. The open document therefore needs a file on disk.
-    if (!filePath) {
+    // on identical files. The open document therefore needs its current state
+    // on disk: no file yet, or pending edits, both mean "save first". Redaction
+    // marks stay out — a save does not apply them, so they could never unblock.
+    if (!filePath || ordinaryDirty) {
       showNotice(t('compareNeedsSaved'))
       return
     }
@@ -3974,22 +4131,25 @@ export default function App() {
         if (!('canceled' in picked)) showNotice(compareReason(picked.reason))
         return
       }
-      const mine = await window.pdfApi.compareReadOpen(filePath)
+      const mine = await window.pdfApi.compareReadOpen(filePath, passwordRef.current)
       if (!mine.ok) {
         showNotice(compareReason(mine.reason))
         return
       }
       const mineSide: PageText[] = mine.pages.map((text, pageIndex) => ({ pageIndex, text }))
       const theirs: PageText[] = picked.pages.map((text, pageIndex) => ({ pageIndex, text }))
-      const [oldSide, newSide] = compareSwapped ? [theirs, mineSide] : [mineSide, theirs]
+      compareSidesRef.current = { mine: mineSide, theirs }
       setCompareName(picked.name)
-      setCompareResult(compareDocuments(oldSide, newSide))
+      setCompareResult(compareSides(mineSide, theirs, compareSwapped))
     } catch (err) {
       showNotice(err instanceof Error ? err.message : String(err))
     } finally {
       setCompareBusy(false)
     }
   }
+
+  const compareSides = (mine: PageText[], theirs: PageText[], swapped: boolean): CompareResult =>
+    swapped ? compareDocuments(theirs, mine) : compareDocuments(mine, theirs)
 
   const attachmentRows = useMemo((): AttachmentRow[] => {
     const rows: AttachmentRow[] = savedAttachments.map((a) => ({
@@ -4143,6 +4303,7 @@ export default function App() {
     bake: readonly LocalTextInsert[],
   ) => ({
     markups: (pending?.markups ?? markups).map(({ id: _id, ...rest }) => rest),
+    ...(noteAuthor ? { annotationAuthor: noteAuthor } : {}),
     annotDeletes: (pending?.annotDeletes ?? annotDeletes).map((d): AnnotDeleteInput => ({
       pageIndex: d.annot.pageIndex,
       objNum: d.annot.objNum,
@@ -4172,6 +4333,12 @@ export default function App() {
     deletedPages: [...deleted],
     ...(order ? { pageOrder: visList } : {}),
     ...(metadata ? { metadata } : {}),
+    // false = keep the file's own /Encrypt entries, true = write the dialog's
+    protectionDirty,
+    ...(diskPasswordRef.current !== null
+      ? { decryption: { userPassword: diskPasswordRef.current } }
+      : {}),
+    ...(encryption ? { encryption } : {}),
     ...(pendingOutline?.edited && pendingOutline.tree ? { outline: pendingOutline.tree } : {}),
     ...(addedAttachments.length > 0 || removedAttachments.size > 0
       ? {
@@ -4299,6 +4466,19 @@ export default function App() {
       afterUserSave,
     })
     if (!filePath || (!anythingToSave && !forceBound)) return Promise.resolve(!anythingToSave)
+    // Writing a protection with no owner password would hand ownership to
+    // anyone, so a protection change with both passwords empty is refused. An
+    // unchanged owner-only file is not affected: its own /Encrypt entries are
+    // carried over, so the save keeps the owner's password without knowing it.
+    if (
+      protectionDirty &&
+      encryption !== null &&
+      encryption.userPassword === '' &&
+      encryption.ownerPassword === ''
+    ) {
+      showNotice(t('pwOwnerNeeded'))
+      return Promise.resolve(false)
+    }
     lastWriteOriginRef.current = origin
     // An explicit save opts this file into autosave
     if (origin !== 'auto') savedOnceRef.current = true
@@ -4371,6 +4551,12 @@ export default function App() {
       }
       if (result.skippedImageEdits && result.skippedImageEdits.length > 0) {
         noticeSkippedImages(result.skippedImageEdits)
+      }
+      // The write landed: a pending protection change is what the disk carries now
+      if (pendingDiskPasswordRef.current !== undefined) {
+        diskPasswordRef.current =
+          pendingDiskPasswordRef.current === '' ? null : pendingDiskPasswordRef.current
+        pendingDiskPasswordRef.current = undefined
       }
       // Reload: changes are in the file now, canvas renders directly, saved pending ops are cleared
       try {
@@ -4503,7 +4689,21 @@ export default function App() {
           }
         : editsPayload(draftEdits, noteFlush)
     setSaveState('saving')
-    const result = await window.pdfApi.save({ path: filePath, targetPath, ...edits })
+    // the redaction copy is a save like any other: on a protected document the
+    // main process has to decrypt the source and re-protect the cleaned output
+    const protection = {
+      ...(encryption !== null ? { encryption } : {}),
+      ...(diskPasswordRef.current !== null
+        ? { decryption: { userPassword: diskPasswordRef.current } }
+        : {}),
+      protectionDirty,
+    }
+    const result = await window.pdfApi.save({
+      path: filePath,
+      targetPath,
+      ...edits,
+      ...protection,
+    })
     if (!result.ok) {
       opFailed(result.error)
       return false
@@ -4521,6 +4721,12 @@ export default function App() {
       // The main process has committed this path and its read grant. Reload the
       // sanitized bytes, clearing undo/search state that could expose old content.
       const scrollTop = scrollRef.current?.scrollTop ?? 0
+      // a protection change rode this save: the file on disk now needs the new password
+      if (pendingDiskPasswordRef.current !== undefined) {
+        diskPasswordRef.current =
+          pendingDiskPasswordRef.current === '' ? null : pendingDiskPasswordRef.current
+        pendingDiskPasswordRef.current = undefined
+      }
       setFilePath(targetPath)
       setStatus('loading')
       try {
@@ -4546,6 +4752,51 @@ export default function App() {
     // still pending, so a saved-confirmation next to the unsaved badge would lie
     setSaveState('idle')
     return true
+  }
+
+  // The ref is written in the same turn so back-to-back calls see the true count against the cap
+  const appendRedactions = (
+    marks: readonly { pageIndex: number; rect: [number, number, number, number] }[],
+  ) => {
+    if (marks.length === 0) return
+    const next = [...redactionsRef.current, ...marks.map((m) => ({ ...m, id: newId() }))]
+    redactionsRef.current = next
+    setRedactions(next)
+  }
+
+  /** Queue redaction marks over every hit of the patterns; the user still reviews and applies */
+  const markSensitive = async (
+    patterns: readonly RedactPattern[],
+  ): Promise<{ hits: number; areas: number; rotated: number; capped: boolean } | null> => {
+    const indexPromise = getSearchIndex()
+    if (!indexPromise) return null
+    const index = await indexPromise
+    const room = MAX_REDACTION_REGIONS - redactionsRef.current.length
+    const found = patternMarks(
+      findPatternsInIndex(index, patterns, (i) => deletedRef.current.has(i)),
+      room,
+    )
+    appendRedactions(found.marks)
+    return {
+      hits: found.hits,
+      areas: found.marks.length,
+      rotated: found.rotated,
+      capped: found.capped,
+    }
+  }
+
+  const runRedactFind = (patterns: readonly RedactPattern[]) => {
+    setRedactFindOpen(false)
+    void markSensitive(patterns).then(
+      (r) => {
+        if (!r) return
+        const notes = [r.hits > 0 ? t('redactFound', { count: r.hits }) : t('redactFoundNone')]
+        if (r.rotated > 0) notes.push(t('redactFoundRotated', { count: r.rotated }))
+        if (r.capped) notes.push(t('redactFoundCapped', { count: r.areas }))
+        showNotice(notes.join(' '))
+      },
+      (err: unknown) => opFailed(err instanceof Error ? err.message : String(err)),
+    )
   }
 
   const requestRedactionSaveAs = () => {
@@ -4923,7 +5174,14 @@ export default function App() {
     const inserts = buildBatesInserts(
       visList.map((origIdx) => {
         const geom = pageGeom(origIdx)
-        return { width: geom.pw, height: geom.ph, rotate: geom.rot, x0: geom.x0, y0: geom.y0 }
+        return {
+          width: geom.pw,
+          height: geom.ph,
+          rotate: geom.rot,
+          x0: geom.x0,
+          y0: geom.y0,
+          userUnit: geom.userUnit,
+        }
       }),
       config,
       (text, size) => measureTextWidth(text, fontOf(size)),
@@ -5589,7 +5847,7 @@ export default function App() {
   /** Pending edits the open draft stands in for (reopened / folded): the draft's probe
       erases their run, so they take the draft's erased state */
   const draftOwnedIds = useMemo(
-    () => new Set(textDraft ? [textDraft.editId, ...(textDraft.foldedIds ?? [])] : []),
+    () => draftOwnedEditIds(textDraft),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- same: identity fields only
     [textDraft?.editId, textDraft?.foldedIds],
   )
@@ -6066,12 +6324,59 @@ export default function App() {
     else if ('canceled' in result) return { ok: true, canceled: true, flushed }
     return result as Exclude<R, { canceled: true }>
   }
+  /** Reloads the file a change just wrote, and keeps the file from *before* it as an Undo step */
+  const reloadWritten = async (before: Uint8Array): Promise<number> => {
+    const kept = writtenRef.current.undo
+    const pageCount = await loadDoc(filePath, doc)
+    const after = await readFileBytes(window.pdfApi, filePath)
+    setWritten({ undo: [...kept.slice(-(MAX_WRITTEN_STEPS - 1)), { before, after }], redo: [] })
+    return pageCount
+  }
+
+  /** Undo or Redo of a change written at once, once no pending edit is left; false when there is none */
+  const stepWritten = (direction: 'undo' | 'redo'): boolean => {
+    const { undo: undoable, redo: redoable } = writtenRef.current
+    const steps = direction === 'undo' ? undoable : redoable
+    const step = steps[steps.length - 1]
+    if (!step || dirty || writtenStepBusyRef.current) return false
+    writtenStepBusyRef.current = true
+    void (async () => {
+      try {
+        const bytes = direction === 'undo' ? step.before : step.after
+        const result = await window.pdfApi.restoreFile({
+          path: filePath,
+          bytes: bytes.slice().buffer as ArrayBuffer,
+        })
+        if (!result.ok) {
+          opFailed(result.error)
+          return
+        }
+        await loadDoc(filePath, doc)
+        setWritten(
+          direction === 'undo'
+            ? { undo: undoable.slice(0, -1), redo: [...redoable, step] }
+            : { undo: [...undoable, step], redo: redoable.slice(0, -1) },
+        )
+      } finally {
+        writtenStepBusyRef.current = false
+      }
+    })()
+    return true
+  }
+
   const rewriteInPlace = async (
     run: () => Promise<{ ok: true } | { ok: true; canceled: true } | { ok: false; error: string }>,
   ): Promise<FileOpResult> => {
-    const result = await runFileOp(run)
+    const held: { before?: Uint8Array } = {}
+    const result = await runFileOp(async () => {
+      held.before = await readFileBytes(window.pdfApi, filePath)
+      return run()
+    })
     if (!result.ok || 'canceled' in result) return result
-    return { ok: true, pageCount: await loadDoc(filePath, doc) }
+    return {
+      ok: true,
+      pageCount: held.before ? await reloadWritten(held.before) : await loadDoc(filePath, doc),
+    }
   }
   const baseName = () => fileName.replace(/\.pdf$/i, '')
 
@@ -6156,12 +6461,13 @@ export default function App() {
 
   const insertPdf = (afterOrigIdx: number) =>
     flushThen(async () => {
+      const before = await readFileBytes(window.pdfApi, filePath)
       const result = await window.pdfApi.insertPdf({ path: filePath, afterPageIndex: afterOrigIdx })
       if (!result.ok) {
         opFailed(result.error)
         return
       }
-      if (!('canceled' in result)) await loadDoc(filePath, doc)
+      if (!('canceled' in result)) await reloadWritten(before)
     })
 
   const insertBlankPage = (afterOrigIdx: number) => insertBlankPageAt(visList.indexOf(afterOrigIdx))
@@ -6299,13 +6605,10 @@ export default function App() {
       await flushThen(async () => {
         setPrinting(true)
         try {
-          const data = await window.pdfApi.readFile(filePath)
-          const pdoc = await getDocument({ data: new Uint8Array(data), ...DOC_OPTS }).promise
-          try {
-            await printPdf(pdoc, pages)
-          } finally {
-            void pdoc.loadingTask.destroy()
-          }
+          const data = await readFileBytes(window.pdfApi, filePath)
+          await withLoadedPdf(data, diskPasswordRef.current ?? passwordRef.current, (pdoc) =>
+            printPdf(pdoc, pages),
+          )
         } catch (err) {
           opFailed(err instanceof Error ? err.message : String(err))
         } finally {
@@ -6493,6 +6796,8 @@ export default function App() {
     },
     outline: () => outline,
     searchIndex: getSearchIndex,
+    redactionCount: () => redactionsRef.current.length,
+    addRedactions: appendRedactions,
     isDeleted: (i) => deletedRef.current.has(i),
     gotoPage: (p) => {
       if (orderRef.current !== order) {
@@ -6905,6 +7210,9 @@ export default function App() {
   useDismissablePopover(thumbMenu != null, () => setThumbMenu(null), {
     inside: () => [thumbMenuRef.current],
   })
+  useDismissablePopover(redactFindOpen, () => setRedactFindOpen(false), {
+    inside: () => [redactFindWrapRef.current],
+  })
 
   // Draw-color palette (Annotate tab). Guarded by its own wrap ref — the
   // generic `.rb-drop-wrap` class is shared with the highlight split button,
@@ -7229,7 +7537,13 @@ export default function App() {
     return (
       <div className="app">
         <div className="pdf-placeholder">
-          {status === 'loading' ? t('loading') : status === 'error' ? t('loadError') : t('noFile')}
+          {status === 'loading'
+            ? t('loading')
+            : status === 'error'
+              ? openError
+                ? `${t('loadError')}: ${openError}`
+                : t('loadError')
+              : t('noFile')}
         </div>
       </div>
     )
@@ -7477,6 +7791,40 @@ export default function App() {
   const firstSignatureWidget =
     formWidgets.find((widget) => widget.kind === 'signature' && !formWidgetSigned(widget)) ?? null
 
+  const applyProtection = (result: {
+    userPassword: string
+    ownerPassword: string
+    permissions: PdfPermissions
+  }): void => {
+    if (!mayChangeProtection(readOnly, diskLock)) {
+      showNotice(t('pwOwnerNeeded'))
+      setProtectionDlg(false)
+      return
+    }
+    setEncryption(result)
+    setProtectionDirty(true)
+    // the next save writes a file that only opens with the new password; the
+    // file ON DISK keeps the old one until that write lands, so the disk
+    // password follows the save instead of leading it
+    passwordRef.current = result.userPassword
+    pendingDiskPasswordRef.current = result.userPassword
+    setProtectionDlg(false)
+  }
+
+  const removeProtection = (): void => {
+    if (!mayChangeProtection(readOnly, diskLock)) {
+      showNotice(t('pwOwnerNeeded'))
+      setProtectionDlg(false)
+      return
+    }
+    setEncryption(null)
+    setProtectionDirty(true)
+    // the next save writes plain; until then the disk file still needs the old password
+    passwordRef.current = undefined
+    pendingDiskPasswordRef.current = ''
+    setProtectionDlg(false)
+  }
+
   const openCertSignDialog = () => {
     if (dirty || saveInFlightRef.current !== null) {
       showNotice(t('certSaveFirst'))
@@ -7668,7 +8016,7 @@ export default function App() {
             className="qa-btn"
             {...pdfTipProps(t('undo'), 'pdf-03')}
             aria-label={t('undo')}
-            disabled={!history.canUndo}
+            disabled={!history.canUndo && written.undo === 0}
             onClick={undo}
           >
             <IconUndo />
@@ -7677,7 +8025,7 @@ export default function App() {
             className="qa-btn"
             {...pdfTipProps(t('redo'), 'pdf-04')}
             aria-label={t('redo')}
-            disabled={!history.canRedo}
+            disabled={!history.canRedo && written.redo === 0}
             onClick={redo}
           >
             <IconRedo />
@@ -7893,6 +8241,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconProps />
                     </span>
+
                     <span>{t('props')}</span>
                   </button>
                 </div>
@@ -8034,6 +8383,33 @@ export default function App() {
                         </span>
                         <span>{t('redact')}</span>
                       </button>
+                      <div className="rb-drop-wrap" ref={redactFindWrapRef}>
+                        <button
+                          className={`rb-big${redactFindOpen ? ' active' : ''}`}
+                          disabled={readOnly || redactionCopyInFlight}
+                          data-tip={t('redactFindHint')}
+                          onClick={() => setRedactFindOpen((v) => !v)}
+                        >
+                          <span className="rb-big-icon">
+                            <IconSearch />
+                            <RbCaret />
+                          </span>
+                          <span>{t('redactFind')}</span>
+                        </button>
+                        {redactFindOpen && (
+                          <div className="rb-drop rb-menu">
+                            {REDACT_PATTERNS.map((p) => (
+                              <button key={p} onClick={() => runRedactFind([p])}>
+                                {t(REDACT_PATTERN_LABELS[p])}
+                              </button>
+                            ))}
+                            <div className="rb-menu-sep" />
+                            <button onClick={() => runRedactFind(REDACT_PATTERNS)}>
+                              {t('redactFindAll')}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       {redactions.length > 0 && (
                         <>
                           <button
@@ -8081,6 +8457,19 @@ export default function App() {
                         <IconCertSign />
                       </span>
                       <span>{t('certSign')}</span>
+                    </button>
+                  )}
+                  {cap('certSign') && (
+                    <button
+                      className="rb-big"
+                      disabled={!protectionEditable || status !== 'ready'}
+                      data-tip={t('protectHint')}
+                      onClick={() => setProtectionDlg(true)}
+                    >
+                      <span className="rb-big-icon">
+                        <IconProtect />
+                      </span>
+                      <span>{t('protect')}</span>
                     </button>
                   )}
                   {cap('certSign') && digitalSignatures.length > 0 && (
@@ -8448,7 +8837,7 @@ export default function App() {
                   {cap('pdfTextEdit') && (
                     <button
                       className="rb-big"
-                      disabled={readOnly || sizes.length === 0}
+                      disabled={readOnly || pageCount === 0}
                       data-tip={t('batesHint')}
                       onClick={() => setBatesDlg(true)}
                     >
@@ -8752,8 +9141,10 @@ export default function App() {
                   busy={compareBusy}
                   onPick={() => void runCompare()}
                   onSwap={() => {
-                    setCompareSwapped((v) => !v)
-                    setCompareResult(null)
+                    const swapped = !compareSwapped
+                    setCompareSwapped(swapped)
+                    const sides = compareSidesRef.current
+                    setCompareResult(sides ? compareSides(sides.mine, sides.theirs, swapped) : null)
                   }}
                   onGoToPage={(pageNo) => scrollToPage(pageNo)}
                 />
@@ -9040,14 +9431,21 @@ export default function App() {
                             }
                           }}
                         >
-                          <PdfPage
-                            doc={doc}
-                            pageNo={origIdx + 1}
-                            scale={scale}
-                            rotationDelta={rotDelta(origIdx)}
-                            visible={rowVisible}
-                            onRenderState={pageRenderState}
-                          />
+                          {failedPages.has(origIdx + 1) ? (
+                            <div className="pdf-page-broken">
+                              <span>{t('loadError')}</span>
+                              <span>#{origIdx + 1}</span>
+                            </div>
+                          ) : (
+                            <PdfPage
+                              doc={doc}
+                              pageNo={origIdx + 1}
+                              scale={scale}
+                              rotationDelta={rotDelta(origIdx)}
+                              visible={rowVisible}
+                              onRenderState={pageRenderState}
+                            />
+                          )}
                           {livePreview.has(origIdx) &&
                             (() => {
                               const lp = livePreview.get(origIdx)!
@@ -9343,7 +9741,7 @@ export default function App() {
                                 })}
                               {/* Pending text edits: cover the original run and preview the replacement */}
                               {textEdits
-                                .filter((te) => te.input.pageIndex === origIdx)
+                                .filter((te) => previewsTextEdit(te, origIdx, draftOwnedIds))
                                 .map((te) => {
                                   const { style, coverStyle } = textEditPreviewParts(
                                     te,
@@ -10630,10 +11028,27 @@ export default function App() {
                 }}
               />
             )}
+            {protectionDlg && (
+              <ProtectionDialog
+                t={t}
+                hasPassword={encryption !== null || documentEncrypted}
+                permissions={
+                  encryption?.permissions ?? {
+                    printing: true,
+                    modifying: true,
+                    annotating: true,
+                    copying: true,
+                  }
+                }
+                onApply={applyProtection}
+                onRemove={removeProtection}
+                onClose={() => setProtectionDlg(false)}
+              />
+            )}
             {batesDlg && (
               <BatesDialog
                 t={t}
-                pageCount={sizes.length}
+                pageCount={pageCount}
                 onApply={applyBates}
                 onClose={() => setBatesDlg(false)}
               />

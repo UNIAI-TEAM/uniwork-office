@@ -789,6 +789,12 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       if (!doc || !owns(path)) throw new Error(NOT_GRANTED)
       return copyBuffer(doc.bytes)
     },
+    async readFileChunk(path, start, end) {
+      if (!doc || !owns(path)) throw new Error(NOT_GRANTED)
+      const from = Math.max(0, Math.min(start, doc.bytes.byteLength))
+      const to = Math.max(from, Math.min(end, doc.bytes.byteLength))
+      return { data: doc.bytes.slice(from, to), fileSize: doc.bytes.byteLength }
+    },
     onReloadRequest(handler) {
       reloadListeners.add(handler)
       return () => {
@@ -943,6 +949,13 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       return rewrite(request.path, async (bytes) => ({
         bytes: await (await core()).cropPagesBytes(bytes, request.pages, request.rect),
       }))
+    },
+    async restoreFile(request) {
+      const { path, bytes } = request ?? {}
+      if (Object.prototype.toString.call(bytes) !== '[object ArrayBuffer]') {
+        return fail(NOT_GRANTED)
+      }
+      return rewrite(path, async () => ({ bytes: new Uint8Array(bytes) }))
     },
     async insertPdf(request) {
       if (!can('insertPages')) return fail(NOT_AVAILABLE)
@@ -1143,6 +1156,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
     // ---- viewer identity, appearance
     getUsername: async () => author,
+    getDefaultZoom: async () => 'width',
     // the web host has no desktop account ping; the author comes from the frame's init only
     onCommentAuthorChanged: () => () => {},
     getLanguage: browser.getLanguage as PdfWebApi['getLanguage'],
@@ -1179,6 +1193,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     requestRedactionCopy: async () => false,
     // certificate signing reads the file on disk and writes a signed copy next to it (desktop only;
     // the `certSign` capability hides the entries) - safe typed answers here
+    decryptPdf: async () => ({ ok: false, reason: NOT_AVAILABLE }),
     listDigitalSignatures: async () => [],
     pickCertificate: async () => null,
     listSystemCertificates: async () => ({ certs: [], issues: [] }),

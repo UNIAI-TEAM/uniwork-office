@@ -17,6 +17,9 @@ const api: PdfApi = {
   // the shell no longer pushes presets into a running editor (My AI is gone); only a web host does
   onAiPreset: () => () => {},
   readFile: (path) => ipcRenderer.invoke(PDF_CHANNELS.readFile, path),
+  readFileChunk: (path: string, start: number, end: number) =>
+    ipcRenderer.invoke(PDF_CHANNELS.readFileChunk, path, start, end),
+  decryptPdf: (bytes, password) => ipcRenderer.invoke(PDF_CHANNELS.decryptPdf, bytes, password),
   save: (request) => ipcRenderer.invoke(PDF_CHANNELS.save, request),
   requestRedactionCopy: (path) => ipcRenderer.invoke(PDF_CHANNELS.requestRedactionCopy, path),
   autoRename: (path, baseName) => ipcRenderer.invoke(PDF_CHANNELS.autoRename, path, baseName),
@@ -49,7 +52,8 @@ const api: PdfApi = {
   extractPages: (request) => ipcRenderer.invoke(PDF_CHANNELS.extractPages, request),
   insertPdf: (request) => ipcRenderer.invoke(PDF_CHANNELS.insertPdf, request),
   compareReadPdf: () => ipcRenderer.invoke(PDF_CHANNELS.compareReadPdf),
-  compareReadOpen: (path: string) => ipcRenderer.invoke(PDF_CHANNELS.compareReadOpen, path),
+  compareReadOpen: (path: string, password?: string) =>
+    ipcRenderer.invoke(PDF_CHANNELS.compareReadOpen, path, password),
   reduceFileSize: (path) => ipcRenderer.invoke(PDF_CHANNELS.reduceFileSize, path),
   pickAttachmentFile: () => ipcRenderer.invoke(PDF_CHANNELS.pickAttachmentFile),
   exportAttachment: (request) => ipcRenderer.invoke(PDF_CHANNELS.exportAttachment, request),
@@ -58,6 +62,7 @@ const api: PdfApi = {
   mergePdf: (request) => ipcRenderer.invoke(PDF_CHANNELS.mergePdf, request),
   mergePages: (request) => ipcRenderer.invoke(PDF_CHANNELS.mergePages, request),
   replacePages: (request) => ipcRenderer.invoke(PDF_CHANNELS.replacePages, request),
+  restoreFile: (request) => ipcRenderer.invoke(PDF_CHANNELS.restoreFile, request),
   setPageSize: (request) => ipcRenderer.invoke(PDF_CHANNELS.setPageSize, request),
   splitPages: (request) => ipcRenderer.invoke(PDF_CHANNELS.splitPages, request),
   cropPages: (request) => ipcRenderer.invoke(PDF_CHANNELS.cropPages, request),
@@ -100,6 +105,7 @@ const api: PdfApi = {
     ipcRenderer.on('uniwork:comment-author-changed', listener)
     return () => ipcRenderer.removeListener('uniwork:comment-author-changed', listener)
   },
+  getDefaultZoom: () => ipcRenderer.invoke(PDF_CHANNELS.getDefaultZoom),
   setDirty: (dirty) => ipcRenderer.send(PDF_CHANNELS.dirtyChanged, dirty),
   onCloseSaveRequest: (handler) => {
     const listener = (_e: Electron.IpcRendererEvent, request?: { origin?: unknown }) =>

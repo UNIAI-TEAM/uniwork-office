@@ -3254,6 +3254,12 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   font-weight: 600;
 }
 
+.rb-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
 /* Dialog color well (stamp dialog): swatch trigger + the shared picker popover.
    The popover is fixed + anchored so it escapes the modal's overflow-y clip. */
 .pdf-color-well-wrap {
@@ -5760,4 +5766,18 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   color: var(--text-secondary);
   font-size: 0.85em;
   white-space: nowrap;
+}
+
+/* a page whose probe failed: same frame as a rendered page, an error line instead of a canvas */
+.pdf-page-broken {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  color: var(--danger);
+  font-size: 12px;
 }

@@ -2,10 +2,17 @@ import type { AiPanelPrefs } from '@genoffice/ui'
 import type { Lang } from '@genoffice/i18n'
 import type { AiSettings, AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 
+/** largest slice readFileChunk hands over IPC; the renderer loops over them */
+export const PDF_READ_CHUNK_BYTES = 8 * 1024 * 1024
+
+export type PdfDefaultZoom = 'width' | 'page' | 'last'
+
 export const PDF_CHANNELS = {
   consumePending: 'pdf:consume-pending',
   consumeAiPreset: 'pdf:consume-ai-preset',
   readFile: 'pdf:read-file',
+  readFileChunk: 'pdf:read-file-chunk',
+  decryptPdf: 'pdf:decrypt',
   save: 'pdf:save',
   requestRedactionCopy: 'pdf:request-redaction-copy',
   autoRename: 'pdf:auto-rename',
@@ -35,6 +42,7 @@ export const PDF_CHANNELS = {
   setPageSize: 'pdf:set-page-size',
   splitPages: 'pdf:split-pages',
   cropPages: 'pdf:crop-pages',
+  restoreFile: 'pdf:restore-file',
   exportImages: 'pdf:export-images',
   convertOffice: 'pdf:convert-office',
   convertProgress: 'pdf:convert-progress',
@@ -51,6 +59,7 @@ export const PDF_CHANNELS = {
   addSignature: 'pdf:add-signature',
   removeSignature: 'pdf:remove-signature',
   getUsername: 'pdf:get-username',
+  getDefaultZoom: 'pdf:get-default-zoom',
   dirtyChanged: 'pdf:dirty-changed',
   closeSaveRequest: 'pdf:close-save-request',
   closeSaveResult: 'pdf:close-save-result',
@@ -383,7 +392,7 @@ export type DrawingInput =
       color: [number, number, number]
       at: [number, number]
       contents: string
-      /** Annotation author (/T); omitted → 'UniWork Office' */
+      /** Annotation author (/T); omitted → the request's annotationAuthor */
       author?: string
       /** Creation time (ms since epoch) → /CreationDate and /M; omitted → save time */
       createdMs?: number
@@ -620,6 +629,9 @@ export interface StaticFormFillRecord {
 }
 
 /** A pending area selected for permanent native PDF redaction. PDF user space, y up. */
+/** Max redaction rects per request: prevents 100k-rect DoS on native redact. */
+export const MAX_REDACTION_REGIONS = 500
+
 export interface RedactionInput {
   pageIndex: number
   rect: [number, number, number, number]
@@ -678,6 +690,22 @@ export interface FormValueInput {
   checked?: boolean
 }
 
+/** What a reader may do with a protected document (§7.6.3.2 Table 24, grouped) */
+export interface PdfPermissions {
+  printing: boolean
+  modifying: boolean
+  annotating: boolean
+  copying: boolean
+}
+
+/** Password protection carried on a save: the source is opened with the user
+    password and the output is written back under the same configuration. */
+export interface PdfEncryptionInput {
+  userPassword: string
+  /** who may lift the limits; defaults to the user password in the UI */
+  ownerPassword: string
+  permissions: PdfPermissions
+}
 export interface SavePdfRequest {
   path: string
   /**
@@ -686,7 +714,24 @@ export interface SavePdfRequest {
    * Must match the target granted to the view by the main process (save dialog pick).
    */
   targetPath?: string
+  /** Present while the session works on a password-protected document: the source
+      bytes are opened with the user password and the output is re-protected. */
+  encryption?: PdfEncryptionInput
+  /**
+   * true when this save writes the protection in `encryption` (a dialog change),
+   * false when the source file's own /Encrypt entries are kept: the session
+   * usually holds only one of the two passwords, and re-deriving the key would
+   * replace both. Omitted by callers that always write `encryption`.
+   */
+  protectionDirty?: boolean
+  /** Password of the file currently on disk, when it is protected — needed even when
+      this save writes plain (protection removed): a password change makes it differ
+      from `encryption.userPassword`. */
+  decryption?: { userPassword: string }
   markups: MarkupInput[]
+  /** Author (/T) of the markups and drawings this save adds; a note keeps its own
+      author when it has one. Omitted → 'UniWork Office' */
+  annotationAuthor?: string
   /** Saved markup annotations to remove (applied before every other stage) */
   annotDeletes?: AnnotDeleteInput[]
   drawings: DrawingInput[]
@@ -881,6 +926,14 @@ export type ReplacePagesResult =
   | { ok: true; canceled: true }
   | { ok: false; error: string }
 
+/** The file put back as it was around a change written in place (Undo and Redo of that change) */
+export interface RestoreFileRequest {
+  path: string
+  bytes: ArrayBuffer
+}
+
+export type RestoreFileResult = { ok: true } | { ok: false; error: string }
+
 /** Resize all pages to a target paper size (points), content scaled to fit; written back in place */
 export interface SetPageSizeRequest {
   path: string
@@ -969,6 +1022,30 @@ export interface PdfApi {
   ): () => void
   /** Read pdf bytes. Only paths granted to this view are allowed */
   readFile(path: string): Promise<ArrayBuffer>
+  /** one slice of a granted file, with the file's size so the reader loop
+   *  needs no separate stat: a 42 MB one-shot ArrayBuffer over IPC has
+   *  killed renderers before first paint on Windows (genoffice#2366) */
+  readFileChunk(
+    path: string,
+    start: number,
+    end: number,
+  ): Promise<{ data: Uint8Array; fileSize: number }>
+  /** Open a password-protected document for editing: plain bytes, the /P the file
+      carried, whether a password was needed at all (false: owner-only file) and
+      which password opened it (the owner's ignores the /P limits) */
+  decryptPdf(
+    bytes: Uint8Array,
+    password: string,
+  ): Promise<
+    | {
+        ok: true
+        bytes: Uint8Array
+        permissions: PdfPermissions
+        neededPassword: boolean
+        unlockedAs: 'user' | 'owner'
+      }
+    | { ok: false; reason: 'wrong-password' | string }
+  >
   /** Pick a second document for Compare and read its per-page text (the pick is
       main-side; no grant and no bytes travel to the render side) */
   compareReadPdf(): Promise<
@@ -981,6 +1058,7 @@ export interface PdfApi {
       and the diff would report phantom changes on identical files */
   compareReadOpen(
     path: string,
+    password?: string,
   ): Promise<
     { ok: true; name: string; pageCount: number; pages: string[] } | { ok: false; reason: string }
   >
@@ -1065,6 +1143,7 @@ export interface PdfApi {
   setPageSize(request: SetPageSizeRequest): Promise<SetPageSizeResult>
   splitPages(request: SplitPagesRequest): Promise<SplitPagesResult>
   cropPages(request: CropPagesRequest): Promise<CropPagesResult>
+  restoreFile(request: RestoreFileRequest): Promise<RestoreFileResult>
   exportImages(request: ExportImagesRequest): Promise<ExportImagesResult>
   /** Convert the current PDF to Word / Excel / PowerPoint via the shell's local conversion flows */
   convertOffice(format: PdfConvertFormat): Promise<void>
@@ -1117,6 +1196,8 @@ export interface PdfApi {
    * the shell, where the author never changes.
    */
   onCommentAuthorChanged?(handler: () => void): () => void
+  /** Settings → General default zoom, applied to files without a remembered reading position */
+  getDefaultZoom(): Promise<PdfDefaultZoom>
   /** Mirror unsaved-changes state to the main process; drives the save prompt before closing a tab/window */
   setDirty(dirty: boolean): void
   /** Main process picked "Save" in the close prompt, or flushes before an export → renderer saves with that origin and replies via sendCloseSaveResult */
