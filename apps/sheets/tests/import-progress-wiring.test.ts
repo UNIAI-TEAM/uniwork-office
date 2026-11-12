@@ -67,4 +67,35 @@ describe('the delimited import progress wiring', () => {
     expect(mainSource).toContain('pendingImports.wasCancelled(importController)')
     expect(appSource).toContain('appImportCanceled')
   })
+
+  it('cancels a pending import when the Sheets webContents is destroyed', () => {
+    const destroyedBlock = mainSource.slice(
+      mainSource.indexOf("webContents.once('destroyed'"),
+      mainSource.indexOf('export function getSheetsWindow'),
+    )
+    expect(destroyedBlock).toContain('pendingImports.cancel(webContents.id)')
+  })
+
+  it('checks the import abort signal before and after writing the converted file', () => {
+    const prepBlock = mainSource.slice(mainSource.indexOf('async function prepareWorkbookForOpen('))
+    const convertCall = prepBlock.indexOf('await csvToXlsxBufferForOpen(')
+    const firstAbortCheck = prepBlock.indexOf(
+      'options?.import?.signal?.throwIfAborted()',
+      convertCall,
+    )
+    const writeCall = prepBlock.indexOf('await writeFile(openPath, converted.buffer)', convertCall)
+    const secondAbortCheck = prepBlock.indexOf(
+      'options?.import?.signal?.throwIfAborted()',
+      writeCall,
+    )
+    const tempCleanup = prepBlock.indexOf(
+      "await cleanupImportTempDirectory(app.getPath('temp'), directory)",
+      writeCall,
+    )
+    expect(convertCall).toBeGreaterThan(-1)
+    expect(firstAbortCheck).toBeGreaterThan(convertCall)
+    expect(firstAbortCheck).toBeLessThan(writeCall)
+    expect(secondAbortCheck).toBeGreaterThan(writeCall)
+    expect(secondAbortCheck).toBeLessThan(tempCleanup)
+  })
 })

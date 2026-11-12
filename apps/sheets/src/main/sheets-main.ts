@@ -1758,6 +1758,7 @@ function registerSheetsSession(webContents: WebContents, client: XlsxSidecarClie
   })
   activeSheetsWebContents = webContents
   webContents.once('destroyed', () => {
+    pendingImports.cancel(webContents.id)
     const entry = sheetsTabs.get(webContents.id)
     sheetsTabs.delete(webContents.id)
     if (entry) {
@@ -4837,8 +4838,10 @@ async function prepareWorkbookForOpen(
         extension === 'tsv' ? '\t' : undefined,
         options?.import,
       )
+      options?.import?.signal?.throwIfAborted()
       emptyCsv = converted.empty
       await writeFile(openPath, converted.buffer)
+      options?.import?.signal?.throwIfAborted()
     } else {
       await client.convertWorkbook({ path, targetPath: openPath })
     }
