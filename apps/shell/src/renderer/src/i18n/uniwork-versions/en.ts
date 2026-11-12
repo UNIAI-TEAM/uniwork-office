@@ -46,7 +46,7 @@ export const en = {
   vhsLockedByMe:
     'You are editing this document in another window. Save or close it there, then try again.',
   vhsReasonUpload: 'uploaded',
-  vhsReasonManual: 'manual version',
+  vhsReasonManual: 'manual',
   vhsReasonAuto: 'automatic',
   vhsReasonRestore: 'restore',
   vhsReasonAgent: 'agent',
@@ -59,7 +59,7 @@ export const en = {
   vhsErrVersionCoalesced:
     'This version was merged into the last version of its editing session, so it has no content of its own. Open that last version instead.',
   vhsErrFileChunkMissing:
-    'Couldn’t read this file because part of its stored data is missing. Try again in a few minutes; if it keeps failing, tell an admin.',
+    "Couldn't read this file because part of its stored data is missing. Try again in a few minutes; if it keeps failing, tell an admin.",
   vhsClose: 'Close',
   vhsCancel: 'Cancel',
 } satisfies Record<keyof typeof zh, string>

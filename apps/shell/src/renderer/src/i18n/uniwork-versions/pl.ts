@@ -47,7 +47,7 @@ export const pl = {
   vhsLockedByMe:
     'Edytujesz ten dokument w innym oknie. Zapisz go lub zamknij tam, a potem spróbuj ponownie.',
   vhsReasonUpload: 'przesłana',
-  vhsReasonManual: 'ręczna wersja',
+  vhsReasonManual: 'ręczna',
   vhsReasonAuto: 'automatyczna',
   vhsReasonRestore: 'przywrócenie',
   vhsReasonAgent: 'agent',

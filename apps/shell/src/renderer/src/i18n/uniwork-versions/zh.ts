@@ -42,7 +42,7 @@ export const zh = {
   vhsLockedByOther: '其他人正在编辑此文档。请等他们完成或接管编辑后再试。',
   vhsLockedByMe: '你正在另一个窗口中编辑此文档。请先在那里保存或关闭，然后重试。',
   vhsReasonUpload: '已上传',
-  vhsReasonManual: '手动版本',
+  vhsReasonManual: '手动',
   vhsReasonAuto: '自动',
   vhsReasonRestore: '恢复',
   vhsReasonAgent: 'Agent',

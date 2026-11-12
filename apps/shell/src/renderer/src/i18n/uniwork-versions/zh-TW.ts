@@ -43,7 +43,7 @@ export const zhTW = {
   vhsLockedByOther: '其他人正在編輯此文件。請等他們完成或接管編輯後再試。',
   vhsLockedByMe: '你正在另一個視窗中編輯此文件。請先在那裡儲存或關閉，然後重試。',
   vhsReasonUpload: '已上傳',
-  vhsReasonManual: '手動版本',
+  vhsReasonManual: '手動',
   vhsReasonAuto: '自動',
   vhsReasonRestore: '還原',
   vhsReasonAgent: 'Agent',

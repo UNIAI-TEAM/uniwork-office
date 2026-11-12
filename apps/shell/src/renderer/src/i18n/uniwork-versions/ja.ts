@@ -47,7 +47,7 @@ export const ja = {
   vhsLockedByMe:
     'このドキュメントは別のウィンドウで編集中です。そこで保存するか閉じてから、もう一度お試しください。',
   vhsReasonUpload: 'アップロード',
-  vhsReasonManual: '手動バージョン',
+  vhsReasonManual: '手動',
   vhsReasonAuto: '自動',
   vhsReasonRestore: '復元',
   vhsReasonAgent: 'agent',

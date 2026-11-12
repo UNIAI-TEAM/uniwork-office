@@ -45,7 +45,7 @@ export const ko = {
   vhsLockedByMe:
     '다른 창에서 이 문서를 편집하고 있습니다. 그곳에서 저장하거나 닫은 뒤 다시 시도하세요.',
   vhsReasonUpload: '업로드됨',
-  vhsReasonManual: '수동 버전',
+  vhsReasonManual: '수동',
   vhsReasonAuto: '자동',
   vhsReasonRestore: '복원',
   vhsReasonAgent: 'agent',

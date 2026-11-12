@@ -46,7 +46,7 @@ export const ms = {
   vhsLockedByMe:
     'Anda sedang menyunting dokumen ini dalam tetingkap lain. Simpan atau tutup di sana, kemudian cuba lagi.',
   vhsReasonUpload: 'dimuat naik',
-  vhsReasonManual: 'versi manual',
+  vhsReasonManual: 'manual',
   vhsReasonAuto: 'automatik',
   vhsReasonRestore: 'pemulihan',
   vhsReasonAgent: 'agent',

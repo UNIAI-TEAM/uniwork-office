@@ -45,7 +45,7 @@ export const vi = {
   vhsLockedByMe:
     'Bạn đang sửa tài liệu này ở một cửa sổ khác. Lưu hoặc đóng cửa sổ đó rồi thử lại.',
   vhsReasonUpload: 'tải lên',
-  vhsReasonManual: 'phiên bản thủ công',
+  vhsReasonManual: 'thủ công',
   vhsReasonAuto: 'tự động',
   vhsReasonRestore: 'khôi phục',
   vhsReasonAgent: 'agent',

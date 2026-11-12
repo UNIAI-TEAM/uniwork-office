@@ -49,7 +49,7 @@ export const de = {
   vhsLockedByMe:
     'Sie bearbeiten dieses Dokument in einem anderen Fenster. Speichern oder schließen Sie es dort und versuchen Sie es dann erneut.',
   vhsReasonUpload: 'hochgeladen',
-  vhsReasonManual: 'manuelle Version',
+  vhsReasonManual: 'manuell',
   vhsReasonAuto: 'automatisch',
   vhsReasonRestore: 'Wiederherstellung',
   vhsReasonAgent: 'Agent',

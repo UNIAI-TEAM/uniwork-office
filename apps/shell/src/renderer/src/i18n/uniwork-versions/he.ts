@@ -43,7 +43,7 @@ export const he = {
   vhsLockedByOther: 'מישהו אחר עורך את המסמך הזה. המתן עד שיסיים או קח את העריכה, ואז נסה שוב.',
   vhsLockedByMe: 'אתה עורך את המסמך הזה בחלון אחר. שמור או סגור אותו שם, ואז נסה שוב.',
   vhsReasonUpload: 'הועלתה',
-  vhsReasonManual: 'גרסה ידנית',
+  vhsReasonManual: 'ידנית',
   vhsReasonAuto: 'אוטומטית',
   vhsReasonRestore: 'שחזור',
   vhsReasonAgent: 'agent',

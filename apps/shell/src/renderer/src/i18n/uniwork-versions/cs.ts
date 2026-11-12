@@ -46,7 +46,7 @@ export const cs = {
   vhsLockedByMe:
     'Tento dokument upravujete v jiném okně. Uložte ho nebo ho tam zavřete a zkuste to znovu.',
   vhsReasonUpload: 'nahraná',
-  vhsReasonManual: 'ruční verze',
+  vhsReasonManual: 'ruční',
   vhsReasonAuto: 'automatická',
   vhsReasonRestore: 'obnovení',
   vhsReasonAgent: 'agent',

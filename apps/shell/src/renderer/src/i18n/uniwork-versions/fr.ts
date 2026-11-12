@@ -49,7 +49,7 @@ export const fr = {
   vhsLockedByMe:
     'Vous modifiez ce document dans une autre fenêtre. Enregistrez-le ou fermez-le là-bas, puis réessayez.',
   vhsReasonUpload: 'importée',
-  vhsReasonManual: 'version manuelle',
+  vhsReasonManual: 'manuelle',
   vhsReasonAuto: 'automatique',
   vhsReasonRestore: 'restauration',
   vhsReasonAgent: 'agent',

@@ -44,7 +44,7 @@ export const th = {
     'มีคนอื่นกำลังแก้ไขเอกสารนี้ รอจนกว่าจะเสร็จหรือรับช่วงการแก้ไข แล้วลองอีกครั้ง',
   vhsLockedByMe: 'คุณกำลังแก้ไขเอกสารนี้ในหน้าต่างอื่น บันทึกหรือปิดที่นั่นก่อน แล้วลองอีกครั้ง',
   vhsReasonUpload: 'อัปโหลด',
-  vhsReasonManual: 'เวอร์ชันด้วยตนเอง',
+  vhsReasonManual: 'ด้วยตนเอง',
   vhsReasonAuto: 'อัตโนมัติ',
   vhsReasonRestore: 'กู้คืน',
   vhsReasonAgent: 'agent',

@@ -47,7 +47,7 @@ export const ru = {
   vhsLockedByMe:
     'Вы редактируете этот документ в другом окне. Сохраните или закройте его там и повторите.',
   vhsReasonUpload: 'загружена',
-  vhsReasonManual: 'ручная версия',
+  vhsReasonManual: 'ручная',
   vhsReasonAuto: 'автоматически',
   vhsReasonRestore: 'восстановление',
   vhsReasonAgent: 'agent',

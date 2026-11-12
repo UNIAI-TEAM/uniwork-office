@@ -44,7 +44,7 @@ export const ar = {
   vhsLockedByOther: 'شخص آخر يحرّر هذا المستند. انتظر حتى ينتهي أو تولَّ التحرير ثم حاول مرة أخرى.',
   vhsLockedByMe: 'أنت تحرّر هذا المستند في نافذة أخرى. احفظه أو أغلقه هناك ثم حاول مرة أخرى.',
   vhsReasonUpload: 'مرفوع',
-  vhsReasonManual: 'إصدار يدوي',
+  vhsReasonManual: 'يدوي',
   vhsReasonAuto: 'تلقائي',
   vhsReasonRestore: 'استعادة',
   vhsReasonAgent: 'agent',

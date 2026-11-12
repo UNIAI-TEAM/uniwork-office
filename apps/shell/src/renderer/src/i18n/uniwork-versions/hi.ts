@@ -46,7 +46,7 @@ export const hi = {
   vhsLockedByMe:
     'आप यह दस्तावेज़ किसी दूसरी विंडो में संपादित कर रहे हैं। वहाँ सहेजें या बंद करें, फिर दोबारा प्रयास करें।',
   vhsReasonUpload: 'अपलोड किया गया',
-  vhsReasonManual: 'मैन्युअल संस्करण',
+  vhsReasonManual: 'मैन्युअल',
   vhsReasonAuto: 'स्वचालित',
   vhsReasonRestore: 'पुनर्स्थापना',
   vhsReasonAgent: 'agent',

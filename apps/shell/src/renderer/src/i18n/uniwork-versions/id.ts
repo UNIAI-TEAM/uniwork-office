@@ -46,7 +46,7 @@ export const id = {
   vhsLockedByMe:
     'Anda sedang mengedit dokumen ini di jendela lain. Simpan atau tutup di sana, lalu coba lagi.',
   vhsReasonUpload: 'diunggah',
-  vhsReasonManual: 'versi manual',
+  vhsReasonManual: 'manual',
   vhsReasonAuto: 'otomatis',
   vhsReasonRestore: 'pemulihan',
   vhsReasonAgent: 'agent',

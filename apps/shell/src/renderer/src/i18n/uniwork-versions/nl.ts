@@ -49,7 +49,7 @@ export const nl = {
   vhsLockedByMe:
     'Je bewerkt dit document in een ander venster. Sla het daar op of sluit het en probeer het opnieuw.',
   vhsReasonUpload: 'geüpload',
-  vhsReasonManual: 'handmatige versie',
+  vhsReasonManual: 'handmatig',
   vhsReasonAuto: 'automatisch',
   vhsReasonRestore: 'herstel',
   vhsReasonAgent: 'agent',
