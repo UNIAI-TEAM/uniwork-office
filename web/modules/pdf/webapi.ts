@@ -1214,6 +1214,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     print: async () => ({ ok: false, error: NOT_AVAILABLE }),
     printFile: async () => ({ ok: false, error: NOT_AVAILABLE }),
     listPrinters: async () => [],
+    printerOptions: async () => [],
     onFileRenamed: () => () => {},
     aiStream: ai.aiStream,
     aiStreamCancel: ai.aiStreamCancel,

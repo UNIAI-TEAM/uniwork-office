@@ -389,4 +389,31 @@ describe('macOS lp printFile route with granted path', () => {
     ])
     expect(calls[0]!.opts).toEqual({ stdio: ['pipe', 'pipe', 'pipe'] })
   })
+
+  it('round-trips chosen driver options into the print call and lp arguments', async () => {
+    const { doc } = fakeDoc(1)
+    const print = vi.fn(async () => ({ ok: true }))
+    ;(window as unknown as { pdfApi: unknown }).pdfApi = { print }
+
+    const driverOptions = [
+      { name: 'cupsPrintQuality', value: 'High' },
+      { name: 'ColorModel', value: 'Gray' },
+      { name: 'MediaType', value: 'Plain' },
+    ]
+    const job = {
+      deviceName: 'Office_LaserJet',
+      copies: 1,
+      collate: true,
+      duplex: 'simplex' as const,
+      driverOptions,
+    }
+    await printPdf(doc, undefined, job)
+
+    expect(print).toHaveBeenCalledWith({
+      ...job,
+      pageSizeIn: { width: 8.5, height: 11 },
+    })
+    const parsed = printJobOptions(job)
+    expect(parsed.driverOptions).toEqual(driverOptions)
+  })
 })
