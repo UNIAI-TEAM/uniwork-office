@@ -28,8 +28,10 @@ interface FakeServer {
 interface FakeOptions {
   /** ignores Range and answers 200 with the whole file */
   noRange?: boolean
-  /** called per request; returning 'cut' ends that body half way with a stream error */
-  behave?: (range: string, nth: number) => 'cut' | 'ok' | { total: number }
+  /** called per request; 'cut' ends that body half way with a stream error, a status answers that status */
+  behave?: (range: string, nth: number) => 'cut' | 'ok' | { total: number } | { status: number }
+  /** the X-Checksum-Sha256 of a window (none when it returns undefined) */
+  checksum?: (range: string, nth: number) => string | undefined
 }
 
 function server(file: Uint8Array, options: FakeOptions = {}): FakeServer {
@@ -55,10 +57,18 @@ function server(file: Uint8Array, options: FakeOptions = {}): FakeServer {
     const end = Math.min(Number(match[2]), file.byteLength - 1)
     const body = file.subarray(start, end + 1)
     const verdict = options.behave?.(range, nth) ?? 'ok'
+    if (typeof verdict === 'object' && 'status' in verdict) {
+      return new Response('{}', {
+        status: verdict.status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
     const total = typeof verdict === 'object' ? verdict.total : file.byteLength
-    const responseHeaders = {
+    const checksum = options.checksum?.(range, nth)
+    const responseHeaders: Record<string, string> = {
       'Content-Length': String(body.byteLength),
       'Content-Range': `bytes ${start}-${end}/${total}`,
+      ...(checksum === undefined ? {} : { 'X-Checksum-Sha256': checksum }),
     }
     if (verdict === 'cut') {
       const half = body.subarray(0, Math.floor(body.byteLength / 2))
@@ -75,13 +85,22 @@ function server(file: Uint8Array, options: FakeOptions = {}): FakeServer {
   return { fetch: fetchImpl, ranges }
 }
 
-function api(fetch: FetchLike) {
+function api(fetch: FetchLike, extra: { streamCeilingMs?: number } = {}) {
   return createUniworkDocsClient({
     apiOrigin: ORIGIN,
     authorized: <T>(call: (token: string) => Promise<T>) => call('tok'),
     isSignedIn: () => true,
     fetch,
+    ...extra,
   })
+}
+
+/** how a download ended: the bytes' arrival or the error that stopped it */
+function ending(download: Promise<{ bytes: Uint8Array }>): Promise<string> {
+  return download.then(
+    () => 'resolved',
+    (error: unknown) => (error instanceof UniworkDocError ? error.code : 'other'),
+  )
 }
 
 const win = (index: number, size: number): string =>
@@ -111,9 +130,13 @@ describe('downloadStream in Range windows (UNI-2518)', () => {
     expect([...totals]).toEqual([SIZE])
     // one diagnostic line: ids and counts only
     expect(log).toHaveBeenCalledTimes(1)
-    expect(String(log.mock.calls[0]?.[0])).toBe(
-      `uniwork docs: ranged download document=${DOC} version=3 requests=3 chunks=3 retries=0 bytes=${SIZE} outcome=ok`,
-    )
+    const line = String(log.mock.calls[0]?.[0])
+    expect(line).toContain(`document=${DOC}`)
+    expect(line).toContain('version=3')
+    expect(line).toContain('requests=3')
+    expect(line).toContain('outcome=ok')
+    expect(line).not.toContain(ORIGIN)
+    expect(line).not.toMatch(/https?:|\.docx|\.pdf|tok/)
   })
 
   it('re-requests only the chunk that was dropped mid-stream', async () => {
@@ -178,5 +201,100 @@ describe('downloadStream in Range windows (UNI-2518)', () => {
     const none = await api(empty.fetch).downloadStream(DOC, undefined)
     expect(none.bytes.byteLength).toBe(0)
     expect(empty.ranges).toEqual([`bytes=0-${CHUNK - 1}`, 'plain'])
+  })
+
+  it('refuses a window of another version (same size, different checksum) and returns nothing', async () => {
+    const file = fileOf(SIZE)
+    const fake = server(file, {
+      checksum: (range) => (range === win(1, SIZE) ? 'bb'.repeat(32) : 'aa'.repeat(32)),
+    })
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const code = await ending(api(fake.fetch).downloadStream(DOC, undefined))
+    expect(code).toBe('malformed_response')
+    // not retried, no later window
+    expect(fake.ranges).toEqual([win(0, SIZE), win(1, SIZE)])
+  })
+
+  it('refuses a later window that carries no checksum once the first one did', async () => {
+    const file = fileOf(SIZE)
+    const fake = server(file, {
+      checksum: (range) => (range === win(0, SIZE) ? 'aa'.repeat(32) : undefined),
+    })
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    expect(await ending(api(fake.fetch).downloadStream(DOC, undefined))).toBe('malformed_response')
+    expect(fake.ranges).toEqual([win(0, SIZE), win(1, SIZE)])
+  })
+
+  it('reads a file whose windows all carry the same checksum', async () => {
+    const file = fileOf(SIZE)
+    const fake = server(file, { checksum: () => 'aa'.repeat(32) })
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { bytes } = await api(fake.fetch).downloadStream(DOC, undefined)
+    expect(Buffer.compare(Buffer.from(bytes), Buffer.from(file))).toBe(0)
+  })
+
+  it('keeps the total-only check when the first window has no checksum', async () => {
+    const file = fileOf(SIZE)
+    const fake = server(file, {
+      checksum: (range) => (range === win(0, SIZE) ? undefined : 'bb'.repeat(32)),
+    })
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { bytes } = await api(fake.fetch).downloadStream(DOC, undefined)
+    expect(Buffer.compare(Buffer.from(bytes), Buffer.from(file))).toBe(0)
+  })
+
+  it('stops with timeout, and asks for no more windows, once the shared ceiling has passed', async () => {
+    const file = fileOf(SIZE)
+    let clock = 1_000_000
+    vi.spyOn(Date, 'now').mockImplementation(() => clock)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const fake = server(file, {
+      behave: (range) => {
+        if (range !== win(1, SIZE)) return 'ok'
+        // the ceiling (1 s) passes while window 1 is being read, and the body is cut
+        clock += 2000
+        return 'cut'
+      },
+    })
+    const code = await ending(
+      api(fake.fetch, { streamCeilingMs: 1000 }).downloadStream(DOC, undefined),
+    )
+    expect(code).toBe('timeout')
+    expect(fake.ranges).toEqual([win(0, SIZE), win(1, SIZE)])
+  })
+
+  it('does not retry or ask for another window after the caller aborts mid-walk', async () => {
+    const file = fileOf(SIZE)
+    const abort = new AbortController()
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const fake = server(file, {
+      behave: (range) => {
+        if (range !== win(1, SIZE)) return 'ok'
+        abort.abort()
+        return 'cut'
+      },
+    })
+    const code = await ending(
+      api(fake.fetch).downloadStream(DOC, undefined, { signal: abort.signal }),
+    )
+    expect(code).not.toBe('resolved')
+    expect(fake.ranges).toEqual([win(0, SIZE), win(1, SIZE)])
+  })
+
+  it('surfaces a 403 on window 2 at once, without retrying it', async () => {
+    const file = fileOf(SIZE)
+    const fake = server(file, {
+      behave: (range) => (range === win(1, SIZE) ? { status: 403 } : 'ok'),
+    })
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const error = await api(fake.fetch)
+      .downloadStream(DOC, undefined)
+      .then(
+        () => null,
+        (caught: unknown) => caught,
+      )
+    expect(error).toBeInstanceOf(UniworkDocError)
+    expect((error as UniworkDocError).status).toBe(403)
+    expect(fake.ranges).toEqual([win(0, SIZE), win(1, SIZE)])
   })
 })

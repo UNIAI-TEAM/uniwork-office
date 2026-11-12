@@ -32,9 +32,14 @@ export function parseContentRange(header: string | null): ContentRange | null {
   return { start, end, total }
 }
 
-/** what one request delivered: a 200 body (the whole file) or a 206 window of it */
+/**
+ * what one request delivered: a 200 body (the whole file) or a 206 window of it. A window
+ * carries the server's whole-file `X-Checksum-Sha256` (null when it sent none), the
+ * only marker that tells two same-size versions apart.
+ */
 export type RangedChunk =
-  { kind: 'whole'; bytes: Uint8Array } | ({ kind: 'partial'; bytes: Uint8Array } & ContentRange)
+  | { kind: 'whole'; bytes: Uint8Array }
+  | ({ kind: 'partial'; bytes: Uint8Array; checksum: string | null } & ContentRange)
 
 export interface ChunkProgress {
   receivedBytes: number
@@ -59,6 +64,8 @@ export interface RangedDownloadInput {
   /** names the download in that line (document id and version, never a title or URL) */
   label: string
   chunkBytes?: number
+  /** epoch ms after which no window is requested or retried (the transfer's shared ceiling) */
+  deadline?: number
   /** test seam: the wait before try n+1 (n >= 1) */
   backoffMs?: (failedAttempt: number) => number
 }
@@ -107,6 +114,8 @@ export async function downloadInChunks(input: RangedDownloadInput): Promise<{ by
   let retries = 0
   let high = 0
   let done = 0
+  // the whole-file checksum of the first window; every later window must carry the same one
+  let pinned: string | null = null
 
   const report = (chunkReceived: number, totalBytes: number | null): void => {
     high = Math.max(high, done + chunkReceived)
@@ -119,6 +128,10 @@ export async function downloadInChunks(input: RangedDownloadInput): Promise<{ by
     knownTotal: number | null,
   ): Promise<RangedChunk> => {
     for (let n = 1; ; n++) {
+      // the shared ceiling passed: another window could only time out at once
+      if (input.deadline !== undefined && Date.now() >= input.deadline) {
+        throw new UniworkDocError('timeout')
+      }
       requests++
       try {
         const chunk = await input.readChunk(range, (p) =>
@@ -136,6 +149,10 @@ export async function downloadInChunks(input: RangedDownloadInput): Promise<{ by
             chunk.bytes.byteLength > declared
           ) {
             // the file changed under the download, or the wrong window came back
+            throw new UniworkDocError('malformed_response')
+          }
+          // another version answered this window (same size, different checksum, or none)
+          if (pinned !== null && chunk.checksum !== pinned) {
             throw new UniworkDocError('malformed_response')
           }
           // a body shorter than its declared window is a cut, not a verdict
@@ -169,6 +186,7 @@ export async function downloadInChunks(input: RangedDownloadInput): Promise<{ by
       return { bytes: first.bytes }
     }
     const { total } = first
+    pinned = first.checksum
     if (total > input.maxBytes) throw new UniworkDocError('too_large')
     size = total
     if (first.bytes.byteLength === total) return { bytes: first.bytes }

@@ -1519,6 +1519,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
             return {
               kind: 'partial',
               ...window,
+              checksum: response.headers.get('X-Checksum-Sha256'),
               // a window's Content-Length is not the file's size
               ...(await readBoundedStream(response, progress, {
                 signal,
@@ -1531,6 +1532,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       return downloadInChunks({
         readChunk,
         maxBytes: MAX_DOWNLOAD_BYTES,
+        deadline,
         label: `document=${id(documentId)} version=${version !== undefined && version > 0 ? Math.floor(version) : 'live'}`,
         log: (line) => console.warn(line),
         ...(signal ? { signal } : {}),
