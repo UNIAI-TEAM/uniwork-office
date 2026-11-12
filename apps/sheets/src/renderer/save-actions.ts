@@ -5,7 +5,7 @@
  * Extracted from App.tsx; the App component passes a SaveContext built fresh
  * per call so refs and state never go stale.
  */
-import type { WorkbookFile, WorkbookFilterState } from '../shared/desktop-api'
+import type { WorkbookFile, WorkbookFilterState, WorkbookSaveRequest } from '../shared/desktop-api'
 import {
   carryLateJournalCells,
   isSheetRemoved,
@@ -31,6 +31,8 @@ import { cap, isViewOnly, platform } from './capabilities'
 import { activeCsvSheet, handleExportCsv, serializeActiveSheetCsv } from './csv-export'
 import type { CellScalar, CellState } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import type { SheetRedactionState } from '@genoffice/xlsx-gateway/gateway/xlsx-redaction'
+/// The slicerState member of a save request (zod: non-strict object shape).
+type WorkbookSlicerSaveState = NonNullable<WorkbookSaveRequest['slicerState']>
 import { formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
 import { isErrorResult, verifiedFormulaValues } from './formula-values'
 import { COORDINATE_SHIFTING_OPS } from './formula-cached-fallback'
@@ -73,6 +75,13 @@ export interface SaveContext {
    * claiming nothing is hidden.
    */
   redactionStates?: () => readonly SheetRedactionState[] | null
+  /**
+   * Slicer panels to persist as OOXML parts on this save, null when the
+   * session changed nothing slicer-related (any file parts stay
+   * byte-identical). Like redactionStates it can be the only change pending.
+   * Timelines are session-only and never ride a save.
+   */
+  slicerState?: (() => WorkbookSlicerSaveState | null) | undefined
   /** Saving swaps the session and reinstalls the workbook, which resets the
       view to the first sheet's A1 — stash where the user was so the
       reinstall lands there instead. `viewRow`/`viewColumn` is the viewport's
@@ -517,6 +526,9 @@ export async function handleSave(
       sheetName: state.sheetName,
       marks: state.marks.map((mark) => ({ ...mark })),
     })) ?? null
+  // Slicer panels only ride the save when the session changed something
+  // slicer-related (create/edit/delete); null keeps every file part raw.
+  const slicerState = ctx.slicerState?.() ?? null
   // The gateway fails closed when these additions ride with structural or
   // sheet changes (their coordinates entangle). Instead of bouncing the
   // user, hold them back and save in two sequential phases: structure
@@ -533,11 +545,15 @@ export async function handleSave(
     structuralOps.length > 0 ? tableEdits.filter((edit) => edit.area !== undefined) : []
   const phaseOneTableEdits = tableEdits.filter((edit) => !heldTableEdits.includes(edit))
   const heldNames = hasShifts ? definedNamesState : null
+  // Slicer parts address their host sheet by name; the same rename hazard as
+  // pivots, so they ride phase two of a split save.
+  const heldSlicerState = hasShifts ? slicerState : null
   const splitSave =
     heldPivots.length > 0 ||
     heldTables.length > 0 ||
     heldTableEdits.length > 0 ||
-    heldNames !== null
+    heldNames !== null ||
+    heldSlicerState !== null
   if (splitSave) {
     const addedSheetIds = state.editJournal.sheets.added
     const strandedHeld = [
@@ -578,9 +594,10 @@ export async function handleSave(
     tableEdits.length +
     pivotAdditions.length +
     sparklineAdditions.length +
-    // A save with nothing else pending but newly withheld cells is still a
-    // save: skipping it would leave the file claiming nothing is hidden.
-    (redactionStates?.length ?? 0)
+    // A save with nothing else pending but newly withheld cells or a slicer
+    // change is still a save: skipping it would drop the change.
+    (redactionStates?.length ?? 0) +
+    (slicerState === null ? 0 : 1)
   // A restored crash-recovery session carries its changes in the workbook
   // bytes themselves, not the journal: a plain Save with nothing pending must
   // still write back to the original file (and clear the recovery copy).
@@ -702,6 +719,7 @@ export async function handleSave(
     workbookProtectionState,
     protectedRangeStates,
     redactionStates,
+    slicerState,
   }
   if (mode === 'recovery') {
     // Best-effort; a failure only means this tick's copy is skipped — but an
@@ -761,6 +779,8 @@ export async function handleSave(
       workbookProtectionState,
       protectedRangeStates,
       redactionStates,
+      // Held slicers ride phase two (heldSlicerState carries them there).
+      slicerState: hasShifts ? null : slicerState,
     })
     if (ctx.lazyWorkbookRef.current !== state) return { ok: false }
     if (result.canceled) {
@@ -835,6 +855,7 @@ export async function handleSave(
         pivotRefreshUpdates: [],
         sheetProtections: [],
         sparklineAdditions: [],
+        slicerState: heldSlicerState,
         // The first phase already refreshed the cached values
         formulaValues: [],
         definedNamesState: heldNames,
