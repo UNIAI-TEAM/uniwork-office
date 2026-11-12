@@ -26,6 +26,8 @@
     "./headless-export": "./src/headless-export.ts",
     "./recovery-copy": "./src/recovery-copy.ts",
     "./recovery-epochs": "./src/recovery-epochs.ts",
+    "./print-cups": "./src/print-cups.ts",
+    "./print-job": "./src/print-job.ts",
     "./print-window": "./src/print-window.ts",
     "./remote-image": "./src/remote-image.ts",
     "./renderer-protocol": "./src/renderer-protocol.ts",

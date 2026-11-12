@@ -1,4 +1,5 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+import type { PrintJobOptions } from '../shared/ipc'
 
 /** Baseline raster density (previous behavior — quality never drops below this). */
 const BASE_DPI = 150
@@ -75,7 +76,21 @@ function waitForPrintDialog(timeoutMs: number): Promise<void> {
   })
 }
 
-export async function printPdf(doc: PDFDocumentProxy, pages?: number[]): Promise<void> {
+/** Keep every other page of a file-page list, Word's "odd pages / even pages" subset. */
+export function filterPageParity(pages: number[], parity: PageParity): number[] {
+  if (parity === 'all') return pages
+  return pages.filter((n) => n % 2 === (parity === 'odd' ? 1 : 0))
+}
+
+export type PageParity = 'all' | 'odd' | 'even'
+
+/** `job`: a chosen printer prints silently through the main process with its
+    copies/duplex options; omitted, the system print dialog takes over. */
+export async function printPdf(
+  doc: PDFDocumentProxy,
+  pages?: number[],
+  job?: PrintJobOptions,
+): Promise<void> {
   const root = document.createElement('div')
   root.className = 'pdf-print-root'
   const canvas = document.createElement('canvas')
@@ -98,12 +113,25 @@ export async function printPdf(doc: PDFDocumentProxy, pages?: number[]): Promise
   // Stream one page at a time so no PDFPageProxy outlives its render — the
   // previous two-pass held all pages alive plus 2× viewports.
   const areas: number[] = []
+  // the document's own paper for the CUPS print route: the first target
+  // page's size in inches (printToPDF bakes its pages at it instead of
+  // Chromium's Letter default, which would rescale every sheet)
+  let firstPageSizeIn: { width: number; height: number } | undefined
   for (const n of targets) {
     const page = await doc.getPage(n)
     try {
       const unit = page.getViewport({ scale: 1 })
       const area = unit.width * unit.height
       areas.push(Number.isFinite(area) && area > 0 ? area : 0)
+      if (
+        firstPageSizeIn === undefined &&
+        Number.isFinite(unit.width) &&
+        unit.width > 0 &&
+        Number.isFinite(unit.height) &&
+        unit.height > 0
+      ) {
+        firstPageSizeIn = { width: unit.width / 72, height: unit.height / 72 }
+      }
     } finally {
       try {
         page.cleanup()
@@ -157,7 +185,15 @@ export async function printPdf(doc: PDFDocumentProxy, pages?: number[]): Promise
   document.body.appendChild(root)
   try {
     await Promise.all([...root.querySelectorAll('img')].map((img) => img.decode()))
-    await waitForPrintDialog(PRINT_DIALOG_TIMEOUT_MS)
+    if (job) {
+      const r = await window.pdfApi.print({
+        ...job,
+        ...(firstPageSizeIn ? { pageSizeIn: firstPageSizeIn } : {}),
+      })
+      if (!r.ok && r.error) throw new Error(r.error)
+    } else {
+      await waitForPrintDialog(PRINT_DIALOG_TIMEOUT_MS)
+    }
   } finally {
     root.remove()
   }

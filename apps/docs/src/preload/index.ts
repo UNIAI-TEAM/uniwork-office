@@ -8,6 +8,8 @@ import type {
   DesktopApi,
   MenuCommand,
   AutoSaveDefault,
+  PrintJobOptions,
+  PrintPaper,
   ContextMenuRequest,
   DocTheme,
   UiTheme,
@@ -178,7 +180,9 @@ const api: DesktopApi = {
   writeMergeOutput: (request: MergeOutputRequest) =>
     ipcRenderer.invoke('docs:merge-output', request),
   fontMetrics: (family: string) => ipcRenderer.invoke('docs:font-metrics', family),
-  print: (scale?: number) => ipcRenderer.invoke('docs:print', scale),
+  print: (scale?: number, job?: PrintJobOptions, paper?: PrintPaper) =>
+    ipcRenderer.invoke('docs:print', scale, job, paper),
+  listPrinters: () => ipcRenderer.invoke('docs:printers'),
   exportPdf: (
     defaultName: string,
     pageWidthTwips: number,

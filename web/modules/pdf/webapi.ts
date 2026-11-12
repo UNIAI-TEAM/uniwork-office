@@ -1211,6 +1211,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     pickAttachmentFile: async () => ({ ok: false, reason: NOT_AVAILABLE }),
     exportAttachment: async () => ({ ok: false, reason: NOT_AVAILABLE }),
     // the host's file.renamed only renames: the web document id (its "path") never changes
+    print: async () => ({ ok: false, error: NOT_AVAILABLE }),
+    listPrinters: async () => [],
     onFileRenamed: () => () => {},
     aiStream: ai.aiStream,
     aiStreamCancel: ai.aiStreamCancel,

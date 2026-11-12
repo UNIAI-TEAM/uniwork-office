@@ -10,6 +10,7 @@
  * preview source, so what the dialog shows is exactly what prints.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { PrintPaper } from '../../shared/ipc'
 import { useI18n } from '../i18n/locale'
 import { parsePrintRange } from '../print-range'
 import { clearPrintZoom, setPrintZoom } from '../print-zoom'
@@ -19,6 +20,20 @@ type RangeMode = 'all' | 'current' | 'custom'
 const pvPages = (): HTMLElement[] => [
   ...document.querySelectorAll<HTMLElement>('.pagination-preview .pv-page'),
 ]
+
+/** The document's own paper in twips, read off the first preview sheet: the
+ * pagination slices pages at the section geometry (96 px per inch), so the
+ * sheet's layout box maps back 1:1. `offsetWidth`/`offsetHeight` ignore the
+ * preview's visual zoom. Null when no sheet exists yet — the CUPS route then
+ * keeps Chromium's default paper rather than printing a wrong size. */
+function paperOfPreview(): PrintPaper | undefined {
+  const page = pvPages()[0]
+  if (!page) return undefined
+  const w = page.offsetWidth
+  const h = page.offsetHeight
+  if (!(w > 0) || !(h > 0)) return undefined
+  return { widthTwips: Math.round(w * 15), heightTwips: Math.round(h * 15) }
+}
 
 export function PrintDialog({
   onClose,
@@ -130,7 +145,7 @@ export function PrintDialog({
     const scale = setPrintZoom()
     setPrintProblem(null)
     try {
-      const r = await window.desktop.print(scale)
+      const r = await window.desktop.print(scale, undefined, paperOfPreview())
       if (r.ok) {
         onClose()
         return
