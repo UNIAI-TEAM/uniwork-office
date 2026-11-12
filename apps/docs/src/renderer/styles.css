@@ -12241,6 +12241,57 @@ body.docs-crop-active
   border-color: var(--danger);
 }
 
+.print-options .print-select {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  height: 28px;
+  margin: 0 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.print-options .print-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.print-options .print-field span {
+  flex: 1;
+}
+
+.print-options .print-field .print-select {
+  flex: 1.6;
+  width: auto;
+  margin: 0;
+}
+
+.print-options .print-copies {
+  width: 64px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.print-options .print-select:disabled,
+.print-options .print-copies:disabled,
+.print-options .print-radio input:disabled {
+  opacity: 0.55;
+}
+
 .print-problem {
   display: flex;
   align-items: center;
