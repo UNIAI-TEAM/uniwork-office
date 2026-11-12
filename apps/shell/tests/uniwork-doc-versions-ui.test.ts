@@ -138,6 +138,8 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
   let root: Root
   let onClose: ReturnType<typeof vi.fn>
   let onChanged: ReturnType<typeof vi.fn>
+  /** the host toast's sentences, in order */
+  let notices: string[]
 
   beforeEach(() => {
     host = document.createElement('div')
@@ -145,6 +147,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
     root = createRoot(host)
     onClose = vi.fn()
     onChanged = vi.fn()
+    notices = []
   })
   afterEach(async () => {
     await act(async () => root.unmount())
@@ -189,6 +192,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
             row,
             bridge,
             shareApi: createFakeShareApi(),
+            onNotice: (message) => notices.push(message),
           }),
         ),
       )
@@ -331,6 +335,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
               row: target(),
               bridge: createFakeDocHistoryBridge({ versions: threeVersions() }),
               shareApi: share,
+              onNotice: (message) => notices.push(message),
             }),
           ),
         )
@@ -496,7 +501,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await open(target(), undefined, 'vi')
       expect(sheet().textContent).toContain('Lịch sử phiên bản')
       expect(rows()[0]!.textContent).toContain('Phiên bản 3')
-      expect(rows()[0]!.textContent).toContain('phiên bản thủ công')
+      expect(rows()[0]!.textContent).toContain('· thủ công ·')
       expect(rows()[0]!.textContent).toContain(viText.vhsCurrentBadge)
     })
   })
@@ -885,9 +890,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await open(target(), bridge)
       await click(viewButton(3))
       expect(onClose).not.toHaveBeenCalled()
-      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(
-        t('vhsOpenUnsupported'),
-      )
+      expect(notices).toEqual([t('vhsOpenUnsupported')])
     })
 
     it('another failure to open reads as the preview error', async () => {
@@ -896,7 +899,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await open(target(), bridge)
       await click(viewButton(3))
       expect(onClose).not.toHaveBeenCalled()
-      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(t('vhsPreviewError'))
+      expect(notices).toEqual([t('vhsPreviewError')])
     })
 
     it('keeps focus on the clicked button after a failed open, and Escape still closes the sheet', async () => {
@@ -940,7 +943,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await act(async () => settle(failure('write_failed')))
       await flush()
       expect(document.activeElement).toBe(download)
-      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(t('vhsDownloadFailed'))
+      expect(notices).toEqual([t('vhsDownloadFailed')])
     })
 
     it('a page version shows its text in a read-only dialog', async () => {
@@ -994,7 +997,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
         versionNo: 2,
         suggestedName: 'Báo cáo.docx',
       })
-      expect(sheet().querySelector('[role="alert"]')).toBeNull()
+      expect(notices).toEqual([])
     })
 
     it('a cancelled save dialog is silent, any other failure says so', async () => {
@@ -1002,10 +1005,10 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       bridge.downloadVersion.mockResolvedValueOnce(failure('dialog_canceled'))
       await open(target(), bridge)
       await click(button(sheet(), t('vhsDownloadVersion', { no: 3 })))
-      expect(sheet().querySelector('[role="alert"]')).toBeNull()
+      expect(notices).toEqual([])
       bridge.downloadVersion.mockResolvedValueOnce(failure('write_failed'))
       await click(button(sheet(), t('vhsDownloadVersion', { no: 3 })))
-      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(t('vhsDownloadFailed'))
+      expect(notices).toEqual([t('vhsDownloadFailed')])
     })
 
     it('a page document offers no download', async () => {
@@ -1110,14 +1113,12 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       bridge.downloadVersion.mockResolvedValueOnce(failure('version_coalesced', { status: 409 }))
       await open(target(), bridge)
       await click(button(sheet(), t('vhsDownloadVersion', { no: 2 })))
-      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(
-        t('vhsErrVersionCoalesced'),
-      )
+      expect(notices).toEqual([t('vhsErrVersionCoalesced')])
       bridge.downloadVersion.mockResolvedValueOnce(failure('file_chunk_missing'))
       await click(button(sheet(), t('vhsDownloadVersion', { no: 2 })))
-      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(
-        t('vhsErrFileChunkMissing'),
-      )
+      expect(notices).toEqual([t('vhsErrVersionCoalesced'), t('vhsErrFileChunkMissing')])
+      // the toast carries it, the sheet keeps no second copy
+      expect(sheet().querySelector('[role="alert"]')).toBeNull()
     })
 
     it('opening a version that has just been released shows the version_coalesced sentence', async () => {
@@ -1126,9 +1127,8 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await open(target(), bridge)
       await click(viewButton(3))
       expect(onClose).not.toHaveBeenCalled()
-      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(
-        t('vhsErrVersionCoalesced'),
-      )
+      expect(notices).toEqual([t('vhsErrVersionCoalesced')])
+      expect(sheet().querySelector('[role="alert"]')).toBeNull()
     })
 
     it('previewing a page version that has just been released shows the version_coalesced sentence', async () => {
@@ -1139,6 +1139,8 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await open(target({ kind: 'page' }), bridge)
       await click(viewButton(1))
       expect(top().textContent).toContain(t('vhsErrVersionCoalesced'))
+      // a released version is a plain note in the dialog, not a failure the screen reader announces
+      expect(top().querySelector('[role="alert"]')).toBeNull()
     })
   })
 })

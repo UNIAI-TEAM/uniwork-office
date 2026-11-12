@@ -36,6 +36,11 @@ export interface VersionHistorySheetProps {
   shareApi?: UniworkShareApi
   /** a checkpoint or a restore landed: the list that opened the sheet reads its row again */
   onChanged?: () => void
+  /**
+   * a download or open the server refused: the host's toast says why (the web sheet's `toast.error`),
+   * so the sentence outlives the row that asked
+   */
+  onNotice: (message: string, tone: 'ok' | 'error') => void
 }
 
 /** no member list in this shell: every name stays unknown and the author line waits (web: not ready) */
@@ -60,6 +65,7 @@ function VersionHistoryBody({
   bridge,
   shareApi,
   onChanged,
+  onNotice,
 }: VersionHistorySheetProps) {
   const { t, dateLocale } = useI18n()
   const api = bridge ?? getDocHistoryBridge()
@@ -73,6 +79,7 @@ function VersionHistoryBody({
       onClose={onClose}
       row={row}
       onChanged={onChanged}
+      onNotice={onNotice}
     />
   )
 }
@@ -87,6 +94,7 @@ function VersionHistoryView({
   onClose,
   row,
   onChanged,
+  onNotice,
 }: {
   api: UniworkDocHistoryApi
   shareApi: UniworkShareApi | undefined
@@ -95,6 +103,7 @@ function VersionHistoryView({
   onClose: () => void
   row: VersionHistoryTarget
   onChanged?: () => void
+  onNotice: (message: string, tone: 'ok' | 'error') => void
 }) {
   const titleId = useId()
   const descriptionId = useId()
@@ -125,7 +134,6 @@ function VersionHistoryView({
   /** the version a restore made current; before any restore the newest row is */
   const [currentNo, setCurrentNo] = useState<number | null>(null)
 
-  const [rowError, setRowError] = useState<StringKey | null>(null)
   const [busy, setBusy] = useState<{ kind: 'open' | 'download'; no: number } | null>(null)
   const [preview, setPreview] = useState<
     | { no: number; state: 'loading' }
@@ -231,7 +239,6 @@ function VersionHistoryView({
   const view = async (version: DocVersion) => {
     // the row buttons stay focusable while busy (aria-disabled): a press then does nothing
     if (busy !== null) return
-    setRowError(null)
     if (version.kind === 'page') {
       const request = ++previewRequest.current
       setPreview({ no: version.version, state: 'loading' })
@@ -253,7 +260,7 @@ function VersionHistoryView({
     if (!alive.current) return
     setBusy(null)
     if (!result.ok) {
-      setRowError(openErrorKey(result))
+      onNotice(t(openErrorKey(result)), 'error')
       return
     }
     // the copy opened in a tab behind the sheet: leave it so the tab is what the person sees
@@ -262,7 +269,6 @@ function VersionHistoryView({
 
   const download = async (version: DocVersion) => {
     if (busy !== null) return
-    setRowError(null)
     setBusy({ kind: 'download', no: version.version })
     const result = await api
       .downloadVersion({
@@ -274,7 +280,9 @@ function VersionHistoryView({
     if (!alive.current) return
     setBusy(null)
     // a cancelled save dialog is the person's choice, not a failure
-    if (!result.ok && result.error !== 'dialog_canceled') setRowError(downloadErrorKey(result))
+    if (!result.ok && result.error !== 'dialog_canceled') {
+      onNotice(t(downloadErrorKey(result)), 'error')
+    }
   }
 
   return (
@@ -358,12 +366,6 @@ function VersionHistoryView({
           </form>
         ) : (
           <p className="uw-versions-note">{t(shelved ? 'vhsShelvedBlocked' : 'vhsManageOnly')}</p>
-        )}
-
-        {rowError && (
-          <p role="alert" className="uw-versions-error uw-versions-row-error">
-            {t(rowError)}
-          </p>
         )}
 
         {list.status === 'loading' ? (
@@ -694,6 +696,9 @@ function PagePreview({
           <p className="uw-versions-muted" aria-busy="true">
             {t('vhsLoading')}
           </p>
+        ) : preview.state === 'error' && preview.key === 'vhsErrVersionCoalesced' ? (
+          // a version that gave its file back has nothing to show: a plain note, not a failure (web)
+          <p className="uw-versions-muted">{t(preview.key)}</p>
         ) : preview.state === 'error' ? (
           <p role="alert" className="uw-versions-error">
             {t(preview.key)}

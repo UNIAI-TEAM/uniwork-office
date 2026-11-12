@@ -3672,6 +3672,7 @@ export function DocumentsHome({
           row={versionsRow}
           onClose={() => setVersionsRow(null)}
           onChanged={() => setListTick((n) => n + 1)}
+          onNotice={(message, tone) => setToast({ message, tone })}
         />
       )}
 

@@ -135,10 +135,6 @@
   line-height: 1.4;
 }
 
-.uw-act .uw-versions-row-error {
-  margin: 8px 0 0;
-}
-
 .uw-versions-create {
   display: flex;
   flex-direction: column;
