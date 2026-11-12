@@ -277,6 +277,7 @@ export function StylePanel(p: Props) {
                 <option value="left">{t('alignLeft')}</option>
                 <option value="center">{t('alignCenter')}</option>
                 <option value="right">{t('alignRight')}</option>
+                <option value="justify">{t('alignJustify')}</option>
               </select>
             </label>
           </div>
