@@ -348,7 +348,13 @@ export function EditorContextMenu({
     command(editor.state, editor.view.dispatch)
   }
 
-  const protAttrs = editor.getAttributes('docProtected')
+  // only the object itself (right-click selects it as a node): a text range
+  // that merely spans a picture keeps the text menu
+  const protAttrs =
+    editor.state.selection instanceof NodeSelection &&
+    editor.state.selection.node.type.name === 'docProtected'
+      ? editor.state.selection.node.attrs
+      : null
   const isImage = protAttrs?.blockType === 'image'
   const isFloating =
     isImage ||
@@ -361,6 +367,8 @@ export function EditorContextMenu({
     !editor.state.selection.node.attrs.rule
       ? editor.state.selection.node
       : null
+  // Word's picture menu: clipboard, the picture, wrap / arrange, link, comment
+  const onPicture = !!menu.imageSrc || !!runPicture || isImage
   const currentWrap = runPicture
     ? ((runPicture.attrs.wrap as string | null) ?? null)
     : boxes?.length
@@ -453,13 +461,6 @@ export function EditorContextMenu({
           <div className="ctx-sep" />
         </>
       )}
-      {menu.imageSrc && (
-        <>
-          {item(t('appViewImage'), { onClick: run(() => onViewImage(menu.imageSrc!)) })}
-          {item(t('appSaveImageAs'), { onClick: run(() => onSaveImageAs(menu.imageSrc!)) })}
-          <div className="ctx-sep" />
-        </>
-      )}
       {item(t('appCut'), {
         shortcut: 'cut',
         disabled: !hasSelection || !canEdit,
@@ -475,15 +476,27 @@ export function EditorContextMenu({
         disabled: !canEdit,
         onClick: run(() => void pasteFromClipboard(editor)),
       })}
-      {item(t('appPastePlain'), {
-        shortcut: 'paste-plain',
-        disabled: !canEdit,
-        onClick: run(() => void pasteFromClipboard(editor, 'text')),
-      })}
-      <div className="ctx-sep" />
-      {item(t('appFontMenu'), { shortcut: 'font-dialog', onClick: run(onFontDialog) })}
-      {item(t('appParagraphMenu'), { onClick: run(onParagraphDialog) })}
-      {inTable && (
+      {!onPicture &&
+        item(t('appPastePlain'), {
+          shortcut: 'paste-plain',
+          disabled: !canEdit,
+          onClick: run(() => void pasteFromClipboard(editor, 'text')),
+        })}
+      {menu.imageSrc && (
+        <>
+          <div className="ctx-sep" />
+          {item(t('appViewImage'), { onClick: run(() => onViewImage(menu.imageSrc!)) })}
+          {item(t('appSaveImageAs'), { onClick: run(() => onSaveImageAs(menu.imageSrc!)) })}
+        </>
+      )}
+      {!onPicture && (
+        <>
+          <div className="ctx-sep" />
+          {item(t('appFontMenu'), { shortcut: 'font-dialog', onClick: run(onFontDialog) })}
+          {item(t('appParagraphMenu'), { onClick: run(onParagraphDialog) })}
+        </>
+      )}
+      {inTable && !onPicture && (
         <>
           <div className="ctx-sep" />
           <div className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)}>
@@ -669,7 +682,7 @@ export function EditorContextMenu({
             })}
         </>
       )}
-      {(field || editor.isActive('instrField')) && onUpdateFields && (
+      {!onPicture && (field || editor.isActive('instrField')) && onUpdateFields && (
         <>
           <div className="ctx-sep" />
           {item(t('appUpdateField'), {
@@ -690,54 +703,56 @@ export function EditorContextMenu({
           )}
         </>
       )}
-      {editor.isActive('docListItem') && !!editor.getAttributes('docListItem').numId && (
-        <>
-          <div className="ctx-sep" />
-          {item(t('appRestartNumbering'), {
-            disabled: !onRestartNumbering,
-            onClick: run(() => onRestartNumbering?.()),
-          })}
-          {item(t('appContinueNumbering'), {
-            disabled: !onContinueNumbering,
-            onClick: run(() => onContinueNumbering?.()),
-          })}
-          {item(t('appSetNumberingValue'), {
-            disabled: !onSetNumberingValue || !canEdit,
-            onClick: run(() => onSetNumberingValue?.()),
-          })}
-          {item(t('appAdjustListIndents'), {
-            disabled: !onAdjustListIndents || !canEdit,
-            onClick: run(() => onAdjustListIndents?.()),
-          })}
-          <div className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)}>
-            {item(t('appChangeListLevel'), {
-              disabled: !onChangeListLevel || !canEdit,
-              submenuKey: 'listLevel',
+      {!onPicture &&
+        editor.isActive('docListItem') &&
+        !!editor.getAttributes('docListItem').numId && (
+          <>
+            <div className="ctx-sep" />
+            {item(t('appRestartNumbering'), {
+              disabled: !onRestartNumbering,
+              onClick: run(() => onRestartNumbering?.()),
             })}
-            {submenu === 'listLevel' && onChangeListLevel && canEdit && (
-              <div className="ctx-submenu">
-                {Array.from({ length: 9 }, (_, i) => (
-                  <button
-                    key={i}
-                    className="ctx-item"
-                    aria-current={
-                      (Number(editor.getAttributes('docListItem').ilvl) || 0) === i
-                        ? 'true'
-                        : undefined
-                    }
-                    onClick={run(() => onChangeListLevel(i))}
-                  >
-                    <span className="ctx-label" style={{ paddingLeft: i * 8 }}>
-                      {t('appParaOutlineLevelN', { n: String(i + 1) })}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-      {cap('ai') && (
+            {item(t('appContinueNumbering'), {
+              disabled: !onContinueNumbering,
+              onClick: run(() => onContinueNumbering?.()),
+            })}
+            {item(t('appSetNumberingValue'), {
+              disabled: !onSetNumberingValue || !canEdit,
+              onClick: run(() => onSetNumberingValue?.()),
+            })}
+            {item(t('appAdjustListIndents'), {
+              disabled: !onAdjustListIndents || !canEdit,
+              onClick: run(() => onAdjustListIndents?.()),
+            })}
+            <div className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)}>
+              {item(t('appChangeListLevel'), {
+                disabled: !onChangeListLevel || !canEdit,
+                submenuKey: 'listLevel',
+              })}
+              {submenu === 'listLevel' && onChangeListLevel && canEdit && (
+                <div className="ctx-submenu">
+                  {Array.from({ length: 9 }, (_, i) => (
+                    <button
+                      key={i}
+                      className="ctx-item"
+                      aria-current={
+                        (Number(editor.getAttributes('docListItem').ilvl) || 0) === i
+                          ? 'true'
+                          : undefined
+                      }
+                      onClick={run(() => onChangeListLevel(i))}
+                    >
+                      <span className="ctx-label" style={{ paddingLeft: i * 8 }}>
+                        {t('appParaOutlineLevelN', { n: String(i + 1) })}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      {cap('ai') && !onPicture && (
         <>
           <div className="ctx-sep" />
           {item(t('appSynonyms'), {
@@ -872,7 +887,7 @@ export function EditorContextMenu({
         disabled: !canComment || (!canEdit && !commentsAllowed),
         onClick: run(onNewComment),
       })}
-      {comment && (
+      {comment && !onPicture && (
         <>
           <div className="ctx-sep" />
           {item(t('appCtxReplyComment'), {
@@ -889,7 +904,7 @@ export function EditorContextMenu({
           })}
         </>
       )}
-      {(revisions?.any || trackChanges) && (
+      {!onPicture && (revisions?.any || trackChanges) && (
         <>
           <div className="ctx-sep" />
           {revisions && revisions.at.length > 0 && (
