@@ -415,6 +415,8 @@ interface WrittenSteps {
 }
 /** Each step holds the whole file twice: a long history of them would hold that much memory */
 const MAX_WRITTEN_STEPS = 10
+const EMPTY_WRITTEN_STEPS: WrittenSteps = { undo: [], redo: [] }
+const EMPTY_WRITTEN_COUNTS = { undo: 0, redo: 0 }
 
 export default function App() {
   const { lang, t } = useI18n()
@@ -1094,9 +1096,9 @@ export default function App() {
   const offeredNameRef = useRef<string | null>(null)
   /** The file around each change written to it at once (Replace pages, Page size, Crop, Insert
       PDF): Undo with no pending edit left writes it back as it was, Redo as the change left it */
-  const writtenRef = useRef<WrittenSteps>({ undo: [], redo: [] })
+  const writtenRef = useRef<WrittenSteps>(EMPTY_WRITTEN_STEPS)
   /** Their counts, for the Undo and Redo buttons */
-  const [written, setWrittenCounts] = useState({ undo: 0, redo: 0 })
+  const [written, setWrittenCounts] = useState(EMPTY_WRITTEN_COUNTS)
   const setWritten = (steps: WrittenSteps) => {
     writtenRef.current = steps
     setWrittenCounts({ undo: steps.undo.length, redo: steps.redo.length })
