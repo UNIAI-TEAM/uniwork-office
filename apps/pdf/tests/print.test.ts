@@ -1,9 +1,125 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import type { execFile, spawn } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
-import type { spawn } from 'node:child_process'
-import { printFileViaCups } from '@genoffice/electron-utils/print-cups'
+import type { CupsPrintJob } from '@genoffice/electron-utils/print-cups'
 import { printJobOptions } from '@genoffice/electron-utils/print-job'
+import type { PrinterOption } from '@genoffice/electron-utils/printer-options'
+type IpcHandler = (
+  event: {
+    sender: {
+      id: number
+      printToPDF?: (opts: unknown) => Promise<Buffer>
+      print?: (opts: unknown, cb: (ok: boolean, reason: string) => void) => void
+    }
+  },
+  ...args: unknown[]
+) => unknown
+
+const ipcHandlers = new Map<string, IpcHandler>()
+const ipcState = vi.hoisted(() => ({
+  senderId: 1,
+  spawnCalls: [] as Array<{ cmd: string; args: readonly string[]; opts: unknown }>,
+  execFileCalls: [] as Array<{ cmd: string; args: readonly string[] }>,
+  lpOptionsStdout: '',
+  lpOptionsError: null as Error | null,
+}))
+
+const spawnMock = vi.fn((cmd: string, args: readonly string[], opts: unknown) => {
+  const child = Object.assign(new EventEmitter(), {
+    stdin: new PassThrough(),
+    stdout: new PassThrough(),
+    stderr: new PassThrough(),
+  })
+  ipcState.spawnCalls.push({ cmd, args, opts })
+  queueMicrotask(() => child.emit('close', 0))
+  return child
+})
+
+const execFileMock = vi.fn(
+  (
+    cmd: string,
+    args: readonly string[],
+    cb: (err: Error | null, stdout: string, stderr: string) => void,
+  ) => {
+    ipcState.execFileCalls.push({ cmd, args })
+    queueMicrotask(() => cb(ipcState.lpOptionsError, ipcState.lpOptionsStdout, ''))
+  },
+)
+
+vi.mock('@genoffice/electron-utils/print-cups', async (importOriginal) => {
+  const actual = await importOriginal<{
+    printPdfViaCups: (
+      pdf: Uint8Array,
+      job: CupsPrintJob,
+      spawnFn?: typeof spawn,
+    ) => Promise<{ ok: boolean; error?: string }>
+    printFileViaCups: (
+      path: string,
+      job: CupsPrintJob,
+      pages?: readonly number[],
+      spawnFn?: typeof spawn,
+    ) => Promise<{ ok: boolean; error?: string }>
+  }>()
+  return {
+    ...actual,
+    printPdfViaCups: (pdf: Uint8Array, job: CupsPrintJob) =>
+      actual.printPdfViaCups(pdf, job, spawnMock as unknown as typeof spawn),
+    printFileViaCups: (path: string, job: CupsPrintJob, pages?: readonly number[]) =>
+      actual.printFileViaCups(path, job, pages, spawnMock as unknown as typeof spawn),
+  }
+})
+
+vi.mock('@genoffice/electron-utils/printer-options', async (importOriginal) => {
+  const actual = await importOriginal<{
+    queryPrinterOptions: (queue: string, execFileFn?: typeof execFile) => Promise<PrinterOption[]>
+  }>()
+  return {
+    ...actual,
+    queryPrinterOptions: (queue: string) =>
+      actual.queryPrinterOptions(queue, execFileMock as unknown as typeof execFile),
+  }
+})
+
+vi.mock('electron', () => ({
+  app: {
+    on: vi.fn(),
+    whenReady: vi.fn(() => new Promise(() => {})),
+    getPath: vi.fn(() => process.cwd()),
+  },
+  dialog: { showOpenDialog: vi.fn() },
+  shell: { showItemInFolder: vi.fn(), openExternal: vi.fn() },
+  BrowserWindow: class {
+    static fromWebContents = vi.fn(() => null)
+    static getFocusedWindow = vi.fn(() => null)
+  },
+  WebContentsView: class {
+    webContents = {
+      id: ipcState.senderId,
+      once: vi.fn(),
+      on: vi.fn(),
+      setWindowOpenHandler: vi.fn(),
+      loadURL: vi.fn(),
+      loadFile: vi.fn(),
+    }
+  },
+  ipcMain: {
+    handle: vi.fn((channel: string, handler: IpcHandler) => {
+      ipcHandlers.set(channel, handler)
+    }),
+    on: vi.fn((channel: string, handler: IpcHandler) => {
+      ipcHandlers.set(channel, handler)
+    }),
+    removeHandler: vi.fn(),
+  },
+}))
+
+import { createPdfView } from '../src/main/pdf-main'
+import { setUniworkDocumentPolicy } from '../src/main/uniwork-policy'
+import { PDF_CHANNELS } from '../src/shared/ipc'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import {
   filterPageParity,
@@ -339,41 +455,85 @@ describe('maySpoolOriginal', () => {
 })
 
 describe('macOS lp printFile route with granted path', () => {
-  it('builds lp argv array with the granted path after -- and no shell string', async () => {
-    const calls: Array<{ cmd: string; args: readonly string[]; opts: unknown }> = []
-    const spawnFn = vi.fn((cmd: string, args: readonly string[], opts: unknown) => {
-      const child = Object.assign(new EventEmitter(), {
-        stdin: new PassThrough(),
-        stdout: new PassThrough(),
-        stderr: new PassThrough(),
-      })
-      calls.push({ cmd, args, opts })
-      queueMicrotask(() => child.emit('close', 0))
-      return child
-    })
+  let grantDir = ''
+  let grantedPath = ''
 
-    const grantedPath = '/Users/alice/Documents/Report (final).pdf'
-    const request = {
+  beforeAll(() => {
+    grantDir = mkdtempSync(join(tmpdir(), 'pdf-print-grant-'))
+    grantedPath = join(grantDir, 'Report (final).pdf')
+    writeFileSync(grantedPath, '%PDF-1.4\n%%EOF\n')
+    createPdfView(grantedPath)
+  })
+
+  afterAll(() => {
+    rmSync(grantDir, { recursive: true, force: true })
+  })
+
+  beforeEach(() => {
+    ipcState.spawnCalls.length = 0
+    ipcState.execFileCalls.length = 0
+    ipcState.lpOptionsStdout = ''
+    ipcState.lpOptionsError = null
+    setUniworkDocumentPolicy(null)
+  })
+
+  afterEach(() => {
+    setUniworkDocumentPolicy(null)
+  })
+
+  function invokePrintFile(request: unknown): Promise<{ ok: boolean; error?: string }> {
+    return ipcHandlers.get(PDF_CHANNELS.printFile)!(
+      { sender: { id: ipcState.senderId } },
+      request,
+    ) as Promise<{ ok: boolean; error?: string }>
+  }
+
+  it('rejects an ungranted path before spawning lp', async () => {
+    await expect(
+      invokePrintFile({
+        deviceName: 'Office_LaserJet',
+        copies: 1,
+        collate: true,
+        duplex: 'simplex',
+        path: join(grantDir, 'ungranted.pdf'),
+      }),
+    ).rejects.toThrow('pdf: path not granted to this view')
+    expect(ipcState.spawnCalls).toHaveLength(0)
+  })
+
+  it('returns { ok: false } without spawning lp when the granted path is locked', async () => {
+    setUniworkDocumentPolicy({
+      isBound: () => true,
+      isReadOnly: () => false,
+      isLocked: (p) => p === grantedPath,
+      isAutosaveEnabled: () => true,
+    })
+    const result = await invokePrintFile({
+      deviceName: 'Office_LaserJet',
+      copies: 1,
+      collate: true,
+      duplex: 'simplex',
+      path: grantedPath,
+    })
+    expect(result).toEqual({ ok: false })
+    expect(ipcState.spawnCalls).toHaveLength(0)
+  })
+
+  it('builds lp argv array with the granted path after -- and no shell string', async () => {
+    const result = await invokePrintFile({
       deviceName: 'Office_LaserJet',
       copies: 2,
       collate: true,
       duplex: 'longEdge' as const,
       pages: [1, 2, 3, 5],
       path: grantedPath,
-    }
-    const opts = printJobOptions(request)
-    const result = await printFileViaCups(
-      request.path,
-      opts,
-      request.pages,
-      spawnFn as unknown as typeof spawn,
-    )
+    })
 
     expect(result).toEqual({ ok: true })
-    expect(calls).toHaveLength(1)
-    expect(calls[0]!.cmd).toBe('/usr/bin/lp')
-    expect(Array.isArray(calls[0]!.args)).toBe(true)
-    expect(calls[0]!.args).toEqual([
+    expect(ipcState.spawnCalls).toHaveLength(1)
+    expect(ipcState.spawnCalls[0]!.cmd).toBe('/usr/bin/lp')
+    expect(Array.isArray(ipcState.spawnCalls[0]!.args)).toBe(true)
+    expect(ipcState.spawnCalls[0]!.args).toEqual([
       '-d',
       'Office_LaserJet',
       '-n',
@@ -387,7 +547,9 @@ describe('macOS lp printFile route with granted path', () => {
       '--',
       grantedPath,
     ])
-    expect(calls[0]!.opts).toEqual({ stdio: ['pipe', 'pipe', 'pipe'] })
+    expect(ipcState.spawnCalls[0]!.args.slice(-2)).toEqual(['--', grantedPath])
+    expect(ipcState.spawnCalls[0]!.opts).toEqual({ stdio: ['pipe', 'pipe', 'pipe'] })
+    expect((ipcState.spawnCalls[0]!.opts as { shell?: unknown } | undefined)?.shell).toBeUndefined()
   })
 
   it('round-trips chosen driver options into the print call and lp arguments', async () => {
