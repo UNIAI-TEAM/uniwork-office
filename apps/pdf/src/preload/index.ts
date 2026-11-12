@@ -17,6 +17,8 @@ const api: PdfApi = {
   // the shell no longer pushes presets into a running editor (My AI is gone); only a web host does
   onAiPreset: () => () => {},
   readFile: (path) => ipcRenderer.invoke(PDF_CHANNELS.readFile, path),
+  readFileChunk: (path: string, start: number, end: number) =>
+    ipcRenderer.invoke(PDF_CHANNELS.readFileChunk, path, start, end),
   decryptPdf: (bytes, password) => ipcRenderer.invoke(PDF_CHANNELS.decryptPdf, bytes, password),
   save: (request) => ipcRenderer.invoke(PDF_CHANNELS.save, request),
   requestRedactionCopy: (path) => ipcRenderer.invoke(PDF_CHANNELS.requestRedactionCopy, path),

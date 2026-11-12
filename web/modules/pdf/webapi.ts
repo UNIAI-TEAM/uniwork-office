@@ -789,6 +789,12 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       if (!doc || !owns(path)) throw new Error(NOT_GRANTED)
       return copyBuffer(doc.bytes)
     },
+    async readFileChunk(path, start, end) {
+      if (!doc || !owns(path)) throw new Error(NOT_GRANTED)
+      const from = Math.max(0, Math.min(start, doc.bytes.byteLength))
+      const to = Math.max(from, Math.min(end, doc.bytes.byteLength))
+      return { data: doc.bytes.slice(from, to), fileSize: doc.bytes.byteLength }
+    },
     onReloadRequest(handler) {
       reloadListeners.add(handler)
       return () => {
