@@ -17,6 +17,7 @@ export const ru = {
   intgSkillsRead: 'Подробнее',
   intgSkillsMine: 'Мои навыки',
   intgSkillsRecommended: 'Рекомендуемые',
+  intgSkillsCatAll: 'Все',
   intgSkillsCatOffice: 'Офис',
   intgSkillsCatBusiness: 'Бизнес',
   intgSkillsCatData: 'Данные',

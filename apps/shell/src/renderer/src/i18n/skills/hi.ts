@@ -17,6 +17,7 @@ export const hi = {
   intgSkillsRead: 'विवरण',
   intgSkillsMine: 'मेरे कौशल',
   intgSkillsRecommended: 'अनुशंसित',
+  intgSkillsCatAll: 'सभी',
   intgSkillsCatOffice: 'ऑफ़िस',
   intgSkillsCatBusiness: 'व्यवसाय',
   intgSkillsCatData: 'डेटा',

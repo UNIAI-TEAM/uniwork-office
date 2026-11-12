@@ -17,6 +17,7 @@ export const cs = {
   intgSkillsRead: 'Podrobnosti',
   intgSkillsMine: 'Moje dovednosti',
   intgSkillsRecommended: 'Doporučené',
+  intgSkillsCatAll: 'Všechny',
   intgSkillsCatOffice: 'Kancelář',
   intgSkillsCatBusiness: 'Byznys',
   intgSkillsCatData: 'Data',

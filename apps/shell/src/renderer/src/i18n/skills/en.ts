@@ -17,6 +17,7 @@ export const en = {
   intgSkillsRead: 'Details',
   intgSkillsMine: 'My skills',
   intgSkillsRecommended: 'Recommended',
+  intgSkillsCatAll: 'All',
   intgSkillsCatOffice: 'Office',
   intgSkillsCatBusiness: 'Business',
   intgSkillsCatData: 'Data',

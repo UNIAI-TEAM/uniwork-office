@@ -16,6 +16,7 @@ export const zh = {
   intgSkillsRead: '详情',
   intgSkillsMine: '我的技能',
   intgSkillsRecommended: '推荐',
+  intgSkillsCatAll: '全部',
   intgSkillsCatOffice: '办公',
   intgSkillsCatBusiness: '商务',
   intgSkillsCatData: '数据',

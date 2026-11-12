@@ -17,6 +17,7 @@ export const vi = {
   intgSkillsRead: 'Chi tiết',
   intgSkillsMine: 'Kỹ năng của tôi',
   intgSkillsRecommended: 'Đề xuất',
+  intgSkillsCatAll: 'Tất cả',
   intgSkillsCatOffice: 'Văn phòng',
   intgSkillsCatBusiness: 'Kinh doanh',
   intgSkillsCatData: 'Dữ liệu',

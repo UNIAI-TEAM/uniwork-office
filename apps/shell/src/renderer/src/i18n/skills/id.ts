@@ -18,6 +18,7 @@ export const id = {
   intgSkillsRead: 'Detail',
   intgSkillsMine: 'Skill saya',
   intgSkillsRecommended: 'Disarankan',
+  intgSkillsCatAll: 'Semua',
   intgSkillsCatOffice: 'Perkantoran',
   intgSkillsCatBusiness: 'Bisnis',
   intgSkillsCatData: 'Data',

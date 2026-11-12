@@ -18,6 +18,7 @@ export const ko = {
   intgSkillsRead: '상세',
   intgSkillsMine: '내 스킬',
   intgSkillsRecommended: '추천',
+  intgSkillsCatAll: '전체',
   intgSkillsCatOffice: '사무',
   intgSkillsCatBusiness: '비즈니스',
   intgSkillsCatData: '데이터',
