@@ -193,6 +193,10 @@ export default {
   // addPastedImage instead of addAttachmentPaths
   getPathForFile: () => '',
 
+  // ---- author name (Settings -> General; web uses host identity per doc) ---
+  getAuthorName: async () => '',
+  onAuthorNameChanged: noopDisposer,
+
   // ---- defaults for the open flow; webapi.ts (W5) overrides these ----------
   consumePendingOpenDocx: async () => null,
   onOpenDocx: noopDisposer,
