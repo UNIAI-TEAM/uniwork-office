@@ -51,7 +51,7 @@ export const GLOBAL_EXCLUDE = [
 // stored-document markers. `GenOffice` followed by one of these is not the
 // product name.
 const FONT_ALIAS =
-  'PUA|Grid|Sans|Serif|Gothic|Che|Poppins|Tamil|Fullwidth|Songti|Hiragino|MS|Batang|Myungjo|Heiti|MingLiU|Ethiopic|Bengali|Box|UI|Hangul|DM|SimSun|YaHei'
+  'PUA|Grid|Sans|Serif|Gothic|Che|Poppins|Tamil|Fullwidth|Songti|Hiragino|MS|Batang|Myungjo|Heiti|MingLiU|Ethiopic|Bengali|Balanced|Cordia|Sarabun|Box|UI|Hangul|DM|SimSun|YaHei'
 const DATA_MARKER = 'visual'
 
 export const NON_BRAND_TOKENS = [
