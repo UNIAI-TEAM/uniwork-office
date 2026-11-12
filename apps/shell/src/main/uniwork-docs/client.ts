@@ -16,6 +16,7 @@ import { TransportError } from '../uniwork-auth/transport'
 import { UniworkDocError, errorFromResponse, parseRetryAfter } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
 import { isLegacyConversion, type LegacyConversion } from './legacy-cloud'
+import { downloadInChunks, parseContentRange, type RangedChunk } from './ranged-download'
 import { DEFAULT_DOCUMENT_LIMITS, parseDocumentLimits, type DocumentLimits } from './limits'
 import {
   documentRevisionOf,
@@ -586,6 +587,8 @@ export interface UniworkCall<T> {
    * bounds the whole exchange. Only the streamed download sets it.
    */
   idle?: { ceilingMs: number }
+  /** UNI-2518: a `Range` request header (`bytes=0-8388607`) for one window of a download */
+  range?: string
   read(response: Response, progress?: () => void): Promise<T>
 }
 
@@ -613,6 +616,7 @@ export function createUniworkSend(
         // the bearer is this call's, whatever headers a target listed
         headers.Authorization = `Bearer ${token}`
         if (call.idempotencyKey) headers['Idempotency-Key'] = call.idempotencyKey
+        if (call.range) headers.Range = call.range
         const controller = new AbortController()
         let timedOut = false
         const expire = () => {
@@ -1486,15 +1490,51 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const query = new URLSearchParams()
       if (version !== undefined && version > 0) query.set('version', String(Math.floor(version)))
       const { signal, onProgress } = streamOptions
-      return send({
-        method: 'GET',
-        route: `/documents/${id(documentId)}/download`,
-        query,
-        // R5BE-9: no chunk for transferTimeout ends it, not the whole transfer
-        timeoutMs: transferTimeout,
-        idle: { ceilingMs: streamCeiling },
+      // UNI-2518: read in 8 MiB Range windows so a cut costs one window, not the file. The
+      // whole transfer still answers to the one streamCeiling it had as a single GET.
+      const deadline = Date.now() + streamCeiling
+      const readChunk = (
+        range: { start: number; end: number } | undefined,
+        chunkProgress: (progress: { receivedBytes: number; totalBytes: number | null }) => void,
+      ): Promise<RangedChunk> =>
+        send({
+          method: 'GET',
+          route: `/documents/${id(documentId)}/download`,
+          query,
+          ...(range ? { range: `bytes=${range.start}-${range.end}` } : {}),
+          // R5BE-9: no chunk for transferTimeout ends it, not the whole transfer
+          timeoutMs: transferTimeout,
+          idle: { ceilingMs: Math.max(1, deadline - Date.now()) },
+          ...(signal ? { signal } : {}),
+          async read(response, progress) {
+            const streamed = { signal, onProgress: chunkProgress }
+            if (response.status !== 206) {
+              return { kind: 'whole', ...(await readBoundedStream(response, progress, streamed)) }
+            }
+            const window = parseContentRange(response.headers.get('Content-Range'))
+            if (!window || window.total > MAX_DOWNLOAD_BYTES) {
+              void response.body?.cancel().catch(() => undefined)
+              throw new UniworkDocError(window ? 'too_large' : 'malformed_response')
+            }
+            return {
+              kind: 'partial',
+              ...window,
+              // a window's Content-Length is not the file's size
+              ...(await readBoundedStream(response, progress, {
+                signal,
+                onProgress: ({ receivedBytes }) =>
+                  chunkProgress({ receivedBytes, totalBytes: window.total }),
+              })),
+            }
+          },
+        })
+      return downloadInChunks({
+        readChunk,
+        maxBytes: MAX_DOWNLOAD_BYTES,
+        label: `document=${id(documentId)} version=${version !== undefined && version > 0 ? Math.floor(version) : 'live'}`,
+        log: (line) => console.warn(line),
         ...(signal ? { signal } : {}),
-        read: (response, progress) => readBoundedStream(response, progress, { signal, onProgress }),
+        ...(onProgress ? { onProgress } : {}),
       })
     },
 
