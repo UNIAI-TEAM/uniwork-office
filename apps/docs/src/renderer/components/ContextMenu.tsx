@@ -910,7 +910,7 @@ export function EditorContextMenu({
           )}
           {trackChanges &&
             item(`${trackChanges.on ? '✓ ' : ''}${t('ribbonTrackChanges')}`, {
-              shortcut: '⇧⌘E',
+              shortcut: 'track-changes',
               onClick: run(trackChanges.onToggle),
             })}
         </>
