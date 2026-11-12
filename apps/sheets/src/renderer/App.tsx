@@ -601,7 +601,11 @@ import { EngineUnavailableScreen } from './EngineUnavailableScreen'
 import { WorkbookOpeningScreen } from './WorkbookOpeningScreen'
 import { isEngineUnavailableError, isTooLargeError } from './web-engine'
 import { handleSheetsControl, type ControlRequest } from './control'
-import { bootOpenAction, createOpenStallTimer } from './workbook-open-stall'
+import {
+  bootOpenAction,
+  createOpenStallTimer,
+  shouldRunOpenStallTimer,
+} from './workbook-open-stall'
 
 // Source sheet id of an in-flight copy-sheet command; the next insert-sheet
 // mutation is that copy and must journal as a duplicate, not a blank add.
@@ -1339,17 +1343,25 @@ export function App({
   const openingWorkbookRef = useRef(openingWorkbook)
   openingWorkbookRef.current = openingWorkbook
   const openStallTimer = useMemo(() => createOpenStallTimer(() => setOpenStalled(true)), [])
-  // Waiting on the user's workbook password is not a stalled open: the timer
-  // pauses and the opening screen stays out from behind the password dialog.
+  // Waiting on the user's workbook password or an active delimited-import
+  // progress card is not a stalled open: the timer pauses while either is
+  // shown and restarts with a fresh bound afterwards.
   const awaitingEncryptedPassword = encryptedPasswordPrompt !== null
+  const importingDelimited = importProgress !== null
   useEffect(() => {
-    if (openingWorkbook && !awaitingEncryptedPassword) {
+    if (
+      shouldRunOpenStallTimer({
+        openingWorkbook,
+        awaitingEncryptedPassword,
+        importingDelimited,
+      })
+    ) {
       openStallTimer.start()
       return openStallTimer.done
     }
     setOpenStalled(false)
     return undefined
-  }, [openingWorkbook, awaitingEncryptedPassword, openStallTimer])
+  }, [openingWorkbook, awaitingEncryptedPassword, importingDelimited, openStallTimer])
   /// Retry: queue the tab's workbook again and start the tab over (a stalled
   /// open may never settle, so its pending state is not reused)
   const retryWorkbookOpen = (): void => {
