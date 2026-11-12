@@ -101,6 +101,10 @@ import { BulkShareDialog, type BulkShareDoc } from '../uniwork-share/BulkShareDi
 import { AccessLogSheet } from '../uniwork-doc-history/AccessLogSheet'
 import { getDocHistoryBridge } from '../uniwork-doc-history/bridge'
 import { VersionHistorySheet } from '../uniwork-doc-history/VersionHistorySheet'
+import {
+  versionsEntryAllowed,
+  type VersionHistoryTarget,
+} from '../uniwork-doc-history/version-history-model'
 import { ShareDialog } from '../uniwork-share/ShareDialog'
 import {
   FolderContentsAccessDialog,
@@ -1909,7 +1913,7 @@ export function DocumentsHome({
   const [logsRow, setLogsRow] = useState<DocumentsHomeDoc | null>(null)
   const docHistoryAvailable = getDocHistoryBridge() !== null
   // UNI-2077: the Version history sheet of a row (same bridge, same availability)
-  const [versionsRow, setVersionsRow] = useState<DocumentsHomeDoc | null>(null)
+  const [versionsRow, setVersionsRow] = useState<VersionHistoryTarget | null>(null)
   // UNI-2068: Tải xuống plans one file or one zip in main; the bar and the result live in the zip store
   const zipBusy = useZipDownloadBusy()
   const zipAvailable = zipDownloadBridge() !== null
@@ -1968,6 +1972,39 @@ export function DocumentsHome({
       resetFilters()
       selectSubView('trash')
       setTrashReveal({ documentId: intent.documentId, stalePage })
+      return true
+    }
+    // B7: a notice about a save through an AI client names the document's Version history
+    if (intent.kind === 'versions') {
+      // a stale preload has no history bridge: nothing to open
+      if (!docHistoryAvailable) return true
+      const listed = pageRef.current.items.find((d) => d.id === intent.documentId)
+      if (listed && versionsEntryAllowed(listed)) {
+        setVersionsRow(listed)
+        return true
+      }
+      void loadDocProperties(intent.documentId)
+        .then((res) => {
+          if (!res.ok) {
+            publishUniworkNotice({ phase: 'failed', error: res.error })
+            return
+          }
+          const { myLevel, shelvedAt, archivedAt } = res.value
+          setVersionsRow({
+            id: res.value.documentId,
+            workspaceId: res.value.workspaceId,
+            title: res.value.title,
+            ...(myLevel === 'view' ||
+            myLevel === 'comment' ||
+            myLevel === 'edit' ||
+            myLevel === 'manage'
+              ? { myLevel }
+              : {}),
+            ...(shelvedAt ? { shelvedAt } : {}),
+            ...(archivedAt ? { archived: true, archivedAt } : {}),
+          })
+        })
+        .catch(() => publishUniworkNotice({ phase: 'failed', error: 'network' }))
       return true
     }
     // a stale preload has no Share bridge: nothing to open

@@ -3,6 +3,7 @@ import {
   onDocumentsIntent,
   onDocumentsIntentRoute,
   openDocumentShare,
+  openDocumentVersions,
   resetDocumentsIntentBusForTests,
   revealInTrash,
 } from '../src/renderer/src/documents-intent-bus'
@@ -84,5 +85,18 @@ describe('documents intent bus (UNI-2079 notice targets)', () => {
     const consumer = vi.fn(() => true)
     onDocumentsIntent(consumer)
     expect(consumer).toHaveBeenCalledTimes(1)
+  })
+
+  it('holds a Version history intent for the Documents home of its workspace (B7)', () => {
+    openDocumentVersions({ documentId: 'doc-1', workspaceId: 'ws-2' })
+    const other = vi.fn(() => false)
+    onDocumentsIntent(other)
+    const mine = vi.fn(() => true)
+    onDocumentsIntent(mine)
+    expect(mine).toHaveBeenCalledWith({
+      kind: 'versions',
+      documentId: 'doc-1',
+      workspaceId: 'ws-2',
+    })
   })
 })

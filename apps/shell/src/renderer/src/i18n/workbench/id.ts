@@ -107,6 +107,8 @@ export const id = {
   wbNotif_document_changed_version_created_one: '{actor} menambahkan versi baru ke “{document}”',
   wbNotif_document_changed_version_created_untitled:
     '{actor} menambahkan versi baru ke sebuah dokumen',
+  wbNotif_document_changed_version_created_via_one:
+    '{actor} memperbarui file “{document}” melalui {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} memindahkan folder berisi {count} dokumen Anda ke sampah; dokumen kini berada di akar ruang kerja',
   wbNotif_document_changed_relocated_one:

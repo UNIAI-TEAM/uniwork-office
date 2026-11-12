@@ -111,6 +111,8 @@ export const ms = {
   wbNotif_document_changed_version_created_one: '{actor} menambah versi baharu pada “{document}”',
   wbNotif_document_changed_version_created_untitled:
     '{actor} menambah versi baharu pada sebuah dokumen',
+  wbNotif_document_changed_version_created_via_one:
+    '{actor} mengemas kini fail “{document}” melalui {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} memindahkan folder yang mengandungi {count} dokumen anda ke tong sampah; dokumen kini berada di akar ruang kerja',
   wbNotif_document_changed_relocated_one:

@@ -25,6 +25,8 @@ export interface DocumentChangedFacts {
   titles: string[]
   /** documents beyond the titles shown; 0 when every one is named */
   more: number
+  /** `params.via_client` (UNI-2501 B7): the AI client a version_created save came through; '' when absent or blank */
+  viaClient: string
 }
 
 const isDocumentChanged = (n: WorkNotification) => n.kind === 'document_changed'
@@ -54,6 +56,7 @@ export function documentChangedFacts(n: WorkNotification): DocumentChangedFacts 
     count,
     titles,
     more: Math.max(0, count - titles.length),
+    viaClient: (n.params.via_client ?? '').trim(),
   }
 }
 
@@ -77,21 +80,36 @@ export function opensDocumentList(n: WorkNotification): boolean {
  * client does not word reads the generic "changed N documents"; ids never reach the sentence.
  */
 export function documentChangedSentenceKey(n: WorkNotification): StringKey {
-  const { verb, count, titles } = documentChangedFacts(n)
+  const { verb, count, titles, viaClient } = documentChangedFacts(n)
   const shape = count > 1 ? 'many' : titles.length > 0 ? 'one' : 'untitled'
   if (verb === null && shape === 'many') return 'wbNotif_document_changed'
+  // B7: one file saved through an AI client names the client; every other shape keeps its sentence
+  if (verb === 'version_created' && shape === 'one' && viaClient !== '') {
+    return 'wbNotif_document_changed_version_created_via_one'
+  }
   return `wbNotif_document_changed_${verb ?? 'generic'}_${shape}` as StringKey
 }
 
-/** the params the sentence places: who, the one document's name, how many */
+/** the params the sentence places: who, the one document's name, how many, the AI client */
 export function documentChangedTitleParams(n: WorkNotification): Record<string, string> {
-  const { count, titles } = documentChangedFacts(n)
+  const { count, titles, viaClient } = documentChangedFacts(n)
   return {
     actor: n.params.actor ?? '',
     document: titles[0] ?? '',
     count: String(count),
     document_count: String(count),
+    client: viaClient,
   }
+}
+
+/**
+ * B7: a save through an AI client opens the document's version history, where the person can restore the
+ * old file. Any other change (and a several-document one) keeps its own target.
+ */
+export function opensVersionHistory(n: WorkNotification): boolean {
+  if (!isDocumentChanged(n)) return false
+  const { verb, count, viaClient } = documentChangedFacts(n)
+  return verb === 'version_created' && count === 1 && viaClient !== '' && documentChangedHasPage(n)
 }
 
 /** what a click on a document notice can do: open it, or only say it is gone / out of reach */

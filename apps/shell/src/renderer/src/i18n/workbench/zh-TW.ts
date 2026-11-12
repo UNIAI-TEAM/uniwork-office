@@ -101,6 +101,7 @@ export const zhTW = {
   wbNotif_document_changed_version_created_many: '{actor} 為 {count} 份文件新增了版本',
   wbNotif_document_changed_version_created_one: '{actor} 為 “{document}” 新增了版本',
   wbNotif_document_changed_version_created_untitled: '{actor} 為一份文件新增了版本',
+  wbNotif_document_changed_version_created_via_one: '{actor} 透過 {client} 更新了檔案 “{document}”',
   wbNotif_document_changed_relocated_many:
     '{actor} 將存放你 {count} 份文件的資料夾移至垃圾桶；這些文件已回到工作區根目錄',
   wbNotif_document_changed_relocated_one:

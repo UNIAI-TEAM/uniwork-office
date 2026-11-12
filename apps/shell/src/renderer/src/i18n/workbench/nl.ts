@@ -124,6 +124,8 @@ export const nl = {
     '{actor} heeft een nieuwe versie toegevoegd aan “{document}”',
   wbNotif_document_changed_version_created_untitled:
     '{actor} heeft een nieuwe versie toegevoegd aan een document',
+  wbNotif_document_changed_version_created_via_one:
+    '{actor} heeft het bestand “{document}” bijgewerkt via {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} heeft de map met {count} van je documenten naar de prullenbak verplaatst; de documenten staan nu in de hoofdmap van de werkruimte',
   wbNotif_document_changed_relocated_one:

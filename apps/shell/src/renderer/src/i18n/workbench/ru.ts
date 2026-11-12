@@ -112,6 +112,8 @@ export const ru = {
     '{actor} добавил(а) новую версию в документы: {count}',
   wbNotif_document_changed_version_created_one: '{actor} добавил(а) новую версию в “{document}”',
   wbNotif_document_changed_version_created_untitled: '{actor} добавил(а) новую версию в документ',
+  wbNotif_document_changed_version_created_via_one:
+    '{actor} обновил(а) файл “{document}” через {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} переместил(а) в корзину папку с вашими документами ({count}); документы теперь в корне рабочего пространства',
   wbNotif_document_changed_relocated_one:

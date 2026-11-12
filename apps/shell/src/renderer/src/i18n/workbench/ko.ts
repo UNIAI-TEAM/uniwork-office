@@ -119,6 +119,8 @@ export const ko = {
   wbNotif_document_changed_version_created_one:
     '{actor} 님이 “{document}” 에 새 버전을 추가했습니다',
   wbNotif_document_changed_version_created_untitled: '{actor} 님이 문서에 새 버전을 추가했습니다',
+  wbNotif_document_changed_version_created_via_one:
+    '{actor} 님이 {client}을(를) 통해 파일 “{document}” 을(를) 업데이트했습니다',
   wbNotif_document_changed_relocated_many:
     '{actor} 님이 내 문서 {count}개가 들어 있는 폴더를 휴지통으로 옮겼습니다. 문서는 워크스페이스 최상위로 이동되었습니다',
   wbNotif_document_changed_relocated_one:

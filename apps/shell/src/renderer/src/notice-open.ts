@@ -9,10 +9,16 @@ import {
   documentChangedHasPage,
   noticeState,
   opensDocumentList,
+  opensVersionHistory,
 } from './desk-doc-change'
 import type { TFunc } from './locale'
 import { localizeNoticeParams, noticeSentence, noticeTarget } from './notices-model'
-import { openDocumentShare, openFolderInDocuments, revealInTrash } from './documents-intent-bus'
+import {
+  openDocumentShare,
+  openDocumentVersions,
+  openFolderInDocuments,
+  revealInTrash,
+} from './documents-intent-bus'
 import { publishUniworkNotice } from './uniwork-notice-bus'
 import { openUniworkDocument } from './uniwork-open'
 
@@ -26,6 +32,8 @@ export interface NoteState {
   gone: boolean
   /** a count-1 change with no title: the reader may be unable to open it, so a failed open still clears it */
   untitled: boolean
+  /** one file saved through an AI client (B7): the click opens its version history */
+  versions: boolean
 }
 
 export interface NoticeLine {
@@ -53,6 +61,7 @@ export function noticeLine(n: WorkNotification, t: TFunc, dateLocale: string): N
     notice: verdict === 'deleted' ? 'deleted' : verdict === 'no_access' ? 'forbidden' : null,
     gone: verdict !== 'open' || (changed && !documentChangedHasPage(n)),
     untitled: !!facts && facts.count === 1 && facts.titles.length === 0,
+    versions: opensVersionHistory(n),
   }
   const named = facts ? (facts.titles[0] ?? '') : (n.params.document ?? '')
   const titles =
@@ -98,6 +107,12 @@ export async function openNotice(
         return
       }
       if (state.gone) {
+        await env.markRead(n.id)
+        return
+      }
+      if (state.versions) {
+        // the Version history sheet lives in the Documents home: the host brings it on screen (documents-intent-bus)
+        openDocumentVersions({ documentId: n.resource_id, workspaceId: n.workspace_id })
         await env.markRead(n.id)
         return
       }

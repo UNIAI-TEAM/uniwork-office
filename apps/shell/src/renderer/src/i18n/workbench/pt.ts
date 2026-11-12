@@ -111,6 +111,8 @@ export const pt = {
   wbNotif_document_changed_version_created_one: '{actor} adicionou uma nova versão a “{document}”',
   wbNotif_document_changed_version_created_untitled:
     '{actor} adicionou uma nova versão a um documento',
+  wbNotif_document_changed_version_created_via_one:
+    '{actor} atualizou o arquivo “{document}” via {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} moveu para a lixeira a pasta que contém {count} dos seus documentos; os documentos agora estão na raiz do espaço de trabalho',
   wbNotif_document_changed_relocated_one:
