@@ -12,10 +12,29 @@ export default defineConfig({
       '@genoffice/docx-engine/zip-splice': local('../../packages/docx-engine/src/zip-splice.ts'),
       '@genoffice/docx-engine/lazy-media': local('../../packages/docx-engine/src/lazy-media.ts'),
       '@genoffice/docx-engine': local('../../packages/docx-engine/src/index.ts'),
+      '@genoffice/font-metrics/resolve': local('../../packages/font-metrics/src/resolve.ts'),
+      '@genoffice/font-metrics/word-faces.json': local(
+        '../../packages/font-metrics/word-faces.json',
+      ),
       '@genoffice/font-metrics': local('../../packages/font-metrics/src/index.ts'),
       // subpath before the bare name: string aliases are prefix replacements
       '@genoffice/electron-utils/headless-export': local(
         '../../packages/electron-utils/src/headless-export.ts',
+      ),
+      '@genoffice/electron-utils/print-cups': local(
+        '../../packages/electron-utils/src/print-cups.ts',
+      ),
+      '@genoffice/electron-utils/print-job': local(
+        '../../packages/electron-utils/src/print-job.ts',
+      ),
+      '@genoffice/electron-utils/generated-images': local(
+        '../../packages/electron-utils/src/generated-images.ts',
+      ),
+      '@genoffice/electron-utils/remote-image': local(
+        '../../packages/electron-utils/src/remote-image.ts',
+      ),
+      '@genoffice/electron-utils/safe-remote-url': local(
+        '../../packages/electron-utils/src/safe-remote-url.ts',
       ),
       '@genoffice/electron-utils/atomic-write': local(
         '../../packages/electron-utils/src/atomic-write.ts',
@@ -72,12 +91,15 @@ export default defineConfig({
       '@genoffice/ui/collab': local('../../packages/ui/src/collab/index.ts'),
       // subpath before the bare name (string aliases are prefix replacements)
       '@genoffice/ui/capabilities': local('../../packages/ui/src/capabilities.ts'),
+      '@genoffice/ui/': `${local('../../packages/ui/src')}/`,
       '@genoffice/ui': local('../../packages/ui/src/index.ts'),
       '@genoffice/xlsx-gateway/*': local('../../packages/xlsx-gateway/src/*'),
     },
   },
   test: {
     include: ['tests/**/*.test.ts'],
+    // the engine's display-only `effective` keys stay out of saved-model toEqual
+    setupFiles: [local('../../packages/docx-engine/tests/setup-equality.ts')],
     environment: 'jsdom',
     testTimeout: 20000,
   },

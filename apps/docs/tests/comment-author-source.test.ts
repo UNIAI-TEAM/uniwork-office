@@ -257,7 +257,8 @@ describe('the page-margin comment surfaces use the same label (visual F1)', () =
   /** a page wrap with one anchored comment span; jsdom has no layout, so the span gets one line box */
   function marginOf(simpleMarkup: boolean, comments: CommentInfo[]) {
     const host = document.createElement('div')
-    if (simpleMarkup) host.className = 'rev-display-simple'
+    host.className = simpleMarkup ? 'app rev-display-simple' : 'app'
+    if (!simpleMarkup) host.setAttribute('data-comment-cards', '')
     const wrap = document.createElement('div')
     const pm = document.createElement('div')
     const span = document.createElement('span')
@@ -291,7 +292,9 @@ describe('the page-margin comment surfaces use the same label (visual F1)', () =
   it('a vi All Markup bubble shows "Người dùng" for the stored "User"; names stay verbatim', () => {
     setModuleLang('vi')
     const { wrap, dispose } = marginOf(false, comments)
-    const names = [...wrap.querySelectorAll('.comment-bubble-author')].map((el) => el.textContent)
+    const names = [...wrap.querySelectorAll('.comment-bubble .comment-author')].map(
+      (el) => el.textContent,
+    )
     expect(names).toEqual(['Người dùng', 'Nguyễn An', 'Người dùng'])
     expect(comments[0]!.author).toBe('User')
     dispose()

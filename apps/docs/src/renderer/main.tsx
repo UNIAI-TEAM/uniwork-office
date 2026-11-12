@@ -1,6 +1,8 @@
+import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { htmlDir, htmlLang, type Lang } from '@genoffice/i18n'
 import { App } from './App'
+import { setAuthorName } from './author-name'
 import { LocaleProvider, setModuleLang } from './i18n/locale'
 import type { DocTheme, UiTheme } from '../shared/ipc'
 import '@genoffice/ui/tokens.css'
@@ -66,13 +68,25 @@ async function bootstrap(): Promise<void> {
   window.desktop?.onDocumentThemeChanged?.(applyDocumentTheme)
   await window.desktop
     ?.getAiPanelPrefs?.()
-    .then(applyAiPanelPrefs)
+    .then((prefs) => {
+      if (prefs) applyAiPanelPrefs(prefs)
+    })
     .catch(() => {})
   window.desktop?.onAiPanelPrefsChanged?.(applyAiPanelPrefs)
-  createRoot(document.getElementById('root')!).render(
-    <LocaleProvider initial={lang}>
-      <App />
-    </LocaleProvider>,
+  await window.desktop
+    ?.getAuthorName?.()
+    .then((name) => {
+      if (typeof name === 'string') setAuthorName(name)
+    })
+    .catch(() => {})
+  window.desktop?.onAuthorNameChanged?.(setAuthorName)
+  const root = createRoot(document.getElementById('root')!)
+  flushSync(() =>
+    root.render(
+      <LocaleProvider initial={lang}>
+        <App />
+      </LocaleProvider>,
+    ),
   )
 }
 

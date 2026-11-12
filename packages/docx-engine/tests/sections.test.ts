@@ -61,6 +61,46 @@ describe('readSections enumerates all sections', () => {
     expect(sections[1].firstBlockIndex).toBe(sections[0].lastBlockIndex + 1)
   })
 
+  it('fractional pgMar / pgSz / cols values round to whole twips instead of falling back', () => {
+    const settings = sectionSettingsFromXml(
+      '<w:sectPr><w:pgSz w:w="12240.4" w:h="15840.6"/>' +
+        '<w:pgMar w:top="686.39404296875" w:right="1344.12" w:bottom="769.61" w:left="1987.19970703125" w:header="708.5" w:footer="707.4" w:gutter="0"/>' +
+        '<w:cols w:num="3" w:space="0.5" w:equalWidth="0"><w:col w:w="2140.2" w:space="0"/><w:col w:w="2140.2" w:space="0"/><w:col w:w="2140.2"/></w:cols></w:sectPr>',
+    )
+    expect(settings.pageWidth).toBe(12240)
+    expect(settings.pageHeight).toBe(15841)
+    expect(settings.marginTop).toBe(686)
+    expect(settings.marginRight).toBe(1344)
+    expect(settings.marginBottom).toBe(770)
+    expect(settings.marginLeft).toBe(1987)
+    expect(settings.headerDist).toBe(709)
+    expect(settings.footerDist).toBe(707)
+    expect(settings.colSpace).toBe(1)
+    expect(settings.colWidths).toEqual([2140, 2140, 2140])
+  })
+
+  it('applySectionSettings rewrites fractional pgMar / cols attributes in place', () => {
+    const sectPr =
+      '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/>' +
+      '<w:pgMar w:top="686.39" w:right="1344.12" w:bottom="769.61" w:left="1987.2" w:header="708.5" w:footer="707.4" w:gutter="0"/>' +
+      '<w:cols w:num="2.0" w:space="425.6"/></w:sectPr>'
+    const settings = sectionSettingsFromXml(sectPr)
+    const out = applySectionSettings(sectPr, { ...settings, marginLeft: 1800, colSpace: 300 })
+    expect(out).toContain(
+      '<w:pgMar w:top="686" w:right="1344" w:bottom="770" w:left="1800" w:header="709" w:footer="707" w:gutter="0"/>',
+    )
+    expect(out).toContain('<w:cols w:num="2" w:space="300"/>')
+    expect(out.match(/w:space=/g)).toHaveLength(1)
+
+    const paired =
+      '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="708" w:footer="708" w:gutter="0"/>' +
+      '<w:cols w:num="3.0" w:space="0.4" w:equalWidth="0"><w:col w:w="2140.2" w:space="0"/><w:col w:w="2140.2" w:space="0"/><w:col w:w="2140.2"/></w:cols></w:sectPr>'
+    const kept = applySectionSettings(paired, sectionSettingsFromXml(paired))
+    expect(kept).toContain(
+      '<w:cols w:num="3" w:space="0" w:equalWidth="0"><w:col w:w="2140" w:space="0"/><w:col w:w="2140" w:space="0"/><w:col w:w="2140"/></w:cols>',
+    )
+  })
+
   it('negative pgMar top/bottom: absolute value, marked fixed, sign restored on save; gutter widens the left margin', () => {
     const sectPr =
       '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="-1530" w:right="1710" w:bottom="-1710" w:left="4003" w:header="720" w:footer="720" w:gutter="245"/></w:sectPr>'
@@ -1077,5 +1117,75 @@ describe('sectPr w:lnNumType', () => {
     const doc = await parseDocx(bytes)
     const flag = (id: string) => doc.styles.get(id)?.display?.suppressLineNumbers
     expect([flag('Quiet'), flag('Loud'), flag('Inherit')]).toEqual([true, false, true])
+  })
+})
+
+describe('pgBorders writer', () => {
+  const base =
+    '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/>' +
+    '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>' +
+    '</w:sectPr>'
+
+  it('writes shadow/frame/display/zOrder per side and reads them back', async () => {
+    const { applySectionSettings, sectionSettingsFromXml, DEFAULT_SECTION } =
+      await import('../src/section')
+    const side = {
+      val: 'double',
+      widthPt: 1.5,
+      spacePt: 10,
+      color: '1F497D',
+      shadow: true as const,
+    }
+    const xml = applySectionSettings(base, {
+      ...DEFAULT_SECTION,
+      pageBorder: true,
+      pageBorderProps: {
+        display: 'notFirstPage',
+        offsetFrom: 'text',
+        zOrder: 'back',
+        spacePt: 10,
+        widthPt: 1.5,
+        color: '1F497D',
+        sides: { top: side, bottom: { ...side, shadow: undefined, frame: true } },
+      },
+    })
+    expect(xml).toContain(
+      '<w:pgBorders w:zOrder="back" w:display="notFirstPage" w:offsetFrom="text">',
+    )
+    expect(xml).toContain(
+      '<w:top w:val="double" w:sz="12" w:space="10" w:color="1F497D" w:shadow="1"/>',
+    )
+    expect(xml).toContain(
+      '<w:bottom w:val="double" w:sz="12" w:space="10" w:color="1F497D" w:frame="1"/>',
+    )
+    expect(xml).not.toContain('<w:left')
+    const s = sectionSettingsFromXml(xml)
+    expect(s.pageBorderProps?.sides).toEqual({
+      top: side,
+      bottom: { val: 'double', widthPt: 1.5, spacePt: 10, color: '1F497D', frame: true },
+    })
+  })
+
+  it('art sides keep w:sz in points', async () => {
+    const { applySectionSettings, DEFAULT_SECTION } = await import('../src/section')
+    const xml = applySectionSettings(base, {
+      ...DEFAULT_SECTION,
+      pageBorder: true,
+      pageBorderProps: {
+        offsetFrom: 'page',
+        spacePt: 24,
+        widthPt: 16,
+        sides: { top: { val: 'gems', widthPt: 16, spacePt: 24, art: true } },
+      },
+    })
+    expect(xml).toContain('<w:top w:val="gems" w:sz="16" w:space="24" w:color="auto"/>')
+  })
+
+  it('pageBorder without props still writes the legacy box', async () => {
+    const { applySectionSettings, DEFAULT_SECTION } = await import('../src/section')
+    const xml = applySectionSettings(base, { ...DEFAULT_SECTION, pageBorder: true })
+    expect(xml).toContain(
+      '<w:pgBorders w:offsetFrom="page"><w:top w:val="single" w:sz="4" w:space="24" w:color="auto"/>',
+    )
   })
 })

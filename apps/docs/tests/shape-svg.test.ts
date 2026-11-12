@@ -53,7 +53,7 @@ describe('straight connector rendering', () => {
 describe('authored outline width', () => {
   it('keeps the historical encoded SVG byte-identical when no width is authored', () => {
     expect(decodedSvg(shapeBackgroundImage('rect', 10, 10, '112233', '445566'))).toBe(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="-1 -1 10 10">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="-1 -1 10 10" preserveAspectRatio="none">' +
         '<path d="M 0 0 L 8 0 L 8 8 L 0 8 Z" fill="#112233" stroke="#445566" stroke-width="2"/>' +
         '</svg>',
     )
@@ -120,7 +120,40 @@ describe('shapeTextInsetsPx', () => {
   })
 
   it('rightArrow keeps text out of the head and above/below the shaft', () => {
-    expect(shapeTextInsetsPx('rightArrow', 240, 80)).toEqual({ l: 0, t: 20, r: 40, b: 20 })
+    // presetShapeDefinitions: x2 = r - ss/4 at the default head length
+    expect(shapeTextInsetsPx('rightArrow', 240, 80)).toEqual({ l: 0, t: 20, r: 20, b: 20 })
+  })
+
+  it('scrolls inset by the curl: ss/8 on three sides, ss/16 past the rolled edge', () => {
+    expect(shapeTextInsetsPx('horizontalScroll', 400, 100)).toEqual({
+      l: 12.5,
+      t: 12.5,
+      r: 6.25,
+      b: 12.5,
+    })
+    expect(shapeTextInsetsPx('verticalScroll', 100, 400)).toEqual({
+      l: 12.5,
+      t: 12.5,
+      r: 12.5,
+      b: 6.25,
+    })
+  })
+
+  it('aspect-pinned presets follow the pinned adjust', () => {
+    const hex = shapeTextInsetsPx('hexagon', 400, 100)!
+    expect(hex.l).toBeCloseTo(41.667, 2)
+    expect(hex.t).toBeCloseTo(10.417, 2)
+    const tall = shapeTextInsetsPx('hexagon', 100, 400)!
+    expect(tall.l).toBeCloseTo(16.667, 2)
+    expect(tall.t).toBeCloseTo(66.667, 2)
+    expect(shapeTextInsetsPx('plus', 400, 100)).toEqual({ l: 0, t: 25, r: 0, b: 25 })
+    expect(shapeTextInsetsPx('chevron', 100, 400)).toEqual({ l: 0, t: 0, r: 0, b: 0 })
+  })
+
+  it('roundRect family insets by the corner radius chord', () => {
+    const r = shapeTextInsetsPx('roundRect', 400, 100)!
+    expect(r.l).toBeCloseTo(4.882, 2)
+    expect(shapeTextInsetsPx('round2SameRect', 400, 100)!.b).toBe(0)
   })
 
   it('plain rect has no geometry insets', () => {

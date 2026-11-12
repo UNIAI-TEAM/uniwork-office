@@ -1,10 +1,13 @@
 import { clipText } from '../preview'
 import type { Editor } from '@tiptap/core'
+import JSZip from 'jszip'
 import {
+  applyTrackedChangesXml,
   BLANK_BULLET_NUM_ID,
   BLANK_ORDERED_NUM_ID,
   buildBlankDocx,
   compareDocuments,
+  countTrackedChangesXml,
   findChartWorkbookPath,
   nextNoteId,
   parseChartPartXml,
@@ -25,6 +28,7 @@ import {
   type HfPartInfo,
   type NoteInfo,
   type PropertyChanges,
+  type RevisionXmlFilter,
   type SaveOptions,
   type StyleUpsert,
   type PictureWatermarkSpec,
@@ -138,6 +142,9 @@ interface SideState {
   footnotes: NoteInfo[]
   endnotes: NoteInfo[]
   notesDirty: boolean
+  /** header / footer / footnote / endnote part XML by zip path, loaded on the first accept_changes / reject_changes */
+  revisionParts: Map<string, string> | null
+  revisionPartsDirty: Set<string>
   /** set_properties changes; written into the docProps parts on save */
   properties?: PropertyChanges
   /** block-level content controls to write on save: wrap a range of body blocks in one new control, or unwrap the control with a tag */
@@ -196,6 +203,8 @@ function sideStateOf(parsed: Parsed): SideState {
     footnotes: [...parsed.footnotes],
     endnotes: [...parsed.endnotes],
     notesDirty: false,
+    revisionParts: null,
+    revisionPartsDirty: new Set(),
   }
 }
 
@@ -245,6 +254,9 @@ export async function saveDocument(doc: OpenDocument): Promise<Uint8Array> {
     contentControls: side.contentControls,
     ...(await chartPartPatches(doc, plan.chartPatches)),
   }
+  for (const path of side.revisionPartsDirty) {
+    options.partXml = { ...options.partXml, [path]: side.revisionParts!.get(path)! }
+  }
   return saveDocx(doc.parsed, sectionEdits.saveBlocks, options)
 }
 
@@ -271,6 +283,26 @@ export async function compareDocxFiles(
   const [originalDoc, revisedDoc] = await Promise.all([parseDocx(original), parseDocx(revised)])
   const result = await compareDocuments(originalDoc, revisedDoc, options)
   return { bytes: result.bytes, summary: result.summary }
+}
+
+const REVISION_PART_RE = /^word\/(?:header\d*|footer\d*|footnotes|endnotes)\.xml$/
+
+async function revisionParts(doc: OpenDocument): Promise<Map<string, string>> {
+  if (doc.side.revisionParts) return doc.side.revisionParts
+  const zip = await JSZip.loadAsync(doc.parsed.internal.originalBytes)
+  const parts = new Map<string, string>()
+  for (const [name, entry] of Object.entries(zip.files)) {
+    if (REVISION_PART_RE.test(name) && !entry.dir) parts.set(name, await entry.async('string'))
+  }
+  doc.side.revisionParts = parts
+  return parts
+}
+
+/** tracked changes outside the body (headers, footers, footnotes, endnotes) */
+export async function countRevisionsElsewhere(doc: OpenDocument): Promise<number> {
+  let n = 0
+  for (const xml of (await revisionParts(doc)).values()) n += countTrackedChangesXml(xml)
+  return n
 }
 
 /**
@@ -343,6 +375,57 @@ function setContentControl(
   }
   return {
     output: `wrap blocks ${start}-${end} in a content control${spec.tag ? ` tagged ${spec.tag}` : ''}`,
+  }
+}
+
+/**
+ * accept_changes / reject_changes: the body goes through the editor; the parts it
+ * never loads are rewritten as XML. Positional selectors (ids, blockIndex,
+ * blockRange) address the body only.
+ */
+async function applyRevisionOp(
+  doc: OpenDocument,
+  op: Record<string, unknown>,
+  mode: 'accept' | 'reject',
+): Promise<{ output?: string; error?: string }> {
+  const { op: _op, ...input } = op
+  const ops = doc.mods.revisionOps
+  const sel = ops.validateSelector(input)
+  if ('error' in sel) return { error: sel.error }
+  const bodyOnly = !!sel.ids || sel.blockIndex !== undefined || !!sel.blockRange
+  const body = ops.applyRevisionSelection(doc.editor, sel, mode)
+  let elsewhere = 0
+  if (!bodyOnly) {
+    const filter: RevisionXmlFilter = {
+      ...(sel.author !== undefined ? { author: sel.author } : {}),
+      ...(sel.type !== undefined ? { type: sel.type } : {}),
+      ...(sel.before !== undefined ? { before: sel.before } : {}),
+    }
+    for (const [path, xml] of await revisionParts(doc)) {
+      const r = applyTrackedChangesXml(xml, mode, filter)
+      if (r.xml === xml) continue
+      elsewhere += r.applied
+      doc.side.revisionParts!.set(path, r.xml)
+      doc.side.revisionPartsDirty.add(path)
+    }
+  }
+  if ('error' in body && elsewhere === 0) return { error: body.error }
+  const verb = mode === 'accept' ? 'Accepted' : 'Rejected'
+  const done = 'error' in body ? [] : body.entries
+  const parts: string[] = []
+  if (done.length)
+    parts.push(`${done.length} tracked change(s) (${done.map((e) => e.id).join(', ')})`)
+  if (elsewhere) parts.push(`${elsewhere} in headers, footers and notes`)
+  const left = ops.listRevisionEntries(doc.editor.state.doc)
+  const leftElsewhere = await countRevisionsElsewhere(doc)
+  const still: string[] = []
+  if (left.length) still.push(`Still ${ops.describePending(left)}`)
+  if (leftElsewhere)
+    still.push(
+      `${left.length ? 'and' : 'Still'} ${leftElsewhere} in headers, footers and notes${bodyOnly ? ' (ids address the body; all: true or author / type / before reach them)' : ''}`,
+    )
+  return {
+    output: `${verb} ${parts.join(' and ')}. ${still.length ? `${still.join(' ')}.` : 'No tracked changes remain.'}`,
   }
 }
 
@@ -702,6 +785,10 @@ export async function applyDocOps(
       const r = setContentControl(doc, op, name)
       if (r.error) failed = rejected(r.error)
       else results.push({ index, op: name, output: r.output! })
+    } else if (name === 'accept_changes' || name === 'reject_changes') {
+      const r = await applyRevisionOp(doc, op, name === 'accept_changes' ? 'accept' : 'reject')
+      if (r.error) failed = rejected(r.error)
+      else results.push({ index, op: name, output: r.output! })
     } else {
       const call = HTML_TOOLS.has(name)
         ? { id: `genoffice-${index}`, name, input: htmlToolInput(doc, name, op) }
@@ -759,11 +846,9 @@ function mergePropertyChanges(
 ): PropertyChanges {
   if (!current || next.clear) return next
   const merged: PropertyChanges = { ...current }
-  for (const section of ['core', 'app', 'custom'] as const) {
-    const values = next[section]
-    if (!values) continue
-    merged[section] = { ...(current[section] ?? {}), ...values }
-  }
+  if (next.core) merged.core = { ...(current.core ?? {}), ...next.core }
+  if (next.app) merged.app = { ...(current.app ?? {}), ...next.app }
+  if (next.custom) merged.custom = { ...(current.custom ?? {}), ...next.custom }
   return merged
 }
 
@@ -1432,7 +1517,7 @@ const CONTENT_NOTES: Record<(typeof CONTENT_OPS)[number], string> = {
   reply_comment: 'ids from `genoffice docs read --comments`; replies attach to the thread root',
   resolve_comment: 'ids from `genoffice docs read --comments`',
   accept_changes:
-    'selector: all: true, ids from `genoffice docs read --revisions` (positional, re-read after every edit), or author / type / blockIndex / blockRange / before; insertions become plain text, deleted text goes',
+    'selector: all: true, ids from `genoffice docs read --revisions` (positional, re-read after every edit), or author / type / blockIndex / blockRange / before; insertions become plain text, deleted text goes, moved text stays at its destination; all / author / type / before also cover headers, footers, footnotes and endnotes',
   reject_changes:
     'same selector as accept_changes; inserted text goes, deleted text comes back, formatting reverts',
   insert_footnote:
@@ -1445,7 +1530,7 @@ const CONTENT_NOTES: Record<(typeof CONTENT_OPS)[number], string> = {
   delete_comment:
     'removes the comment and its anchor; a thread root with replies needs withReplies: true, a reply id removes just that reply',
   set_properties:
-    'the document properties of the file: core (title, subject, creator, keywords, description, lastModifiedBy, revision, created, modified, category, contentStatus, identifier, language, version), app (template, totalTime, pages, words, characters, application, docSecurity, lines, paragraphs, scaleCrop, company, linksUpToDate, charactersWithSpaces, sharedDoc, hyperlinksChanged, appVersion, manager) and custom (by name); a string sets the value, null removes the property, clear: "all" empties all three parts; `genoffice docs read --properties` lists the current ones',
+    'the document properties of the file: core (title, subject, creator, keywords, description, lastModifiedBy, revision, created, modified, category, contentStatus, identifier, language, version), app (template, totalTime, pages, words, characters, application, docSecurity, lines, paragraphs, scaleCrop, company, linksUpToDate, charactersWithSpaces, sharedDoc, hyperlinksChanged, appVersion, manager) and custom (by name); a string sets a value, a number or boolean gives a typed custom value (i4/bool; an existing i4/i8/r8/bool/filetime/date property keeps its vt type when the value fits), null removes the property, clear: "all" empties all three parts; `genoffice docs read --properties` lists the current ones with their customTypes',
 }
 
 const AFTER_BLOCK_INDEX =
@@ -1461,10 +1546,16 @@ const INSERT_IMAGE_SCHEMA: JsonSchema = {
   required: ['url'],
 }
 
-/** set_properties: the values of a property part, by key (a string sets, null removes) */
+/** set_properties: the text values of a core/app property, by key (a string sets, null removes) */
 const PROPERTY_VALUES: JsonSchema = {
   type: 'object',
   additionalProperties: { type: ['string', 'null'] },
+}
+
+/** set_properties.custom: text stays lpwstr, a number/boolean keeps or takes a typed vt value */
+const CUSTOM_PROPERTY_VALUES: JsonSchema = {
+  type: 'object',
+  additionalProperties: { type: ['string', 'number', 'boolean', 'null'] },
 }
 
 const SET_PROPERTIES_SCHEMA: JsonSchema = {
@@ -1481,9 +1572,9 @@ const SET_PROPERTIES_SCHEMA: JsonSchema = {
         'extended (app) properties by friendly key (company, template, application, manager, …); a string sets the value, null removes the element',
     },
     custom: {
-      ...PROPERTY_VALUES,
+      ...CUSTOM_PROPERTY_VALUES,
       description:
-        'custom properties by name (MatterId, Reviewer, …); a string sets the value, null removes the property',
+        'custom properties by name (MatterId, Reviewer, …): a string stores vt:lpwstr, a number vt:i4 (or i8/r8 when out of int32), a boolean vt:bool; an existing typed property keeps its vt type when the value fits it (i4/i8/r8/ui*/bool/filetime/date); null removes the property',
     },
     clear: {
       type: 'string',

@@ -193,7 +193,6 @@ describe('printFileViaCups', () => {
     expect(calls).toHaveLength(0)
   })
 })
-
 describe('printOutcome', () => {
   it('a cancel in the interactive dialog is not an error, a silent one is', () => {
     expect(printOutcome(false, 'Print job canceled', false)).toEqual({ ok: false })

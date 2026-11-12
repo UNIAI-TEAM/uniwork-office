@@ -223,4 +223,6 @@ export const cs = {
   aiMindMapReset: 'Obnovit zobrazení',
   aiMindMapExpand: 'Rozbalit větev',
   aiMindMapCollapse: 'Sbalit větev',
+  aiMindMapExportSvg: 'Exportovat SVG',
+  aiMindMapInsert: 'Vložit do dokumentu',
 } satisfies Record<keyof typeof zh, string>

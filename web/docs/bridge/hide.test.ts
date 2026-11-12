@@ -17,6 +17,8 @@ describe('webCapabilities (the single web capability source)', () => {
         'desktopOpen',
         'docPassword',
         'exportHtml',
+        'exportImages',
+        'exportMarkdown',
         'exportPdf',
         'imageGeneration',
         'imageSearch',
@@ -124,6 +126,7 @@ describe('hide stubs behind the hidden desktop-only entries', () => {
     expect(hide.getPathForFile()).toBe('')
     // the off answer of the ai.start handoff (withWebAi replaces it while AI is on)
     expect(await hide.consumeAiPreset()).toBeNull()
+    expect(await hide.getAuthorName()).toBe('')
   })
 
   it('on* subscribers return a disposer', () => {
@@ -133,6 +136,7 @@ describe('hide stubs behind the hidden desktop-only entries', () => {
       'onTeardown',
       'onAutoSaveDefaultChanged',
       'onAiPreset',
+      'onAuthorNameChanged',
     ] as const) {
       const off = hide[key](() => {})
       expect(typeof off).toBe('function')

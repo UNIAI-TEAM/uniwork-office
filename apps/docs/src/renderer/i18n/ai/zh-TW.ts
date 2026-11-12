@@ -210,4 +210,6 @@ export const zhTW = {
   aiMindMapReset: '重設檢視',
   aiMindMapExpand: '展開分支',
   aiMindMapCollapse: '收合分支',
+  aiMindMapExportSvg: '匯出 SVG',
+  aiMindMapInsert: '插入文件',
 } satisfies Record<keyof typeof zh, string>

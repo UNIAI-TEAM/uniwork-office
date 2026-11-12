@@ -208,4 +208,6 @@ export const zh = {
   aiMindMapReset: '重置视图',
   aiMindMapExpand: '展开分支',
   aiMindMapCollapse: '折叠分支',
+  aiMindMapExportSvg: '导出 SVG',
+  aiMindMapInsert: '插入文档',
 }

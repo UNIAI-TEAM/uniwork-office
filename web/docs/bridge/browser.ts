@@ -630,6 +630,7 @@ const browser = {
   },
 
   fontMetrics: () => Promise.resolve(null),
+  fontAliases: () => Promise.resolve({}),
 } satisfies Partial<DesktopApi>
 
 // apply the stored theme before the renderer mounts (main.tsx re-applies it identically)

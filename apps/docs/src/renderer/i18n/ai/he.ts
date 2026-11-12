@@ -215,4 +215,6 @@ export const he = {
   aiMindMapReset: 'איפוס תצוגה',
   aiMindMapExpand: 'הרחב ענף',
   aiMindMapCollapse: 'כווץ ענף',
+  aiMindMapExportSvg: 'ייצוא SVG',
+  aiMindMapInsert: 'הוספה למסמך',
 } satisfies Record<keyof typeof zh, string>

@@ -218,4 +218,6 @@ export const ko = {
   aiMindMapReset: '보기 초기화',
   aiMindMapExpand: '가지 펼치기',
   aiMindMapCollapse: '가지 접기',
+  aiMindMapExportSvg: 'SVG 내보내기',
+  aiMindMapInsert: '문서에 삽입',
 } satisfies Record<keyof typeof zh, string>

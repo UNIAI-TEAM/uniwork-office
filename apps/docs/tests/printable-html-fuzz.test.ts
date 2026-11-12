@@ -152,37 +152,30 @@ async function roundTrip(
 const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim()
 
 describe('seeded docx -> editor text -> printable HTML fuzz', () => {
-  // Fails today at seed 5 (`source paragraphs: expected 3 to be greater than 3`); the loop stops
-  // at the first failing seed. Fixed by lane office-port-docs-s1 (UNI-2516): genoffice 61c02412b
-  // vMerge fix (not diagnosed further). Remove `.fails` once that lands.
-  it.fails(
-    'a healthy document keeps its anchor and visible text through the sanitizer',
-    async () => {
-      for (let seed = 1; seed <= SEEDS; seed++) {
-        const { html, text, source } = await roundTrip(await buildFuzzDocx(seed), `seed ${seed}`)
-        expect(text, `seed ${seed} anchor in PDF`).toContain(anchorText(seed))
-        // Guard against an empty generator turning the fidelity checks into no-ops.
-        expect(source.length, `seed ${seed} source paragraphs`).toBeGreaterThan(3)
-        // The sanitizer keeps every paragraph's text, including CJK literals. The
-        // comparison is with the editor's own text: comparing the printed HTML
-        // with the HTML it was decoded from could never fail.
-        for (const paragraph of source.slice(0, 20)) {
-          const probe = paragraph.slice(0, 24)
-          if (probe.length < 4) continue
-          expect(html, `seed ${seed} sanitized HTML`).toContain(escapeHtml(probe))
-        }
-        // ASCII prose is what a WinAnsi PDF font can carry; assert a sample of it
-        // survived the PDF boundary as well.
-        const ascii = source
-          .map((line) => line.replace(/[^\x20-\x7e]/g, ' '))
-          .map(normalise)
-          .filter((line) => /^[A-Za-z0-9 ,.:_-]{12,}$/.test(line))
-        expect(ascii.length, `seed ${seed} ASCII prose to read back`).toBeGreaterThan(0)
-        for (const line of ascii.slice(0, 5)) {
-          expect(text, `seed ${seed} printed line`).toContain(line.slice(0, 24))
-        }
+  it('a healthy document keeps its anchor and visible text through the sanitizer', async () => {
+    for (let seed = 1; seed <= SEEDS; seed++) {
+      const { html, text, source } = await roundTrip(await buildFuzzDocx(seed), `seed ${seed}`)
+      expect(text, `seed ${seed} anchor in PDF`).toContain(anchorText(seed))
+      // Guard against an empty generator turning the fidelity checks into no-ops.
+      expect(source.length, `seed ${seed} source paragraphs`).toBeGreaterThan(3)
+      // The sanitizer keeps every paragraph's text, including CJK literals. The
+      // comparison is with the editor's own text: comparing the printed HTML
+      // with the HTML it was decoded from could never fail.
+      for (const paragraph of source.slice(0, 20)) {
+        const probe = paragraph.slice(0, 24)
+        if (probe.length < 4) continue
+        expect(html, `seed ${seed} sanitized HTML`).toContain(escapeHtml(probe))
       }
-    },
-    60000,
-  )
+      // ASCII prose is what a WinAnsi PDF font can carry; assert a sample of it
+      // survived the PDF boundary as well.
+      const ascii = source
+        .map((line) => line.replace(/[^\x20-\x7e]/g, ' '))
+        .map(normalise)
+        .filter((line) => /^[A-Za-z0-9 ,.:_-]{12,}$/.test(line))
+      expect(ascii.length, `seed ${seed} ASCII prose to read back`).toBeGreaterThan(0)
+      for (const line of ascii.slice(0, 5)) {
+        expect(text, `seed ${seed} printed line`).toContain(line.slice(0, 24))
+      }
+    }
+  }, 60000)
 })

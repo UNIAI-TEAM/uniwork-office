@@ -51,12 +51,13 @@ export const GLOBAL_EXCLUDE = [
 // stored-document markers. `GenOffice` followed by one of these is not the
 // product name.
 const FONT_ALIAS =
-  'PUA|Grid|Sans|Serif|Gothic|Che|Poppins|Tamil|Fullwidth|Songti|Hiragino|MS|Batang|Myungjo|Heiti|MingLiU|Ethiopic|Box|UI|Hangul|DM|SimSun|YaHei'
+  'PUA|Grid|Sans|Serif|Gothic|Che|Poppins|Tamil|Fullwidth|Songti|Hiragino|MS|Batang|Myungjo|Heiti|MingLiU|Ethiopic|Bengali|Balanced|Cordia|Sarabun|Box|UI|Hangul|DM|SimSun|YaHei'
 const DATA_MARKER = 'visual'
 
 export const NON_BRAND_TOKENS = [
   new RegExp(`GenOffice\\s+(?:${FONT_ALIAS}|${DATA_MARKER})\\b`, 'g'),
-  /GenOffice\s+\[/g, // font-alias matcher regex source
+  /GenOffice\s+[[(]/g, // font-alias matcher regex source
+  /\^GenOffice\s/g, // font-alias prefix regex source
   /webSearch\('GenOffice'/g, // search connectivity probe query
   /[A-Za-z0-9_]GenOffice|GenOffice[A-Za-z0-9_]/g,
   /[A-Za-z0-9_]Genspark|Genspark[A-Z0-9_]/g,
@@ -317,7 +318,7 @@ export function dropStringKeys(keys) {
 }
 
 const PRODUCT_NAME = new RegExp(
-  `(?<![A-Za-z0-9_@])GenOffice(?![A-Za-z0-9_])(?!-(?![A-Z]))(?!\\s+(?:${FONT_ALIAS}|${DATA_MARKER})\\b)`,
+  `(?<![A-Za-z0-9_@^])GenOffice(?![A-Za-z0-9_])(?!-(?![A-Z]))(?!\\s+(?:${FONT_ALIAS}|${DATA_MARKER})\\b)`,
   'g',
 )
 

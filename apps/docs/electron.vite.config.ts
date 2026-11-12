@@ -15,6 +15,15 @@ const localAlias = {
     '../../packages/docx-engine/src/zip-splice.ts',
   ),
   '@genoffice/docx-engine': resolve(__dirname, '../../packages/docx-engine/src/index.ts'),
+  '@genoffice/font-metrics/resolve': resolve(
+    __dirname,
+    '../../packages/font-metrics/src/resolve.ts',
+  ),
+  '@genoffice/font-metrics/word-faces.json': resolve(
+    __dirname,
+    '../../packages/font-metrics/word-faces.json',
+  ),
+  '@genoffice/font-metrics': resolve(__dirname, '../../packages/font-metrics/src/index.ts'),
   '@genoffice/shortcuts': resolve(__dirname, '../../packages/shortcuts/src/index.ts'),
 }
 
@@ -32,6 +41,7 @@ export default defineConfig({
           '@genoffice/electron-utils',
           '@genoffice/font-metrics',
           '@genoffice/shortcuts',
+          '@genoffice/pptx-render',
           '@genoffice/xlsx-gateway',
         ],
       }),

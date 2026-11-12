@@ -100,6 +100,7 @@ type FakeWc = ReturnType<typeof fakeWc>
 
 const hook = vi.fn()
 const bound = new Set<string>()
+const locked = new Set<string>()
 
 function call<T = { ok: boolean }>(name: string, wc: FakeWc, ...args: unknown[]): Promise<T> {
   return Promise.resolve(handlers.get(name)!({ sender: wc }, ...args)) as Promise<T>
@@ -121,7 +122,12 @@ describe('docs:export-pdf on a DOCX', () => {
     bound.clear()
     showSaveDialog.mockReset()
     setDocsUserSaveHook(hook)
-    setUniworkDocumentPolicy({ isBound: (p) => bound.has(p), isReadOnly: () => false })
+    locked.clear()
+    setUniworkDocumentPolicy({
+      isBound: (p) => bound.has(p),
+      isReadOnly: () => false,
+      isLocked: (p) => locked.has(p),
+    })
   })
   afterEach(() => {
     setUniworkDocumentPolicy(null)
@@ -199,6 +205,43 @@ describe('docs:export-pdf on a DOCX', () => {
     expect(r.ok).toBe(false)
     expect(r.error).toContain('boom')
     expect(existsSync(out)).toBe(false)
+  })
+
+  it('docs:export-markdown on a locked/refusing working copy returns { ok: false } and writes nothing (FE-W1-03)', async () => {
+    const wc = fakeWc([])
+    const docx = openBoundDoc(wc)
+    await call('docs:open-path', wc, docx)
+    locked.add(docx)
+    const out = join(dir, 'report.md')
+    showSaveDialog.mockResolvedValue({ canceled: false, filePath: out })
+    const r = await call<{ ok: boolean; path?: string }>(
+      'docs:export-markdown',
+      wc,
+      'report.docx',
+      '# Confidential\n\nBody text\n',
+      [],
+    )
+    expect(r).toEqual({ ok: false })
+    expect(showSaveDialog).not.toHaveBeenCalled()
+    expect(existsSync(out)).toBe(false)
+    expect(readFileSync(docx, 'utf8')).toBe('docx-bytes')
+  })
+
+  it('docs:export-markdown normalizes a typed .docx name to .md so it never overwrites the open .docx (FE-W1-03)', async () => {
+    const wc = fakeWc([])
+    const docx = openBoundDoc(wc)
+    showSaveDialog.mockResolvedValue({ canceled: false, filePath: docx })
+    const r = await call<{ ok: boolean; path?: string }>(
+      'docs:export-markdown',
+      wc,
+      'report.docx',
+      '# Heading\n',
+      [],
+    )
+    const md = docx.replace(/\.docx$/, '.md')
+    expect(r).toMatchObject({ ok: true, path: md })
+    expect(readFileSync(docx, 'utf8')).toBe('docx-bytes')
+    expect(readFileSync(md, 'utf8')).toBe('# Heading\n')
   })
 })
 

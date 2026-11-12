@@ -221,4 +221,6 @@ export const hi = {
   aiMindMapReset: 'दृश्य रीसेट करें',
   aiMindMapExpand: 'शाखा खोलें',
   aiMindMapCollapse: 'शाखा समेटें',
+  aiMindMapExportSvg: 'SVG निर्यात करें',
+  aiMindMapInsert: 'दस्तावेज़ में डालें',
 } satisfies Record<keyof typeof zh, string>

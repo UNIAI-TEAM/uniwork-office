@@ -50,6 +50,7 @@ export { installScreenTips } from './screentip'
 export {
   installPopoverDismiss,
   useDismissablePopover,
+  useEscapeToClose,
   type PopoverDismissOptions,
 } from './popover-dismiss'
 export { Dropdown, type DropdownOption } from './dropdown'
@@ -220,3 +221,5 @@ export {
   askUniText,
   type AskUniStringKey,
 } from './strings-ask-uni'
+export { useScrollWindow } from './scroll-window'
+export { createImeEnterGuard, useImeEnterGuard, type ImeEnterGuard } from './ime-enter'

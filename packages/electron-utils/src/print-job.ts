@@ -1,5 +1,4 @@
 import { isValidOptionName, isValidOptionValue } from './printer-options'
-
 export type PrintDuplex = 'simplex' | 'longEdge' | 'shortEdge'
 
 /** per-job options chosen in an in-app print dialog; deviceName null = system dialog */

@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { parseDocx, readSections, type Block, type TableModel } from '@genoffice/docx-engine'
+import {
+  parseDocx,
+  readSections,
+  type Block,
+  type TableCell,
+  type TableModel,
+} from '@genoffice/docx-engine'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
 import {
   blocksToPmDoc,
   clampTableColWidths,
+  distributeContentAutofit,
   expandAutofitColWidths,
   legacyIndentTable,
   tableModelToPmNode,
@@ -118,18 +125,18 @@ describe('expandAutofitColWidths', () => {
     expect(model.colWidthsTwips).toEqual([567, 4000])
   })
 
-  it('takes real advances from an injected metrics provider with rounding slack only', () => {
+  it('takes real advances from an injected metrics provider, aligned to the px grid', () => {
     const model: TableModel = {
       rows: [[cell(ARABIC_HEADER), cell('ok')]],
       colWidthsTwips: [567, 4000],
       autoLayout: true,
     }
-    // a measured 20px word + 2px edge: ceil(22 x 1.02 x 15) + 216 = 553 twips fits the declared 567
+    // a measured 20px word + 14.4px margins = 34.4 -> 35 px = 525 twips fits the declared 567
     const narrow = { measure: () => 20, metrics: () => ({ ascent: 0, descent: 0, lineHeight: 0 }) }
     expect(expandAutofitColWidths(model, 10772, 9638, narrow)).toBe(model)
-    // a measured 40px word needs ceil(42 x 1.02 x 15) + 216 = 859 twips, not the 1.08 heuristic floor
+    // a measured 40px word needs 55 px = 825 twips, not the 1.08 heuristic floor
     const wide = { ...narrow, measure: () => 40 }
-    expect(expandAutofitColWidths(model, 10772, 9638, wide).colWidthsTwips![0]).toBe(859)
+    expect(expandAutofitColWidths(model, 10772, 9638, wide).colWidthsTwips![0]).toBe(825)
   })
 
   it('leaves fixed-layout tables and already-wide autofit columns alone', () => {
@@ -171,8 +178,8 @@ describe('expandAutofitColWidths', () => {
     }
     const expanded = expandAutofitColWidths(model, 10772, 9638, metrics)
     const widths = expanded.colWidthsTwips!
-    // ceil((199 + 2) x 1.02 x 15) + 79 = 3155
-    expect(widths[1]).toBe(3155)
+    // ceil(199 + 79 / 15) = 205 px = 3075
+    expect(widths[1]).toBe(3075)
     expect(widths[0]).toBeLessThan(2835)
     expect(widths[2]).toBeLessThan(2835)
     expect(widths.reduce((a, b) => a + b, 0)).toBe(9642)
@@ -256,15 +263,16 @@ describe('expandAutofitColWidths', () => {
 
   it('a grid Word laid out grows a column only past a bare word overflow', () => {
     // Word saved 1132 twips for a column whose widest word it measured at 60px:
-    // 60 x 15 + 216 margins = 1116 fits; the 2px edge + 2% slack that guards
-    // generator grids would push it to 1165 and wrap the header one line more
+    // 60 x 15 + 216 margins = 1116 fits on the px grid too (75 px = 1125), so neither a
+    // generator grid nor Word's own grid grows (a 2 px edge used to push it to 1146
+    // and wrap the header one line more)
     const model: TableModel = {
       rows: [[cell('MLA-01'), cell('Issuance of Official Conclave Notification')]],
       colWidthsTwips: [1132, 3223],
       autoLayout: true,
     }
     const metrics = { measure: () => 60, metrics: () => ({ ascent: 0, descent: 0, lineHeight: 0 }) }
-    expect(expandAutofitColWidths(model, 10466, 8550, metrics).colWidthsTwips![0]).toBe(1165)
+    expect(expandAutofitColWidths(model, 10466, 8550, metrics).colWidthsTwips![0]).toBe(1132)
     const laidOut = { ...model, layoutGrid: true }
     expect(expandAutofitColWidths(laidOut, 10466, 8550, metrics)).toBe(laidOut)
     // a word that really overflows still widens the column (fallback font much wider)
@@ -327,13 +335,15 @@ describe('expandAutofitColWidths', () => {
     )
     expect(Math.abs(sum(legacyAuto.colWidthsTwips!) - 9956)).toBeLessThanOrEqual(2)
     // past the paper edge a left-aligned table still holds its widths (Word draws a
-    // 531 pt grid on a 451 pt column 8 pt past the paper edge and clips it); a
-    // centred one still compresses to the column
+    // 531 pt grid on a 451 pt column 8 pt past the paper edge and clips it); so do
+    // centred and right-aligned ones (probe 2026-10-29: centred on the margin box /
+    // pinned to the right margin, clipped by the paper)
     const wide: TableModel = { ...model, colWidthsTwips: [603, 1807, 1276, 1418, 1842, 4600] }
     expect(expandAutofitColWidths(wide, 10466, 9026)).toBe(wide)
     const centred: TableModel = { ...wide, indentTwips: undefined, align: 'center' }
-    const centredTotal = expandAutofitColWidths(centred, 10466, 9026).colWidthsTwips!
-    expect(Math.abs(sum(centredTotal) - 9026)).toBeLessThanOrEqual(2)
+    expect(expandAutofitColWidths(centred, 11906, 9026)).toBe(centred)
+    const right: TableModel = { ...centred, align: 'right' }
+    expect(expandAutofitColWidths(right, 10466, 9026)).toBe(right)
   })
 
   it('leaves a full-width pct table alone even when its indent pushes it past the column', () => {
@@ -664,13 +674,13 @@ describe('renderTableSpec width budget', () => {
 })
 
 describe('nested table width solving', () => {
-  // 8px per character, so 'w' x 20 + 2px edge = 162px -> ceil(162 x 1.02 x 15) + 216 = 2695 twips
+  // 8px per character, so 'w' x 20 = 160px + 14.4px margins -> 175 px = 2625 twips
   const perChar = {
     measure: (t: string) => t.length * 8,
     metrics: () => ({ ascent: 0, descent: 0, lineHeight: 0 }),
   }
-  const LONG = 2695
-  const X = Math.ceil(10 * 1.02 * 15) + 216
+  const LONG = 15 * Math.ceil(20 * 8 + 216 / 15)
+  const X = 15 * Math.ceil(8 + 216 / 15)
   const deep: TableModel = {
     rows: [[cell('w'.repeat(20)), cell('x')]],
     colWidthsTwips: [335, 335],
@@ -992,5 +1002,111 @@ describe('min-content follows the document default run', () => {
     // 15 chars x 0.5 x 14.67px = 110px -> 1650 + 216 twips; at 16px -> 1800 + 216
     expect(at11.colWidthsTwips![0]).toBe(Math.ceil(15 * 0.5 * (22 / 2) * (96 / 72) * 15) + 216)
     expect(at12.colWidthsTwips![0]).toBe(15 * 0.5 * 16 * 15 + 216)
+  })
+})
+
+describe('distributeContentAutofit', () => {
+  // Word probe 2026-10-20 (A4, TNR 12, cell margins 108, pct tables without tcW,
+  // column 9014 twips between border centres); min/max-content in twips incl. margins
+  it('under the max-content sum: min-content plus the room split by (max - min)', () => {
+    // three long/long/short paragraphs -> Word 3792/3322/1900
+    const widths = distributeContentAutofit(9014, [1302, 1349, 1429], [13079, 10699, 3715])
+    expect(widths).toEqual([3784, 3319, 1911])
+    // a one-word column stays at its word -> Word 1042/4272/3700
+    expect(distributeContentAutofit(9014, [1042, 1302, 1349], [1042, 13079, 10699])).toEqual([
+      1042, 4268, 3704,
+    ])
+  })
+
+  it('over the max-content sum: the extra is shared in proportion to max-content', () => {
+    // Word 740/2744/5530
+    const widths = distributeContentAutofit(9014, [389, 1029, 1189], [389, 1509, 2982])
+    expect(widths).toEqual([719, 2787, 5508])
+  })
+
+  it('below the min-content sum: min-contents scale down together', () => {
+    expect(distributeContentAutofit(1000, [1000, 1000], [2000, 3000])).toEqual([500, 500])
+  })
+})
+
+describe('expandAutofitColWidths content autofit', () => {
+  it('a tcW-less pct table ignores its placeholder grid and sizes columns by content', () => {
+    // every glyph 10px wide: "Domaine" 70px, the sentence 600px (past the column)
+    const metrics = {
+      measure: (text: string) => text.length * 10,
+      metrics: () => ({ ascent: 0, descent: 0, lineHeight: 0 }),
+    }
+    const sentence = 'Passee de 1,247 milliard (janvier 2026) a 1,166 milliard (sept.)'
+    const model: TableModel = {
+      rows: [[cell('Domaine'), cell(sentence.slice(0, 60))]],
+      colWidthsTwips: [3960, 3960],
+      colWidthsPct: [50, 50],
+      widthPct: 100,
+      autoLayout: true,
+      contentAutofit: true,
+    }
+    const expanded = expandAutofitColWidths(model, 9026, 9026, metrics)
+    const [w1, w2] = expanded.colWidthsTwips!
+    expect(w1 + w2).toBe(9026)
+    // col1 = its word (ceil(70 + 14.4) = 85 px = 1275) plus nothing: the
+    // sentence's slack takes all the room since the short cell has none
+    expect(w1).toBe(1275)
+    expect(expanded.widthPct).toBeUndefined()
+    // without the flag the grid still rules
+    const plain = { ...model, contentAutofit: undefined }
+    expect(expandAutofitColWidths(plain, 9026, 9026, metrics)).toBe(plain)
+  })
+
+  it('an inline picture counts as an unbreakable unit of its own width', () => {
+    const metrics = {
+      measure: (text: string) => text.length * 10,
+      metrics: () => ({ ascent: 0, descent: 0, lineHeight: 0 }),
+    }
+    const sentence = 'Passee de 1,247 milliard (janvier 2026) a 1,166 milliard (sept.)'
+    const picture: TableCell = {
+      paras: [''],
+      richParas: [
+        {
+          runs: [{ text: '', image: { dataUrl: 'data:,', xml: '', widthPx: 200, heightPx: 100 } }],
+        },
+      ],
+    }
+    const model: TableModel = {
+      rows: [[picture, cell(sentence.slice(0, 60))]],
+      colWidthsTwips: [3960, 3960],
+      colWidthsPct: [50, 50],
+      widthPct: 100,
+      autoLayout: true,
+      contentAutofit: true,
+    }
+    const [w1, w2] = expandAutofitColWidths(model, 9026, 9026, metrics).colWidthsTwips!
+    expect(w1 + w2).toBe(9026)
+    // ceil(200 + 14.4) = 215 px = 3225: the picture column never collapses
+    expect(w1).toBe(3225)
+    // a floating picture takes no cell width
+    const floating: TableModel = {
+      ...model,
+      rows: [
+        [
+          {
+            paras: [''],
+            richParas: [
+              {
+                runs: [
+                  {
+                    text: '',
+                    image: { dataUrl: 'data:,', xml: '', widthPx: 200, wrap: 'square-left' },
+                  },
+                ],
+              },
+            ],
+          },
+          cell(sentence.slice(0, 60)),
+        ],
+      ],
+    }
+    expect(expandAutofitColWidths(floating, 9026, 9026, metrics).colWidthsTwips![0]).toBeLessThan(
+      3307,
+    )
   })
 })

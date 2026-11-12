@@ -227,4 +227,6 @@ export const de = {
   aiMindMapReset: 'Ansicht zurücksetzen',
   aiMindMapExpand: 'Zweig ausklappen',
   aiMindMapCollapse: 'Zweig einklappen',
+  aiMindMapExportSvg: 'SVG exportieren',
+  aiMindMapInsert: 'In Dokument einfügen',
 } satisfies Record<keyof typeof zh, string>

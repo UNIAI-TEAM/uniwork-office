@@ -221,4 +221,6 @@ export const id = {
   aiMindMapReset: 'Setel ulang tampilan',
   aiMindMapExpand: 'Bentangkan cabang',
   aiMindMapCollapse: 'Lipat cabang',
+  aiMindMapExportSvg: 'Ekspor SVG',
+  aiMindMapInsert: 'Sisipkan ke dokumen',
 } satisfies Record<keyof typeof zh, string>

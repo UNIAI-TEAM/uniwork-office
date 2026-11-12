@@ -34,10 +34,14 @@ function strAttr(tag: string, name: string): string | undefined {
   return new RegExp(`${name}\\s*=\\s*["']([^"']*)["']`).exec(tag)?.[1]
 }
 
-/** Integer attribute of a tag; XML allows either quote style, so match both. */
+/**
+ * Integer attribute of a tag; XML allows either quote style, so match both.
+ * Fractional twips (converter output like w:left="1987.1997") round like the
+ * paragraph spacing/indent readers do instead of dropping to the default.
+ */
 function intAttr(tag: string, name: string, fallback: number): number {
-  const m = new RegExp(`${name}=["'](-?\\d+)["']`).exec(tag)
-  const v = m ? parseInt(m[1], 10) : NaN
+  const m = new RegExp(`${name}=["'](-?\\d+(?:\\.\\d+)?)["']`).exec(tag)
+  const v = m ? Math.round(parseFloat(m[1])) : NaN
   return Number.isFinite(v) ? v : fallback
 }
 
@@ -56,8 +60,13 @@ function hasVisiblePageBorder(xml: string): boolean {
   })
 }
 
+function onOffAttr(tag: string, attr: string): boolean {
+  const v = strAttr(tag, attr)
+  return v === '1' || v === 'true' || v === 'on'
+}
+
 /** ST_Border line styles; every other w:val is an art (bitmap) border. */
-const LINE_BORDER_VALS = new Set([
+export const LINE_BORDER_VALS = new Set([
   'single',
   'thick',
   'double',
@@ -110,6 +119,8 @@ function pageBorderPropsOf(xml: string): SectionSettings['pageBorderProps'] {
       spacePt: intAttr(side, 'w:space', 0),
       ...(sideColor ? { color: sideColor } : {}),
       ...(art ? { art } : {}),
+      ...(onOffAttr(side, 'w:shadow') ? { shadow: true } : {}),
+      ...(onOffAttr(side, 'w:frame') ? { frame: true } : {}),
     }
     spacePt = Math.max(spacePt, intAttr(side, 'w:space', 0))
     widthPt = Math.max(widthPt, sides[name]!.widthPt)
@@ -153,7 +164,7 @@ export function sectionSettingsFromXml(
   // element, so matching its start tag covers both the self-closing and the paired
   // spelling, and either attribute quote style
   const colsElement = /<w:cols[^>]*>[\s\S]*?<\/w:cols>/.exec(xml)?.[0]
-  const colWidths = (colsElement?.match(/<w:col [^>]*w:w=["']\d+["'][^>]*>/g) ?? [])
+  const colWidths = (colsElement?.match(/<w:col [^>]*w:w=["'][\d.]+["'][^>]*>/g) ?? [])
     .map((tag) => intAttr(tag, 'w:w', 0))
     .filter((w) => w > 0)
 
@@ -409,6 +420,51 @@ export function readSections(parsed: ParsedDoc): SectionInfo[] {
   return sections
 }
 
+/**
+ * A kept w:cols element whose values were loaded fractional: round them in
+ * place so the saved markup is schema-valid without touching its structure.
+ */
+function roundColsInPlace(xml: string, cols: string): string {
+  const rounded = cols.replace(
+    / w:(num|space|w)="(\d+\.\d+)"/g,
+    (_m, name: string, v: string) => ` w:${name}="${Math.round(parseFloat(v))}"`,
+  )
+  return rounded === cols ? xml : xml.replace(cols, rounded)
+}
+
+/**
+ * w:pgBorders for pageBorderProps. Without props the legacy single-line box
+ * (½ pt, 24 pt from the page edge) is written; props with no sides yield ''.
+ */
+export function pageBordersXml(props: SectionSettings['pageBorderProps']): string {
+  const sides = props?.sides
+  if (props && !(sides && Object.keys(sides).length > 0)) return ''
+  if (!props || !sides) {
+    const side = (name: string) =>
+      `<w:${name} w:val="single" w:sz="4" w:space="24" w:color="auto"/>`
+    return (
+      '<w:pgBorders w:offsetFrom="page">' +
+      `${side('top')}${side('left')}${side('bottom')}${side('right')}` +
+      '</w:pgBorders>'
+    )
+  }
+  let out = '<w:pgBorders'
+  if (props.zOrder === 'back') out += ' w:zOrder="back"'
+  if (props.display) out += ` w:display="${props.display}"`
+  out += ` w:offsetFrom="${props.offsetFrom ?? 'text'}">`
+  for (const name of ['top', 'left', 'bottom', 'right'] as const) {
+    const side = sides[name]
+    if (!side) continue
+    const sz = side.art ? Math.round(side.widthPt) : Math.round(side.widthPt * 8)
+    out += `<w:${name} w:val="${side.val}" w:sz="${sz}" w:space="${Math.round(side.spacePt)}"`
+    out += ` w:color="${side.color ?? 'auto'}"`
+    if (side.shadow) out += ' w:shadow="1"'
+    if (side.frame) out += ' w:frame="1"'
+    out += '/>'
+  }
+  return out + '</w:pgBorders>'
+}
+
 /** Rewrite pgSz / pgMar inside a w:sectPr XML slice, preserving everything else. */
 export function applySectionSettings(sectPrXml: string, settings: SectionSettings): string {
   const orient = settings.orientation === 'landscape' ? ' w:orient="landscape"' : ''
@@ -421,7 +477,7 @@ export function applySectionSettings(sectPrXml: string, settings: SectionSetting
   }
   const replaceMarAttr = (tag: string, name: string, value: number): string => {
     if (new RegExp(`${name}="`).test(tag)) {
-      return tag.replace(new RegExp(`${name}="-?\\d+"`), `${name}="${value}"`)
+      return tag.replace(new RegExp(`${name}="-?[\\d.]+"`), `${name}="${value}"`)
     }
     return tag.replace(/\/>$/, ` ${name}="${value}"/>`)
   }
@@ -458,17 +514,11 @@ export function applySectionSettings(sectPrXml: string, settings: SectionSetting
     xml = xml.replace(/<\/w:sectPr>/, `${pgMar}</w:sectPr>`)
   }
 
-  // page border: single-line box measured from the page edge (pgBorders sits
-  // between pgMar and cols in CT_SectPr)
+  // page border (pgBorders sits between pgMar and cols in CT_SectPr)
   xml = xml.replace(/<w:pgBorders[^>]*\/>|<w:pgBorders[\s\S]*?<\/w:pgBorders>/, '')
   if (settings.pageBorder) {
-    const side = (name: string) =>
-      `<w:${name} w:val="single" w:sz="4" w:space="24" w:color="auto"/>`
-    const pgBorders =
-      '<w:pgBorders w:offsetFrom="page">' +
-      `${side('top')}${side('left')}${side('bottom')}${side('right')}` +
-      '</w:pgBorders>'
-    xml = xml.replace(/(<w:pgMar[^>]*\/>)/, `$1${pgBorders}`)
+    const pgBorders = pageBordersXml(settings.pageBorderProps)
+    if (pgBorders) xml = xml.replace(/(<w:pgMar[^>]*\/>)/, `$1${pgBorders}`)
   }
 
   // columns (w:cols may be self-closing or carry explicit <w:col> children)
@@ -486,7 +536,7 @@ export function applySectionSettings(sectPrXml: string, settings: SectionSetting
   ) {
     // explicit unequal widths: rebuild the element (opt-in via colWidths) —
     // unless the document already carries exactly these values (round-trip)
-    const currentWidths = (colsMatch?.[0].match(/<w:col [^>]*w:w=["']\d+["'][^>]*>/g) ?? []).map(
+    const currentWidths = (colsMatch?.[0].match(/<w:col [^>]*w:w=["'][\d.]+["'][^>]*>/g) ?? []).map(
       (t) => intAttr(t, 'w:w', 0),
     )
     const unchanged =
@@ -505,23 +555,27 @@ export function applySectionSettings(sectPrXml: string, settings: SectionSetting
         .join('')
       const tag = `<w:cols${numAttr} w:space="${space}" w:equalWidth="0">${children}</w:cols>`
       xml = colsMatch ? xml.replace(colsMatch[0], tag) : colsAnchor(tag)
+    } else if (colsMatch) {
+      xml = roundColsInPlace(xml, colsMatch[0])
     }
   } else if (colsMatch) {
     const openTag = /^<w:cols[^>]*>/.exec(colsMatch[0])?.[0] ?? colsMatch[0]
     const selfClosing = colsMatch[0].endsWith('/>')
-    const currentNum = / w:num="(\d+)"/.exec(openTag)?.[1] ?? '1'
+    const currentNum = String(intAttr(openTag, 'w:num', 1))
     if (selfClosing || currentNum !== String(settings.columns)) {
       // explicit per-column widths only stay valid while the count is unchanged
-      let tag = openTag.replace(/ w:num="\d+"/, '').replace(/\/?>$/, '/>')
+      let tag = openTag.replace(/ w:num="[\d.]+"/, '').replace(/\/?>$/, '/>')
       if (numAttr) tag = tag.replace(/^<w:cols/, `<w:cols${numAttr}`)
       // honor an explicitly different column gap (720 = OOXML default); equal
       // values leave the tag byte-identical for round-trip safety
       if (settings.colSpace !== undefined && settings.colSpace !== intAttr(tag, 'w:space', 720)) {
-        tag = / w:space="\d+"/.test(tag)
-          ? tag.replace(/ w:space="\d+"/, ` w:space="${settings.colSpace}"`)
+        tag = / w:space="[\d.]+"/.test(tag)
+          ? tag.replace(/ w:space="[\d.]+"/, ` w:space="${settings.colSpace}"`)
           : tag.replace(/\/>$/, ` w:space="${settings.colSpace}"/>`)
       }
       xml = xml.replace(colsMatch[0], tag)
+    } else {
+      xml = roundColsInPlace(xml, colsMatch[0])
     }
   } else if (numAttr) {
     xml = colsAnchor(`<w:cols${numAttr} w:space="${settings.colSpace ?? 425}"/>`)

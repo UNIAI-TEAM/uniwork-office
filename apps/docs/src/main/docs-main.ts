@@ -90,7 +90,11 @@ import {
 import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
 import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-cloud-status'
-import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
+import {
+  configureMetricsCache,
+  familyAliases,
+  familyVerticalMetrics,
+} from '@genoffice/font-metrics'
 import { createI18n, getUiLang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore, type PracticeId } from '@genoffice/project-store'
 import type {
@@ -140,11 +144,12 @@ import type {
   OpenDocxResult,
   SpellLanguages,
 } from '../shared/ipc'
-import { ATTACHMENT_IMAGE_EXTS } from '../shared/ipc'
+import { ATTACHMENT_IMAGE_EXTS, MARKDOWN_MEDIA_DIR_TOKEN, type MarkdownImage } from '../shared/ipc'
 import { MERGE_DATA_SOURCE_EXTENSIONS, readMergeDataSource } from './merge-data-source'
 import { mergeOutputFileName, mergeOutputPath } from './merge-output'
 import { ClickClaims } from '../shared/context-menu-claims'
 import { docsMenuAccelerator, type DocsMenuShortcut } from '../shared/docs-shortcuts'
+import { SAVE_AS_EXPORT_FILTERS, saveAsExportFormat } from '../shared/save-as-format'
 import { findDocxPath } from '../shared/open-file'
 import { atomicWriteFile, looksLikeZip } from './atomic-write'
 import {
@@ -181,10 +186,17 @@ import { copyImageDisplaySize, validCopyImageDataUrl } from './copy-image-guard'
 import {
   hasNoPrinter,
   htmlExportPath,
+  markdownExportPath,
   pdfExportPath,
+  printJobOptions,
+  printPaperOption,
   printScaleOption,
   validPrintGeometry,
+  validPrintPaper,
 } from './print-args'
+import { printPdfViaCups } from '@genoffice/electron-utils/print-cups'
+import { printOutcome } from '@genoffice/electron-utils/print-job'
+import { addPdfInternalLinks } from './pdf-links'
 import {
   assignStarredGroup,
   dropStarredItems,
@@ -235,6 +247,7 @@ const tMain = createI18n({
     filterAll: '所有文件',
     dlgExportPdf: '导出为 PDF',
     dlgExportHtml: '导出为 HTML',
+    dlgExportMarkdown: '导出为 Markdown',
     dlgPickExportDir: '选择导出目录',
     errUnsupportedExt: '暂不支持 .{ext} 类型',
     errNotFile: '不是文件',
@@ -257,6 +270,7 @@ const tMain = createI18n({
     menuPageSetup: '页面设置…',
     menuExportPdf: '导出为 PDF…',
     menuExportHtml: '导出为 HTML…',
+    menuExportMarkdown: '导出为 Markdown…',
     menuExportImages: '导出为图片…',
     menuPrint: '打印…',
     menuEdit: '编辑',
@@ -276,6 +290,7 @@ const tMain = createI18n({
     menuZoom100: '实际大小 (100%)',
     menuPageWidth: '页宽',
     menuWholePage: '整页',
+    menuMultiPage: '多页',
     menuAiSidebar: 'AI 侧栏',
     menuDarkMode: '深色模式',
     menuFullscreen: '进入全屏',
@@ -366,6 +381,7 @@ const tMain = createI18n({
     filterAll: 'All Files',
     dlgExportPdf: 'Export as PDF',
     dlgExportHtml: 'Export as HTML',
+    dlgExportMarkdown: 'Export as Markdown',
     dlgPickExportDir: 'Choose Export Folder',
     errUnsupportedExt: '.{ext} files are not supported',
     errNotFile: 'not a file',
@@ -388,6 +404,7 @@ const tMain = createI18n({
     menuPageSetup: 'Page Setup…',
     menuExportPdf: 'Export as PDF…',
     menuExportHtml: 'Export as HTML…',
+    menuExportMarkdown: 'Export as Markdown…',
     menuExportImages: 'Export as Images…',
     menuPrint: 'Print…',
     menuEdit: 'Edit',
@@ -407,6 +424,7 @@ const tMain = createI18n({
     menuZoom100: 'Actual Size (100%)',
     menuPageWidth: 'Page Width',
     menuWholePage: 'Whole Page',
+    menuMultiPage: 'Multiple Pages',
     menuAiSidebar: 'AI Sidebar',
     menuDarkMode: 'Dark Mode',
     menuFullscreen: 'Enter Full Screen',
@@ -497,6 +515,7 @@ const tMain = createI18n({
     filterAll: 'Tất cả các tệp',
     dlgExportPdf: 'Xuất dưới dạng PDF',
     dlgExportHtml: 'Xuất dưới dạng HTML',
+    dlgExportMarkdown: 'Xuất dưới dạng Markdown',
     dlgPickExportDir: 'Chọn thư mục xuất',
     errUnsupportedExt: 'Tệp .{ext} không được hỗ trợ',
     errNotFile: 'không phải là tệp',
@@ -520,6 +539,7 @@ const tMain = createI18n({
     menuPageSetup: 'Thiết lập trang…',
     menuExportPdf: 'Xuất dưới dạng PDF…',
     menuExportHtml: 'Xuất dưới dạng HTML…',
+    menuExportMarkdown: 'Xuất dưới dạng Markdown…',
     menuExportImages: 'Xuất dưới dạng hình ảnh…',
     menuPrint: 'In…',
     menuEdit: 'Chỉnh sửa',
@@ -539,6 +559,7 @@ const tMain = createI18n({
     menuZoom100: 'Kích thước thực tế (100%)',
     menuPageWidth: 'Chiều rộng trang',
     menuWholePage: 'Toàn bộ trang',
+    menuMultiPage: 'Nhiều trang',
     menuAiSidebar: 'Thanh bên AI',
     menuDarkMode: 'Chế độ tối',
     menuFullscreen: 'Vào chế độ toàn màn hình',
@@ -628,6 +649,7 @@ const tMain = createI18n({
     filterAll: 'すべてのファイル',
     dlgExportPdf: 'PDF としてエクスポート',
     dlgExportHtml: 'HTML としてエクスポート',
+    dlgExportMarkdown: 'Markdown としてエクスポート',
     dlgPickExportDir: 'エクスポート先フォルダーの選択',
     errUnsupportedExt: '.{ext} 形式には対応していません',
     errNotFile: 'ファイルではありません',
@@ -651,6 +673,7 @@ const tMain = createI18n({
     menuPageSetup: 'ページ設定…',
     menuExportPdf: 'PDF としてエクスポート…',
     menuExportHtml: 'HTML としてエクスポート…',
+    menuExportMarkdown: 'Markdown としてエクスポート…',
     menuExportImages: '画像としてエクスポート…',
     menuPrint: '印刷…',
     menuEdit: '編集',
@@ -670,6 +693,7 @@ const tMain = createI18n({
     menuZoom100: '実際のサイズ (100%)',
     menuPageWidth: 'ページ幅',
     menuWholePage: 'ページ全体',
+    menuMultiPage: '複数ページ',
     menuAiSidebar: 'AI サイドバー',
     menuDarkMode: 'ダークモード',
     menuFullscreen: 'フルスクリーンにする',
@@ -760,6 +784,7 @@ const tMain = createI18n({
     filterAll: '모든 파일',
     dlgExportPdf: 'PDF로 내보내기',
     dlgExportHtml: 'HTML로 내보내기',
+    dlgExportMarkdown: 'Markdown로 내보내기',
     dlgPickExportDir: '내보낼 폴더 선택',
     errUnsupportedExt: '.{ext} 형식은 지원되지 않습니다',
     errNotFile: '파일이 아닙니다',
@@ -783,6 +808,7 @@ const tMain = createI18n({
     menuPageSetup: '페이지 설정…',
     menuExportPdf: 'PDF로 내보내기…',
     menuExportHtml: 'HTML로 내보내기…',
+    menuExportMarkdown: 'Markdown로 내보내기…',
     menuExportImages: '이미지로 내보내기…',
     menuPrint: '인쇄…',
     menuEdit: '편집',
@@ -802,6 +828,7 @@ const tMain = createI18n({
     menuZoom100: '실제 크기(100%)',
     menuPageWidth: '페이지 너비',
     menuWholePage: '전체 페이지',
+    menuMultiPage: '여러 페이지',
     menuAiSidebar: 'AI 사이드바',
     menuDarkMode: '다크 모드',
     menuFullscreen: '전체 화면 시작',
@@ -893,6 +920,7 @@ const tMain = createI18n({
     filterAll: 'Tous les fichiers',
     dlgExportPdf: 'Exporter au format PDF',
     dlgExportHtml: 'Exporter au format HTML',
+    dlgExportMarkdown: 'Exporter au format Markdown',
     dlgPickExportDir: "Choisir le dossier d'exportation",
     errUnsupportedExt: 'les fichiers .{ext} ne sont pas pris en charge',
     errNotFile: "n'est pas un fichier",
@@ -916,6 +944,7 @@ const tMain = createI18n({
     menuPageSetup: 'Mise en page…',
     menuExportPdf: 'Exporter au format PDF…',
     menuExportHtml: 'Exporter au format HTML…',
+    menuExportMarkdown: 'Exporter au format Markdown…',
     menuExportImages: 'Exporter en images…',
     menuPrint: 'Imprimer…',
     menuEdit: 'Édition',
@@ -935,6 +964,7 @@ const tMain = createI18n({
     menuZoom100: 'Taille réelle (100 %)',
     menuPageWidth: 'Largeur de page',
     menuWholePage: 'Page entière',
+    menuMultiPage: 'Plusieurs pages',
     menuAiSidebar: 'Volet IA',
     menuDarkMode: 'Mode sombre',
     menuFullscreen: 'Activer le mode plein écran',
@@ -1026,6 +1056,7 @@ const tMain = createI18n({
     filterAll: 'Alle Dateien',
     dlgExportPdf: 'Als PDF exportieren',
     dlgExportHtml: 'Als HTML exportieren',
+    dlgExportMarkdown: 'Als Markdown exportieren',
     dlgPickExportDir: 'Exportordner auswählen',
     errUnsupportedExt: '.{ext}-Dateien werden nicht unterstützt',
     errNotFile: 'keine Datei',
@@ -1049,6 +1080,7 @@ const tMain = createI18n({
     menuPageSetup: 'Seite einrichten…',
     menuExportPdf: 'Als PDF exportieren…',
     menuExportHtml: 'Als HTML exportieren…',
+    menuExportMarkdown: 'Als Markdown exportieren…',
     menuExportImages: 'Als Bilder exportieren…',
     menuPrint: 'Drucken…',
     menuEdit: 'Bearbeiten',
@@ -1068,6 +1100,7 @@ const tMain = createI18n({
     menuZoom100: 'Originalgröße (100 %)',
     menuPageWidth: 'Seitenbreite',
     menuWholePage: 'Ganze Seite',
+    menuMultiPage: 'Mehrere Seiten',
     menuAiSidebar: 'KI-Seitenleiste',
     menuDarkMode: 'Dunkelmodus',
     menuFullscreen: 'Vollbild ein',
@@ -1158,6 +1191,7 @@ const tMain = createI18n({
     filterAll: 'Todos los archivos',
     dlgExportPdf: 'Exportar como PDF',
     dlgExportHtml: 'Exportar como HTML',
+    dlgExportMarkdown: 'Exportar como Markdown',
     dlgPickExportDir: 'Elegir carpeta de exportación',
     errUnsupportedExt: 'los archivos .{ext} no son compatibles',
     errNotFile: 'no es un archivo',
@@ -1181,6 +1215,7 @@ const tMain = createI18n({
     menuPageSetup: 'Configurar página…',
     menuExportPdf: 'Exportar como PDF…',
     menuExportHtml: 'Exportar como HTML…',
+    menuExportMarkdown: 'Exportar como Markdown…',
     menuExportImages: 'Exportar como imágenes…',
     menuPrint: 'Imprimir…',
     menuEdit: 'Edición',
@@ -1200,6 +1235,7 @@ const tMain = createI18n({
     menuZoom100: 'Tamaño real (100 %)',
     menuPageWidth: 'Ancho de página',
     menuWholePage: 'Página completa',
+    menuMultiPage: 'Varias páginas',
     menuAiSidebar: 'Barra lateral de IA',
     menuDarkMode: 'Modo oscuro',
     menuFullscreen: 'Usar pantalla completa',
@@ -1289,6 +1325,7 @@ const tMain = createI18n({
     filterAll: 'ไฟล์ทั้งหมด',
     dlgExportPdf: 'ส่งออกเป็น PDF',
     dlgExportHtml: 'ส่งออกเป็น HTML',
+    dlgExportMarkdown: 'ส่งออกเป็น Markdown',
     dlgPickExportDir: 'เลือกโฟลเดอร์ส่งออก',
     errUnsupportedExt: 'ไม่รองรับไฟล์ .{ext}',
     errNotFile: 'ไม่ใช่ไฟล์',
@@ -1312,6 +1349,7 @@ const tMain = createI18n({
     menuPageSetup: 'ตั้งค่าหน้ากระดาษ…',
     menuExportPdf: 'ส่งออกเป็น PDF…',
     menuExportHtml: 'ส่งออกเป็น HTML…',
+    menuExportMarkdown: 'ส่งออกเป็น Markdown…',
     menuExportImages: 'ส่งออกเป็นรูปภาพ…',
     menuPrint: 'พิมพ์…',
     menuEdit: 'แก้ไข',
@@ -1331,6 +1369,7 @@ const tMain = createI18n({
     menuZoom100: 'ขนาดจริง (100%)',
     menuPageWidth: 'ความกว้างของหน้า',
     menuWholePage: 'ทั้งหน้า',
+    menuMultiPage: 'หลายหน้า',
     menuAiSidebar: 'แถบข้าง AI',
     menuDarkMode: 'โหมดมืด',
     menuFullscreen: 'เข้าสู่โหมดเต็มหน้าจอ',
@@ -1421,6 +1460,7 @@ const tMain = createI18n({
     filterAll: 'Semua File',
     dlgExportPdf: 'Ekspor sebagai PDF',
     dlgExportHtml: 'Ekspor sebagai HTML',
+    dlgExportMarkdown: 'Ekspor sebagai Markdown',
     dlgPickExportDir: 'Pilih Folder Ekspor',
     errUnsupportedExt: 'file .{ext} tidak didukung',
     errNotFile: 'bukan file',
@@ -1444,6 +1484,7 @@ const tMain = createI18n({
     menuPageSetup: 'Penyetelan Halaman…',
     menuExportPdf: 'Ekspor sebagai PDF…',
     menuExportHtml: 'Ekspor sebagai HTML…',
+    menuExportMarkdown: 'Ekspor sebagai Markdown…',
     menuExportImages: 'Ekspor sebagai gambar…',
     menuPrint: 'Cetak…',
     menuEdit: 'Edit',
@@ -1463,6 +1504,7 @@ const tMain = createI18n({
     menuZoom100: 'Ukuran Sebenarnya (100%)',
     menuPageWidth: 'Lebar Halaman',
     menuWholePage: 'Seluruh Halaman',
+    menuMultiPage: 'Beberapa halaman',
     menuAiSidebar: 'Bilah Samping AI',
     menuDarkMode: 'Mode Gelap',
     menuFullscreen: 'Masuk Layar Penuh',
@@ -1553,6 +1595,7 @@ const tMain = createI18n({
     filterAll: 'Все файлы',
     dlgExportPdf: 'Экспорт в PDF',
     dlgExportHtml: 'Экспорт в HTML',
+    dlgExportMarkdown: 'Экспорт в Markdown',
     dlgPickExportDir: 'Выбор папки для экспорта',
     errUnsupportedExt: 'файлы .{ext} не поддерживаются',
     errNotFile: 'не является файлом',
@@ -1576,6 +1619,7 @@ const tMain = createI18n({
     menuPageSetup: 'Параметры страницы…',
     menuExportPdf: 'Экспорт в PDF…',
     menuExportHtml: 'Экспорт в HTML…',
+    menuExportMarkdown: 'Экспорт в Markdown…',
     menuExportImages: 'Экспорт в изображения…',
     menuPrint: 'Печать…',
     menuEdit: 'Правка',
@@ -1595,6 +1639,7 @@ const tMain = createI18n({
     menuZoom100: 'Фактический размер (100%)',
     menuPageWidth: 'По ширине страницы',
     menuWholePage: 'Страница целиком',
+    menuMultiPage: 'Несколько страниц',
     menuAiSidebar: 'Боковая панель ИИ',
     menuDarkMode: 'Темный режим',
     menuFullscreen: 'Перейти в полноэкранный режим',
@@ -1685,6 +1730,7 @@ const tMain = createI18n({
     filterAll: 'كل الملفات',
     dlgExportPdf: 'تصدير بتنسيق PDF',
     dlgExportHtml: 'تصدير بتنسيق HTML',
+    dlgExportMarkdown: 'تصدير بتنسيق Markdown',
     dlgPickExportDir: 'اختيار مجلد التصدير',
     errUnsupportedExt: 'ملفات .{ext} غير مدعومة',
     errNotFile: 'ليس ملفًا',
@@ -1708,6 +1754,7 @@ const tMain = createI18n({
     menuPageSetup: 'إعداد الصفحة…',
     menuExportPdf: 'تصدير بتنسيق PDF…',
     menuExportHtml: 'تصدير بتنسيق HTML…',
+    menuExportMarkdown: 'تصدير بتنسيق Markdown…',
     menuExportImages: 'تصدير كصور…',
     menuPrint: 'طباعة…',
     menuEdit: 'تحرير',
@@ -1727,6 +1774,7 @@ const tMain = createI18n({
     menuZoom100: 'الحجم الفعلي (100%)',
     menuPageWidth: 'عرض الصفحة',
     menuWholePage: 'صفحة كاملة',
+    menuMultiPage: 'صفحات متعددة',
     menuAiSidebar: 'الشريط الجانبي للذكاء الاصطناعي',
     menuDarkMode: 'الوضع الداكن',
     menuFullscreen: 'الدخول إلى ملء الشاشة',
@@ -1816,6 +1864,7 @@ const tMain = createI18n({
     filterAll: 'Todos os Arquivos',
     dlgExportPdf: 'Exportar como PDF',
     dlgExportHtml: 'Exportar como HTML',
+    dlgExportMarkdown: 'Exportar como Markdown',
     dlgPickExportDir: 'Escolher Pasta de Exportação',
     errUnsupportedExt: 'arquivos .{ext} não são suportados',
     errNotFile: 'não é um arquivo',
@@ -1839,6 +1888,7 @@ const tMain = createI18n({
     menuPageSetup: 'Configurar Página…',
     menuExportPdf: 'Exportar como PDF…',
     menuExportHtml: 'Exportar como HTML…',
+    menuExportMarkdown: 'Exportar como Markdown…',
     menuExportImages: 'Exportar como imagens…',
     menuPrint: 'Imprimir…',
     menuEdit: 'Editar',
@@ -1858,6 +1908,7 @@ const tMain = createI18n({
     menuZoom100: 'Tamanho Real (100%)',
     menuPageWidth: 'Largura da Página',
     menuWholePage: 'Página Inteira',
+    menuMultiPage: 'Várias páginas',
     menuAiSidebar: 'Barra Lateral de IA',
     menuDarkMode: 'Modo Escuro',
     menuFullscreen: 'Entrar em Tela Cheia',
@@ -1948,6 +1999,7 @@ const tMain = createI18n({
     filterAll: 'Tutti i file',
     dlgExportPdf: 'Esporta come PDF',
     dlgExportHtml: 'Esporta come HTML',
+    dlgExportMarkdown: 'Esporta come Markdown',
     dlgPickExportDir: 'Scegli la cartella di esportazione',
     errUnsupportedExt: 'i file .{ext} non sono supportati',
     errNotFile: 'non è un file',
@@ -1971,6 +2023,7 @@ const tMain = createI18n({
     menuPageSetup: 'Imposta pagina…',
     menuExportPdf: 'Esporta come PDF…',
     menuExportHtml: 'Esporta come HTML…',
+    menuExportMarkdown: 'Esporta come Markdown…',
     menuExportImages: 'Esporta come immagini…',
     menuPrint: 'Stampa…',
     menuEdit: 'Modifica',
@@ -1990,6 +2043,7 @@ const tMain = createI18n({
     menuZoom100: 'Dimensioni effettive (100%)',
     menuPageWidth: 'Larghezza pagina',
     menuWholePage: 'Pagina intera',
+    menuMultiPage: 'Più pagine',
     menuAiSidebar: 'Barra laterale IA',
     menuDarkMode: 'Modalità scura',
     menuFullscreen: 'Attiva schermo intero',
@@ -2080,6 +2134,7 @@ const tMain = createI18n({
     filterAll: 'Wszystkie pliki',
     dlgExportPdf: 'Eksportuj jako PDF',
     dlgExportHtml: 'Eksportuj jako HTML',
+    dlgExportMarkdown: 'Eksportuj jako Markdown',
     dlgPickExportDir: 'Wybierz folder eksportu',
     errUnsupportedExt: 'pliki .{ext} nie są obsługiwane',
     errNotFile: 'to nie jest plik',
@@ -2103,6 +2158,7 @@ const tMain = createI18n({
     menuPageSetup: 'Ustawienia strony…',
     menuExportPdf: 'Eksportuj jako PDF…',
     menuExportHtml: 'Eksportuj jako HTML…',
+    menuExportMarkdown: 'Eksportuj jako Markdown…',
     menuExportImages: 'Eksportuj jako obrazy…',
     menuPrint: 'Drukuj…',
     menuEdit: 'Edycja',
@@ -2122,6 +2178,7 @@ const tMain = createI18n({
     menuZoom100: 'Rzeczywisty rozmiar (100%)',
     menuPageWidth: 'Szerokość strony',
     menuWholePage: 'Cała strona',
+    menuMultiPage: 'Wiele stron',
     menuAiSidebar: 'Pasek boczny AI',
     menuDarkMode: 'Tryb ciemny',
     menuFullscreen: 'Przejdź do pełnego ekranu',
@@ -2212,6 +2269,7 @@ const tMain = createI18n({
     filterAll: 'Všechny soubory',
     dlgExportPdf: 'Exportovat jako PDF',
     dlgExportHtml: 'Exportovat jako HTML',
+    dlgExportMarkdown: 'Exportovat jako Markdown',
     dlgPickExportDir: 'Zvolte složku pro export',
     errUnsupportedExt: 'soubory .{ext} nejsou podporovány',
     errNotFile: 'není soubor',
@@ -2235,6 +2293,7 @@ const tMain = createI18n({
     menuPageSetup: 'Vzhled stránky…',
     menuExportPdf: 'Exportovat jako PDF…',
     menuExportHtml: 'Exportovat jako HTML…',
+    menuExportMarkdown: 'Exportovat jako Markdown…',
     menuExportImages: 'Exportovat jako obrázky…',
     menuPrint: 'Tisk…',
     menuEdit: 'Úpravy',
@@ -2254,6 +2313,7 @@ const tMain = createI18n({
     menuZoom100: 'Skutečná velikost (100 %)',
     menuPageWidth: 'Šířka stránky',
     menuWholePage: 'Celá stránka',
+    menuMultiPage: 'Více stránek',
     menuAiSidebar: 'Boční panel AI',
     menuDarkMode: 'Tmavý režim',
     menuFullscreen: 'Přejít na celou obrazovku',
@@ -2344,6 +2404,7 @@ const tMain = createI18n({
     filterAll: 'Alle bestanden',
     dlgExportPdf: 'Exporteren als PDF',
     dlgExportHtml: 'Exporteren als HTML',
+    dlgExportMarkdown: 'Exporteren als Markdown',
     dlgPickExportDir: 'Exportmap kiezen',
     errUnsupportedExt: '.{ext}-bestanden worden niet ondersteund',
     errNotFile: 'geen bestand',
@@ -2367,6 +2428,7 @@ const tMain = createI18n({
     menuPageSetup: 'Pagina-instelling…',
     menuExportPdf: 'Exporteren als PDF…',
     menuExportHtml: 'Exporteren als HTML…',
+    menuExportMarkdown: 'Exporteren als Markdown…',
     menuExportImages: 'Exporteren als afbeeldingen…',
     menuPrint: 'Afdrukken…',
     menuEdit: 'Bewerken',
@@ -2386,6 +2448,7 @@ const tMain = createI18n({
     menuZoom100: 'Ware grootte (100%)',
     menuPageWidth: 'Paginabreedte',
     menuWholePage: 'Hele pagina',
+    menuMultiPage: "Meerdere pagina's",
     menuAiSidebar: 'AI-zijbalk',
     menuDarkMode: 'Donkere modus',
     menuFullscreen: 'Schermvullende weergave',
@@ -2476,6 +2539,7 @@ const tMain = createI18n({
     filterAll: 'Semua Fail',
     dlgExportPdf: 'Eksport sebagai PDF',
     dlgExportHtml: 'Eksport sebagai HTML',
+    dlgExportMarkdown: 'Eksport sebagai Markdown',
     dlgPickExportDir: 'Pilih Folder Eksport',
     errUnsupportedExt: 'fail .{ext} tidak disokong',
     errNotFile: 'bukan fail',
@@ -2499,6 +2563,7 @@ const tMain = createI18n({
     menuPageSetup: 'Persediaan Halaman…',
     menuExportPdf: 'Eksport sebagai PDF…',
     menuExportHtml: 'Eksport sebagai HTML…',
+    menuExportMarkdown: 'Eksport sebagai Markdown…',
     menuExportImages: 'Eksport sebagai imej…',
     menuPrint: 'Cetak…',
     menuEdit: 'Edit',
@@ -2518,6 +2583,7 @@ const tMain = createI18n({
     menuZoom100: 'Saiz Sebenar (100%)',
     menuPageWidth: 'Lebar Halaman',
     menuWholePage: 'Seluruh Halaman',
+    menuMultiPage: 'Beberapa halaman',
     menuAiSidebar: 'Bar Sisi AI',
     menuDarkMode: 'Mod Gelap',
     menuFullscreen: 'Masuk Skrin Penuh',
@@ -2607,6 +2673,7 @@ const tMain = createI18n({
     filterAll: 'כל הקבצים',
     dlgExportPdf: 'ייצוא כ-PDF',
     dlgExportHtml: 'ייצוא כ-HTML',
+    dlgExportMarkdown: 'ייצוא כ-Markdown',
     dlgPickExportDir: 'בחירת תיקיית ייצוא',
     errUnsupportedExt: 'קובצי .{ext} אינם נתמכים',
     errNotFile: 'אינו קובץ',
@@ -2630,6 +2697,7 @@ const tMain = createI18n({
     menuPageSetup: 'הגדרת עמוד…',
     menuExportPdf: 'ייצוא כ-PDF…',
     menuExportHtml: 'ייצוא כ-HTML…',
+    menuExportMarkdown: 'ייצוא כ-Markdown…',
     menuExportImages: 'ייצוא כתמונות…',
     menuPrint: 'הדפסה…',
     menuEdit: 'עריכה',
@@ -2649,6 +2717,7 @@ const tMain = createI18n({
     menuZoom100: 'גודל אמיתי (100%)',
     menuPageWidth: 'רוחב עמוד',
     menuWholePage: 'עמוד שלם',
+    menuMultiPage: 'עמודים מרובים',
     menuAiSidebar: 'סרגל צד AI',
     menuDarkMode: 'מצב כהה',
     menuFullscreen: 'מעבר למסך מלא',
@@ -2738,6 +2807,7 @@ const tMain = createI18n({
     filterAll: 'सभी फ़ाइलें',
     dlgExportPdf: 'PDF के रूप में निर्यात करें',
     dlgExportHtml: 'HTML के रूप में निर्यात करें',
+    dlgExportMarkdown: 'Markdown के रूप में निर्यात करें',
     dlgPickExportDir: 'निर्यात फ़ोल्डर चुनें',
     errUnsupportedExt: '.{ext} फ़ाइलें समर्थित नहीं हैं',
     errNotFile: 'फ़ाइल नहीं है',
@@ -2761,6 +2831,7 @@ const tMain = createI18n({
     menuPageSetup: 'पृष्ठ सेटअप…',
     menuExportPdf: 'PDF के रूप में निर्यात करें…',
     menuExportHtml: 'HTML के रूप में निर्यात करें…',
+    menuExportMarkdown: 'Markdown के रूप में निर्यात करें…',
     menuExportImages: 'छवियों के रूप में निर्यात…',
     menuPrint: 'प्रिंट करें…',
     menuEdit: 'संपादन',
@@ -2780,6 +2851,7 @@ const tMain = createI18n({
     menuZoom100: 'वास्तविक आकार (100%)',
     menuPageWidth: 'पृष्ठ चौड़ाई',
     menuWholePage: 'पूरा पृष्ठ',
+    menuMultiPage: 'एकाधिक पृष्ठ',
     menuAiSidebar: 'AI साइडबार',
     menuDarkMode: 'डार्क मोड',
     menuFullscreen: 'पूर्ण स्क्रीन में जाएँ',
@@ -2869,6 +2941,7 @@ const tMain = createI18n({
     filterAll: '所有檔案',
     dlgExportPdf: '匯出為 PDF',
     dlgExportHtml: '匯出為 HTML',
+    dlgExportMarkdown: '匯出為 Markdown',
     dlgPickExportDir: '選擇匯出目錄',
     errUnsupportedExt: '暫不支援 .{ext} 類型',
     errNotFile: '不是檔案',
@@ -2891,6 +2964,7 @@ const tMain = createI18n({
     menuPageSetup: '版面設定…',
     menuExportPdf: '匯出為 PDF…',
     menuExportHtml: '匯出為 HTML…',
+    menuExportMarkdown: '匯出為 Markdown…',
     menuExportImages: '匯出為圖片…',
     menuPrint: '列印…',
     menuEdit: '編輯',
@@ -2910,6 +2984,7 @@ const tMain = createI18n({
     menuZoom100: '實際大小 (100%)',
     menuPageWidth: '頁面寬度',
     menuWholePage: '整頁',
+    menuMultiPage: '多頁',
     menuAiSidebar: 'AI 側邊欄',
     menuDarkMode: '深色模式',
     menuFullscreen: '進入全螢幕',
@@ -3074,7 +3149,7 @@ async function openDialog(event: IpcMainInvokeEvent, options: OpenDialogOptions)
 async function saveDialog(event: IpcMainInvokeEvent, options: SaveDialogOptions) {
   // before any pick is remembered, bare-name suggestions anchor in the
   // configurable default save folder instead of Electron's Downloads pin
-  return showSaveDialogWithMemory(dialog, dialogParent(event), options, defaultSaveDir())
+  return showSaveDialogWithMemory(dialog, dialogParent(event), options, defaultSaveDir)
 }
 
 /** default folder where new files land on their first (silent) save; shared with the other editors via shell. User-configurable (app-settings.json), falls back to <Documents>/UniWork Office. */
@@ -4390,6 +4465,20 @@ export function registerDocsIpc(): void {
   ipcMain.handle('docs:font-metrics', (_event, family: string) =>
     typeof family === 'string' ? familyVerticalMetrics(family) : null,
   )
+  // the other spellings of the installed faces behind these names: a document
+  // that declares a CJK font by its localized name needs the English spelling
+  // the browser resolves (genoffice#2449). The renderer is not trusted, but
+  // the answer is only font names.
+  ipcMain.handle('docs:font-aliases', (_event, names: unknown) => {
+    if (!Array.isArray(names)) return {}
+    const out: Record<string, readonly string[]> = {}
+    for (const raw of names.slice(0, 512)) {
+      if (typeof raw !== 'string' || raw.length === 0 || raw.length > 256) continue
+      const aliases = familyAliases(raw)
+      if (aliases.length) out[raw] = aliases
+    }
+    return out
+  })
 
   ipcMain.handle('docs:open', async (event) => {
     const result = await openDialog(event, {
@@ -4831,7 +4920,7 @@ export function registerDocsIpc(): void {
             ? defaultName
             : (convertedDocumentFor(sourcePath)?.suggestSaveAs ??
               saveAsSuggestion(typeof sourcePath === 'string' ? sourcePath : null, defaultName)),
-        filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
+        filters: [{ name: tm('filterWord'), extensions: ['docx'] }, ...SAVE_AS_EXPORT_FILTERS],
       })
       if (result.canceled || !result.filePath) return { ok: false }
       // never write OOXML under a legacy name (a converted .doc's own original included), and never
@@ -4845,6 +4934,12 @@ export function registerDocsIpc(): void {
       // the tab may have been closed while the dialog was open; checked before the
       // write because Save As may overwrite an existing file (no safe rollback)
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+      // another format is an exported copy: the renderer runs that export, the document stays where it is
+      const exportAs = saveAsExportFormat(target)
+      if (exportAs) {
+        allowPdfWrite(event.sender.id, target)
+        return { ok: false, exportAs, path: target }
+      }
       // UniWork seam: Save As may not overwrite a view-only UniWork working copy.
       // Picking the document's own file is an explicit Save of it, so it reports a
       // user save; any other target is a plain local copy.
@@ -5073,7 +5168,7 @@ export function registerDocsIpc(): void {
       await writeFile(path, bytes)
     }
     try {
-      if (request.mode === 'single') {
+      if (request.mode === 'single' || request.mode === 'labels') {
         const file = files[0]!
         const name = mergeOutputFileName(file.name)
         const result = await saveDialog(event, {
@@ -5226,30 +5321,67 @@ export function registerDocsIpc(): void {
   // renderer print scale (inverse of the preview's print zoom, see print-zoom.ts)
   // Infinity passes a `> 0` check, so require finiteness before handing it to Chromium.
   const pdfScale = (scale?: number) => printScaleOption(scale)
+  const withInternalLinks = async (data: Buffer, links: unknown): Promise<Buffer> => {
+    if (!Array.isArray(links) || links.length === 0) return data
+    const { PDFDocument } = await import('pdf-lib')
+    const pdf = await PDFDocument.load(data)
+    if (addPdfInternalLinks(pdf, links) === 0) return data
+    return Buffer.from(await pdf.save())
+  }
   const printScale = (scale?: number) =>
     typeof scale === 'number' && Number.isFinite(scale) && scale > 0 && scale !== 1
       ? { scaleFactor: Math.round(scale * 100) }
       : {}
 
-  ipcMain.handle('docs:print', async (event, scale?: number) => {
+  ipcMain.handle('docs:printers', async (event) => {
+    const printers = await event.sender.getPrintersAsync()
+    return printers.map((p) => ({ name: p.name, displayName: p.displayName || p.name }))
+  })
+
+  ipcMain.handle('docs:print', async (event, scale?: number, job?: unknown, paper?: unknown) => {
     // G5-03a: a locked working copy prints nothing
     if (uniworkRefusesExport(event.sender.id)) return { ok: false }
     // print the calling tab's own content; zero margins — the docx page padding provides them.
-    // Resolves when the system dialog is dismissed; the print dialog stays open on cancel
-    // (ok=false without error) and surfaces real failures. With no printer installed
-    // print() would do nothing at all, so that case is reported up front (noPrinter) and
-    // the renderer offers Save as PDF.
+    // Resolves when the system dialog is dismissed (or the silent job is queued); the print
+    // dialog stays open on cancel (ok=false without error) and surfaces real failures. With no
+    // printer installed print() would do nothing at all, so that case is reported up front
+    // (noPrinter) and the renderer offers Save as PDF.
     if (await hasNoPrinter(event.sender)) return { ok: false, noPrinter: true }
+    const printOpts = {
+      margins: { marginType: 'none' as const },
+      ...printScale(scale),
+      ...printJobOptions(job),
+      // the document's own paper: Chromium prints on Letter unless the job
+      // states one, and an A4 sheet on Letter is taller than the paper — it
+      // splits in two, so the printed page loses its bottom (genoffice#2563)
+      ...printPaperOption(paper),
+    }
+    // A named printer prints silently, and Chromium's silent print on macOS
+    // can drop the job outright — no queue entry, no callback error
+    // (genoffice#2347). Route those jobs through CUPS instead: printToPDF
+    // bakes the pages at the document's own paper size, and lp spools a
+    // real job whose queue state and failures are diagnosable.
+    if (process.platform === 'darwin' && printOpts.silent) {
+      const geometry = validPrintPaper(paper)
+      const printed = await event.sender.printToPDF({
+        printBackground: true,
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        ...(geometry
+          ? {
+              pageSize: {
+                width: geometry.widthTwips / TWIPS_PER_INCH,
+                height: geometry.heightTwips / TWIPS_PER_INCH,
+              },
+            }
+          : {}),
+        ...printScaleOption(scale),
+      })
+      return printPdfViaCups(printed, printOpts)
+    }
     return new Promise<{ ok: boolean; error?: string; noPrinter?: boolean }>((resolve) => {
-      event.sender.print(
-        { margins: { marginType: 'none' }, ...printScale(scale) },
-        (success, failureReason) => {
-          resolve({
-            ok: success,
-            ...(failureReason && !/cancel/i.test(failureReason) ? { error: failureReason } : {}),
-          })
-        },
-      )
+      event.sender.print(printOpts, (success, failureReason) => {
+        resolve(printOutcome(success, failureReason, printOpts.silent))
+      })
     })
   })
 
@@ -5262,6 +5394,7 @@ export function registerDocsIpc(): void {
       pageHeightTwips: number,
       outPath?: string,
       scale?: number,
+      links?: unknown,
     ) => {
       // G5-03a: a locked working copy exports nothing
       if (uniworkRefusesExport(event.sender.id)) return { ok: false }
@@ -5290,7 +5423,7 @@ export function registerDocsIpc(): void {
         allowPdfWrite(event.sender.id, filePath)
       }
       try {
-        const data = await event.sender.printToPDF({
+        const printed = await event.sender.printToPDF({
           printBackground: true,
           // custom pageSize is in inches; the docx page padding provides the margins
           pageSize: {
@@ -5300,6 +5433,7 @@ export function registerDocsIpc(): void {
           margins: { top: 0, bottom: 0, left: 0, right: 0 },
           ...pdfScale(scale),
         })
+        const data = await withInternalLinks(printed, links)
         await atomicWriteFile(filePath, data)
         if (!isImageExportTemp(event.sender.id, filePath)) openGeneratedFile(filePath)
         return { ok: true, path: filePath }
@@ -5415,6 +5549,52 @@ export function registerDocsIpc(): void {
     },
   )
 
+  ipcMain.handle(
+    'docs:export-markdown',
+    async (
+      event,
+      defaultName: string,
+      markdown: string,
+      images: MarkdownImage[],
+      outPath?: string,
+    ) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
+      if (typeof markdown !== 'string' || !markdown) return { ok: false, error: 'empty document' }
+      if (!Array.isArray(images)) return { ok: false, error: 'bad image list' }
+      let filePath = outPath ?? null
+      if (filePath && !canPdfWrite(event.sender.id, filePath)) {
+        return { ok: false, error: 'export target is not an authorized path' }
+      }
+      if (!filePath) {
+        const result = await saveDialog(event, {
+          title: tm('dlgExportMarkdown'),
+          defaultPath: defaultName.replace(/\.docx$/i, '') + '.md',
+          filters: [{ name: 'Markdown', extensions: ['md'] }],
+        })
+        if (result.canceled || !result.filePath) return { ok: false }
+        // like docs:export-pdf, a merged export never lands on the open .docx; the .md name stays
+        filePath = markdownExportPath(result.filePath)
+        allowPdfWrite(event.sender.id, filePath)
+      }
+      try {
+        const written = await writeMarkdownMedia(filePath, images)
+        // the Markdown destination was escaped before the swap: parentheses must not survive it
+        const mediaDir = encodeURIComponent(
+          basename(filePath).replace(/\.md$/i, '') + '_files',
+        ).replace(/[()]/g, (c) => (c === '(' ? '%28' : '%29'))
+        await atomicWriteFile(
+          filePath,
+          Buffer.from(markdown.split(`${MARKDOWN_MEDIA_DIR_TOKEN}/`).join(`${mediaDir}/`), 'utf8'),
+        )
+        openGeneratedFile(filePath)
+        return { ok: true, path: filePath, imagesDropped: images.length - written }
+      } catch (err) {
+        return { ok: false, error: String(err), path: filePath }
+      }
+    },
+  )
+
   // mixed paper-size export: the renderer prints group by group per size (other pages hidden via CSS); this produces one group's bytes
   ipcMain.handle(
     'docs:print-pdf-buffer',
@@ -5446,7 +5626,13 @@ export function registerDocsIpc(): void {
   // merge grouped PDF fragments into one file in page order (pdf-lib)
   ipcMain.handle(
     'docs:save-merged-pdf',
-    async (event, defaultName: string, base64Parts: string[], outPath?: string) => {
+    async (
+      event,
+      defaultName: string,
+      base64Parts: string[],
+      outPath?: string,
+      links?: unknown,
+    ) => {
       // G5-03a: a locked working copy exports nothing
       if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       let filePath = outPath ?? null
@@ -5460,7 +5646,8 @@ export function registerDocsIpc(): void {
           filters: [{ name: 'PDF', extensions: ['pdf'] }],
         })
         if (result.canceled || !result.filePath) return { ok: false }
-        filePath = result.filePath
+        // like docs:export-pdf, a merged export never lands on the open .docx; the .pdf name stays
+        filePath = pdfExportPath(result.filePath)
         allowPdfWrite(event.sender.id, filePath)
       }
       try {
@@ -5471,6 +5658,7 @@ export function registerDocsIpc(): void {
           const pages = await merged.copyPages(part, part.getPageIndices())
           for (const page of pages) merged.addPage(page)
         }
+        if (Array.isArray(links) && links.length > 0) addPdfInternalLinks(merged, links)
         await atomicWriteFile(filePath, Buffer.from(await merged.save()))
         if (!isImageExportTemp(event.sender.id, filePath)) openGeneratedFile(filePath)
         return { ok: true, path: filePath }
@@ -5535,6 +5723,30 @@ export function setDocsShellHooks(hooks: DocsShellHooks | null): void {
 /** After writing an exported/AI-generated file: open it in the right tab
  * (shell) or reveal it in the folder (standalone). Tab-opening failure must
  * not report the write itself as failed — the file is already persisted. */
+/**
+ * Pictures of a Markdown export land in `<file>_files/` next to it, like a
+ * browser's "save page" folder. Returns how many were written; unreadable
+ * sources are skipped and the reference in the Markdown dangles.
+ */
+async function writeMarkdownMedia(mdPath: string, images: MarkdownImage[]): Promise<number> {
+  if (images.length === 0) return 0
+  const dir = join(dirname(mdPath), basename(mdPath).replace(/\.md$/i, '') + '_files')
+  let written = 0
+  for (const img of images) {
+    if (typeof img?.name !== 'string' || !/^image\d+\.\w+$/.test(img.name)) continue
+    if (typeof img.src !== 'string') continue
+    const data = /^data:image\/[\w.+-]+;base64,(.*)$/s.exec(img.src)
+    const body = data
+      ? Buffer.from(data[1], 'base64')
+      : ((await readLazyMedia(img.src).catch(() => null))?.body ?? null)
+    if (!body || body.length === 0) continue
+    if (written === 0) await mkdir(dir, { recursive: true })
+    await atomicWriteFile(join(dir, img.name), body)
+    written++
+  }
+  return written
+}
+
 function openGeneratedFile(path: string): void {
   // Headless export has no tab strip and no user: revealing the file in Finder
   // would be the only visible effect of a run that must stay silent.
@@ -5710,6 +5922,7 @@ export function buildDocsMenu(): void {
         { label: tm('menuPageSetup'), click: () => sendCommand('page-setup') },
         { label: tm('menuExportPdf'), click: () => sendCommand('export-pdf') },
         { label: tm('menuExportHtml'), click: () => sendCommand('export-html') },
+        { label: tm('menuExportMarkdown'), click: () => sendCommand('export-markdown') },
         { label: tm('menuExportImages'), click: () => sendCommand('export-images') },
         {
           label: tm('menuPrint'),
@@ -5781,6 +5994,7 @@ export function buildDocsMenu(): void {
             })),
             { label: tm('menuPageWidth'), click: () => sendCommand('zoom-page-width') },
             { label: tm('menuWholePage'), click: () => sendCommand('zoom-whole-page') },
+            { label: tm('menuMultiPage'), click: () => sendCommand('zoom-multi-page') },
           ],
         },
         { type: 'separator' },

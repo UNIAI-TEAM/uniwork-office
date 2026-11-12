@@ -218,4 +218,6 @@ export const th = {
   aiMindMapReset: 'รีเซ็ตมุมมอง',
   aiMindMapExpand: 'ขยายสาขา',
   aiMindMapCollapse: 'ย่อสาขา',
+  aiMindMapExportSvg: 'ส่งออก SVG',
+  aiMindMapInsert: 'แทรกลงในเอกสาร',
 } satisfies Record<keyof typeof zh, string>

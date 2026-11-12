@@ -13,8 +13,9 @@ import {
   type XNode,
 } from './xml-utils'
 import { customEnumItems } from './list-markers'
-import { decodeNumericCharRefs, type RelInfo } from './parse-xml-text'
+import { decodeNumericCharRefs, onOffOf, type RelInfo } from './parse-xml-text'
 import type {
+  CommentImage,
   CommentInfo,
   DocProtection,
   NumberingDef,
@@ -103,6 +104,54 @@ function resultTextOf(node: XNode): string {
   return out
 }
 
+/**
+ * The first picture a comment carries: the blip's relationship resolves
+ * against word/_rels/comments.xml.rels, the bytes come from the media part,
+ * the display size from wp:extent. Everything missing (no rels part, an
+ * external target, an unknown media path) degrades to no image — the text
+ * still shows.
+ */
+async function commentImageOf(zip: JSZip, comment: XNode): Promise<CommentImage | undefined> {
+  let blipAttrs: Record<string, string> | undefined
+  let extent: Record<string, string> | undefined
+  const walk = (node: XNode): void => {
+    if (blipAttrs) return
+    const name = nameOf(node)
+    if (name === 'a:blip') {
+      blipAttrs = attrsOf(node)
+      return
+    }
+    if (name === 'wp:extent') extent = attrsOf(node)
+    for (const child of childrenOf(node)) walk(child)
+  }
+  for (const para of findChildren(comment, 'w:p')) walk(para)
+  const relId = blipAttrs?.['r:embed']
+  if (!relId) return undefined
+  const relsFile = zip.file('word/_rels/comments.xml.rels')
+  if (!relsFile) return undefined
+  const relsXml = await relsFile.async('string')
+  const relRe = new RegExp(`<Relationship\\b[^>]*Id="${relId}"[^>]*/>`)
+  const rel = relRe.exec(relsXml)?.[0]
+  const target = rel ? /Target="([^"]+)"/.exec(rel)?.[1] : undefined
+  if (!target || /TargetMode="External"/.test(rel ?? '')) return undefined
+  const mediaPath = `word/${target.replace(/^\//, '').replace(/^word\//, '')}`
+  const mediaFile = zip.file(mediaPath)
+  if (!mediaFile) return undefined
+  const mime = mediaPath.toLowerCase().endsWith('.png')
+    ? 'image/png'
+    : mediaPath.toLowerCase().endsWith('.gif')
+      ? 'image/gif'
+      : 'image/jpeg'
+  const widthPx = extent?.cx ? Math.round(parseInt(extent.cx, 10) / 9525) : 0
+  const heightPx = extent?.cy ? Math.round(parseInt(extent.cy, 10) / 9525) : 0
+  return {
+    mime,
+    base64: await mediaFile.async('base64'),
+    ...(widthPx > 0 ? { widthPx } : { widthPx: 160 }),
+    ...(heightPx > 0 ? { heightPx } : { heightPx: 120 }),
+  }
+}
+
 /** word/comments.xml (+ reply/resolved relations from commentsExtended) -> display list, file order */
 export async function parseComments(zip: JSZip): Promise<CommentInfo[]> {
   const file = zip.file('word/comments.xml')
@@ -116,6 +165,7 @@ export async function parseComments(zip: JSZip): Promise<CommentInfo[]> {
     if (!attrs['w:id']) continue
     const paras = findChildren(node, 'w:p')
     const paraId = paras.length > 0 ? attrsOf(paras[paras.length - 1])['w14:paraId'] : undefined
+    const image = await commentImageOf(zip, node)
     out.push({
       id: attrs['w:id'],
       author: attrs['w:author'] ?? '',
@@ -123,6 +173,7 @@ export async function parseComments(zip: JSZip): Promise<CommentInfo[]> {
       date: attrs['w:date'],
       text: paras.map(resultTextOf).join('\n'),
       ...(paraId ? { paraId } : {}),
+      ...(image ? { image } : {}),
     })
   }
   // commentsExtended.xml: paraId → parent paraId / done (Word 2013+ replies and resolution)
@@ -272,6 +323,7 @@ function parseNumberingLevel(lvlNode: XNode): NumberingLevel {
   const lvlRestart = parseInt(attrsOf(findChild(lvlNode, 'w:lvlRestart') ?? {})['w:val'] ?? '', 10)
   if (Number.isFinite(lvlRestart)) level.lvlRestart = lvlRestart
   const lvlPPr = findChild(lvlNode, 'w:pPr')
+  if (lvlPPr && onOffOf(lvlPPr, 'w:bidi')) level.bidi = true
   const tabs = lvlPPr ? findChild(lvlPPr, 'w:tabs') : undefined
   const tabPos = tabs ? parseInt(attrsOf(findChild(tabs, 'w:tab') ?? {})['w:pos'] ?? '', 10) : NaN
   if (Number.isFinite(tabPos)) level.tabStop = tabPos
@@ -279,9 +331,13 @@ function parseNumberingLevel(lvlNode: XNode): NumberingLevel {
   if (ind) {
     const attrs = attrsOf(ind)
     // an explicit 0 is a real value: left="0" firstLine="0" puts the marker at the
-    // margin with no hanging area (Word then tabs to the next default stop)
+    // margin with no hanging area (Word then tabs to the next default stop); an
+    // absent left is 0 too (Word probe 2026-10-20: `right=360 hanging=360` hangs
+    // the marker 18pt outside the start margin), left/right are logical start/end
     const left = parseInt(attrs['w:left'] ?? attrs['w:start'] ?? '', 10)
-    if (left >= 0) level.indentLeft = left
+    level.indentLeft = Number.isFinite(left) ? left : 0
+    const right = parseInt(attrs['w:right'] ?? attrs['w:end'] ?? '', 10)
+    if (Number.isFinite(right)) level.indentRight = right
     const hanging = parseInt(attrs['w:hanging'] ?? '', 10)
     if (hanging > 0) level.hanging = hanging
     const firstLine = parseInt(attrs['w:firstLine'] ?? '', 10)

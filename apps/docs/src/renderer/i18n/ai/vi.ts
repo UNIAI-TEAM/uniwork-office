@@ -222,4 +222,6 @@ export const vi = {
   aiMindMapReset: 'Đặt lại khung nhìn',
   aiMindMapExpand: 'Mở rộng nhánh',
   aiMindMapCollapse: 'Thu gọn nhánh',
+  aiMindMapExportSvg: 'Xuất SVG',
+  aiMindMapInsert: 'Chèn vào tài liệu',
 } satisfies Record<keyof typeof zh, string>

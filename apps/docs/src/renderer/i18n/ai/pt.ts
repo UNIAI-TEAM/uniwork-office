@@ -39,7 +39,7 @@ export const pt = {
   aiChipTableEdit: 'Ajustar linhas/colunas',
   aiQueueTitle: 'Alterações na fila',
   aiQueueHint:
-    'Clique numa linha para localizar o trecho; o envio aplica todas as alterações numa única solicitação',
+    'Clique em uma linha para localizar o trecho; o envio aplica todas as alterações em uma única solicitação',
   aiQueueSend: 'Enviar {count} alterações',
   aiQueueDiscard: 'Limpar',
   aiQueueDiscardConfirm: 'Limpar as {count} alterações na fila?',
@@ -226,4 +226,6 @@ export const pt = {
   aiMindMapReset: 'Redefinir visualização',
   aiMindMapExpand: 'Expandir ramo',
   aiMindMapCollapse: 'Recolher ramo',
+  aiMindMapExportSvg: 'Exportar SVG',
+  aiMindMapInsert: 'Inserir no documento',
 } satisfies Record<keyof typeof zh, string>

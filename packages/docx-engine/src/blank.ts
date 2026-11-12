@@ -1,4 +1,14 @@
 import JSZip from 'jszip'
+import {
+  APP_PROPERTIES_CONTENT_TYPE,
+  APP_PROPERTIES_PATH,
+  APP_PROPERTIES_REL_TYPE,
+  CORE_PROPERTIES_CONTENT_TYPE,
+  CORE_PROPERTIES_PATH,
+  CORE_PROPERTIES_REL_TYPE,
+  newDocumentAppPropertiesXml,
+  newDocumentCorePropertiesXml,
+} from './doc-properties'
 import { PPR_CHILD_ORDER } from './generate'
 import type { NumberingLevel } from './types'
 
@@ -162,6 +172,8 @@ function decimalLevels(): string {
 export interface CustomNumberingLevel {
   /** w:numFmt:decimal/bullet/lowerLetter/upperRoman/chineseCountingThousand… */
   numFmt: string
+  /** w14 enumeration behind numFmt "custom" ("Za prvé, Za druhé, …"), written as mc:AlternateContent */
+  customFormat?: string
   /** w:lvlText: a pattern like "%1." or a literal bullet symbol */
   lvlText: string
   /** w:ind w:left(twips) */
@@ -201,6 +213,7 @@ export function customLevelFromNumberingLevel(level: NumberingLevel): CustomNumb
     hanging: level.hanging ?? (level.indentLeft === undefined ? 360 : 0),
     start: level.start,
   }
+  if (level.customFormat) out.customFormat = level.customFormat
   if (level.suff) out.suff = level.suff
   if (level.lvlJc) out.lvlJc = level.lvlJc
   if (level.font) out.font = level.font
@@ -228,6 +241,7 @@ export function numberingLevelFromCustom(
     indentLeft: l.indentLeft,
     hanging: l.hanging ?? 360,
   }
+  if (l.customFormat) out.customFormat = l.customFormat
   if (l.suff) out.suff = l.suff
   if (l.lvlJc) out.lvlJc = l.lvlJc
   if (l.font) out.font = l.font
@@ -290,7 +304,11 @@ export function mergeLevelXml(existing: string, l: CustomNumberingLevel, ilvl: n
     else children.set(name, xml)
   }
   set('w:start', `<w:start w:val="${l.start ?? 1}"/>`)
-  set('w:numFmt', `<w:numFmt w:val="${escAttr(l.numFmt)}"/>`)
+  // a w14 custom format lives in mc:AlternateContent in the numFmt slot; the
+  // dialog's numFmt replaces whichever form the file had
+  for (const [name, xml] of children)
+    if (name.endsWith(':AlternateContent') && /<w:numFmt\b/.test(xml)) children.delete(name)
+  set('w:numFmt', numFmtXml(l))
   if (l.lvlRestart !== undefined) set('w:lvlRestart', `<w:lvlRestart w:val="${l.lvlRestart}"/>`)
   if (l.pStyle !== undefined)
     set('w:pStyle', l.pStyle ? `<w:pStyle w:val="${escAttr(l.pStyle)}"/>` : null)
@@ -379,9 +397,21 @@ export function mergeLevelXml(existing: string, l: CustomNumberingLevel, ilvl: n
 const escAttr = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+/** Word's shape for a w14 enumeration: the format in mc:Choice, decimal for older readers.
+ *  Namespaces are declared on the element so the part's root needs no edit. */
+function numFmtXml(l: CustomNumberingLevel): string {
+  if (l.numFmt !== 'custom' || !l.customFormat) return `<w:numFmt w:val="${escAttr(l.numFmt)}"/>`
+  return (
+    '<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"' +
+    ' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">' +
+    `<mc:Choice Requires="w14"><w:numFmt w:val="custom" w:format="${escAttr(l.customFormat)}"/></mc:Choice>` +
+    '<mc:Fallback><w:numFmt w:val="decimal"/></mc:Fallback></mc:AlternateContent>'
+  )
+}
+
 /** One w:lvl in CT_Lvl child order */
 export function customLevelXml(l: CustomNumberingLevel, ilvl: number): string {
-  const parts = [`<w:start w:val="${l.start ?? 1}"/>`, `<w:numFmt w:val="${escAttr(l.numFmt)}"/>`]
+  const parts = [`<w:start w:val="${l.start ?? 1}"/>`, numFmtXml(l)]
   if (l.lvlRestart !== undefined) parts.push(`<w:lvlRestart w:val="${l.lvlRestart}"/>`)
   if (l.pStyle) parts.push(`<w:pStyle w:val="${escAttr(l.pStyle)}"/>`)
   if (l.isLgl) parts.push('<w:isLgl/>')
@@ -511,6 +541,17 @@ export interface BlankDocxOptions {
   eastAsiaFont?: string
   /** Page size of the single section; defaults to A4. */
   paperSize?: BlankPaperSize
+  /** Creation stamp of docProps/core.xml; defaults to now (tests pin a fixed date). */
+  createdAt?: Date
+  /** docProps/app.xml Application; defaults to "GenOffice". */
+  application?: string
+  /** docProps/app.xml AppVersion; defaults to the docx-engine package version. */
+  appVersion?: string
+  /** docProps/app.xml Template; defaults to Word's "Normal.dotm". */
+  template?: string
+  /** drop the Application / AppVersion generator fields from docProps/app.xml
+   *  (the Word-default Template stays); defaults to false. */
+  omitGeneratorFields?: boolean
 }
 
 /** Build a minimal valid .docx: one empty paragraph, portrait page, standard styles. */
@@ -525,6 +566,8 @@ export async function buildBlankDocx(options?: BlankDocxOptions): Promise<Uint8A
       '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
       '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
       '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>' +
+      `<Override PartName="/${CORE_PROPERTIES_PATH}" ContentType="${CORE_PROPERTIES_CONTENT_TYPE}"/>` +
+      `<Override PartName="/${APP_PROPERTIES_PATH}" ContentType="${APP_PROPERTIES_CONTENT_TYPE}"/>` +
       '</Types>',
   )
 
@@ -532,6 +575,8 @@ export async function buildBlankDocx(options?: BlankDocxOptions): Promise<Uint8A
     '_rels/.rels',
     `${XML_DECL}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
       '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+      `<Relationship Id="rId2" Type="${CORE_PROPERTIES_REL_TYPE}" Target="${CORE_PROPERTIES_PATH}"/>` +
+      `<Relationship Id="rId3" Type="${APP_PROPERTIES_REL_TYPE}" Target="${APP_PROPERTIES_PATH}"/>` +
       '</Relationships>',
   )
 
@@ -545,6 +590,20 @@ export async function buildBlankDocx(options?: BlankDocxOptions): Promise<Uint8A
 
   zip.file('word/styles.xml', stylesXml(options?.eastAsiaFont))
   zip.file('word/numbering.xml', NUMBERING_XML)
+
+  // Word always writes both parts; a document created here carries minimal
+  // Word-like ones so later property sets have a home (and DMS tools see the
+  // expected metadata instead of nothing)
+  zip.file(CORE_PROPERTIES_PATH, newDocumentCorePropertiesXml(options?.createdAt))
+  zip.file(
+    APP_PROPERTIES_PATH,
+    newDocumentAppPropertiesXml({
+      application: options?.application,
+      appVersion: options?.appVersion,
+      template: options?.template,
+      omitGeneratorFields: options?.omitGeneratorFields,
+    }),
+  )
 
   const paper = PAPER_TWIPS[options?.paperSize ?? 'A4']
   const sectPr =

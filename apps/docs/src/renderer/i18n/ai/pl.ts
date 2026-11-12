@@ -224,4 +224,6 @@ export const pl = {
   aiMindMapReset: 'Resetuj widok',
   aiMindMapExpand: 'Rozwiń gałąź',
   aiMindMapCollapse: 'Zwiń gałąź',
+  aiMindMapExportSvg: 'Eksportuj SVG',
+  aiMindMapInsert: 'Wstaw do dokumentu',
 } satisfies Record<keyof typeof zh, string>

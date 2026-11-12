@@ -223,4 +223,6 @@ export const ja = {
   aiMindMapReset: '表示をリセット',
   aiMindMapExpand: 'ブランチを展開',
   aiMindMapCollapse: 'ブランチを折りたたむ',
+  aiMindMapExportSvg: 'SVG で書き出す',
+  aiMindMapInsert: 'ドキュメントに挿入',
 } satisfies Record<keyof typeof zh, string>

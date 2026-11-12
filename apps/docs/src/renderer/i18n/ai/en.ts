@@ -222,4 +222,6 @@ export const en = {
   aiMindMapReset: 'Reset view',
   aiMindMapExpand: 'Expand branch',
   aiMindMapCollapse: 'Collapse branch',
+  aiMindMapExportSvg: 'Export SVG',
+  aiMindMapInsert: 'Insert into document',
 } satisfies Record<keyof typeof zh, string>

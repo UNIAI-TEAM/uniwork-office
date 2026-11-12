@@ -49,6 +49,29 @@ async function buildHeaderLogoDocx(
   })
 }
 
+describe('header layout-table vMerge', () => {
+  const tc = (w: number, merge: string, text: string) =>
+    `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${merge}</w:tcPr><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:tc>`
+  const header =
+    '<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tbl>' +
+    '<w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr><w:tblGrid><w:gridCol w:w="3000"/><w:gridCol w:w="6000"/></w:tblGrid>' +
+    `<w:tr>${tc(3000, '<w:vMerge w:val="restart"/>', 'Tall')}${tc(6000, '', 'b')}</w:tr>` +
+    `<w:tr>${tc(3000, '<w:vMerge/>', '')}${tc(6000, '', 'd')}</w:tr>` +
+    `<w:tr>${tc(3000, '<w:vMerge/>', '')}${tc(6000, '', 'f')}</w:tr>` +
+    '</w:tbl></w:hdr>'
+
+  it('marks the restart cell with its row span and the continuations as empty placeholders', async () => {
+    const doc = await parseDocx(await buildHeaderLogoDocx(header))
+    const rows = Object.values(doc.hfParts ?? {})[0].paras
+    expect(rows).toHaveLength(3)
+    expect(rows[0].cells![0]).toMatchObject({ vSpan: 3 })
+    expect(rows[0].cells![1].vSpan).toBeUndefined()
+    expect(rows[1].cells![0]).toMatchObject({ vMergeContinue: true })
+    expect(rows[1].cells![0].vSpan).toBeUndefined()
+    expect(rows[2].cells![0]).toMatchObject({ vMergeContinue: true })
+  })
+})
+
 describe('header/footer images (display-only Logo)', () => {
   it('parses header images with size, text paragraphs unaffected', async () => {
     const doc = await parseDocx(await buildHeaderLogoDocx())
@@ -304,6 +327,50 @@ describe('header/footer images (display-only Logo)', () => {
     expect(svg).toContain('fill="#20093F"')
     expect(svg).toContain('d="M 0 0 L 20 0 L 10 20 Z"')
   })
+
+  it('stroke-only custGeom rule (cy=0 line, wps:style lnRef color) renders as a stroked SVG (header rule)', async () => {
+    const headerXml =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' +
+      ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"' +
+      ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"' +
+      ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' +
+      ' xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"' +
+      ' xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">' +
+      '<w:p><w:r><w:drawing><wp:anchor behindDoc="0">' +
+      '<wp:simplePos x="0" y="0"/>' +
+      '<wp:positionH relativeFrom="page"><wp:posOffset>682625</wp:posOffset></wp:positionH>' +
+      '<wp:positionV relativeFrom="page"><wp:posOffset>1070610</wp:posOffset></wp:positionV>' +
+      '<wp:extent cx="4230370" cy="19050"/><wp:wrapSquare wrapText="bothSides"/>' +
+      '<a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup">' +
+      '<wpg:wgp><wpg:cNvGrpSpPr/><wpg:grpSpPr><a:xfrm>' +
+      '<a:off x="0" y="0"/><a:ext cx="4230370" cy="19050"/>' +
+      '<a:chOff x="0" y="0"/><a:chExt cx="4230370" cy="19050"/>' +
+      '</a:xfrm></wpg:grpSpPr>' +
+      '<wps:wsp><wps:cNvPr id="2" name="Shape 2"/><wps:cNvSpPr/><wps:spPr>' +
+      '<a:xfrm><a:off x="0" y="0"/><a:ext cx="4230370" cy="0"/></a:xfrm>' +
+      '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="0" t="0" r="0" b="0"/>' +
+      '<a:pathLst><a:path w="4230370">' +
+      '<a:moveTo><a:pt x="0" y="0"/></a:moveTo>' +
+      '<a:lnTo><a:pt x="4230370" y="0"/></a:lnTo>' +
+      '</a:path></a:pathLst></a:custGeom>' +
+      '<a:ln w="19050" cap="flat"><a:miter lim="127000"/></a:ln>' +
+      '</wps:spPr><wps:style>' +
+      '<a:lnRef idx="1"><a:srgbClr val="000000"/></a:lnRef>' +
+      '<a:fillRef idx="0"><a:srgbClr val="000000"><a:alpha val="0"/></a:srgbClr></a:fillRef>' +
+      '<a:effectRef idx="0"><a:scrgbClr r="0" g="0" b="0"/></a:effectRef>' +
+      '<a:fontRef idx="none"/></wps:style><wps:bodyPr/></wps:wsp>' +
+      '</wpg:wgp></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p></w:hdr>'
+    const doc = await parseDocx(await buildHeaderLogoDocx(headerXml))
+    expect(doc.headerImages).toHaveLength(1)
+    const img = doc.headerImages![0]
+    expect(img.floating).toBe(true)
+    expect(img.wrap).toBe('square')
+    expect(img.heightPx).toBe(2)
+    const svg = decodeURIComponent(img.dataUrl.slice('data:image/svg+xml,'.length))
+    expect(svg).toContain('d="M 0 1 L 444.13 1"')
+    expect(svg).toContain('fill="none" stroke="#000000" stroke-width="2"')
+  })
 })
 
 describe('layout-table cell images (header logo in a w:tbl cell)', () => {
@@ -545,6 +612,47 @@ const ANCHOR_PIC = (posH: string, posV: string): string =>
   '</a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>'
 
 const hdr = (inner: string): string => HEADER_XML.replace(/<w:p>[\s\S]*<\/w:p>/, inner)
+
+describe('inline OLE object (w:object) in a header', () => {
+  const VML_NS =
+    ' xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"'
+  const hdr = (body: string): string =>
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' +
+    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"' +
+    VML_NS +
+    `>${body}</w:hdr>`
+  const OLE_RELS =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" Target="embeddings/oleObject1.bin"/>' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>' +
+    '</Relationships>'
+  const object = (shapeStyle: string) =>
+    '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:object w:dxaOrig="6707" w:dyaOrig="1040">' +
+    `<v:shape id="_x0000_i1025" type="#_x0000_t75"${shapeStyle}><v:imagedata r:id="rId1" o:title=""/></v:shape>` +
+    '<o:OLEObject Type="Embed" ProgID="MSDraw" ShapeID="_x0000_i1025" DrawAspect="Content" ObjectID="_1" r:id="rId2"/>' +
+    '</w:object></w:r></w:p>'
+
+  it('paints the preview picture in the strip like a VML picture', async () => {
+    const headerXml = hdr(object(' style="width:335.6pt;height:51.95pt"'))
+    const doc = await parseDocx(await buildHeaderLogoDocx(headerXml, OLE_RELS))
+    expect(doc.headerImages).toHaveLength(1)
+    const img = doc.headerImages![0]
+    expect(img.dataUrl.startsWith('data:image/png;base64,')).toBe(true)
+    expect(img.floating).toBeUndefined()
+    expect(img.align).toBe('center')
+    expect(img.widthPx).toBe(447)
+    expect(img.heightPx).toBe(69)
+  })
+
+  it('falls back to dxaOrig/dyaOrig when the shape has no style', async () => {
+    const doc = await parseDocx(await buildHeaderLogoDocx(hdr(object('')), OLE_RELS))
+    const img = doc.headerImages![0]
+    expect(img.widthPx).toBe(447)
+    expect(img.heightPx).toBe(69)
+  })
+})
 
 describe('anchored header/footer object bands (wp:positionH/V relativeFrom)', () => {
   it('keeps the margin bands as the offset/alignment origin', async () => {

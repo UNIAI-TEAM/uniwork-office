@@ -91,6 +91,8 @@ export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.f
   print: false,
   exportPdf: false,
   exportHtml: false,
+  exportMarkdown: false,
+  exportImages: false,
   readOnlyProfile: false,
 })
 
@@ -190,6 +192,10 @@ export default {
   // SYNC and truthiness-tested (AiPanel.tsx:1139/1148): '' routes files through
   // addPastedImage instead of addAttachmentPaths
   getPathForFile: () => '',
+
+  // ---- author name (Settings -> General; web uses host identity per doc) ---
+  getAuthorName: async () => '',
+  onAuthorNameChanged: noopDisposer,
 
   // ---- defaults for the open flow; webapi.ts (W5) overrides these ----------
   consumePendingOpenDocx: async () => null,
