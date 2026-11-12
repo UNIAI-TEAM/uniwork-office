@@ -836,6 +836,64 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     return { bytes }
   }
 
+  /**
+   * UNI-2518: read a download in 8 MiB Range windows so a cut costs one window, not the
+   * file. The whole transfer still answers to the one streamCeiling it had as a single GET.
+   * A route that ignores Range answers 200 and is read in that one piece.
+   */
+  const downloadRanged = (
+    target: { route: string; query?: URLSearchParams; label: string },
+    streamOptions: DownloadStreamOptions,
+  ): Promise<DownloadResult> => {
+    const { signal, onProgress } = streamOptions
+    const deadline = Date.now() + streamCeiling
+    const readChunk = (
+      range: { start: number; end: number } | undefined,
+      chunkProgress: (progress: { receivedBytes: number; totalBytes: number | null }) => void,
+    ): Promise<RangedChunk> =>
+      send({
+        method: 'GET',
+        route: target.route,
+        ...(target.query ? { query: target.query } : {}),
+        ...(range ? { range: `bytes=${range.start}-${range.end}` } : {}),
+        // R5BE-9: no chunk for transferTimeout ends it, not the whole transfer
+        timeoutMs: transferTimeout,
+        idle: { ceilingMs: Math.max(1, deadline - Date.now()) },
+        ...(signal ? { signal } : {}),
+        async read(response, progress) {
+          const streamed = { signal, onProgress: chunkProgress }
+          if (response.status !== 206) {
+            return { kind: 'whole', ...(await readBoundedStream(response, progress, streamed)) }
+          }
+          const window = parseContentRange(response.headers.get('Content-Range'))
+          if (!window || window.total > MAX_DOWNLOAD_BYTES) {
+            void response.body?.cancel().catch(() => undefined)
+            throw new UniworkDocError(window ? 'too_large' : 'malformed_response')
+          }
+          return {
+            kind: 'partial',
+            ...window,
+            checksum: response.headers.get('X-Checksum-Sha256'),
+            // a window's Content-Length is not the file's size
+            ...(await readBoundedStream(response, progress, {
+              signal,
+              onProgress: ({ receivedBytes }) =>
+                chunkProgress({ receivedBytes, totalBytes: window.total }),
+            })),
+          }
+        },
+      })
+    return downloadInChunks({
+      readChunk,
+      maxBytes: MAX_DOWNLOAD_BYTES,
+      deadline,
+      label: target.label,
+      log: (line) => console.warn(line),
+      ...(signal ? { signal } : {}),
+      ...(onProgress ? { onProgress } : {}),
+    })
+  }
+
   return {
     async listWorkspaces(orgId) {
       const raw = await send({
@@ -1020,13 +1078,14 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     },
 
     async downloadSource(workspaceId, sourceId) {
-      return send({
-        method: 'GET',
-        route: `/workspaces/${id(workspaceId)}/documents/sources/${uniworkSourceId(sourceId)}/download`,
-        timeoutMs: transferTimeout,
-        idle: { ceilingMs: streamCeiling },
-        read: readBoundedStream,
-      })
+      const source = uniworkSourceId(sourceId)
+      return downloadRanged(
+        {
+          route: `/workspaces/${id(workspaceId)}/documents/sources/${source}/download`,
+          label: `source=${source}`,
+        },
+        {},
+      )
     },
 
     async listWorkspaceMembers(workspaceId) {
@@ -1489,55 +1548,14 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     async downloadStream(documentId, version, streamOptions = {}) {
       const query = new URLSearchParams()
       if (version !== undefined && version > 0) query.set('version', String(Math.floor(version)))
-      const { signal, onProgress } = streamOptions
-      // UNI-2518: read in 8 MiB Range windows so a cut costs one window, not the file. The
-      // whole transfer still answers to the one streamCeiling it had as a single GET.
-      const deadline = Date.now() + streamCeiling
-      const readChunk = (
-        range: { start: number; end: number } | undefined,
-        chunkProgress: (progress: { receivedBytes: number; totalBytes: number | null }) => void,
-      ): Promise<RangedChunk> =>
-        send({
-          method: 'GET',
+      return downloadRanged(
+        {
           route: `/documents/${id(documentId)}/download`,
           query,
-          ...(range ? { range: `bytes=${range.start}-${range.end}` } : {}),
-          // R5BE-9: no chunk for transferTimeout ends it, not the whole transfer
-          timeoutMs: transferTimeout,
-          idle: { ceilingMs: Math.max(1, deadline - Date.now()) },
-          ...(signal ? { signal } : {}),
-          async read(response, progress) {
-            const streamed = { signal, onProgress: chunkProgress }
-            if (response.status !== 206) {
-              return { kind: 'whole', ...(await readBoundedStream(response, progress, streamed)) }
-            }
-            const window = parseContentRange(response.headers.get('Content-Range'))
-            if (!window || window.total > MAX_DOWNLOAD_BYTES) {
-              void response.body?.cancel().catch(() => undefined)
-              throw new UniworkDocError(window ? 'too_large' : 'malformed_response')
-            }
-            return {
-              kind: 'partial',
-              ...window,
-              checksum: response.headers.get('X-Checksum-Sha256'),
-              // a window's Content-Length is not the file's size
-              ...(await readBoundedStream(response, progress, {
-                signal,
-                onProgress: ({ receivedBytes }) =>
-                  chunkProgress({ receivedBytes, totalBytes: window.total }),
-              })),
-            }
-          },
-        })
-      return downloadInChunks({
-        readChunk,
-        maxBytes: MAX_DOWNLOAD_BYTES,
-        deadline,
-        label: `document=${id(documentId)} version=${version !== undefined && version > 0 ? Math.floor(version) : 'live'}`,
-        log: (line) => console.warn(line),
-        ...(signal ? { signal } : {}),
-        ...(onProgress ? { onProgress } : {}),
-      })
+          label: `document=${id(documentId)} version=${version !== undefined && version > 0 ? Math.floor(version) : 'live'}`,
+        },
+        streamOptions,
+      )
     },
 
     async upload(input) {

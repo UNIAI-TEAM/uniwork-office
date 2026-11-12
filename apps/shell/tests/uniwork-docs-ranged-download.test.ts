@@ -298,3 +298,46 @@ describe('downloadStream in Range windows (UNI-2518)', () => {
     expect(fake.ranges).toEqual([win(0, SIZE), win(1, SIZE)])
   })
 })
+
+describe('downloadSource in Range windows (UNI-2518)', () => {
+  const SIZE = 2 * CHUNK + 17
+
+  it('reads a multi-window source with identical bytes, one window dropped and retried alone', async () => {
+    const file = fileOf(SIZE)
+    const urls: string[] = []
+    const fake = server(file, {
+      behave: (range, nth) => (range === win(1, SIZE) && nth === 1 ? 'cut' : 'ok'),
+    })
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { bytes } = await api(async (url, init) => {
+      urls.push(String(url))
+      return fake.fetch(url, init)
+    }).downloadSource('ws_1', 'chat:att_1')
+    expect(Buffer.compare(Buffer.from(bytes), Buffer.from(file))).toBe(0)
+    expect(fake.ranges).toEqual([win(0, SIZE), win(1, SIZE), win(1, SIZE), win(2, SIZE)])
+    expect(new Set(urls)).toEqual(
+      new Set([`${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/chat%3Aatt_1/download`]),
+    )
+    // ids only: the source id, no workspace, origin or token
+    const line = String(log.mock.calls.at(-1)?.[0])
+    expect(line).toContain('source=chat%3Aatt_1')
+    expect(line).toContain('retries=1')
+    expect(line).not.toMatch(/ws_1|https?:|tok/)
+  })
+
+  it('reads a source route that answers 200 without Range in one request', async () => {
+    const file = fileOf(SIZE)
+    const fake = server(file, { noRange: true })
+    const { bytes } = await api(fake.fetch).downloadSource('ws_1', 'task:att_1')
+    expect(Buffer.compare(Buffer.from(bytes), Buffer.from(file))).toBe(0)
+    expect(fake.ranges).toHaveLength(1)
+  })
+
+  it('gives the error a cut single GET had when one window keeps failing', async () => {
+    const file = fileOf(SIZE)
+    const fake = server(file, { behave: (range) => (range === win(1, SIZE) ? 'cut' : 'ok') })
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    expect(await ending(api(fake.fetch).downloadSource('ws_1', 'email:att_1'))).toBe('network')
+    expect(fake.ranges).toEqual([win(0, SIZE), win(1, SIZE), win(1, SIZE), win(1, SIZE)])
+  })
+})
