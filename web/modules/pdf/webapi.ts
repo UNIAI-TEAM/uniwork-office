@@ -950,6 +950,13 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
         bytes: await (await core()).cropPagesBytes(bytes, request.pages, request.rect),
       }))
     },
+    async restoreFile(request) {
+      const { path, bytes } = request ?? {}
+      if (Object.prototype.toString.call(bytes) !== '[object ArrayBuffer]') {
+        return fail(NOT_GRANTED)
+      }
+      return rewrite(path, async () => ({ bytes: new Uint8Array(bytes) }))
+    },
     async insertPdf(request) {
       if (!can('insertPages')) return fail(NOT_AVAILABLE)
       const refused = writeRefusal(request?.path)
