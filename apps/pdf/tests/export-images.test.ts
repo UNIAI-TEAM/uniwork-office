@@ -148,10 +148,7 @@ describe('PDF image export paths', () => {
       canvas.toDataURL('image/jpeg', 0.92).split(',')[1] ?? '',
       'base64',
     )
-    const encoded50 = Buffer.from(
-      canvas.toDataURL('image/jpeg', 0.5).split(',')[1] ?? '',
-      'base64',
-    )
+    const encoded50 = Buffer.from(canvas.toDataURL('image/jpeg', 0.5).split(',')[1] ?? '', 'base64')
     const toDataURLSpy = vi.spyOn(canvas, 'toDataURL')
 
     const b64 = encodeExportPage(canvas, 'jpg')
