@@ -318,15 +318,13 @@ export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOp
     key: string,
   ): Promise<SourceViewResult<OpenSourceValue>> => {
     const startedAt = epoch
-    // the sweep removes the whole preview root: write only after it is done
-    await Promise.resolve(deps.startupSweep).catch(() => undefined)
-    if (epoch !== startedAt) return fail('not_signed_in')
-
     const hash = createHash('sha256').update(key).digest('hex').slice(0, 16)
     const dir = join(sessionDir(), hash)
     const path = join(dir, safeFileName(input.name, extension))
     let dirCreated = false
     const ensureDir = async (): Promise<void> => {
+      // the sweep removes the whole preview root: write only after it is done
+      await Promise.resolve(deps.startupSweep).catch(() => undefined)
       if (epoch !== startedAt) throw new UniworkDocError('not_signed_in')
       if (dirCreated) return
       // owner-only: the plaintext of an attachment must not be readable by other users
