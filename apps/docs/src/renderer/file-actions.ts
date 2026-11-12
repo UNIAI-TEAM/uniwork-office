@@ -61,7 +61,7 @@ import { docTextLength, docWeight, openTierFor, refusalMeasureFor } from './larg
 import { documentToMarkdown } from './export-markdown'
 import { collectPdfInternalLinks } from './pdf-internal-links'
 import type { PdfInternalLink } from '../shared/ipc'
-import { docStyleCss } from './doc-style-css'
+import { docBodyEaFont, docStyleCss } from './doc-style-css'
 import { setNoteNumFmts } from './note-format'
 import type { CompareEntry } from './editor/compare'
 import { blocksToPmDoc, pmDocOptions, pmDocToSavePlan, type PmNode } from './editor/convert'
@@ -96,6 +96,8 @@ import {
   setAdditiveParagraphSpacing,
   setDocFontTable,
   setHangulSpaceWidening,
+  setLatinViaEastAsiaSlot,
+  latinViaEastAsiaSlotFor,
 } from './line-metrics'
 import { adoptEmbeddedFonts } from './embedded-fonts'
 import { prefetchFaces } from './font-resolve'
@@ -393,6 +395,7 @@ function applyDocLayoutSettings(editor: Editor, parsed: ParsedDocFull): void {
   editor.storage.cjkPunctShrink.legacyLayout = (parsed.compatibilityMode ?? 0) < 15
   editor.storage.cjkPunctShrink.docEastAsiaLang = parsed.docDefaults?.eastAsiaLang ?? null
   setHangulSpaceWidening(hangulSpaceWideningFor(parsed))
+  setLatinViaEastAsiaSlot(latinViaEastAsiaSlotFor(parsed), docBodyEaFont(parsed))
   setStaticAsciiResolver(() => editor.storage.listNumbering)
   // Chromium only hyphenates under an explicit lang (the app shell is zh-CN);
   // scoped to autoHyphenation docs so CJK font fallback is untouched elsewhere

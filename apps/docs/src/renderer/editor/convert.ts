@@ -83,6 +83,7 @@ import { charScaleXAttr, parseGlowAttr, parseTextEffectAttr } from './text-effec
 import { SHAPE_INLINE_WRAP, shapeWrapOf } from './floating-z-order'
 import { REDACT_BDR } from './redaction'
 import { holdsDeclaredWidth, resolveTableWidth } from './table-geometry'
+import type { PictureLayer } from './image-rotation'
 import { tableFloatSideRoom } from './anchor-geometry'
 
 export { holdsDeclaredWidth }
@@ -1911,10 +1912,12 @@ export function runsToInline(runs: Run[]): PmNode[] {
           rotDeg: run.image.rotDeg ?? null,
           flipH: run.image.flipH ?? false,
           flipV: run.image.flipV ?? false,
+          layers: run.image.layers ?? null,
           rule: run.image.rule
             ? {
                 ...run.image.rule,
                 ...(run.sizeHalfPoints ? { sizeHalfPoints: run.sizeHalfPoints } : {}),
+                ...((run.fontAscii ?? run.font) ? { fontAscii: run.fontAscii ?? run.font } : {}),
               }
             : null,
           rawRPr: run.rawRPr ?? null,
@@ -3963,6 +3966,7 @@ export function inlineToRuns(content: PmNode[]): Run[] {
             ...(node.attrs?.rotDeg ? { rotDeg: Number(node.attrs.rotDeg) } : {}),
             ...(node.attrs?.flipH ? { flipH: true } : {}),
             ...(node.attrs?.flipV ? { flipV: true } : {}),
+            ...(node.attrs?.layers ? { layers: node.attrs.layers as PictureLayer[] } : {}),
           },
         })
       }

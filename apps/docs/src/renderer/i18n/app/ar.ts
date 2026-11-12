@@ -141,6 +141,7 @@ export const ar = {
   appCommentsTitleDoc: 'تعليقات المستند ({n})',
   appCommentPlaceholder: 'اكتب تعليقًا…',
   appCommentBtn: 'تعليق',
+  appAttachImage: 'إرفاق صورة',
   appUnknownAuthor: '(كاتب غير معروف)',
   appResolved: 'تم الحل',
   appResolvedComments: 'التعليقات المحلولة ({n})',

@@ -100,6 +100,16 @@ beforeEach(async () => {
   window.CSS ??= {
     escape: (v: string) => v.replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`),
   } as typeof CSS
+  HTMLCanvasElement.prototype.getContext = (() => ({
+    font: '',
+    measureText: (s: string) => ({
+      width: Math.max(1, s.length) * 60,
+      actualBoundingBoxLeft: 0,
+      actualBoundingBoxRight: Math.max(1, s.length) * 60,
+      actualBoundingBoxAscent: 70,
+      actualBoundingBoxDescent: 20,
+    }),
+  })) as unknown as typeof HTMLCanvasElement.prototype.getContext
   Object.defineProperty(document, 'fonts', {
     configurable: true,
     value: {
@@ -257,24 +267,21 @@ const pickWatermarkItem = (label: string, why: string) =>
   )
 
 describe('canvas watermark layer when the pending watermark changes', () => {
-  it('dropping a new text watermark hides the parsed WordArt float on the page', async () => {
+  it('dropping a new text watermark replaces the parsed WordArt float on the page', async () => {
     // the mounted document shows its parsed watermark as a behind-text float
     expect(document.querySelector('.ProseMirror'), 'editor mounted').not.toBeNull()
     await untilFloat()
-    expect(floatImages().length, 'parsed watermark paints as a page float').toBeGreaterThan(0)
-    expect(document.querySelector('.page-watermark'), 'no pending ghost yet').toBeNull()
+    expect(floatImages(), 'parsed watermark paints as a page float').toHaveLength(1)
+    expect(floatImages()[0]?.textContent).toBe('DRAFT')
 
-    // Design → Watermark → preset: only App state changes (watermarkDirty → true)
+    // Design → Watermark → preset: pendingWatermarkImage replaces the parsed
+    // WordArt shape in the float layer instead of stacking a second watermark
     openWatermarkMenu()
-    pickWatermarkItem(t('ribbonWatermarkDraft'), 'DRAFT preset')
+    pickWatermarkItem(t('ribbonWatermarkConfidential'), 'CONFIDENTIAL preset')
     await settle()
 
-    // the ghost text overlay shows the pending watermark…
-    expect(document.querySelector('.page-watermark'), 'pending ghost drawn').not.toBeNull()
-    // …and the parsed WordArt shape must be filtered out of the float layer —
-    // it stays a float until the next pagination rebuild, which the
-    // watermarkDirty dep is there to schedule
-    expect(floatImages(), 'parsed watermark float dropped').toHaveLength(0)
+    expect(floatImages(), 'pending watermark float replaces parsed one').toHaveLength(1)
+    expect(floatImages()[0]?.textContent).toBe(t('ribbonWatermarkConfidential'))
   })
 
   it('removing the watermark drops the parsed WordArt float too', async () => {

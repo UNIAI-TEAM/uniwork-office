@@ -151,6 +151,7 @@ export const de = {
   appCommentsTitleDoc: 'Kommentare im Dokument ({n})',
   appCommentPlaceholder: 'Kommentar eingeben…',
   appCommentBtn: 'Kommentar',
+  appAttachImage: 'Bild anhängen',
   appUnknownAuthor: '(Unbekannter Autor)',
   appResolved: 'Gelöst',
   appResolvedComments: 'Gelöste Kommentare ({n})',
