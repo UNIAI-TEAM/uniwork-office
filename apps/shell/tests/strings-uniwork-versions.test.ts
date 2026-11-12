@@ -82,7 +82,7 @@ describe('uniwork versions string shard', () => {
     expect(en.vhsShelvedBlocked).toBe('This document is archived and read-only.')
     expect(vi.vhsDownloadVersion).toBe('Tải phiên bản {no}')
     expect(en.vhsDownloadFailed).toBe('Could not download the file')
-    expect(vi.vhsReasonManual).toBe('phiên bản thủ công')
+    expect(vi.vhsReasonManual).toBe('thủ công')
     expect(vi.vhsNameSubmit).toBe('Tạo phiên bản')
     expect(en.vhsNameSubmit).toBe('Create version')
     for (const lang of ['vi', 'en'] as const) {
