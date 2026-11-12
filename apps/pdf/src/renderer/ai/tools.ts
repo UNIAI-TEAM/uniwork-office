@@ -300,7 +300,7 @@ export const AGENT_TOOLS: AgentToolDef[] = [
   {
     name: 'find_sensitive_info',
     description:
-      'Find phone numbers, email addresses, credit card numbers (Luhn-checked), US Social Security numbers, dates and IBANs (mod-97 checked) in the document text with deterministic matchers. Returns each hit with its page. mark=true also queues every hit as a pending redaction mark; the user must review the marks and click Apply redactions themselves — you cannot apply them. Scanned pages are covered only after OCR.',
+      'Find phone numbers, email addresses, credit card numbers (Luhn-checked), US Social Security numbers, Vietnamese Citizen IDs (CCCD), Vietnamese tax IDs (MST, mod-11 checked), dates and IBANs (mod-97 checked) in the document text with deterministic matchers. Returns each hit with its page. mark=true also queues every hit as a pending redaction mark; the user must review the marks and click Apply redactions themselves — you cannot apply them. Scanned pages are covered only after OCR.',
     inputSchema: {
       type: 'object',
       properties: {
