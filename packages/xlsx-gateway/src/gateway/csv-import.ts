@@ -362,6 +362,35 @@ export function csvGridShape(
 }
 
 /**
+ * csvGridShape for the desktop import: the same single pass, but it awaits
+ * `pause` every few thousand rows so the caller can hand the event loop back
+ * (the scan of a 50 MB file is seconds of synchronous work otherwise, and a
+ * Cancel click queued behind it is not handled until the scan ends). The
+ * parser stays free of node APIs; the caller supplies the pause.
+ */
+export async function csvGridShapeYielding(
+  input: string,
+  delimiter: string,
+  pause: () => Promise<void>,
+  options?: CsvImportOptions,
+): Promise<CsvGridShape> {
+  let rows = 0
+  let columns = 1
+  const total = Math.max(input.length, 1)
+  const scan = {
+    onOffset: (chars: number) => options?.onProgress?.({ phase: 'read', fraction: chars / total }),
+    ...(options?.signal ? { signal: options.signal } : {}),
+  }
+  for (const row of csvRows(input, delimiter, scan)) {
+    rows += 1
+    columns = noteColumn(columns, row)
+    if (rows % 2048 === 0) await pause()
+  }
+  options?.onProgress?.({ phase: 'read', fraction: 1 })
+  return { rows, columns }
+}
+
+/**
  * The worksheet XML, chunk by chunk. A 40 MB CSV becomes a worksheet several
  * times its size, and building that as one string is what made the import
  * need a gigabyte of memory; the chunks go into the archive as they come.

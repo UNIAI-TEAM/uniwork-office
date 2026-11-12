@@ -13,6 +13,7 @@ import JSZip from 'jszip'
 
 import {
   csvGridShape,
+  csvGridShapeYielding,
   csvRows,
   escapeXml,
   resolveImportDelimiter,
@@ -48,7 +49,9 @@ export async function csvToXlsxBufferForOpen(
   options?: CsvImportOptions,
 ): Promise<{ buffer: Buffer; empty: boolean }> {
   const resolved = delimiter ?? resolveImportDelimiter(csvText)
-  const shape = csvGridShape(csvText, resolved, options)
+  // the open path runs in the main process: the scan hands the event loop back
+  // so the progress events and the Cancel click are handled while it runs
+  const shape = await csvGridShapeYielding(csvText, resolved, loopPause(), options)
   const buffer = await xlsxBufferFromGrid(csvRows(csvText, resolved), shape, sheetName, options)
   return { buffer, empty: shape.rows === 0 }
 }
@@ -73,6 +76,24 @@ export async function sheetCsvToXlsxBuffer(
 export async function blankXlsxBuffer(sheetName = 'Sheet1'): Promise<Buffer> {
   const shape: CsvGridShape = { rows: 0, columns: 1 }
   return xlsxBufferFromGrid([], shape, sheetName)
+}
+
+/** how long the import may hold the event loop before it lets queued work run */
+const SLICE_MS = 25
+
+/**
+ * A pause for the import's loops: it resolves at once while the current slice
+ * is young and, once the slice is SLICE_MS old, waits one turn of the event
+ * loop (setImmediate runs after the pending IPC and timer callbacks), so the
+ * import stays about as fast and the main process answers within a slice.
+ */
+function loopPause(): () => Promise<void> {
+  let sliceStart = performance.now()
+  return async () => {
+    if (performance.now() - sliceStart < SLICE_MS) return
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    sliceStart = performance.now()
+  }
 }
 
 /**
@@ -143,8 +164,9 @@ function worksheetXmlStream(
   shape: CsvGridShape,
   options?: CsvImportOptions,
 ): Readable {
+  const pause = loopPause()
   return Readable.from(
-    (function* (): Generator<Buffer> {
+    (async function* (): AsyncGenerator<Buffer> {
       // The archive reads the worksheet as it compresses it, so the rows
       // arrive at the compressor's pace: the row count is the progress, and an
       // abort lands while the compression is still running (the error the
@@ -159,6 +181,10 @@ function worksheetXmlStream(
       })
       for (const chunk of chunks) {
         options?.signal?.throwIfAborted()
+        // The archive pulls this stream through promise callbacks only, so
+        // without a real event-loop turn here the whole write runs as one
+        // task and nothing queued behind it (Cancel) is handled until the end.
+        await pause()
         yield Buffer.from(chunk, 'utf8')
       }
     })(),

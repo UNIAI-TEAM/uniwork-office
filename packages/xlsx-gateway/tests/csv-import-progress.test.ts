@@ -109,4 +109,64 @@ describe('the delimited import progress', () => {
     controller.abort()
     expect(() => csvGridShape(CSV, ',', { signal: controller.signal })).toThrow(/abort/i)
   })
+
+  describe('keeps the event loop responsive (UNI-2527)', () => {
+    // The desktop import runs in the main process. A Cancel click is an IPC
+    // callback queued behind the running task, so an import that never ends
+    // its task (the archive pulls the worksheet through promise callbacks
+    // only) handles Cancel when it is already over.
+    const bigCsv = (): string => {
+      const lines = ['id,name,amount,note']
+      for (let i = 1; i <= 30_000; i += 1) lines.push(`${i},name ${i},${i * 1.5},"note, ${i}"`)
+      return lines.join('\n')
+    }
+
+    it('lets a queued callback run while the text is being read', async () => {
+      // 150 000 rows is several hundred ms of scan: a callback queued at the
+      // first read checkpoint must have run by the time the scan reports its
+      // end (a scan that never yields reports the end in the same task).
+      const lines = ['id,name,amount']
+      for (let i = 1; i <= 150_000; i += 1) lines.push(`${i},name ${i},${i * 1.5}`)
+      const controller = new AbortController()
+      let queuedRan = false
+      let queued = false
+      let ranBeforeReadEnd: boolean | undefined
+      const promise = csvToXlsxBufferForOpen(lines.join('\n'), 'Sheet1', ',', {
+        onProgress: (progress) => {
+          if (progress.phase === 'read' && !queued) {
+            queued = true
+            setTimeout(() => {
+              queuedRan = true
+            }, 0)
+          }
+          if (progress.phase === 'read' && progress.fraction === 1) ranBeforeReadEnd = queuedRan
+          if (progress.phase === 'write') controller.abort() // the write is not measured here
+        },
+        signal: controller.signal,
+      })
+      await expect(promise).rejects.toThrow(/abort/i)
+      expect(ranBeforeReadEnd).toBe(true)
+    })
+
+    it('honours a cancel that arrives as a macrotask after the write began', async () => {
+      const controller = new AbortController()
+      let writing = false
+      let doneRows = 0
+      const promise = csvToXlsxBufferForOpen(bigCsv(), 'Sheet1', ',', {
+        onProgress: (progress) => {
+          if (progress.phase !== 'write') return
+          doneRows += 1
+          if (!writing) {
+            writing = true
+            // what cancelImport's IPC handler does, delivered as its own task
+            setTimeout(() => controller.abort(), 0)
+          }
+        },
+        signal: controller.signal,
+      })
+      await expect(promise).rejects.toThrow(/abort/i)
+      // it stopped well before the 30 000 rows were written
+      expect(doneRows).toBeLessThan(30_000)
+    })
+  })
 })
