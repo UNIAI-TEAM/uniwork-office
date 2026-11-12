@@ -69,6 +69,22 @@ describe('NotePictureHoverCard', () => {
     expect(onRemove).toHaveBeenCalledWith('sheet-1', 3, 2)
   })
 
+  it('hides the remove button when readOnly is true', async () => {
+    await mount(
+      createElement(NotePictureHoverCard, {
+        card: cardOf(),
+        sessionId: 'session-1',
+        onRemove: vi.fn(),
+        readOnly: true,
+      }),
+    )
+    const card = document.querySelector('.note-hover-card')
+    expect(card).not.toBeNull()
+    expect(card!.querySelector('.np-author')?.textContent).toBe('Alice')
+    expect(card!.querySelector('.np-image')?.getAttribute('src')).toBe('data:image/png;base64,AAA')
+    expect(card!.querySelector('.np-remove')).toBeNull()
+  })
+
   it('renders nothing without a card, and no picture without bytes', async () => {
     await mount(
       createElement(NotePictureHoverCard, { card: null, sessionId: undefined, onRemove: vi.fn() }),

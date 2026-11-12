@@ -6100,6 +6100,7 @@ export function App({
           handleRemoveNotePicture(ribbonContext(), sheetId, row, column)
           setNotePopupCard(null)
         }}
+        readOnly={workbookFile?.readOnly === true || isViewOnly()}
       />
       {redactDialog && (
         <RedactDialog

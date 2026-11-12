@@ -165,10 +165,13 @@ export function NotePictureHoverCard({
   card,
   sessionId,
   onRemove,
+  readOnly = false,
 }: {
   readonly card: NotePopupCard | null
   readonly sessionId: string | undefined
   readonly onRemove: (sheetId: string, row: number, column: number) => void
+  /** a view-only or locked document: the card still shows the picture but cannot remove it */
+  readonly readOnly?: boolean
 }): React.JSX.Element | null {
   const { t } = useI18n()
   const ref = useRef<HTMLDivElement | null>(null)
@@ -228,15 +231,17 @@ export function NotePictureHoverCard({
     >
       <header>
         {picture.author && <span className="np-author">{picture.author}</span>}
-        <button
-          type="button"
-          className="np-remove"
-          aria-label={t('appNotePictureRemove')}
-          title={t('appNotePictureRemove')}
-          onClick={() => onRemove(shown.sheetId, shown.row, shown.column)}
-        >
-          ×
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            className="np-remove"
+            aria-label={t('appNotePictureRemove')}
+            title={t('appNotePictureRemove')}
+            onClick={() => onRemove(shown.sheetId, shown.row, shown.column)}
+          >
+            ×
+          </button>
+        )}
       </header>
       <Picture sessionId={sessionId} picture={picture} />
       {picture.text && <p className="np-text">{picture.text}</p>}
