@@ -411,6 +411,43 @@ describe('slicer write + read round trip', () => {
     expect(xml).toContain('</pivotCacheDefinition>')
   })
 
+  it("wires a first slicer at worksheet level past a linked CF rule's nested extLst", async () => {
+    const pkg = fixture()
+    pkg.write(
+      'xl/worksheets/sheet1.xml',
+      WORKSHEET.replace(
+        '</sheetData>',
+        '</sheetData><conditionalFormatting sqref="A1"><cfRule type="dataBar" priority="1"><dataBar><cfvo type="min"/><cfvo type="max"/><color rgb="FF638EC6"/></dataBar><extLst><ext uri="{B025F937-C7B1-47D3-B67F-A62EFF666E3E}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:id>{1}</x14:id></ext></extLst></cfRule></conditionalFormatting>',
+      ),
+    )
+    await applySlicerState(pkg, { slicers: [SLICER_INPUT], removals: [] }, WORKBOOK, new Set())
+    const xml = await pkg.readText('xl/worksheets/sheet1.xml')
+    const slicerExt = xml.indexOf('<x14:slicerList>')
+    expect(slicerExt).toBeGreaterThan(xml.indexOf('</conditionalFormatting>'))
+    expect(xml.slice(slicerExt).match(/<\/extLst>/g)).toHaveLength(1)
+    expect(xml.indexOf('</worksheet>')).toBeGreaterThan(slicerExt)
+    expect(await parseSlicerState(readerOf(pkg))).toHaveLength(1)
+  })
+
+  it('adds the x14 ext to a pivot cache definition that already has an extLst', async () => {
+    const pkg = fixture()
+    pkg.write(
+      'xl/pivotCache/pivotCacheDefinition1.xml',
+      PIVOT_CACHE.replace(
+        '</pivotCacheDefinition>',
+        '<extLst><ext uri="{FOREIGN}" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"><x15:pivotCacheDecoupled/></ext></extLst></pivotCacheDefinition>',
+      ),
+    )
+    await applySlicerState(pkg, { slicers: [SLICER_INPUT], removals: [] }, WORKBOOK, new Set())
+    const xml = await pkg.readText('xl/pivotCache/pivotCacheDefinition1.xml')
+    expect(xml.match(/<extLst>/g)).toHaveLength(1)
+    expect(xml).toContain('<x15:pivotCacheDecoupled/>')
+    expect(xml).toContain('<x14:pivotCacheDefinition pivotCacheId="1"/>')
+    expect(xml.indexOf('<x14:pivotCacheDefinition')).toBeGreaterThan(
+      xml.indexOf('<x15:pivotCacheDecoupled/>'),
+    )
+  })
+
   it('removes parts, rels, exts, frames, and content types without leaving orphans', async () => {
     const { pkg, slicer } = await writeInitial()
     pkg.write(
@@ -1112,6 +1149,130 @@ describe('slicer state through the save planner', () => {
     expect(followed.file('xl/slicers/slicer2.xml')).not.toBeNull()
     const followWorkbook = await followed.file('xl/workbook.xml')!.async('string')
     expect(followWorkbook.match(/<definedName\b/g) ?? []).toHaveLength(1)
+  })
+
+  it('round-trips a workbook with a slicer and a timeline (open -> save -> reopen keeps both)', async () => {
+    const timelineXml =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<timelines xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main">' +
+      '<timeline name="Date" cache="Timeline_Date" caption="Date" level="2" selectionLevel="2"/></timelines>'
+    const timelineCacheXml =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<timelineCacheDefinition xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" name="Timeline_Date" sourceName="Date">' +
+      '<pivotTables><pivotTable tabId="1" name="Pivot1"/></pivotTables>' +
+      '<state filterType="dateBetween"/></timelineCacheDefinition>'
+    const baseZip = await JSZip.loadAsync(await plannerFixture())
+    baseZip.file('xl/timelines/timeline1.xml', timelineXml)
+    baseZip.file('xl/timelineCaches/timelineCache1.xml', timelineCacheXml)
+    const initialBuffer = await baseZip.generateAsync({ type: 'nodebuffer' })
+
+    // First save: write the slicer into a workbook that already carries a timeline.
+    const firstPlan = await planCellEditsToXlsx(
+      await createBufferEntrySource(initialBuffer),
+      [],
+      [],
+      [],
+      undefined,
+      [],
+      [],
+      [],
+      [],
+      [],
+      null,
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      null,
+      null,
+      [],
+      [],
+      [],
+      [],
+      [],
+      null,
+      { slicers: [{ sheetName: 'Data', ...SLICER_INPUT }], removals: [] },
+    )
+    const firstSaved = await assembleWithJsZip(initialBuffer, firstPlan)
+    expect(() => assertOnlyTouchedEntriesChanged(firstSaved)).not.toThrow()
+
+    // Open: restore the slicer from the saved workbook.
+    const opened = await parseSlicerState(await createBufferEntrySource(firstSaved.buffer))
+    expect(opened).toHaveLength(1)
+    expect(opened[0]).toMatchObject({
+      sheetId: 'sheet-1',
+      name: 'Region',
+      selectedItems: [0, 2],
+    })
+
+    // Save again with updated slicer selection: both the updated slicer and the timeline survive.
+    const secondPlan = await planCellEditsToXlsx(
+      await createBufferEntrySource(firstSaved.buffer),
+      [],
+      [],
+      [],
+      undefined,
+      [],
+      [],
+      [],
+      [],
+      [],
+      null,
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      null,
+      null,
+      [],
+      [],
+      [],
+      [],
+      [],
+      null,
+      {
+        slicers: [
+          {
+            sheetName: 'Data',
+            ...SLICER_INPUT,
+            name: opened[0]!.name,
+            partPath: opened[0]!.partPath,
+            cachePath: opened[0]!.cachePath,
+            cacheName: opened[0]!.cacheName,
+            items: [
+              { x: 0, selected: false },
+              { x: 1, selected: true },
+              { x: 2, selected: true },
+            ],
+          },
+        ],
+        removals: [],
+      },
+    )
+    const secondSaved = await assembleWithJsZip(firstSaved.buffer, secondPlan)
+    expect(() => assertOnlyTouchedEntriesChanged(secondSaved)).not.toThrow()
+
+    // Reopen: slicer selection reflects the second save, and timeline parts remain byte-identical.
+    const reopened = await parseSlicerState(await createBufferEntrySource(secondSaved.buffer))
+    expect(reopened).toHaveLength(1)
+    expect(reopened[0]!.selectedItems).toEqual([1, 2])
+    const reopenedZip = await JSZip.loadAsync(secondSaved.buffer)
+    expect(await reopenedZip.file('xl/timelines/timeline1.xml')?.async('string')).toBe(timelineXml)
+    expect(await reopenedZip.file('xl/timelineCaches/timelineCache1.xml')?.async('string')).toBe(
+      timelineCacheXml,
+    )
   })
 })
 
