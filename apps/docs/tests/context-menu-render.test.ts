@@ -77,25 +77,25 @@ describe('EditorContextMenu render & fork seams (FE-W1-01 / W1-E1)', () => {
 
     await act(async () => {
       root!.render(
-        createElement(
-          LocaleProvider,
-          { initial: 'en' },
-          createElement(EditorContextMenu, {
+        createElement(LocaleProvider, {
+          initial: 'en',
+          children: createElement(EditorContextMenu, {
             editor: editor!,
-            menu: { left: 100, top: 100, pos: 2 },
-            canEdit: true,
-            canComment: true,
+            menu: { x: 100, y: 100, pos: 2 },
+            commentsAllowed: true,
             onClose: vi.fn(),
             onFontDialog: vi.fn(),
             onParagraphDialog: vi.fn(),
             onLink: vi.fn(),
             onNewComment: vi.fn(),
+            onViewImage: vi.fn(),
+            onSaveImageAs: vi.fn(),
             onAiPreset: vi.fn(),
             onRedact,
             onUnredact: vi.fn(),
             trackChanges: { on: false, onToggle: onToggleTrack },
           }),
-        ),
+        }),
       )
     })
 
