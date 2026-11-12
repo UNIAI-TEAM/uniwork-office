@@ -111,9 +111,7 @@ describe('the write guard on model output', () => {
     expect(out.error).toMatch(/placeholder/i)
   })
 
-  // needs findReplace to scan table cells (scanParagraphs, snapshot aff3d20aa): the fork's findReplace
-  // never matches inside a table, so the batch is a no-op there and nothing can be overwritten
-  it.skip('refuses a batch that overwrites a span inside a table cell', async () => {
+  it('refuses a batch that overwrites a span inside a table cell', async () => {
     const editor = await marked(true)
     expect(editor.getText()).toContain(SECRET)
     const out = executeOps(editor, replaceOps(SECRET, 'the number'))
