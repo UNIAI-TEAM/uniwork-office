@@ -1171,7 +1171,10 @@ export function App() {
   }, [autoSave, path, editing, editingCell, save])
 
   const saveAs = useCallback(() => fileActions.saveAs(() => ctxRef.current), [])
-  const exportImages = useCallback(() => fileActions.exportImages(ctxRef.current), [])
+  const exportImages = useCallback(
+    (format: 'png' | 'jpg' = 'png') => fileActions.exportImages(ctxRef.current, format),
+    [],
+  )
   const exportPdf = useCallback(() => void fileActions.exportPdf(ctxRef.current), [])
 
   // Headless export mode (--headless-export): this renderer lives in a hidden
@@ -2572,7 +2575,8 @@ export function App() {
       else if (cmd === 'save-as') void saveAs()
       // macOS has no File ribbon tab, so these only exist in the menu
       else if (cmd === 'export-pdf' && cap('exportPdf')) void exportPdf()
-      else if (cmd === 'export-images' && cap('saveAs')) void exportImages()
+      else if (cmd === 'export-images' && cap('saveAs')) void exportImages('png')
+      else if (cmd === 'export-images-jpg' && cap('saveAs')) void exportImages('jpg')
       else if (cmd === 'print' && cap('print')) setPrintDlgOpen(true)
       // Through the preview path so the zoom pivots on the viewport center, not the scroll origin
       else if (cmd === 'zoom-in') previewZoom(nextPreset)
@@ -3568,7 +3572,8 @@ export function App() {
         onExportPdf={() => void exportPdf()}
         onUseApp={setUseAppFeature}
         onPrint={() => setPrintDlgOpen(true)}
-        onExportImages={() => void exportImages()}
+        onExportImages={() => void exportImages('png')}
+        onExportImagesJpg={() => void exportImages('jpg')}
         onFormat={onFormat}
         zoom={zoom}
         onZoom={previewZoom}

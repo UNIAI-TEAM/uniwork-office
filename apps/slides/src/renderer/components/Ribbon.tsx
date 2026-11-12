@@ -1164,6 +1164,7 @@ export function Ribbon({
   onUseApp,
   onPrint,
   onExportImages,
+  onExportImagesJpg,
   onFormat,
   zoom,
   onZoom,
@@ -1911,15 +1912,26 @@ export function Ribbon({
                   </button>
                 )}
                 {cap('saveAs') && (
-                  <button
-                    disabled={!hasDoc}
-                    onClick={() => {
-                      setFileOpen(false)
-                      onExportImages()
-                    }}
-                  >
-                    {t('ribbonFileExportImages')}
-                  </button>
+                  <>
+                    <button
+                      disabled={!hasDoc}
+                      onClick={() => {
+                        setFileOpen(false)
+                        onExportImages()
+                      }}
+                    >
+                      {t('ribbonFileExportImages')}
+                    </button>
+                    <button
+                      disabled={!hasDoc}
+                      onClick={() => {
+                        setFileOpen(false)
+                        onExportImagesJpg()
+                      }}
+                    >
+                      {t('ribbonFileExportImagesJpg')}
+                    </button>
+                  </>
                 )}
               </div>
             )}

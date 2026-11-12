@@ -26,20 +26,25 @@ export function pageWidthIn(widthPx: number, heightPx: number): number {
 }
 
 /** `<base>-01.png` ... (3 digits from 100 pages on, like the desktop) */
-export function imageFileNames(baseName: string, count: number): string[] {
+export function imageFileNames(
+  baseName: string,
+  count: number,
+  ext: 'png' | 'jpg' = 'png',
+): string[] {
   const pad = count >= 100 ? 3 : 2
   return Array.from(
     { length: count },
-    (_, i) => `${baseName}-${String(i + 1).padStart(pad, '0')}.png`,
+    (_, i) => `${baseName}-${String(i + 1).padStart(pad, '0')}.${ext}`,
   )
 }
 
 export async function zipImages(
   baseName: string,
   pngsBase64: readonly string[],
+  ext: 'png' | 'jpg' = 'png',
 ): Promise<Uint8Array> {
   const zip = new JSZip()
-  const names = imageFileNames(baseName, pngsBase64.length)
+  const names = imageFileNames(baseName, pngsBase64.length, ext)
   pngsBase64.forEach((b64, i) => zip.file(names[i]!, base64ToBytes(b64)))
   return zip.generateAsync({ type: 'uint8array', compression: 'STORE' })
 }

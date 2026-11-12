@@ -1321,7 +1321,7 @@ export function createWebSlidesApi(
       if (!canSaveAs()) return { ok: false, error: text('webReadOnly') }
       try {
         const name = safeFileName(`${op.baseName}-images.zip`, 'slides-images.zip')
-        const zip = await zipImages(op.baseName, op.pngsBase64)
+        const zip = await zipImages(op.baseName, op.pngsBase64, op.format === 'jpg' ? 'jpg' : 'png')
         download(name, new Blob([zip as Uint8Array<ArrayBuffer>], { type: 'application/zip' }))
         return { ok: true, paths: [name] }
       } catch (err) {
