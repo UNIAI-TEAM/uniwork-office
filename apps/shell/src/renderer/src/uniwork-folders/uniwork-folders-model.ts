@@ -7,7 +7,7 @@ import type {
 } from '../../../shared/home-api'
 import type { StringKey } from '../locale'
 import { isOpenable, type DocNameError } from '../uniwork-docs-model'
-import { canCreateInsideFolder, workspaceFolderIntoMyFolder } from './ws-folder'
+import { canCreateInsideFolder, isInsideMyFolder, workspaceFolderIntoMyFolder } from './ws-folder'
 
 /**
  * FD-11 (UNI-1809) folder tree model: what UniworkFolderTree, UniworkBrowser
@@ -481,6 +481,44 @@ export function withMyFolderLabel(nodes: UniworkFolderNode[], label: string): Un
       })),
     )
   return visit(nodes)
+}
+
+// ── The workspace folder node (UNI-2509, the web's F11) ──
+
+/**
+ * The id of the Documents sidebar's "workspace folder" node. It is drawn by the tree only and stands for
+ * the workspace root (the documents with no parent, My Folder aside). It is not a ULID (the colon is
+ * outside Crockford base32): never a document id, never sent to the server, kept in a URL, a recent
+ * entry or a stored selection. The tree never hands it to a host callback; its menu comes from the host.
+ */
+export const WORKSPACE_NODE_ID = 'ui:workspace-root'
+
+export function isWorkspaceNode(entry: { id: string | null } | null | undefined): boolean {
+  return entry?.id === WORKSPACE_NODE_ID
+}
+
+/**
+ * The roots as the sidebar draws them: My Folder first, then one node that wraps every other root (the
+ * node still wraps them when there is no My Folder yet). `nodes` is the labelled forest (My Folder
+ * first); the real forest and every move rule stay untouched.
+ */
+export function withWorkspaceNode(nodes: UniworkFolderNode[], title: string): UniworkFolderNode[] {
+  const node: UniworkFolderNode = {
+    id: WORKSPACE_NODE_ID,
+    parentId: null,
+    title,
+    position: 0,
+    children: nodes.filter((n) => !isMyFolder(n)),
+  }
+  return [...nodes.filter(isMyFolder), node]
+}
+
+/**
+ * Whether what sits inside `id` (null = the workspace root) is drawn under the workspace folder node:
+ * the root and every folder outside My Folder. An id the index does not hold is not judged.
+ */
+export function drawnUnderWorkspaceNode(index: FolderIndex, id: string | null): boolean {
+  return id === null || (index.has(id) && !isInsideMyFolder(id, index))
 }
 
 /** the id of My Folder in a tree, at any depth; null when the tree has none */

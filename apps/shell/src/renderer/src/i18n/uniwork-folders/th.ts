@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const th = {
   ufRoot: 'เอกสาร (ราก)',
+  ufWorkspaceFolder: 'โฟลเดอร์ของพื้นที่ทำงาน',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'โฟลเดอร์',
   ufContentsLabel: 'เนื้อหาโฟลเดอร์',

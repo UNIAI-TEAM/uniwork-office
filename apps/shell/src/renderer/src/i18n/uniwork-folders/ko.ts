@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const ko = {
   ufRoot: '문서(루트)',
+  ufWorkspaceFolder: '작업 공간 폴더',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: '폴더',
   ufContentsLabel: '폴더 내용',

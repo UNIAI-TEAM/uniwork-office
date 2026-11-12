@@ -1,6 +1,7 @@
 /** FD-11 UniWork folder tree: browser, tree, picker, folder actions; zh defines the key set */
 export const zh = {
   ufRoot: '文档（根目录）',
+  ufWorkspaceFolder: '工作区文件夹',
   ufTreeLabel: '文件夹',
   ufContentsLabel: '文件夹内容',
   ufRecent: '最近',

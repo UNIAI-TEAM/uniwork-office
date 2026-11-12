@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const ar = {
   ufRoot: 'المستندات (الجذر)',
+  ufWorkspaceFolder: 'مجلد مساحة العمل',
   ufTreeLabel: 'المجلدات',
   ufContentsLabel: 'محتوى المجلد',
   ufRecent: 'الأخيرة',

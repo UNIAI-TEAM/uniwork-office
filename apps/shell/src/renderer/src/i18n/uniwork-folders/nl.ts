@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const nl = {
   ufRoot: 'Documenten (hoofdmap)',
+  ufWorkspaceFolder: 'Werkruimtemap',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Mappen',
   ufContentsLabel: 'Inhoud van de map',

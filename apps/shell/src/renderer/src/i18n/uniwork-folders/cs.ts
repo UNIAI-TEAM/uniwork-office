@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const cs = {
   ufRoot: 'Dokumenty (kořen)',
+  ufWorkspaceFolder: 'Složka pracovního prostoru',
   ufTreeLabel: 'Složky',
   ufContentsLabel: 'Obsah složky',
   ufRecent: 'Nedávné',

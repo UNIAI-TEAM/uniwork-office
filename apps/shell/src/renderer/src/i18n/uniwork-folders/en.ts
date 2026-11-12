@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const en = {
   ufRoot: 'Documents (root)',
+  ufWorkspaceFolder: 'Workspace folder',
   ufTreeLabel: 'Folders',
   ufContentsLabel: 'Folder contents',
   ufRecent: 'Recent',

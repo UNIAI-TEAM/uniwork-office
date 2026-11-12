@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const id = {
   ufRoot: 'Dokumen (akar)',
+  ufWorkspaceFolder: 'Folder ruang kerja',
   ufTreeLabel: 'Folder',
   ufContentsLabel: 'Isi folder',
   ufRecent: 'Terbaru',

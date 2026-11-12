@@ -55,7 +55,9 @@ import { FolderGlyph, MyFolderGlyph, UniworkFolderTree } from '../uniwork-folder
 import {
   MY_FOLDER_LABEL_KEY,
   ROOT_KEY,
+  WORKSPACE_NODE_ID,
   buildFolderIndex,
+  drawnUnderWorkspaceNode,
   entryTitleOf,
   expandKeysFor,
   expandParentAndAncestorsFor,
@@ -74,7 +76,11 @@ import {
 } from '../uniwork-folders/uniwork-folders-model'
 import { useFolderActions } from '../uniwork-folders/use-folder-actions'
 import { useFolderLevels } from '../uniwork-folders/use-folder-levels'
-import { canCreateInsideFolder, type WorkspaceFolderCandidate } from '../uniwork-folders/ws-folder'
+import {
+  canCreateInsideFolder,
+  isHumanMemberRole,
+  type WorkspaceFolderCandidate,
+} from '../uniwork-folders/ws-folder'
 import {
   canPurgeDocuments,
   cancelUploadDocument,
@@ -511,7 +517,8 @@ export function DocumentsHome({
   // the Drive node remembers its chevron here beside the folders' (open by default, reset with them)
   // a restored Drive view opens its account's folder nodes, so the current node is visible
   const [expanded, setExpanded] = useState<Set<string>>(() => {
-    const keys = [ROOT_KEY, DRIVE_NODE_KEY]
+    // the workspace folder node starts open: it holds the folders that used to be the tree (never persisted)
+    const keys = [ROOT_KEY, DRIVE_NODE_KEY, WORKSPACE_NODE_ID]
     if (initialSubView === 'google-drive' && initialDriveView?.accountId) {
       keys.push(driveAccountKey(initialDriveView.accountId))
     }
@@ -660,7 +667,12 @@ export function DocumentsHome({
 
   const expandParent = useCallback(
     (parentId: string | null) => {
-      setExpanded((prev) => new Set([...prev, ...expandParentAndAncestorsFor(index, parentId)]))
+      setExpanded((prev) => {
+        const next = new Set([...prev, ...expandParentAndAncestorsFor(index, parentId)])
+        // a folder made or moved to the root lands under the workspace folder node
+        if (drawnUnderWorkspaceNode(index, parentId)) next.add(WORKSPACE_NODE_ID)
+        return next
+      })
     },
     [index],
   )
@@ -688,7 +700,7 @@ export function DocumentsHome({
     setFolderNotice(null)
     setMyFolderId(null)
     setElsewhereSource(null)
-    setExpanded(new Set([ROOT_KEY, DRIVE_NODE_KEY]))
+    setExpanded(new Set([ROOT_KEY, DRIVE_NODE_KEY, WORKSPACE_NODE_ID]))
     resetFilters()
     setSearchDraft('')
     setKnownAuthors([])
@@ -769,10 +781,22 @@ export function DocumentsHome({
       })
   }, [workspaceId, treeTick])
 
-  // Expand ancestors when initialFolderId or folderId is set
+  // Expand ancestors when initialFolderId or folderId is set. The workspace folder node is no ancestor in
+  // the index, so a folder under it opens it here, once per folder: folding it afterwards sticks.
+  const openedUnderWorkspaceRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!folderId || tree.nodes.length === 0) return
-    setExpanded((prev) => new Set([...prev, ...expandKeysFor(index, folderId)]))
+    if (!folderId) {
+      openedUnderWorkspaceRef.current = null
+      return
+    }
+    if (tree.nodes.length === 0) return
+    const keys = expandKeysFor(index, folderId)
+    if (!drawnUnderWorkspaceNode(index, folderId)) openedUnderWorkspaceRef.current = null
+    else if (openedUnderWorkspaceRef.current !== folderId) {
+      openedUnderWorkspaceRef.current = folderId
+      keys.push(WORKSPACE_NODE_ID)
+    }
+    setExpanded((prev) => new Set([...prev, ...keys]))
   }, [folderId, index, tree.nodes.length])
 
   // Notify host of open folder changes so area switches preserve open folder
@@ -2860,6 +2884,22 @@ export function DocumentsHome({
               idPrefix={`${uid}-tree`}
               hideRoot
               afterFirstRootRow={hasMyFolderNode ? driveSidebarRows : undefined}
+              workspaceNode={{
+                // the node's only entry: a new folder at the workspace root (the "+" above does the same)
+                menu:
+                  myRole === null || isHumanMemberRole(myRole)
+                    ? [
+                        {
+                          id: 'new',
+                          label: t('ufNewFolder'),
+                          onSelect: () => {
+                            onSidebarNavigate?.()
+                            folderActions.openCreate(null, false)
+                          },
+                        },
+                      ]
+                    : [],
+              }}
               nodes={tree.nodes}
               label={t('ufTreeLabel')}
               expanded={expanded}

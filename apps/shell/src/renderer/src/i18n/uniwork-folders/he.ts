@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const he = {
   ufRoot: 'מסמכים (שורש)',
+  ufWorkspaceFolder: 'תיקיית סביבת העבודה',
   ufTreeLabel: 'תיקיות',
   ufContentsLabel: 'תוכן התיקייה',
   ufRecent: 'אחרונים',

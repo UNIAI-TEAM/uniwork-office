@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const vi = {
   ufRoot: 'Tài liệu (gốc)',
+  ufWorkspaceFolder: 'Thư mục của workspace',
   ufTreeLabel: 'Thư mục',
   ufContentsLabel: 'Nội dung thư mục',
   ufRecent: 'Gần đây',

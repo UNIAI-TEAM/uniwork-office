@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const hi = {
   ufRoot: 'दस्तावेज़ (रूट)',
+  ufWorkspaceFolder: 'वर्कस्पेस का फ़ोल्डर',
   ufTreeLabel: 'फ़ोल्डर',
   ufContentsLabel: 'फ़ोल्डर की सामग्री',
   ufRecent: 'हाल के',

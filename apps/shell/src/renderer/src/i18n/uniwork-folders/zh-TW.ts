@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const zhTW = {
   ufRoot: '文件（根目錄）',
+  ufWorkspaceFolder: '工作區資料夾',
   ufTreeLabel: '資料夾',
   ufContentsLabel: '資料夾內容',
   ufRecent: '最近',
