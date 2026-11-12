@@ -105,6 +105,7 @@ const api: PdfApi = {
     ipcRenderer.on('uniwork:comment-author-changed', listener)
     return () => ipcRenderer.removeListener('uniwork:comment-author-changed', listener)
   },
+  getDefaultZoom: () => ipcRenderer.invoke(PDF_CHANNELS.getDefaultZoom),
   setDirty: (dirty) => ipcRenderer.send(PDF_CHANNELS.dirtyChanged, dirty),
   onCloseSaveRequest: (handler) => {
     const listener = (_e: Electron.IpcRendererEvent, request?: { origin?: unknown }) =>
