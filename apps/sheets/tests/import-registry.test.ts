@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+
+import { csvToXlsxBufferForOpen } from '@genoffice/xlsx-gateway/gateway/csv-import-xlsx'
 
 import { ImportRegistry } from '../src/main/import-registry'
+import { cleanupImportTempDirectory } from '../src/main/temp-files'
 
 /**
  * The cancel for a delimited import (a .csv/.tsv opened as a workbook) has to
@@ -87,5 +95,89 @@ describe('the import registry', () => {
     const controller = registry.start(7)
     registry.finish(7, controller)
     expect(registry.wasCancelled(controller)).toBe(false)
+  })
+
+  it('a cancelled import leaves no written worksheet / temp file and opens no session', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'sheets-cancel-import-'))
+    try {
+      const registry = new ImportRegistry()
+      const openWorkbookSession = vi.fn()
+      const csvText = `col1,col2\n${'alpha,10\n'.repeat(200)}`
+
+      // Case 1: Cancelled during conversion (write phase) before writeFile
+      const dirMid = join(tempRoot, 'genoffice-imports', randomUUID())
+      const openPathMid = join(dirMid, 'cancelled-mid.xlsx')
+      await mkdir(dirMid, { recursive: true })
+      const controllerMid = registry.start(42)
+      let sessionMid: unknown = 'unset'
+      try {
+        try {
+          const converted = await csvToXlsxBufferForOpen(csvText, 'Sheet1', ',', {
+            signal: controllerMid.signal,
+            onProgress: (progress) => {
+              if (progress.phase === 'write') registry.cancel(42)
+            },
+          })
+          controllerMid.signal.throwIfAborted()
+          await writeFile(openPathMid, converted.buffer)
+          controllerMid.signal.throwIfAborted()
+        } catch (error) {
+          await cleanupImportTempDirectory(tempRoot, dirMid)
+          throw error
+        }
+        sessionMid = await openWorkbookSession(openPathMid)
+      } catch (error) {
+        if (registry.wasCancelled(controllerMid)) {
+          sessionMid = null
+        } else {
+          throw error
+        }
+      } finally {
+        registry.finish(42, controllerMid)
+      }
+
+      expect(sessionMid).toBeNull()
+      expect(existsSync(openPathMid)).toBe(false)
+      expect(existsSync(dirMid)).toBe(false)
+      expect(openWorkbookSession).not.toHaveBeenCalled()
+
+      // Case 2: Late cancel arriving while writeFile completes still removes the temp file and opens no session
+      const dirLate = join(tempRoot, 'genoffice-imports', randomUUID())
+      const openPathLate = join(dirLate, 'cancelled-late.xlsx')
+      await mkdir(dirLate, { recursive: true })
+      const controllerLate = registry.start(42)
+      let sessionLate: unknown = 'unset'
+      try {
+        try {
+          const converted = await csvToXlsxBufferForOpen(csvText, 'Sheet1', ',', {
+            signal: controllerLate.signal,
+          })
+          controllerLate.signal.throwIfAborted()
+          await writeFile(openPathLate, converted.buffer)
+          registry.cancel(42)
+          controllerLate.signal.throwIfAborted()
+        } catch (error) {
+          await cleanupImportTempDirectory(tempRoot, dirLate)
+          throw error
+        }
+        sessionLate = await openWorkbookSession(openPathLate)
+      } catch (error) {
+        if (registry.wasCancelled(controllerLate)) {
+          sessionLate = null
+        } else {
+          throw error
+        }
+      } finally {
+        registry.finish(42, controllerLate)
+      }
+
+      expect(sessionLate).toBeNull()
+      expect(existsSync(openPathLate)).toBe(false)
+      expect(existsSync(dirLate)).toBe(false)
+      expect(openWorkbookSession).not.toHaveBeenCalled()
+      expect(registry.controllerFor(42)).toBeUndefined()
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true })
+    }
   })
 })
