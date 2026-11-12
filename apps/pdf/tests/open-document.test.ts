@@ -4,10 +4,11 @@ import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it, vi } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
 import { decryptDocument } from '../src/main/pdf-crypt'
+import type { getDocument as getDocumentType } from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 const { getDocument } = vi.hoisted(() => ({ getDocument: vi.fn() }))
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({ getDocument }))
-import { loadPdfForView } from '../src/renderer/open-document'
+import { loadPdfForView, withLoadedPdf } from '../src/renderer/open-document'
 
 // A real transferable boundary, like PDF.js handing document data to its worker.
 // The reader itself is not needed to exercise the caller's retained bytes.
@@ -70,5 +71,62 @@ describe('document loading retains source bytes for the open pipeline', () => {
     await expect(opened.promise).rejects.toBe(error)
     expect(getDocument.mock.calls[0][0].password).toBe('incorrect')
     getDocument.mockReset()
+  })
+})
+
+describe('withLoadedPdf (printDoc load path)', () => {
+  it.each([
+    ['encrc4.pdf', 'user123', 2],
+    ['enc-r5-aes256.pdf', 's3cret', 1],
+    ['enc-r5-owneronly.pdf', '', 1],
+  ])(
+    'opens encrypted fixture %s with its stored password and cleans up the loading task',
+    async (file, password, expectedPages) => {
+      const actual = await vi.importActual<{ getDocument: typeof getDocumentType }>(
+        'pdfjs-dist/legacy/build/pdf.mjs',
+      )
+      getDocument.mockImplementation((opts) => actual.getDocument(opts))
+      try {
+        const bytes = new Uint8Array(readFileSync(join(__dirname, 'fixtures', file)))
+        let destroyed = 0
+        const pageCount = await withLoadedPdf(bytes, password, async (doc) => {
+          const origDestroy = doc.loadingTask.destroy.bind(doc.loadingTask)
+          vi.spyOn(doc.loadingTask, 'destroy').mockImplementation(async () => {
+            destroyed++
+            await origDestroy()
+          })
+          const firstPage = await doc.getPage(1)
+          expect(firstPage.getViewport({ scale: 1 }).width).toBeGreaterThan(0)
+          firstPage.cleanup()
+          return doc.numPages
+        })
+        expect(pageCount).toBe(expectedPages)
+        expect(destroyed).toBe(1)
+      } finally {
+        getDocument.mockReset()
+      }
+    },
+  )
+
+  it('rejects when an encrypted fixture is opened without a password and destroys the failed task', async () => {
+    const actual = await vi.importActual<{ getDocument: typeof getDocumentType }>(
+      'pdfjs-dist/legacy/build/pdf.mjs',
+    )
+    let createdTask: { destroy: () => Promise<void> } | undefined
+    getDocument.mockImplementation((opts) => {
+      const task = actual.getDocument(opts)
+      createdTask = task
+      vi.spyOn(task, 'destroy')
+      return task
+    })
+    try {
+      const bytes = new Uint8Array(readFileSync(join(__dirname, 'fixtures', 'enc-r5-aes256.pdf')))
+      const run = vi.fn()
+      await expect(withLoadedPdf(bytes, null, run)).rejects.toThrow(/password/i)
+      expect(run).not.toHaveBeenCalled()
+      expect(createdTask?.destroy).toHaveBeenCalledTimes(1)
+    } finally {
+      getDocument.mockReset()
+    }
   })
 })
