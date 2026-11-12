@@ -161,7 +161,7 @@ describe('the Mailings tab', () => {
     const radios = [
       ...view.querySelectorAll<HTMLLabelElement>('label.protect-check.mailmerge-radio'),
     ]
-    expect(radios).toHaveLength(2)
+    expect(radios).toHaveLength(4)
     for (const label of radios) {
       expect(label.querySelector('input[type="radio"]')).not.toBeNull()
       expect(label.querySelector('span.ctl')).not.toBeNull()
