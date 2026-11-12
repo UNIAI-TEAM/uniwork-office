@@ -993,7 +993,7 @@ export default function App() {
   const [pendingSign, setPendingSign] = useState<SignatureData | null>(null)
   /** A /Sig widget selected from the form layer; confirmed signatures fit this rect directly. */
   const [signatureTarget, setSignatureTarget] = useState<FormWidget | null>(null)
-  const [exporting, setExporting] = useState<'png' | 'jpg' | null>(null)
+  const [exporting, setExporting] = useState(false)
   const [formCatalog, setFormCatalog] = useState<FormCatalog | null>(null)
   const [formHasXfa, setFormHasXfa] = useState(false)
   const [documentEncrypted, setDocumentEncrypted] = useState(false)
@@ -6029,7 +6029,7 @@ export default function App() {
   const exportImages = (allPages: boolean, format: 'png' | 'jpg' = 'png') =>
     flushThen(async () => {
       if (!doc || exporting) return
-      setExporting(format)
+      setExporting(true)
       try {
         const targets = allPages ? visList : [curOrigIdx].filter((i) => i >= 0)
         const images: string[] = []
@@ -6059,7 +6059,7 @@ export default function App() {
       } catch (err) {
         opFailed(err instanceof Error ? err.message : String(err))
       } finally {
-        setExporting(null)
+        setExporting(false)
       }
     })
 
@@ -8277,24 +8277,24 @@ export default function App() {
                       <button
                         className="rb-big"
                         data-tip={t('exportImagesAll')}
-                        disabled={exporting !== null}
+                        disabled={exporting}
                         onClick={() => void exportImages(true)}
                       >
                         <span className="rb-big-icon">
                           <IconExportImg />
                         </span>
-                        <span>{exporting === 'png' ? t('exporting') : t('exportImages')}</span>
+                        <span>{exporting ? t('exporting') : t('exportImages')}</span>
                       </button>
                       <button
                         className="rb-big"
                         data-tip={t('exportImagesAllJpg')}
-                        disabled={exporting !== null}
+                        disabled={exporting}
                         onClick={() => void exportImages(true, 'jpg')}
                       >
                         <span className="rb-big-icon">
                           <IconExportImg />
                         </span>
-                        <span>{exporting === 'jpg' ? t('exporting') : t('exportImagesJpg')}</span>
+                        <span>{exporting ? t('exporting') : t('exportImagesJpg')}</span>
                       </button>
                     </>
                   )}
