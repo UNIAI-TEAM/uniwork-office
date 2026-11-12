@@ -532,7 +532,7 @@ describe('open flow', () => {
     const other = join(dir, 'uniwork-documents', 'default', 'acc_2', DOC, 'Q4 plan.docx')
     const local = join(dir, 'plain.docx')
     writeFileSync(local, 'x')
-    const page = pageRecentPaths([path, other, local], {}, new Set(), (p) =>
+    const page = await pageRecentPaths([path, other, local], {}, new Set(), (p) =>
       ctx.service.recentSource(p),
     )
     expect(page.entries.map((e) => e.path)).toEqual([path, local])
@@ -544,7 +544,9 @@ describe('open flow', () => {
     })
     expect(page.entries[1]?.uniwork).toBeUndefined()
     ctx.signOut()
-    const hidden = pageRecentPaths([path, local], {}, new Set(), (p) => ctx.service.recentSource(p))
+    const hidden = await pageRecentPaths([path, local], {}, new Set(), (p) =>
+      ctx.service.recentSource(p),
+    )
     expect(hidden.entries.map((e) => e.path)).toEqual([local])
   })
 })

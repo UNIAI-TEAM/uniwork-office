@@ -378,7 +378,7 @@ import {
   pageRecentPaths,
   pageStarredPaths,
   type RecentUniworkLookup,
-  statPathEntries,
+  statPathEntriesAsync,
 } from './recent-files'
 import { isMoveSource, isUserVisibleFile, type FileTargetSources } from './file-targets'
 import {
@@ -5081,8 +5081,8 @@ function startQueuedWorkbookNudge(): void {
 
 // ---- home IPC ----
 
-function statEntries(paths: string[]): RecentEntry[] {
-  return statPathEntries(paths, new Set(readStarredFiles()))
+function statEntries(paths: string[]): Promise<RecentEntry[]> {
+  return statPathEntriesAsync(paths, new Set(readStarredFiles()))
 }
 
 /** recents, starred and search share one rule for UniWork working copies */
@@ -5228,7 +5228,7 @@ function registerHomeIpc(): void {
     openLegalDoc(doc, legalDocEnv(), { openPath: (path) => shell.openPath(path) }),
   )
 
-  guardedIpc.handle(HOME_CHANNELS.recents, (_event, query: unknown): RecentPage =>
+  guardedIpc.handle(HOME_CHANNELS.recents, (_event, query: unknown): Promise<RecentPage> =>
     pageRecentPaths(readRecentFiles(), query, new Set(readStarredFiles()), uniworkRecentLookup),
   )
 
@@ -5262,7 +5262,7 @@ function registerHomeIpc(): void {
   // Starred files sort by mtime, which requires stat-ing them all first; they
   // are hand-picked and few, so this is fine. The Starred view's group pills
   // scope the whole query (totals included) through the group map.
-  guardedIpc.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage =>
+  guardedIpc.handle(HOME_CHANNELS.starred, (_event, query: unknown): Promise<RecentPage> =>
     pageStarredPaths(readStarredFiles(), query, uniworkRecentLookup, readStarredGroupMap()),
   )
 
@@ -5272,7 +5272,7 @@ function registerHomeIpc(): void {
     setStarredGroup(stringPaths(paths), typeof group === 'string' && group ? group : null)
   })
 
-  guardedIpc.handle(HOME_CHANNELS.statPaths, (_event, paths: unknown): RecentEntry[] =>
+  guardedIpc.handle(HOME_CHANNELS.statPaths, (_event, paths: unknown): Promise<RecentEntry[]> =>
     statEntries(capStatPaths(stringPaths(paths))),
   )
 
