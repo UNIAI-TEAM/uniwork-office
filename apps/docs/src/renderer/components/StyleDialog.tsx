@@ -119,13 +119,17 @@ export function StyleDialog({ target, initial, styles, pending, onSubmit, onClos
     setTouched((prev) => new Set(prev).add(f))
   }
   const creating = target === null
-  const fontList = (picked: string) => {
+  const fonts = useMemo(() => {
     const list = [...fontFamiliesFor(lang)]
-    if (picked && !list.includes(picked)) list.unshift(picked)
+    if (values.font && !list.includes(values.font)) list.unshift(values.font)
     return list
-  }
-  const fonts = useMemo(() => fontList(values.font), [lang, values.font])
-  const eastAsiaFonts = useMemo(() => fontList(values.eastAsiaFont), [lang, values.eastAsiaFont])
+  }, [lang, values.font])
+  const eastAsiaFonts = useMemo(() => {
+    const list = [...fontFamiliesFor(lang)]
+    if (values.eastAsiaFont && !list.includes(values.eastAsiaFont))
+      list.unshift(values.eastAsiaFont)
+    return list
+  }, [lang, values.eastAsiaFont])
   const bases = useMemo(
     () =>
       [...styles.values()].filter(
