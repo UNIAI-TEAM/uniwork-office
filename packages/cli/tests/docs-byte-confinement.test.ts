@@ -85,42 +85,35 @@ it('keeps an untouched paragraph with <w:proofErr> byte-identical', async () => 
   expect(after).toContain('PLAIN TEXT')
 })
 
-// Fails today: the fork's docx-engine has no w16du:dateUtc support. Fixed by lane
-// office-port-docs-s1 (UNI-2516): the genoffice dateUtc snapshot hunks. Remove `.fails` once that lands.
-it.fails(
-  'keeps w16du:dateUtc on an untouched tracked paragraph and on a regenerated one',
-  async () => {
-    const dir = tempDir()
-    const input = await makeDocx(dir)
+it('keeps w16du:dateUtc on an untouched tracked paragraph and on a regenerated one', async () => {
+  const dir = tempDir()
+  const input = await makeDocx(dir)
 
-    // the edit lands elsewhere: the tracked paragraph is copied through verbatim
-    const out = await applyOps(
-      dir,
-      input,
-      [{ op: 'findReplace', find: 'plain text', replace: 'PLAIN TEXT' }],
-      'fr-elsewhere',
-    )
-    const before = await documentXml(input)
-    const after = await documentXml(out)
-    expect(paragraphWith(after, 'Inserted sentence')).toBe(
-      paragraphWith(before, 'Inserted sentence'),
-    )
-    expect((after.match(/w16du:dateUtc=/g) ?? []).length).toBe(2)
+  // the edit lands elsewhere: the tracked paragraph is copied through verbatim
+  const out = await applyOps(
+    dir,
+    input,
+    [{ op: 'findReplace', find: 'plain text', replace: 'PLAIN TEXT' }],
+    'fr-elsewhere',
+  )
+  const before = await documentXml(input)
+  const after = await documentXml(out)
+  expect(paragraphWith(after, 'Inserted sentence')).toBe(paragraphWith(before, 'Inserted sentence'))
+  expect((after.match(/w16du:dateUtc=/g) ?? []).length).toBe(2)
 
-    // the edit lands inside the tracked paragraph: it is regenerated, and the
-    // revision attributes (author/date/dateUtc) must survive
-    const out2 = await applyOps(
-      dir,
-      input,
-      [{ op: 'findReplace', find: 'Inserted sentence', replace: 'INSERTED sentence' }],
-      'fr-inside',
-    )
-    const after2 = await documentXml(out2)
-    expect(after2).toContain('INSERTED sentence')
-    const ins = /<w:ins\b[^>]*>/.exec(after2)?.[0] ?? ''
-    expect(ins).toContain('w:id="501"')
-    expect(ins).toContain('w:author="Author A"')
-    expect(ins).toContain('w:date="2026-01-01T10:00:00Z"')
-    expect(ins).toContain('w16du:dateUtc="2026-01-01T10:00:00Z"')
-  },
-)
+  // the edit lands inside the tracked paragraph: it is regenerated, and the
+  // revision attributes (author/date/dateUtc) must survive
+  const out2 = await applyOps(
+    dir,
+    input,
+    [{ op: 'findReplace', find: 'Inserted sentence', replace: 'INSERTED sentence' }],
+    'fr-inside',
+  )
+  const after2 = await documentXml(out2)
+  expect(after2).toContain('INSERTED sentence')
+  const ins = /<w:ins\b[^>]*>/.exec(after2)?.[0] ?? ''
+  expect(ins).toContain('w:id="501"')
+  expect(ins).toContain('w:author="Author A"')
+  expect(ins).toContain('w:date="2026-01-01T10:00:00Z"')
+  expect(ins).toContain('w16du:dateUtc="2026-01-01T10:00:00Z"')
+})
