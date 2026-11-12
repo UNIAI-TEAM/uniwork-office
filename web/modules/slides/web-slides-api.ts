@@ -1357,6 +1357,8 @@ export function createWebSlidesApi(
       hostPrint?.(r.ok)
       return r
     },
+    listPrinters: async () => [],
+    printerOptions: async () => [],
 
     // AI: hidden on the web (capability `ai` false); same shapes as the Docs stubs
     getAiSettings: () => aiStubs.getAiSettings() as ReturnType<SlidesApi['getAiSettings']>,
