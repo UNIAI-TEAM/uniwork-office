@@ -60,6 +60,7 @@ export interface ResolvedSave {
       tableEdits: PlanArgs[26]
       cellImageAdditions: PlanArgs[27]
       redactionStates: PlanArgs[28]
+      slicerState: PlanArgs[29]
     },
     never
   >
@@ -208,6 +209,16 @@ export function resolveSaveRequest(
         ...('previousFill' in mark ? { previousFill: mark.previousFill ?? null } : {}),
       })),
     })) ?? null
+  const slicerState =
+    (request.slicerState ?? null) === null
+      ? null
+      : {
+          slicers: request.slicerState!.slicers.map(({ sheetId, ...slicer }) => ({
+            sheetName: resolveSheetName(sheetId),
+            ...slicer,
+          })),
+          removals: [...request.slicerState!.removals],
+        }
   return {
     edits,
     args: {
@@ -327,6 +338,7 @@ export function resolveSaveRequest(
       bulkConstantFills,
       tabColorStates,
       redactionStates,
+      slicerState,
     },
   }
 }
@@ -476,6 +488,7 @@ export async function saveWorkbookBytes(input: {
     a.tableEdits,
     a.cellImageAdditions,
     a.redactionStates,
+    a.slicerState,
   )
   const plan = input.cachedValues
     ? await rewriteCachedValues(planned, source, input.cachedValues)

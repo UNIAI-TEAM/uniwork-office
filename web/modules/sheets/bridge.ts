@@ -1024,6 +1024,10 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       capabilities.pivotRefresh === false
         ? Promise.reject(new Error(`pivot refresh: ${NOT_AVAILABLE}`))
         : transport.readPivotDefinition(request),
+    readSlicerState: (request) =>
+      capabilities.pivotRefresh === false
+        ? Promise.reject(new Error(`pivot refresh: ${NOT_AVAILABLE}`))
+        : transport.readSlicerState(request),
     async readWorkbookRedactions(
       request: WorkbookRedactionsRequest,
     ): Promise<WorkbookRedactionsResult> {
