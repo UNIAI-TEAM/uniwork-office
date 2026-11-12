@@ -86,9 +86,15 @@ describe('workbench string shards', () => {
     expect(workbenchStrings.vi.wbNotifFallback).toBe('Thông báo mới')
   })
 
-  it('words document changes like the web in vi and en, 33 sentence keys', () => {
+  it('words document changes like the web in vi and en, 34 sentence keys', () => {
     const changed = referenceKeys.filter((k) => k.startsWith('wbNotif_document_changed'))
-    expect(changed).toHaveLength(33)
+    expect(changed).toHaveLength(34)
+    expect(workbenchStrings.vi.wbNotif_document_changed_version_created_via_one).toBe(
+      '{actor} đã cập nhật file “{document}” qua {client}',
+    )
+    expect(workbenchStrings.en.wbNotif_document_changed_version_created_via_one).toBe(
+      '{actor} updated the file “{document}” via {client}',
+    )
     expect(workbenchStrings.vi.wbNotif_document_changed_renamed_one).toBe(
       '{actor} đã đổi tên tài liệu “{document}”',
     )
