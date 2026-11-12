@@ -181,6 +181,7 @@ import { copyImageDisplaySize, validCopyImageDataUrl } from './copy-image-guard'
 import {
   hasNoPrinter,
   htmlExportPath,
+  markdownExportPath,
   pdfExportPath,
   printJobOptions,
   printScaleOption,
@@ -5529,6 +5530,8 @@ export function registerDocsIpc(): void {
       images: MarkdownImage[],
       outPath?: string,
     ) => {
+      // G5-03a: a locked working copy exports nothing
+      if (uniworkRefusesExport(event.sender.id)) return { ok: false }
       if (typeof markdown !== 'string' || !markdown) return { ok: false, error: 'empty document' }
       if (!Array.isArray(images)) return { ok: false, error: 'bad image list' }
       let filePath = outPath ?? null
@@ -5542,7 +5545,8 @@ export function registerDocsIpc(): void {
           filters: [{ name: 'Markdown', extensions: ['md'] }],
         })
         if (result.canceled || !result.filePath) return { ok: false }
-        filePath = result.filePath
+        // like docs:export-pdf, a merged export never lands on the open .docx; the .md name stays
+        filePath = markdownExportPath(result.filePath)
         allowPdfWrite(event.sender.id, filePath)
       }
       try {
@@ -5614,7 +5618,8 @@ export function registerDocsIpc(): void {
           filters: [{ name: 'PDF', extensions: ['pdf'] }],
         })
         if (result.canceled || !result.filePath) return { ok: false }
-        filePath = result.filePath
+        // like docs:export-pdf, a merged export never lands on the open .docx; the .pdf name stays
+        filePath = pdfExportPath(result.filePath)
         allowPdfWrite(event.sender.id, filePath)
       }
       try {
