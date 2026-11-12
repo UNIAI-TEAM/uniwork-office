@@ -17,6 +17,8 @@ describe('webCapabilities (the single web capability source)', () => {
         'desktopOpen',
         'docPassword',
         'exportHtml',
+        'exportImages',
+        'exportMarkdown',
         'exportPdf',
         'imageGeneration',
         'imageSearch',

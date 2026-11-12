@@ -23,6 +23,7 @@ export {
 export {
   parseDocx,
   reconcileGridColumns,
+  paraCsFormat,
   styleRunFormat,
   type ParseExtras,
   type ParseOptions,
@@ -104,7 +105,12 @@ export {
   mergePPrFormat,
   setPPrChange,
   stripPPrChange,
+  paraMarkRevisionXml,
+  setParaMarkRevision,
   stripParaMarkRevision,
+  resolveParaMarkRPrChange,
+  paraMarkColor,
+  stripParaMarkColor,
   patchFieldParagraphXml,
   patchImageParagraphXml,
   patchMathTokens,
@@ -125,6 +131,10 @@ export {
   type ImagePatch,
   type TextboxParaPatch,
   type TextboxParasPatchSet,
+  inlinePictureDrawingXml,
+  resizeInlinePictureXml,
+  NEW_PICTURE_TOKEN_PREFIX,
+  type InlinePictureXmlOptions,
   type TableGenOptions,
   type TocEntry,
 } from './generate'
@@ -241,13 +251,32 @@ export {
 
 export { previewFontSettings } from './font-settings'
 export {
+  applyRevisionResolutions,
   applyTrackedChangesXml,
   countTrackedChangesXml,
+  readPropChangeXml,
+  resolvePropChangeXml,
+  type PropChangeRecord,
+  type RevisionResolution,
   type RevisionXmlFilter,
   type RevisionXmlMode,
   type RevisionXmlResult,
   type RevisionXmlType,
 } from './revision-xml'
+export {
+  resolveParagraphProps,
+  resolveCtxOf,
+  resolveParagraphPropsXml,
+  resolveRunProps,
+  shadowCompare,
+  type EffectivePPr,
+  type EffectiveRPr,
+  type PropSource,
+  type ResolveCompat,
+  type ResolveCtx,
+  type ResolveDiff,
+  type TableCond,
+} from './resolve-props'
 export {
   compareBlocks,
   compareDocuments,

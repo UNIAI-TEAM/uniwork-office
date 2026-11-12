@@ -227,4 +227,6 @@ export const it = {
   aiMindMapReset: 'Reimposta vista',
   aiMindMapExpand: 'Espandi ramo',
   aiMindMapCollapse: 'Comprimi ramo',
+  aiMindMapExportSvg: 'Esporta SVG',
+  aiMindMapInsert: 'Inserisci nel documento',
 } satisfies Record<keyof typeof zh, string>

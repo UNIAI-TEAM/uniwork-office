@@ -3,6 +3,7 @@ import { Editor } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import {
+  allSelectedRanges,
   clearMultiSelect,
   isMultiSelectModifier,
   multiSelectRanges,
@@ -97,9 +98,10 @@ describe('isMultiSelectModifier', () => {
   const ev = (init: Partial<MouseEvent>) =>
     ({ metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...init }) as MouseEvent
 
-  it('accepts ctrl or cmd on its own', () => {
+  it("accepts the platform's modifier on its own and ignores the other", () => {
+    // jsdom reports no platform, so the plugin takes the non-Mac branch
     expect(isMultiSelectModifier(ev({ ctrlKey: true }))).toBe(true)
-    expect(isMultiSelectModifier(ev({ metaKey: true }))).toBe(true)
+    expect(isMultiSelectModifier(ev({ metaKey: true }))).toBe(false)
   })
 
   it('rejects the combos that already mean something else', () => {
@@ -159,6 +161,19 @@ describe('MultiSelect', () => {
     expect(multiSelectRanges(editor.view)).toEqual([{ from: 7, to: 12 }])
   })
 
+  it('a ctrl+click on a link leaves the gesture to the link, adding nothing', () => {
+    const editor = makeEditor()
+    editor.commands.setTextSelection({ from: 1, to: 6 })
+    editor.view.posAtCoords = () => ({ pos: 9, inside: 1 })
+    const link = document.createElement('a')
+    link.href = 'https://example.com'
+    editor.view.dom.appendChild(link)
+    const init = { ctrlKey: true, metaKey: true, clientX: 0, clientY: 0 }
+    link.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, ...init }))
+    link.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, ...init }))
+    expect(multiSelectRanges(editor.view)).toEqual([])
+  })
+
   it('a plain click clears every added range', () => {
     const editor = makeEditor()
     ctrlClick(editor, 9)
@@ -185,6 +200,37 @@ describe('MultiSelect', () => {
     // what the browser's drag selects while the button is down
     editor.commands.setTextSelection({ from: 7, to: 12 })
     dispatchMouse(editor, 'mouseup', { ctrlKey: true, clientX: 20, clientY: 0 })
+    expect(multiSelectRanges(editor.view)).toEqual([
+      { from: 1, to: 6 },
+      { from: 7, to: 12 },
+    ])
+    expect(
+      editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to),
+    ).toBe('bravo')
+  })
+
+  it('a ctrl+drag released outside the editor still adds both ranges', () => {
+    const editor = makeEditor()
+    editor.commands.setTextSelection({ from: 1, to: 6 })
+    dispatchMouse(editor, 'mousedown', { ctrlKey: true, clientX: 0, clientY: 0 })
+    editor.commands.setTextSelection({ from: 7, to: 12 })
+    document.body.dispatchEvent(
+      new MouseEvent('mouseup', { bubbles: true, ctrlKey: true, clientX: 20, clientY: 0 }),
+    )
+    expect(multiSelectRanges(editor.view)).toEqual([
+      { from: 1, to: 6 },
+      { from: 7, to: 12 },
+    ])
+  })
+
+  it('a ctrl+click that jittered past the drag threshold still selects the word', () => {
+    const editor = makeEditor()
+    editor.commands.setTextSelection({ from: 1, to: 6 })
+    editor.view.posAtCoords = () => ({ pos: 9, inside: -1 })
+    dispatchMouse(editor, 'mousedown', { ctrlKey: true, clientX: 0, clientY: 0 })
+    // the wobble dragged no text: the browser left the selection collapsed
+    editor.commands.setTextSelection({ from: 9, to: 9 })
+    dispatchMouse(editor, 'mouseup', { ctrlKey: true, clientX: 6, clientY: 0 })
     expect(multiSelectRanges(editor.view)).toEqual([
       { from: 1, to: 6 },
       { from: 7, to: 12 },
@@ -240,5 +286,203 @@ describe('MultiSelect', () => {
     const editor = makeEditor()
     ctrlClick(editor, 9)
     expect(editor.state.doc.textContent).toBe('alpha bravo charlie')
+  })
+
+  describe('operations across the added ranges', () => {
+    const marksAt = (editor: Editor, pos: number) =>
+      editor.state.doc.nodeAt(pos)?.marks.map((m) => m.type.name) ?? []
+
+    function selectAlphaAndCharlie(editor: Editor): void {
+      editor.commands.setTextSelection({ from: 1, to: 6 }) // alpha
+      ctrlClick(editor, 16) // charlie becomes the live selection, both are added
+      expect(multiSelectRanges(editor.view)).toEqual([
+        { from: 1, to: 6 },
+        { from: 13, to: 20 },
+      ])
+      expect([editor.state.selection.from, editor.state.selection.to]).toEqual([13, 20])
+    }
+
+    it('bold applied to the live selection is replayed on the added range', () => {
+      const editor = makeEditor()
+      selectAlphaAndCharlie(editor)
+      editor.commands.toggleMark('bold')
+      expect(marksAt(editor, 14)).toContain('bold')
+      expect(marksAt(editor, 2)).toContain('bold')
+      expect(marksAt(editor, 8)).not.toContain('bold') // bravo untouched
+      expect(multiSelectRanges(editor.view)).toHaveLength(2)
+    })
+
+    it('removing bold is replayed too', () => {
+      const editor = makeEditor()
+      editor.commands.setTextSelection({ from: 1, to: 20 })
+      editor.commands.toggleMark('bold')
+      selectAlphaAndCharlie(editor)
+      editor.commands.toggleMark('bold')
+      expect(marksAt(editor, 2)).not.toContain('bold')
+      expect(marksAt(editor, 14)).not.toContain('bold')
+      expect(marksAt(editor, 8)).toContain('bold')
+    })
+
+    it("a text-style patch merges into each range's own existing style", () => {
+      const editor = makeEditor()
+      editor.commands.setTextSelection({ from: 1, to: 6 })
+      editor.commands.setMark('docTextStyle', { sizeHalfPoints: 40 })
+      selectAlphaAndCharlie(editor)
+      editor.commands.setMark('docTextStyle', { color: 'FF0000' })
+      const style = (pos: number) =>
+        editor.state.doc.nodeAt(pos)?.marks.find((m) => m.type.name === 'docTextStyle')?.attrs
+      expect(style(1)?.color).toBe('FF0000')
+      expect(style(1)?.sizeHalfPoints).toBe(40)
+      expect(style(14)?.color).toBe('FF0000')
+      expect(style(14)?.sizeHalfPoints).toBeNull()
+    })
+
+    it('a comment mark anchors only the live selection', () => {
+      const editor = makeEditor()
+      selectAlphaAndCharlie(editor)
+      editor.commands.setMark('comment', { ids: 'c1' })
+      expect(marksAt(editor, 14)).toContain('comment')
+      expect(marksAt(editor, 2)).not.toContain('comment')
+    })
+
+    it('without added ranges a mark command changes only the selection', () => {
+      const editor = makeEditor()
+      editor.commands.setTextSelection({ from: 13, to: 20 })
+      const before = editor.state.doc
+      editor.commands.toggleMark('bold')
+      expect(marksAt(editor, 14)).toContain('bold')
+      expect(marksAt(editor, 2)).not.toContain('bold')
+      expect(editor.state.doc.eq(before)).toBe(false)
+    })
+
+    it('the replay settles in one extra transaction', () => {
+      const editor = makeEditor()
+      selectAlphaAndCharlie(editor)
+      let count = 0
+      const dispatch = editor.view.dispatch.bind(editor.view)
+      editor.view.dispatch = (tr) => {
+        count++
+        dispatch(tr)
+      }
+      editor.commands.toggleMark('bold')
+      expect(count).toBe(1)
+      expect(marksAt(editor, 2)).toContain('bold')
+    })
+
+    it('a collapsed caret with added ranges leaves stored marks alone', () => {
+      const editor = makeEditor()
+      ctrlClick(editor, 9)
+      editor.commands.setTextSelection(3)
+      editor.commands.toggleMark('bold')
+      expect(editor.state.storedMarks?.map((m) => m.type.name)).toContain('bold')
+      expect(marksAt(editor, 8)).not.toContain('bold')
+    })
+
+    it('a patch over a live range with mixed styles keeps each target run intact', () => {
+      const editor = makeEditor()
+      editor.commands.setTextSelection({ from: 1, to: 3 })
+      editor.commands.setMark('docTextStyle', { sizeHalfPoints: 40 })
+      editor.commands.setTextSelection({ from: 13, to: 15 })
+      editor.commands.setMark('docTextStyle', { sizeHalfPoints: 60 })
+      selectAlphaAndCharlie(editor)
+      editor.commands.setMark('docTextStyle', { color: '00FF00' })
+      const style = (pos: number) =>
+        editor.state.doc.nodeAt(pos)?.marks.find((m) => m.type.name === 'docTextStyle')?.attrs
+      expect(style(1)?.color).toBe('00FF00')
+      expect(style(1)?.sizeHalfPoints).toBe(40)
+      expect(style(5)?.sizeHalfPoints).toBeNull()
+      expect(style(14)?.sizeHalfPoints).toBe(60)
+    })
+
+    it('bold still reaches the added range when a boldOff run spawns a follow-up transaction', () => {
+      const editor = makeEditor()
+      editor.commands.setTextSelection({ from: 13, to: 20 })
+      editor.commands.setMark('docTextStyle', { boldOff: true })
+      selectAlphaAndCharlie(editor)
+      editor.commands.toggleMark('bold')
+      expect(marksAt(editor, 14)).toContain('bold')
+      expect(marksAt(editor, 2)).toContain('bold')
+    })
+
+    it('typing inside the live selection is not replayed', () => {
+      const editor = makeEditor()
+      selectAlphaAndCharlie(editor)
+      editor.commands.insertContent('X')
+      expect(editor.state.doc.textContent).toBe('alpha bravo X')
+    })
+
+    it('allSelectedRanges merges the live selection with the added ones in document order', () => {
+      const editor = makeEditor()
+      selectAlphaAndCharlie(editor)
+      expect(allSelectedRanges(editor.state)).toEqual([
+        { from: 1, to: 6 },
+        { from: 13, to: 20 },
+      ])
+    })
+
+    function fakeClipboardEvent(type: 'copy' | 'cut'): { event: Event; data: Map<string, string> } {
+      const data = new Map<string, string>()
+      const event = new Event(type, { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'clipboardData', {
+        value: {
+          clearData: () => data.clear(),
+          setData: (k: string, v: string) => data.set(k, v),
+          getData: (k: string) => data.get(k) ?? '',
+        },
+      })
+      return { event, data }
+    }
+
+    it('copy puts every range on the clipboard, one paragraph each', () => {
+      const editor = makeEditor()
+      selectAlphaAndCharlie(editor)
+      editor.commands.setTextSelection({ from: 13, to: 20 })
+      const { event, data } = fakeClipboardEvent('copy')
+      editor.view.dom.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(true)
+      expect(data.get('text/plain')).toBe('alpha\n\ncharlie')
+      expect(data.get('text/html')).toMatch(/alpha.*charlie/s)
+      expect(editor.state.doc.textContent).toBe('alpha bravo charlie')
+    })
+
+    it('cut copies every range and deletes them all', () => {
+      const editor = makeEditor()
+      selectAlphaAndCharlie(editor)
+      const { event, data } = fakeClipboardEvent('cut')
+      editor.view.dom.dispatchEvent(event)
+      expect(data.get('text/plain')).toBe('alpha\n\ncharlie')
+      expect(editor.state.doc.textContent).toBe(' bravo ')
+      expect(multiSelectRanges(editor.view)).toEqual([])
+    })
+
+    it('copy without added ranges is left to the editor', () => {
+      const editor = makeEditor()
+      editor.commands.setTextSelection({ from: 1, to: 6 })
+      const { event } = fakeClipboardEvent('copy')
+      const handled = editor.view.someProp('handleDOMEvents', (h) =>
+        h.copy?.(editor.view, event as ClipboardEvent),
+      )
+      expect(handled).toBeFalsy()
+    })
+
+    it('Backspace deletes every range', () => {
+      const editor = makeEditor()
+      selectAlphaAndCharlie(editor)
+      editor.view.dom.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }),
+      )
+      expect(editor.state.doc.textContent).toBe(' bravo ')
+      expect(multiSelectRanges(editor.view)).toEqual([])
+    })
+
+    it('Delete with a collapsed caret still removes the added ranges', () => {
+      const editor = makeEditor()
+      ctrlClick(editor, 9) // bravo
+      editor.commands.setTextSelection(1)
+      editor.view.dom.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }),
+      )
+      expect(editor.state.doc.textContent).toBe('alpha  charlie')
+    })
   })
 })

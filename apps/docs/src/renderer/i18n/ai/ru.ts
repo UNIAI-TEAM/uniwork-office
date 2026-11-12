@@ -223,4 +223,6 @@ export const ru = {
   aiMindMapReset: 'Сбросить вид',
   aiMindMapExpand: 'Развернуть ветку',
   aiMindMapCollapse: 'Свернуть ветку',
+  aiMindMapExportSvg: 'Экспорт SVG',
+  aiMindMapInsert: 'Вставить в документ',
 } satisfies Record<keyof typeof zh, string>

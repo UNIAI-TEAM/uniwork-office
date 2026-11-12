@@ -222,4 +222,6 @@ export const ms = {
   aiMindMapReset: 'Set semula pandangan',
   aiMindMapExpand: 'Kembangkan cabang',
   aiMindMapCollapse: 'Lipat cabang',
+  aiMindMapExportSvg: 'Eksport SVG',
+  aiMindMapInsert: 'Sisipkan ke dokumen',
 } satisfies Record<keyof typeof zh, string>

@@ -75,3 +75,6 @@ export function htmlExportPath(picked: string): string {
   if (/\.docx$/i.test(picked)) return picked.replace(/\.docx$/i, '.html')
   return `${picked}.html`
 }
+
+export { printJobOptions } from '@genoffice/electron-utils/print-job'
+export type { PrintDuplex, PrintJobOptions } from '@genoffice/electron-utils/print-job'
