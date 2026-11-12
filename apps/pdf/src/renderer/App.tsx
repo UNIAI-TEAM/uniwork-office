@@ -120,11 +120,14 @@ import {
   remapOutlineTree,
 } from './heading-outline'
 import { printPdf } from './print'
+import type { PdfEncryptionInput, PdfPermissions } from '../shared/ipc'
+import { mayChangeProtection } from './protection-gate'
 import { PasswordDialog } from './PasswordDialog'
 import { StaticTextDialog } from './StaticTextDialog'
 import { PropertiesDialog } from './PropertiesDialog'
 import { LinkDialog, type LinkDraft } from './LinkDialog'
 import { CertSignDialog } from './CertSignDialog'
+import { ProtectionDialog } from './ProtectionDialog'
 import { BatesDialog } from './BatesDialog'
 import { buildBatesInserts, type BatesConfig } from './bates'
 import { MeasureScaleDialog } from './MeasureScaleDialog'
@@ -310,6 +313,7 @@ import {
   IconSign,
   IconCertSign,
   IconSignatures,
+  IconProtect,
   IconBates,
   IconMeasure,
   IconPreviousField,
@@ -940,6 +944,26 @@ export default function App() {
   const [formCatalog, setFormCatalog] = useState<FormCatalog | null>(null)
   const [formHasXfa, setFormHasXfa] = useState(false)
   const [documentEncrypted, setDocumentEncrypted] = useState(false)
+  /** false until a password-protected document has been opened for editing by the
+      session's own decryptor (pdf.js accepting the password is not the same claim) */
+  const [sessionUnlocked, setSessionUnlocked] = useState(false)
+  /** protection the next save writes; null while the document saves plain */
+  const [encryption, setEncryption] = useState<PdfEncryptionInput | null>(null)
+  /** password of the file on disk (null: it is plain) — a protection change makes it
+      differ from `encryption.userPassword` until the save lands */
+  const diskPasswordRef = useRef<string | null>(null)
+  /** the password the in-flight save is writing: it reaches diskPasswordRef
+      only once that save lands — the file on disk still carries the old one */
+  const pendingDiskPasswordRef = useRef<string | null | undefined>(undefined)
+  const [protectionDlg, setProtectionDlg] = useState(false)
+  /** the protection configuration differs from the file on disk (set, changed or
+      lifted since the last load); cleared by the post-save reload */
+  const [protectionDirty, setProtectionDirty] = useState(false)
+  /** what the file on disk allows this session: the /P limits bind a user
+      password (or the empty one of an owner-only file); the owner's ignore them */
+  const [diskLock, setDiskLock] = useState<{ unlockedAsOwner: boolean; modifying: boolean } | null>(
+    null,
+  )
   const [activeFormWidgetId, setActiveFormWidgetId] = useState<string | null>(null)
   const formControlRefs = useRef<Map<string, HTMLElement>>(new Map())
   const [formEdits, setFormEdits] = useState<Map<string, FormValueInput>>(new Map())
@@ -1286,6 +1310,35 @@ export default function App() {
         const formFeatures = documentFormFeatures(documentInfo, bytes)
         setFormHasXfa(formFeatures.hasXfa)
         setDocumentEncrypted(formFeatures.encrypted)
+        if (formFeatures.encrypted) {
+          // pdf.js already accepted this password for rendering; the session's own
+          // handler must accept it too before the document counts as editable
+          const password = passwordRef.current ?? ''
+          const outcome = await window.pdfApi.decryptPdf(bytes, password)
+          if (outcome.ok) {
+            setEncryption({
+              userPassword: password,
+              ownerPassword: password,
+              permissions: outcome.permissions,
+            })
+            setSessionUnlocked(true)
+            setDiskLock({
+              unlockedAsOwner: outcome.unlockedAs === 'owner',
+              modifying: outcome.permissions.modifying,
+            })
+          } else {
+            setEncryption(null)
+            setSessionUnlocked(false)
+            setDiskLock(null)
+          }
+          diskPasswordRef.current = password
+        } else {
+          setEncryption(null)
+          setSessionUnlocked(false)
+          setDiskLock(null)
+          diskPasswordRef.current = null
+        }
+        setProtectionDirty(false)
         for (let i = 1; i <= loaded.numPages; i++) {
           const page = await loaded.getPage(i)
           // Unrotated size; display size is derived by geom from the total rotation
@@ -1606,6 +1659,20 @@ export default function App() {
         setStatus('ready')
       } catch (err) {
         if ((err as Error | null)?.name === 'PasswordException') {
+          // a certificate-encrypted document has no password to type: pdf.js
+          // reports it like a password failure, and the answer has to name the
+          // real reason instead of looping the prompt
+          try {
+            const raw = new Uint8Array(await window.pdfApi.readFile(path))
+            const probe = await window.pdfApi.decryptPdf(raw, '')
+            if (!probe.ok && probe.reason === 'certificate-encryption') {
+              showNotice(t('pwCertEncrypted'))
+              setStatus('error')
+              return
+            }
+          } catch {
+            /* classification is best-effort: the prompt still works without it */
+          }
           // like docs: a failed attempt clears the field alongside the error
           setPwWrong(passwordRef.current !== undefined)
           setPwInput('')
@@ -1666,13 +1733,23 @@ export default function App() {
   const commentsBridge = useMemo(() => pdfCommentsBridge(), [])
   const serverComments = uniwork.bound && commentsBridge !== null && !!filePath
 
-  /** pdf-lib cannot write encrypted files, including owner-protected files that open without a password. */
+  /** Editable once the session can both read and write the document: password-opened
+      files count after our own decryptor accepted them (the save pipeline re-reads the
+      protected bytes from disk, which pdf-lib alone cannot). A session holding only
+      the user password — or the empty one of an owner-only file — is additionally
+      bound by the /P the file carries: modifying denied means read-only. */
   const encryptedReadOnly =
-    status === 'ready' && (passwordRef.current !== undefined || documentEncrypted)
+    status === 'ready' &&
+    documentEncrypted &&
+    (!sessionUnlocked || (diskLock !== null && !diskLock.unlockedAsOwner && !diskLock.modifying))
   /** View-only platform (web viewer without the save grant): the same read-only mode */
   const viewOnly = !cap('edit')
   /** View-only UniWork documents reuse the same read-only mode (edit tools and Save off) */
   const readOnly = viewOnly || encryptedReadOnly || uniwork.readOnly
+  /** Only the owner password may change or lift protection: a user-password
+      session, even one allowed to modify the content, must not be able to strip
+      the owner's password. A plain document has no protection to lose. */
+  const protectionEditable = mayChangeProtection(readOnly, diskLock)
   /** The bake a save writes: never for a document the user cannot edit (view-only, encrypted,
       bound read-only), which would otherwise gain a text layer through a plain Save */
   const ocrBakeInserts = useMemo(
@@ -2170,6 +2247,7 @@ export default function App() {
     order !== null ||
     metadata !== null ||
     recovered ||
+    protectionDirty ||
     (pendingOutline?.edited ?? false) ||
     addedAttachments.length > 0 ||
     removedAttachments.size > 0
@@ -4172,6 +4250,12 @@ export default function App() {
     deletedPages: [...deleted],
     ...(order ? { pageOrder: visList } : {}),
     ...(metadata ? { metadata } : {}),
+    // false = keep the file's own /Encrypt entries, true = write the dialog's
+    protectionDirty,
+    ...(diskPasswordRef.current !== null
+      ? { decryption: { userPassword: diskPasswordRef.current } }
+      : {}),
+    ...(encryption ? { encryption } : {}),
     ...(pendingOutline?.edited && pendingOutline.tree ? { outline: pendingOutline.tree } : {}),
     ...(addedAttachments.length > 0 || removedAttachments.size > 0
       ? {
@@ -4299,6 +4383,19 @@ export default function App() {
       afterUserSave,
     })
     if (!filePath || (!anythingToSave && !forceBound)) return Promise.resolve(!anythingToSave)
+    // Writing a protection with no owner password would hand ownership to
+    // anyone, so a protection change with both passwords empty is refused. An
+    // unchanged owner-only file is not affected: its own /Encrypt entries are
+    // carried over, so the save keeps the owner's password without knowing it.
+    if (
+      protectionDirty &&
+      encryption !== null &&
+      encryption.userPassword === '' &&
+      encryption.ownerPassword === ''
+    ) {
+      showNotice(t('pwOwnerNeeded'))
+      return Promise.resolve(false)
+    }
     lastWriteOriginRef.current = origin
     // An explicit save opts this file into autosave
     if (origin !== 'auto') savedOnceRef.current = true
@@ -4371,6 +4468,12 @@ export default function App() {
       }
       if (result.skippedImageEdits && result.skippedImageEdits.length > 0) {
         noticeSkippedImages(result.skippedImageEdits)
+      }
+      // The write landed: a pending protection change is what the disk carries now
+      if (pendingDiskPasswordRef.current !== undefined) {
+        diskPasswordRef.current =
+          pendingDiskPasswordRef.current === '' ? null : pendingDiskPasswordRef.current
+        pendingDiskPasswordRef.current = undefined
       }
       // Reload: changes are in the file now, canvas renders directly, saved pending ops are cleared
       try {
@@ -4503,7 +4606,21 @@ export default function App() {
           }
         : editsPayload(draftEdits, noteFlush)
     setSaveState('saving')
-    const result = await window.pdfApi.save({ path: filePath, targetPath, ...edits })
+    // the redaction copy is a save like any other: on a protected document the
+    // main process has to decrypt the source and re-protect the cleaned output
+    const protection = {
+      ...(encryption !== null ? { encryption } : {}),
+      ...(diskPasswordRef.current !== null
+        ? { decryption: { userPassword: diskPasswordRef.current } }
+        : {}),
+      protectionDirty,
+    }
+    const result = await window.pdfApi.save({
+      path: filePath,
+      targetPath,
+      ...edits,
+      ...protection,
+    })
     if (!result.ok) {
       opFailed(result.error)
       return false
@@ -4521,6 +4638,12 @@ export default function App() {
       // The main process has committed this path and its read grant. Reload the
       // sanitized bytes, clearing undo/search state that could expose old content.
       const scrollTop = scrollRef.current?.scrollTop ?? 0
+      // a protection change rode this save: the file on disk now needs the new password
+      if (pendingDiskPasswordRef.current !== undefined) {
+        diskPasswordRef.current =
+          pendingDiskPasswordRef.current === '' ? null : pendingDiskPasswordRef.current
+        pendingDiskPasswordRef.current = undefined
+      }
       setFilePath(targetPath)
       setStatus('loading')
       try {
@@ -7477,6 +7600,40 @@ export default function App() {
   const firstSignatureWidget =
     formWidgets.find((widget) => widget.kind === 'signature' && !formWidgetSigned(widget)) ?? null
 
+  const applyProtection = (result: {
+    userPassword: string
+    ownerPassword: string
+    permissions: PdfPermissions
+  }): void => {
+    if (!mayChangeProtection(readOnly, diskLock)) {
+      showNotice(t('pwOwnerNeeded'))
+      setProtectionDlg(false)
+      return
+    }
+    setEncryption(result)
+    setProtectionDirty(true)
+    // the next save writes a file that only opens with the new password; the
+    // file ON DISK keeps the old one until that write lands, so the disk
+    // password follows the save instead of leading it
+    passwordRef.current = result.userPassword
+    pendingDiskPasswordRef.current = result.userPassword
+    setProtectionDlg(false)
+  }
+
+  const removeProtection = (): void => {
+    if (!mayChangeProtection(readOnly, diskLock)) {
+      showNotice(t('pwOwnerNeeded'))
+      setProtectionDlg(false)
+      return
+    }
+    setEncryption(null)
+    setProtectionDirty(true)
+    // the next save writes plain; until then the disk file still needs the old password
+    passwordRef.current = undefined
+    pendingDiskPasswordRef.current = ''
+    setProtectionDlg(false)
+  }
+
   const openCertSignDialog = () => {
     if (dirty || saveInFlightRef.current !== null) {
       showNotice(t('certSaveFirst'))
@@ -8081,6 +8238,19 @@ export default function App() {
                         <IconCertSign />
                       </span>
                       <span>{t('certSign')}</span>
+                    </button>
+                  )}
+                  {cap('certSign') && (
+                    <button
+                      className="rb-big"
+                      disabled={!protectionEditable || status !== 'ready'}
+                      data-tip={t('protectHint')}
+                      onClick={() => setProtectionDlg(true)}
+                    >
+                      <span className="rb-big-icon">
+                        <IconProtect />
+                      </span>
+                      <span>{t('protect')}</span>
                     </button>
                   )}
                   {cap('certSign') && digitalSignatures.length > 0 && (
@@ -10628,6 +10798,23 @@ export default function App() {
                   setPropsDlg(false)
                   applyEditOps([{ op: 'setMetadata', metadata: meta }])
                 }}
+              />
+            )}
+            {protectionDlg && (
+              <ProtectionDialog
+                t={t}
+                hasPassword={encryption !== null || documentEncrypted}
+                permissions={
+                  encryption?.permissions ?? {
+                    printing: true,
+                    modifying: true,
+                    annotating: true,
+                    copying: true,
+                  }
+                }
+                onApply={applyProtection}
+                onRemove={removeProtection}
+                onClose={() => setProtectionDlg(false)}
               />
             )}
             {batesDlg && (
