@@ -1198,6 +1198,7 @@ export function createWebSlidesApi(
     masterEditFill: engine('slides:master-edit-fill'),
     masterEditStroke: engine('slides:master-edit-stroke'),
     masterDeleteElement: engine('slides:master-delete-element'),
+    masterAddElement: engine('slides:master-add-element'),
 
     // engine: tables, charts, links, header/footer, themes
     editTableCell: engine('slides:edit-table-cell'),
@@ -1320,7 +1321,7 @@ export function createWebSlidesApi(
       if (!canSaveAs()) return { ok: false, error: text('webReadOnly') }
       try {
         const name = safeFileName(`${op.baseName}-images.zip`, 'slides-images.zip')
-        const zip = await zipImages(op.baseName, op.pngsBase64)
+        const zip = await zipImages(op.baseName, op.pngsBase64, op.format === 'jpg' ? 'jpg' : 'png')
         download(name, new Blob([zip as Uint8Array<ArrayBuffer>], { type: 'application/zip' }))
         return { ok: true, paths: [name] }
       } catch (err) {
@@ -1356,6 +1357,8 @@ export function createWebSlidesApi(
       hostPrint?.(r.ok)
       return r
     },
+    listPrinters: async () => [],
+    printerOptions: async () => [],
 
     // AI: hidden on the web (capability `ai` false); same shapes as the Docs stubs
     getAiSettings: () => aiStubs.getAiSettings() as ReturnType<SlidesApi['getAiSettings']>,

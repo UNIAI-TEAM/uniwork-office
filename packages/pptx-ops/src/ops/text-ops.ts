@@ -103,6 +103,21 @@ function centerParagraphs(paragraphs: Paragraph[]): void {
   for (const p of paragraphs) if (!p.align) p.align = 'center'
 }
 
+/**
+ * True when a traced paragraph or run landed at a different index than its source
+ * (reordered, split or inserted). The in-place run patch then writes the text into
+ * the old run at its new position and keeps that run's attributes, so setText flags
+ * the element and save rebuilds the txBody from the traced model runs instead. The
+ * flag stays set until the element is reparsed/materialized.
+ */
+function textMovedInPlace(paragraphs: EditParagraph[]): boolean {
+  return paragraphs.some(
+    (p, pi) =>
+      (p.srcPara != null && p.srcPara !== pi) ||
+      p.runs.some((r, ri) => r.srcRun != null && r.srcRun !== ri),
+  )
+}
+
 // ── setText ─────────────────────────────────────────────────────────────
 // Run-level rich-text rebuild (srcPara/srcRun back-tracing preserves unedited
 // formatting). Level changes are rematerialized here (they change inherited
@@ -181,6 +196,7 @@ register({
       const previousXml = patchSlideXml(slide)
       const before = plainText(childBody.paragraphs)
       childBody.paragraphs = applyEditParagraphs(childBody.paragraphs, paragraphs)
+      if (textMovedInPlace(paragraphs)) textChild.textMoved = true
       if (autoShape) centerParagraphs(childBody.paragraphs)
       ensureRunLinkRels(ctx.opened, index, childBody.paragraphs)
       if (!patchGroupChildText(slide, groupId, textChild)) {
@@ -211,6 +227,7 @@ register({
     const before = plainText(body.paragraphs)
     const levelDirty = levelsChanged(body.paragraphs, paragraphs)
     body.paragraphs = applyEditParagraphs(body.paragraphs, paragraphs)
+    if (textMovedInPlace(paragraphs)) te.textMoved = true
     if (autoShape) centerParagraphs(body.paragraphs)
     // Link rels and level rematerialization are deck-slide concerns (rels live on
     // the slide part; levels resolve against the chrome being edited) — skip on parts

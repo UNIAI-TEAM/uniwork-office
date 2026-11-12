@@ -13,6 +13,11 @@ import type { CustGeomPathCmd, SlideComment, SectionInfo } from '@genoffice/pptx
 import type { FontSizeStep } from '@genoffice/pptx-ops/font-size'
 // the font catalog's shape is the store's to declare, not a copy kept in step by hand
 import type { CatalogEntry as FontCatalogEntry } from '@genoffice/electron-utils/font-store'
+import type { PrintDuplex, PrintJobOptions, PrinterInfo } from '@genoffice/electron-utils/print-job'
+import type { PrinterOption } from '@genoffice/electron-utils/printer-options'
+
+export type { PrintDuplex, PrintJobOptions, PrinterInfo }
+export type { PrinterOption }
 import type { LayoutSkeleton } from '../renderer/ai/layout-skeleton'
 import type {
   AiSettings,
@@ -326,6 +331,24 @@ export interface MasterEditStrokeOp {
 
 export interface MasterDeleteElementOp {
   sourceId: string
+}
+
+/** Insert onto the current master/layout part; pixel coordinates like AddElementOp, the part is the session's edit target */
+export interface MasterAddElementOp {
+  kind: InsertKind
+  xPx: number
+  yPx: number
+  wPx: number
+  hPx: number
+  fitWidthPx: number
+  /** Rich-text paragraphs (a text box starts empty; shape defaults apply otherwise) */
+  paragraphs?: EditParagraph[]
+  /** Shape solid fill #RRGGBB */
+  fillColor?: string
+  /** Shape stroke (solid color + point width) */
+  stroke?: { color: string; widthPt: number }
+  /** Text body wrap / autofit (click-to-type text boxes); absent = wrap="square", no autofit */
+  bodyPr?: { wrap?: 'square' | 'none'; autoFit?: 'shrink' | 'resize' }
 }
 
 /** Find/replace: matches within runs across pages; firstOnly+elementId used by "Replace" for the current hit. */
@@ -1184,13 +1207,15 @@ export interface EditChartOp {
 
 // ── Export (PDF / images) ─────────────────────────────────────────────
 
-/** Export as images: the renderer has already rendered hi-res PNGs; the main process only writes them to disk. */
+/** Export as images: the renderer has already rendered hi-res pages; the main process only writes them to disk. */
 export interface ExportImagesOp {
   /** Target directory (absolute path chosen via pickExportDir) */
   dir: string
-  /** File base name (without extension), written as <baseName>-01.png / -02.png … */
+  /** File base name (without extension), written as <baseName>-01.png / -02.png … (or .jpg) */
   baseName: string
-  /** base64 per page PNG (without the data: prefix), in page order */
+  /** Image format of the rendered pages; anything but 'jpg' is written as .png */
+  format?: 'png' | 'jpg'
+  /** base64 per page image (without the data: prefix), in page order */
   pngsBase64: string[]
 }
 
@@ -1260,13 +1285,18 @@ export interface PrintSlidesOp {
   widthPx: number
   heightPx: number
   /** Layout: full slides / handouts (N per page) / notes pages (slide + notes text) */
-  layout?: 'full' | 'handout2' | 'handout3' | 'handout6' | 'notes'
+  layout?: 'full' | 'handout2' | 'handout3' | 'handout4' | 'handout6' | 'handout9' | 'notes'
   /** Per-page notes text for the notes layout (same order as pngsBase64) */
   notes?: string[]
   /** Paper orientation for handout/notes pages (full pages always follow the slide ratio) */
   orientation?: 'portrait' | 'landscape'
+  /** Thumbnail order across the handout grid (row-first vs column-first) */
+  order?: 'horizontal' | 'vertical'
   /** Border around full-page slides */
   frame?: boolean
+  /** A printer the dialog picked: present = print silently with these job
+   *  options (macOS routes through lp); absent = the system print dialog. */
+  job?: PrintJobOptions
 }
 
 /** Show sync state from presenter view -> audience window (absolute state mirror; audience seek is idempotent) */
@@ -1305,6 +1335,7 @@ export type MenuCommand =
   | 'save-as'
   | 'export-pdf'
   | 'export-images'
+  | 'export-images-jpg'
   | 'print'
   | 'zoom-in'
   | 'zoom-out'
@@ -1742,8 +1773,12 @@ export interface SlidesApi {
   savePicture: (op: SavePictureOp) => Promise<SavePictureResult>
   /** Main process printToPDF via a hidden window, written to disk */
   exportPdf: (op: ExportPdfOp) => Promise<ExportPdfResult>
-  /** Print (system dialog; cancel counts as ok=false without an error) */
+  /** Print: with job = silent (macOS named printers spool through lp); without = system dialog */
   printSlides: (op: PrintSlidesOp) => Promise<{ ok: boolean; error?: string }>
+  /** installed printers for the in-app print dialog */
+  listPrinters: () => Promise<PrinterInfo[]>
+  /** the driver option groups a queue advertises (quality, color, media type); empty when none */
+  printerOptions: (queue: string) => Promise<PrinterOption[]>
   /** `origin` 'auto' = AutoSave pass (never writes a UniWork document); omitted = explicit Save */
   save: (origin?: 'user' | 'auto' | 'in-place') => Promise<{
     ok: boolean
@@ -1890,6 +1925,10 @@ export interface SlidesApi {
   masterEditFill: (op: MasterEditFillOp) => Promise<RenderSlide | null>
   masterEditStroke: (op: MasterEditStrokeOp) => Promise<RenderSlide | null>
   masterDeleteElement: (op: MasterDeleteElementOp) => Promise<RenderSlide | null>
+  /** Insert a text box / preset shape / line onto the current master/layout part */
+  masterAddElement: (
+    op: MasterAddElementOp,
+  ) => Promise<{ slide: RenderSlide; sourceId: string } | null>
   // ── Presenter-view multi-screen show ────────────────────────────────
   /** Enter presenter view: detects multiple displays and opens a fullscreen audience show window on the external screen (sharing this session's document) */
   presenterStart: () => Promise<{ audience: boolean }>
