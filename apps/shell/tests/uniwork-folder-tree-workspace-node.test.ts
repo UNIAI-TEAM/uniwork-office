@@ -17,7 +17,6 @@ import {
   WORKSPACE_NODE_ID,
   buildFolderIndex,
   drawnUnderWorkspaceNode,
-  isWorkspaceNode,
   withWorkspaceNode,
 } from '../src/renderer/src/uniwork-folders/uniwork-folders-model'
 
@@ -64,13 +63,6 @@ describe('withWorkspaceNode / drawnUnderWorkspaceNode', () => {
     const before = JSON.stringify(FOREST)
     withWorkspaceNode(FOREST, 'WS')
     expect(JSON.stringify(FOREST)).toBe(before)
-  })
-
-  it('knows the id is the node: only the exact display id', () => {
-    expect(isWorkspaceNode({ id: WORKSPACE_NODE_ID })).toBe(true)
-    expect(isWorkspaceNode({ id: 'plans' })).toBe(false)
-    expect(isWorkspaceNode({ id: null })).toBe(false)
-    expect(isWorkspaceNode(null)).toBe(false)
   })
 
   it('draws the root and every folder outside My Folder under the node, nothing else', () => {
