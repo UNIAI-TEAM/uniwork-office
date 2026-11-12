@@ -46,11 +46,20 @@ export const id = {
   vhsLockedByMe:
     'Anda sedang mengedit dokumen ini di jendela lain. Simpan atau tutup di sana, lalu coba lagi.',
   vhsReasonUpload: 'diunggah',
-  vhsReasonManual: 'versi manual',
+  vhsReasonManual: 'manual',
   vhsReasonAuto: 'otomatis',
   vhsReasonRestore: 'pemulihan',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'lainnya',
+  vhsCoalescedGroupOne: '{n} penyimpanan dalam sesi ini',
+  vhsCoalescedGroupOther: '{n} penyimpanan dalam sesi ini',
+  vhsCoalescedOrphanOne: '{n} penyimpanan digabungkan ke versi terakhir sesi pengeditannya',
+  vhsCoalescedOrphanOther: '{n} penyimpanan digabungkan ke versi terakhir sesi pengeditannya',
+  vhsReleasedNoContent: 'Versi ini tidak memiliki konten lagi untuk dibuka atau diunduh.',
+  vhsErrVersionCoalesced:
+    'Versi ini digabungkan ke versi terakhir sesi pengeditannya sehingga tidak memiliki konten sendiri. Buka versi terakhir itu sebagai gantinya.',
+  vhsErrFileChunkMissing:
+    'File ini tidak dapat dibaca karena sebagian data tersimpannya hilang. Coba lagi dalam beberapa menit; jika masih gagal, beri tahu admin.',
   vhsClose: 'Tutup',
   vhsCancel: 'Batal',
 } satisfies Record<keyof typeof zh, string>

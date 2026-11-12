@@ -47,11 +47,20 @@ export const pl = {
   vhsLockedByMe:
     'Edytujesz ten dokument w innym oknie. Zapisz go lub zamknij tam, a potem spróbuj ponownie.',
   vhsReasonUpload: 'przesłana',
-  vhsReasonManual: 'ręczna wersja',
+  vhsReasonManual: 'ręczna',
   vhsReasonAuto: 'automatyczna',
   vhsReasonRestore: 'przywrócenie',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'inna',
+  vhsCoalescedGroupOne: 'Zapisy w tej sesji: {n}',
+  vhsCoalescedGroupOther: 'Zapisy w tej sesji: {n}',
+  vhsCoalescedOrphanOne: 'Zapisy scalone z ostatnią wersją sesji edycji: {n}',
+  vhsCoalescedOrphanOther: 'Zapisy scalone z ostatnią wersją sesji edycji: {n}',
+  vhsReleasedNoContent: 'Ta wersja nie ma już zawartości, którą można otworzyć lub pobrać.',
+  vhsErrVersionCoalesced:
+    'Ta wersja została scalona z ostatnią wersją swojej sesji edycji, więc nie ma własnej zawartości. Otwórz zamiast niej tę ostatnią wersję.',
+  vhsErrFileChunkMissing:
+    'Nie można odczytać tego pliku, ponieważ brakuje części jego przechowywanych danych. Spróbuj ponownie za kilka minut; jeśli błąd się powtarza, powiadom administratora.',
   vhsClose: 'Zamknij',
   vhsCancel: 'Anuluj',
 } satisfies Record<keyof typeof zh, string>

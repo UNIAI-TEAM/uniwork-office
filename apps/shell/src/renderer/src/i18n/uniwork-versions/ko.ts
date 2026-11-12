@@ -45,11 +45,20 @@ export const ko = {
   vhsLockedByMe:
     '다른 창에서 이 문서를 편집하고 있습니다. 그곳에서 저장하거나 닫은 뒤 다시 시도하세요.',
   vhsReasonUpload: '업로드됨',
-  vhsReasonManual: '수동 버전',
+  vhsReasonManual: '수동',
   vhsReasonAuto: '자동',
   vhsReasonRestore: '복원',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: '기타',
+  vhsCoalescedGroupOne: '이 세션에서 {n}번 저장',
+  vhsCoalescedGroupOther: '이 세션에서 {n}번 저장',
+  vhsCoalescedOrphanOne: '{n}번의 저장이 편집 세션의 마지막 버전에 병합되었습니다',
+  vhsCoalescedOrphanOther: '{n}번의 저장이 편집 세션의 마지막 버전에 병합되었습니다',
+  vhsReleasedNoContent: '이 버전에는 열거나 다운로드할 수 있는 내용이 남아 있지 않습니다.',
+  vhsErrVersionCoalesced:
+    '이 버전은 편집 세션의 마지막 버전에 병합되어 자체 내용이 없습니다. 대신 그 마지막 버전을 여세요.',
+  vhsErrFileChunkMissing:
+    '저장된 데이터 일부가 없어 이 파일을 읽을 수 없습니다. 몇 분 후에 다시 시도하고, 계속 실패하면 관리자에게 알려 주세요.',
   vhsClose: '닫기',
   vhsCancel: '취소',
 } satisfies Record<keyof typeof zh, string>

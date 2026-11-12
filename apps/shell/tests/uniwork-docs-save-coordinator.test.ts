@@ -157,6 +157,7 @@ interface ServerState {
     baseRevision: string
     idempotencyKey: string
     editLockId?: string
+    editorSessionId?: string
   }>
 }
 
@@ -259,6 +260,7 @@ afterEach(() => {
 async function harness(
   extra: {
     editLockId?: (path: string) => string | null
+    editorSessionId?: (path: string) => string | null
     prepareEditLock?: (path: string) => Promise<'held' | 'park' | 'proceed'>
     onCommitEditLocked?: (path: string, error: UniworkDocError) => void
   } = {},
@@ -334,6 +336,7 @@ async function harness(
     drafts,
     dispatcher,
     ...(extra.editLockId ? { editLockId: extra.editLockId } : {}),
+    ...(extra.editorSessionId ? { editorSessionId: extra.editorSessionId } : {}),
     ...(extra.prepareEditLock ? { prepareEditLock: extra.prepareEditLock } : {}),
     ...(extra.onCommitEditLocked ? { onCommitEditLocked: extra.onCommitEditLocked } : {}),
   })
@@ -2919,5 +2922,47 @@ describe('EL-1(b): outgoing commit carries edit_lock_id; 423 while held -> lost'
     expect(h.server.state.counts.commit).toBe(0)
     expect(doc.record.state).toBe('failed')
     expect(doc.record.lastError).toBe('edit_locked')
+  })
+})
+
+describe('UNI-2510: commit carries the editor_session_id of the window that wrote the save', () => {
+  const WINDOW_A = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
+  const WINDOW_B = '01BX5ZZKBKACTAV9WEVGEMMVRZ'
+
+  it('a commit carries the id of the window that saved it', async () => {
+    const a = await harness({ editorSessionId: () => WINDOW_A })
+    const docA = a.makeDoc()
+    await a.coordinator.save(docA.path, { userSave: true })
+    expect(a.server.state.commitInputs.map((input) => input.editorSessionId)).toEqual([WINDOW_A])
+
+    const b = await harness({ editorSessionId: () => WINDOW_B })
+    const docB = b.makeDoc()
+    await b.coordinator.save(docB.path, { userSave: true })
+    expect(b.server.state.commitInputs[0]?.editorSessionId).toBe(WINDOW_B)
+  })
+
+  it('a save without a host id omits the field', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.commitInputs[0]).not.toHaveProperty('editorSessionId')
+  })
+
+  it('an offline save pushed later keeps the id of the window that wrote it', async () => {
+    const h = await harness({ editorSessionId: () => WINDOW_A })
+    const doc = h.makeDoc()
+    await h.coordinator.save(doc.path, { forceOffline: true })
+    const parked = await stored(h.intents, doc)
+    expect(parked?.intent.state).toBe('paused_offline')
+    expect(parked?.intent.editorSessionId).toBe(WINDOW_A)
+    expect(h.server.state.counts.commit).toBe(0)
+
+    // the queue pushes it later, with no id of its own to give
+    const queued: QueueDoc = { ...doc, record: parked!.intent, payload: parked!.payload }
+    h.capability.set('org_1', true)
+    await h.dispatcher.setOnline([queued], true)
+    await h.dispatcher.dispatchAll([queued])
+    expect(h.server.state.commitInputs).toHaveLength(1)
+    expect(h.server.state.commitInputs[0]?.editorSessionId).toBe(WINDOW_A)
   })
 })

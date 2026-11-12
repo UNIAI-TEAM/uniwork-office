@@ -117,6 +117,7 @@ import {
   type EditLockSessionView,
 } from '../uniwork-edit-lock/session'
 import { UniworkDocError } from './errors'
+import { newEditorSessionId } from './editor-session-id'
 import { EDIT_LOCK_QUIT_CAP_MS } from './edit-lock-quit'
 import {
   copyTitleFor,
@@ -1311,6 +1312,8 @@ export class UniworkDocsService {
   private readonly inFlightDropReleases = new Set<Promise<unknown>>()
   /** pathKey -> editor_id for this process + path */
   private readonly editorIds = new Map<string, string>()
+  /** UNI-2510: pathKey -> editor_session_id of the editor opening of that path in this window */
+  private readonly editorSessionIds = new Map<string, string>()
   private lastOwner: LastOwner | null
   /** the owner last-account.json holds: a failed write leaves it behind `lastOwner` and is retried */
   private lastOwnerOnDisk: LastOwner | null
@@ -1652,6 +1655,7 @@ export class UniworkDocsService {
       dispatcherBusy: (key) => this.queueInFlight.has(key),
       prepareEditLock: (path) => this.prepareEditLock(path),
       editLockId: (path) => this.editLockIdOf(path),
+      editorSessionId: (path) => this.editorSessionIdOf(path),
       editLockHolder: (path) => this.editLockHolderOf(path),
       onCommitEditLocked: (path, error) =>
         this.editLocks.get(pathKey(path))?.markLostFromCommit(error),
@@ -1714,6 +1718,37 @@ export class UniworkDocsService {
 
   private editLockIdOf(path: string): string | null {
     return this.editLocks.get(pathKey(path))?.lockId() ?? null
+  }
+
+  /**
+   * UNI-2510: the `editor_session_id` of the editor opening that shows `path`. The service is one per
+   * process and a path is shown in at most one view, so the id follows the opening of that path: minted
+   * by the first save made while a view shows the path, kept for every later save (a tear-off moves the
+   * live view and keeps it), and ended by `notePathsDropped` (the view is gone), `reloadEditor` (Reload
+   * latest) or `noteEditorLoaded` (the view loaded again). A save with no view showing the path gets no
+   * id and mints none, so a leftover id never reaches the next opening.
+   */
+  private editorSessionIdOf(path: string): string | null {
+    const key = pathKey(path)
+    if (!this.deps.isPathOpen(path)) {
+      this.editorSessionIds.delete(key)
+      return null
+    }
+    let id = this.editorSessionIds.get(key)
+    if (!id) {
+      id = newEditorSessionId()
+      this.editorSessionIds.set(key, id)
+    }
+    return id
+  }
+
+  /**
+   * UNI-2510: the editor view showing `path` finished loading (first open, crash reload, the module's
+   * own `location.reload()`): the document is mounted anew, as on the web, so its next save is a new
+   * editor session.
+   */
+  noteEditorLoaded(path: string): void {
+    this.editorSessionIds.delete(pathKey(path))
   }
 
   private editLockHolderOf(path: string): UniworkDocEditLock | null {
@@ -1855,6 +1890,8 @@ export class UniworkDocsService {
       // UNI-1959: a name dialog still open for a closed tab is dismissed with it
       this.cancelFirstSaveFor(path)
       const key = pathKey(path)
+      // the tab is gone: its next opening is a new editor session
+      this.editorSessionIds.delete(key)
       const session = this.editLocks.get(key)
       if (!session) continue
       this.editLocks.delete(key)
@@ -8264,7 +8301,7 @@ export class UniworkDocsService {
     }
     this.remoteBars.set(pathKey(done.path), { kind: 'updated', version: notice.version })
     this.remoteNotices.set(pathKey(done.path), notice)
-    this.deps.reloadPath(done.path)
+    this.reloadEditor(done.path)
     const shown = this.store.lookup(path)
     if (shown) this.publish(toStatus(shown))
   }
@@ -8363,6 +8400,12 @@ export class UniworkDocsService {
     } catch {
       return false
     }
+  }
+
+  /** UNI-2510: remounts the editor of a path; the reopened document is a new editor session */
+  private reloadEditor(path: string): void {
+    this.editorSessionIds.delete(pathKey(path))
+    this.deps.reloadPath(path)
   }
 
   /**
@@ -9705,7 +9748,7 @@ export class UniworkDocsService {
       // the bar belonged to the replaced base: the copy is at the head now
       this.remoteBars.delete(pathKey(doc.path))
       this.remoteNotices.delete(pathKey(doc.path))
-      this.deps.reloadPath(doc.path)
+      this.reloadEditor(doc.path)
     } finally {
       // the superseded intent's upload session is released after the local steps, and also
       // when one of them fails, so the server session is never leaked

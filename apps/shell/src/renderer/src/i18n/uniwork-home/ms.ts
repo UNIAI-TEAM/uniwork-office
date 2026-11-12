@@ -237,7 +237,8 @@ export const ms = {
   fuRepUploadMissing: 'Fail tidak pernah sampai ke storan.',
   fuRepSizeMismatch: 'Saiz yang dimuat naik tidak sepadan dengan fail asal.',
   fuRepUnsupportedMedia: 'Kandungan fail tidak sepadan dengan formatnya.',
-  fuRepStorageQuota: 'Storan penuh. Kosongkan ruang.',
+  fuRepStorageQuota:
+    'Storan penuh. Kosongkan ruang. Jika anda baru sahaja memuat naik versi lain, cuba lagi dalam beberapa minit.',
   fuRepNotFound: 'Fail tidak ditemui dalam muat naik ini.',
   fuRepPartsInvalid: 'Bahagian fail besar tidak sepadan.',
   fuRepMissingEtag: 'Tidak dapat mengesahkan fail telah sampai ke storan.',

@@ -923,6 +923,8 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
           length: old.length,
           // the same snapshot, so "Save again" re-sends the conversion the bytes were made for
           ...(old.conversion === undefined ? {} : { conversion: old.conversion }),
+          // and the editor opening the bytes were saved in
+          ...(old.editorSessionId === undefined ? {} : { editorSessionId: old.editorSessionId }),
         },
         deps.now?.() ?? Date.now(),
       )

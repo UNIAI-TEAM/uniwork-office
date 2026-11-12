@@ -45,6 +45,8 @@ export interface NewIntentInput {
   createdAt?: string
   /** UNI-2212: the commit's conversion snapshot (null = ordinary; absent = read the binding) */
   conversion?: LegacyConversion | null
+  /** UNI-2510: the editor opening the save was made in (absent = the commit omits the field) */
+  editorSessionId?: string
 }
 
 export type QueueEffect =
@@ -299,6 +301,7 @@ function createFromSave(
     createdAt: input.createdAt ?? iso(ctx.now),
     updatedAt: iso(ctx.now),
     ...(input.conversion === undefined ? {} : { conversion: input.conversion }),
+    ...(input.editorSessionId === undefined ? {} : { editorSessionId: input.editorSessionId }),
   }
 }
 

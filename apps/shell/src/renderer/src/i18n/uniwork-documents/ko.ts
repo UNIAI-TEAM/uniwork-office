@@ -36,7 +36,8 @@ export const ko = {
   uwErrNotFound: '이 문서는 더 이상 존재하지 않습니다.',
   uwErrDeleted: '이 문서는 UniWork에서 삭제되었습니다.',
   uwErrConflict: '다른 사용자가 더 최신 버전을 먼저 저장했습니다.',
-  uwErrQuotaExceeded: 'UniWork 저장 공간이 가득 찼습니다.',
+  uwErrQuotaExceeded:
+    'UniWork 저장 공간이 가득 찼습니다. 방금 다른 버전을 업로드했다면 몇 분 후에 다시 시도하세요.',
   uwErrTooLarge: '이 파일은 UniWork에 비해 너무 큽니다.',
   uwErrUnsupportedFormat: '이 파일 형식은 UniWork Office에서 지원되지 않습니다.',
   uwErrEngineIncompatible: '이 버전의 UniWork Office에서는 이 문서를 열 수 없습니다.',

@@ -236,7 +236,8 @@ export const cs = {
   fuRepUploadMissing: 'Soubor se nikdy nedostal do úložiště.',
   fuRepSizeMismatch: 'Velikost nahraného souboru neodpovídá originálu.',
   fuRepUnsupportedMedia: 'Obsah souboru neodpovídá jeho formátu.',
-  fuRepStorageQuota: 'Úložiště je plné. Uvolněte místo.',
+  fuRepStorageQuota:
+    'Úložiště je plné. Uvolněte místo. Pokud jste právě nahráli další verzi, zkuste to znovu za několik minut.',
   fuRepNotFound: 'Soubor nebyl v tomto nahrávání nalezen.',
   fuRepPartsInvalid: 'Části velkého souboru nesedí.',
   fuRepMissingEtag: 'Nepodařilo se potvrdit, že soubor dorazil do úložiště.',

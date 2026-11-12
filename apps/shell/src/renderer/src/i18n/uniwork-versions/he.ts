@@ -43,11 +43,20 @@ export const he = {
   vhsLockedByOther: 'מישהו אחר עורך את המסמך הזה. המתן עד שיסיים או קח את העריכה, ואז נסה שוב.',
   vhsLockedByMe: 'אתה עורך את המסמך הזה בחלון אחר. שמור או סגור אותו שם, ואז נסה שוב.',
   vhsReasonUpload: 'הועלתה',
-  vhsReasonManual: 'גרסה ידנית',
+  vhsReasonManual: 'ידנית',
   vhsReasonAuto: 'אוטומטית',
   vhsReasonRestore: 'שחזור',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'אחר',
+  vhsCoalescedGroupOne: 'שמירות בהפעלה הזו: {n}',
+  vhsCoalescedGroupOther: 'שמירות בהפעלה הזו: {n}',
+  vhsCoalescedOrphanOne: 'שמירות שמוזגו לגרסה האחרונה של הפעלת העריכה: {n}',
+  vhsCoalescedOrphanOther: 'שמירות שמוזגו לגרסה האחרונה של הפעלת העריכה: {n}',
+  vhsReleasedNoContent: 'לגרסה הזו לא נותר תוכן לפתיחה או להורדה.',
+  vhsErrVersionCoalesced:
+    'הגרסה הזו מוזגה לגרסה האחרונה של הפעלת העריכה שלה, ולכן אין לה תוכן משלה. פתחו במקומה את הגרסה האחרונה.',
+  vhsErrFileChunkMissing:
+    'לא ניתן היה לקרוא את הקובץ הזה כי חלק מהנתונים השמורים שלו חסר. נסו שוב בעוד כמה דקות; אם הבעיה נמשכת, ספרו למנהל.',
   vhsClose: 'סגור',
   vhsCancel: 'ביטול',
 } satisfies Record<keyof typeof zh, string>

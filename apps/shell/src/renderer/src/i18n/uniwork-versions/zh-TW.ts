@@ -43,11 +43,20 @@ export const zhTW = {
   vhsLockedByOther: '其他人正在編輯此文件。請等他們完成或接管編輯後再試。',
   vhsLockedByMe: '你正在另一個視窗中編輯此文件。請先在那裡儲存或關閉，然後重試。',
   vhsReasonUpload: '已上傳',
-  vhsReasonManual: '手動版本',
+  vhsReasonManual: '手動',
   vhsReasonAuto: '自動',
   vhsReasonRestore: '還原',
   vhsReasonAgent: 'Agent',
   vhsReasonUnknown: '其他',
+  vhsCoalescedGroupOne: '此工作階段中儲存了 {n} 次',
+  vhsCoalescedGroupOther: '此工作階段中儲存了 {n} 次',
+  vhsCoalescedOrphanOne: '{n} 次儲存已合併到其編輯工作階段的最後一個版本',
+  vhsCoalescedOrphanOther: '{n} 次儲存已合併到其編輯工作階段的最後一個版本',
+  vhsReleasedNoContent: '此版本已沒有可開啟或下載的內容。',
+  vhsErrVersionCoalesced:
+    '此版本已合併到其編輯工作階段的最後一個版本，因此沒有自己的內容。請改為開啟該最後一個版本。',
+  vhsErrFileChunkMissing:
+    '無法讀取此檔案，因為其儲存資料缺少一部分。請幾分鐘後再試；如果仍然失敗，請告知管理員。',
   vhsClose: '關閉',
   vhsCancel: '取消',
 } satisfies Record<keyof typeof zh, string>

@@ -46,11 +46,20 @@ export const cs = {
   vhsLockedByMe:
     'Tento dokument upravujete v jiném okně. Uložte ho nebo ho tam zavřete a zkuste to znovu.',
   vhsReasonUpload: 'nahraná',
-  vhsReasonManual: 'ruční verze',
+  vhsReasonManual: 'ruční',
   vhsReasonAuto: 'automatická',
   vhsReasonRestore: 'obnovení',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'jiná',
+  vhsCoalescedGroupOne: 'Uložení v této relaci: {n}',
+  vhsCoalescedGroupOther: 'Uložení v této relaci: {n}',
+  vhsCoalescedOrphanOne: 'Uložení sloučená do poslední verze své editační relace: {n}',
+  vhsCoalescedOrphanOther: 'Uložení sloučená do poslední verze své editační relace: {n}',
+  vhsReleasedNoContent: 'Tato verze již nemá žádný obsah, který by šlo otevřít nebo stáhnout.',
+  vhsErrVersionCoalesced:
+    'Tato verze byla sloučena do poslední verze své editační relace, proto nemá vlastní obsah. Otevřete místo ní tuto poslední verzi.',
+  vhsErrFileChunkMissing:
+    'Tento soubor se nepodařilo přečíst, protože chybí část jeho uložených dat. Zkuste to znovu za několik minut; pokud to selhává dál, informujte správce.',
   vhsClose: 'Zavřít',
   vhsCancel: 'Zrušit',
 } satisfies Record<keyof typeof zh, string>

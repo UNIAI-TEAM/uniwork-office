@@ -44,11 +44,20 @@ export const th = {
     'มีคนอื่นกำลังแก้ไขเอกสารนี้ รอจนกว่าจะเสร็จหรือรับช่วงการแก้ไข แล้วลองอีกครั้ง',
   vhsLockedByMe: 'คุณกำลังแก้ไขเอกสารนี้ในหน้าต่างอื่น บันทึกหรือปิดที่นั่นก่อน แล้วลองอีกครั้ง',
   vhsReasonUpload: 'อัปโหลด',
-  vhsReasonManual: 'เวอร์ชันด้วยตนเอง',
+  vhsReasonManual: 'ด้วยตนเอง',
   vhsReasonAuto: 'อัตโนมัติ',
   vhsReasonRestore: 'กู้คืน',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'อื่น ๆ',
+  vhsCoalescedGroupOne: 'บันทึก {n} ครั้งในเซสชันนี้',
+  vhsCoalescedGroupOther: 'บันทึก {n} ครั้งในเซสชันนี้',
+  vhsCoalescedOrphanOne: 'การบันทึก {n} ครั้งถูกรวมเข้ากับเวอร์ชันล่าสุดของเซสชันการแก้ไข',
+  vhsCoalescedOrphanOther: 'การบันทึก {n} ครั้งถูกรวมเข้ากับเวอร์ชันล่าสุดของเซสชันการแก้ไข',
+  vhsReleasedNoContent: 'เวอร์ชันนี้ไม่มีเนื้อหาเหลือให้เปิดหรือดาวน์โหลดแล้ว',
+  vhsErrVersionCoalesced:
+    'เวอร์ชันนี้ถูกรวมเข้ากับเวอร์ชันล่าสุดของเซสชันการแก้ไข จึงไม่มีเนื้อหาของตัวเอง โปรดเปิดเวอร์ชันล่าสุดนั้นแทน',
+  vhsErrFileChunkMissing:
+    'อ่านไฟล์นี้ไม่ได้เพราะข้อมูลที่จัดเก็บบางส่วนหายไป ลองอีกครั้งในอีกไม่กี่นาที หากยังไม่สำเร็จ โปรดแจ้งผู้ดูแลระบบ',
   vhsClose: 'ปิด',
   vhsCancel: 'ยกเลิก',
 } satisfies Record<keyof typeof zh, string>

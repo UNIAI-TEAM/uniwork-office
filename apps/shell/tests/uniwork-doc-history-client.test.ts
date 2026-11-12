@@ -99,6 +99,8 @@ describe('listVersions', () => {
         size_bytes: 2048,
         checksum_sha256: 'abc',
         restored_from: null,
+        coalesced_into: null,
+        restorable: true,
         created_by: 'u_1',
         created_by_kind: 'human',
         created_at: '2099-01-01T00:00:00Z',
@@ -127,12 +129,39 @@ describe('listVersions', () => {
           size_bytes: 0,
           checksum_sha256: null,
           restored_from: null,
+          coalesced_into: null,
+          restorable: true,
           created_by: '',
           created_by_kind: 'human',
           created_at: '',
         },
       ],
     })
+  })
+
+  it('UNI-2502: reads coalesced_into and restorable; absent fields read as a normal row', async () => {
+    const { client } = setup(() =>
+      json(200, {
+        versions: [
+          { ...WIRE_VERSION, id: 'v6', version: 6 },
+          {
+            ...WIRE_VERSION,
+            id: 'v5',
+            version: 5,
+            file_id: null,
+            coalesced_into: 6,
+            restorable: false,
+          },
+          { ...WIRE_VERSION, id: 'v4', version: 4, coalesced_into: 'x', restorable: 'no' },
+        ],
+      }),
+    )
+    const rows = (await client.listVersions('doc_1')).versions
+    expect(rows.map((v) => [v.version, v.coalesced_into, v.restorable])).toEqual([
+      [6, null, true],
+      [5, 6, false],
+      [4, null, true],
+    ])
   })
 
   it('clamps the limit to the server cap of 100', async () => {
@@ -211,6 +240,16 @@ describe('createVersion', () => {
     const { client, seen } = setup(() => json(201, { version: WIRE_VERSION }))
     await client.createVersion('doc_1', {}, 'key_12345678')
     expect(seen[0]!.body).toEqual({})
+  })
+
+  it('UNI-2502: 409 version_coalesced and file_chunk_missing keep their server codes', async () => {
+    const coalesced = setup(() => envelope(409, 'version_coalesced'))
+    const first = await failure(coalesced.client.createVersion('doc_1', {}, 'key_12345678'))
+    expect(first.serverCode).toBe('version_coalesced')
+    expect(first.status).toBe(409)
+    const missing = setup(() => envelope(500, 'file_chunk_missing'))
+    const second = await failure(missing.client.createVersion('doc_1', {}, 'key_12345678'))
+    expect(second.serverCode).toBe('file_chunk_missing')
   })
 
   it('409 document_version_unchanged keeps its server code', async () => {

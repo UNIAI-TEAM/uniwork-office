@@ -10,10 +10,16 @@ import { LocaleProvider } from '../src/renderer/src/locale'
 import { VersionHistorySheet } from '../src/renderer/src/uniwork-doc-history/VersionHistorySheet'
 import {
   canWriteVersions,
+  downloadErrorKey,
+  groupVersionRows,
+  isReleasedVersion,
+  openErrorKey,
   pageText,
+  restoreRefusal,
   versionsEntryAllowed,
   type VersionHistoryTarget,
 } from '../src/renderer/src/uniwork-doc-history/version-history-model'
+import type { DocVersion } from '../src/shared/doc-history-api'
 import { createFakeShareApi } from '../src/renderer/src/uniwork-share/fake-share-api'
 import { uniworkVersionStrings } from '../src/renderer/src/i18n/strings-uniwork-versions'
 import {
@@ -132,6 +138,8 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
   let root: Root
   let onClose: ReturnType<typeof vi.fn>
   let onChanged: ReturnType<typeof vi.fn>
+  /** the host toast's sentences, in order */
+  let notices: string[]
 
   beforeEach(() => {
     host = document.createElement('div')
@@ -139,6 +147,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
     root = createRoot(host)
     onClose = vi.fn()
     onChanged = vi.fn()
+    notices = []
   })
   afterEach(async () => {
     await act(async () => root.unmount())
@@ -183,6 +192,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
             row,
             bridge,
             shareApi: createFakeShareApi(),
+            onNotice: (message) => notices.push(message),
           }),
         ),
       )
@@ -325,6 +335,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
               row: target(),
               bridge: createFakeDocHistoryBridge({ versions: threeVersions() }),
               shareApi: share,
+              onNotice: (message) => notices.push(message),
             }),
           ),
         )
@@ -490,7 +501,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await open(target(), undefined, 'vi')
       expect(sheet().textContent).toContain('Lịch sử phiên bản')
       expect(rows()[0]!.textContent).toContain('Phiên bản 3')
-      expect(rows()[0]!.textContent).toContain('phiên bản thủ công')
+      expect(rows()[0]!.textContent).toContain('· thủ công ·')
       expect(rows()[0]!.textContent).toContain(viText.vhsCurrentBadge)
     })
   })
@@ -879,9 +890,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await open(target(), bridge)
       await click(viewButton(3))
       expect(onClose).not.toHaveBeenCalled()
-      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(
-        t('vhsOpenUnsupported'),
-      )
+      expect(notices).toEqual([t('vhsOpenUnsupported')])
     })
 
     it('another failure to open reads as the preview error', async () => {
@@ -890,7 +899,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await open(target(), bridge)
       await click(viewButton(3))
       expect(onClose).not.toHaveBeenCalled()
-      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(t('vhsPreviewError'))
+      expect(notices).toEqual([t('vhsPreviewError')])
     })
 
     it('keeps focus on the clicked button after a failed open, and Escape still closes the sheet', async () => {
@@ -934,7 +943,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await act(async () => settle(failure('write_failed')))
       await flush()
       expect(document.activeElement).toBe(download)
-      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(t('vhsDownloadFailed'))
+      expect(notices).toEqual([t('vhsDownloadFailed')])
     })
 
     it('a page version shows its text in a read-only dialog', async () => {
@@ -988,7 +997,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
         versionNo: 2,
         suggestedName: 'Báo cáo.docx',
       })
-      expect(sheet().querySelector('[role="alert"]')).toBeNull()
+      expect(notices).toEqual([])
     })
 
     it('a cancelled save dialog is silent, any other failure says so', async () => {
@@ -996,10 +1005,10 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       bridge.downloadVersion.mockResolvedValueOnce(failure('dialog_canceled'))
       await open(target(), bridge)
       await click(button(sheet(), t('vhsDownloadVersion', { no: 3 })))
-      expect(sheet().querySelector('[role="alert"]')).toBeNull()
+      expect(notices).toEqual([])
       bridge.downloadVersion.mockResolvedValueOnce(failure('write_failed'))
       await click(button(sheet(), t('vhsDownloadVersion', { no: 3 })))
-      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(t('vhsDownloadFailed'))
+      expect(notices).toEqual([t('vhsDownloadFailed')])
     })
 
     it('a page document offers no download', async () => {
@@ -1009,5 +1018,197 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       )
       expect(button(sheet(), t('vhsDownloadVersion', { no: 3 }))).toBeUndefined()
     })
+  })
+
+  describe('versions a settled editing session gave their file back (UNI-2502)', () => {
+    const released = (no: number, into: number) =>
+      versionOf({
+        id: `v${no}`,
+        version: no,
+        file_id: null,
+        coalesced_into: into,
+        restorable: false,
+      })
+    const actions = (no: number) => [
+      t('vhsRestore', { no }),
+      t('vhsDownloadVersion', { no }),
+      t('vhsPreviewTitle', { no }),
+    ]
+
+    it('folds released versions under their session last version, with no actions of their own', async () => {
+      const bridge = createFakeDocHistoryBridge({
+        versions: [
+          versionOf({ id: 'v6', version: 6 }),
+          released(5, 6),
+          released(4, 6),
+          released(3, 6),
+          versionOf({ id: 'v2', version: 2 }),
+        ],
+      })
+      await open(target(), bridge)
+      // two rows: 6 (with its session) and 2
+      expect(rows().map((r) => r.getAttribute('data-version-row'))).toEqual(['6', '2'])
+      for (const no of [5, 4, 3]) {
+        for (const name of actions(no)) expect(button(sheet(), name)).toBeUndefined()
+      }
+      // one caption, under version 6, counting the whole session: three released saves and the last one
+      const captions = sheet().querySelectorAll('[data-testid="version-group"]')
+      expect(captions).toHaveLength(1)
+      expect(captions[0]!.textContent).toBe(t('vhsCoalescedGroupOther', { n: 4 }))
+      expect(captions[0]!.closest('li')).toBe(rows()[0])
+      for (const no of [6, 2]) {
+        for (const name of actions(no)) expect(button(sheet(), name)).toBeTruthy()
+      }
+    })
+
+    it('keeps a version the server calls not restorable as its own row with no actions and a caption', async () => {
+      const bridge = createFakeDocHistoryBridge({
+        versions: [
+          versionOf({ id: 'v6', version: 6 }),
+          versionOf({ id: 'v5', version: 5, file_id: null, restorable: false }),
+        ],
+      })
+      await open(target(), bridge)
+      expect(rows().map((r) => r.getAttribute('data-version-row'))).toEqual(['6', '5'])
+      const caption = rows()[1]!.querySelector('[data-testid="version-released"]')
+      expect(caption?.textContent).toBe(t('vhsReleasedNoContent'))
+      expect(sheet().querySelectorAll('[data-testid="version-group"]')).toHaveLength(0)
+      for (const name of actions(5)) expect(button(sheet(), name)).toBeUndefined()
+      for (const name of actions(6)) expect(button(sheet(), name)).toBeTruthy()
+    })
+
+    it('still counts a group whose last version is not loaded, without claiming the whole session', async () => {
+      const bridge = createFakeDocHistoryBridge({ versions: [released(5, 6), released(4, 6)] })
+      await open(target(), bridge)
+      expect(sheet().querySelector('[data-testid="version-orphan"]')?.textContent).toBe(
+        t('vhsCoalescedOrphanOther', { n: 2 }),
+      )
+      expect(sheet().querySelectorAll('[data-testid="version-group"]')).toHaveLength(0)
+      expect(button(sheet(), t('vhsRestore', { no: 5 }))).toBeUndefined()
+    })
+
+    it('reads the web copy in Vietnamese', async () => {
+      const bridge = createFakeDocHistoryBridge({
+        versions: [versionOf({ id: 'v6', version: 6 }), released(5, 6)],
+      })
+      await open(target(), bridge, 'vi')
+      expect(sheet().querySelector('[data-testid="version-group"]')?.textContent).toBe(
+        '2 lần lưu trong phiên này',
+      )
+    })
+
+    it('a restore refused with version_coalesced gets its own sentence, not the working-copy one', async () => {
+      const bridge = createFakeDocHistoryBridge({ versions: threeVersions() })
+      bridge.restore.mockResolvedValueOnce(failure('version_coalesced', { status: 409 }))
+      await open(target(), bridge)
+      await click(button(sheet(), t('vhsRestore', { no: 2 })))
+      await click(button(top(), t('vhsRestoreConfirmSubmit')))
+      const alert = top().querySelector('[role="alert"]')?.textContent
+      expect(alert).toBe(t('vhsErrVersionCoalesced'))
+      expect(alert).not.toContain(t('vhsRestoreConflict'))
+    })
+
+    it('a download refused with version_coalesced or file_chunk_missing says why', async () => {
+      const bridge = createFakeDocHistoryBridge({ versions: threeVersions() })
+      bridge.downloadVersion.mockResolvedValueOnce(failure('version_coalesced', { status: 409 }))
+      await open(target(), bridge)
+      await click(button(sheet(), t('vhsDownloadVersion', { no: 2 })))
+      expect(notices).toEqual([t('vhsErrVersionCoalesced')])
+      bridge.downloadVersion.mockResolvedValueOnce(failure('file_chunk_missing'))
+      await click(button(sheet(), t('vhsDownloadVersion', { no: 2 })))
+      expect(notices).toEqual([t('vhsErrVersionCoalesced'), t('vhsErrFileChunkMissing')])
+      // the toast carries it, the sheet keeps no second copy
+      expect(sheet().querySelector('[role="alert"]')).toBeNull()
+    })
+
+    it('opening a version that has just been released shows the version_coalesced sentence', async () => {
+      const bridge = createFakeDocHistoryBridge({ versions: threeVersions() })
+      bridge.openVersion.mockResolvedValueOnce(failure('version_coalesced', { status: 409 }))
+      await open(target(), bridge)
+      await click(viewButton(3))
+      expect(onClose).not.toHaveBeenCalled()
+      expect(notices).toEqual([t('vhsErrVersionCoalesced')])
+      expect(sheet().querySelector('[role="alert"]')).toBeNull()
+    })
+
+    it('previewing a page version that has just been released shows the version_coalesced sentence', async () => {
+      const bridge = createFakeDocHistoryBridge({
+        versions: [versionOf({ id: 'v1', version: 1, kind: 'page', file_id: null })],
+      })
+      bridge.version.mockResolvedValueOnce(failure('version_coalesced', { status: 409 }))
+      await open(target({ kind: 'page' }), bridge)
+      await click(viewButton(1))
+      expect(top().textContent).toContain(t('vhsErrVersionCoalesced'))
+      // a released version is a plain note in the dialog, not a failure the screen reader announces
+      expect(top().querySelector('[role="alert"]')).toBeNull()
+    })
+  })
+})
+
+describe('version history grouping and released versions (UNI-2502, model)', () => {
+  const row = (no: number, over: Partial<DocVersion> = {}) =>
+    versionOf({ id: `v${no}`, version: no, ...over })
+
+  it('folds the versions pointing at a session last version under it and keeps the rest in order', () => {
+    const rows = groupVersionRows([
+      row(7),
+      row(6, { coalesced_into: 7 }),
+      row(5, { coalesced_into: 7 }),
+      row(4),
+      row(3, { coalesced_into: 4 }),
+    ])
+    expect(
+      rows.map((r) => (r.kind === 'version' ? r.version.version : `orphan:${r.into}`)),
+    ).toEqual([7, 4])
+    expect(rows.map((r) => r.coalesced.map((v) => v.version))).toEqual([[6, 5], [3]])
+  })
+
+  it('surfaces one orphan group, where its first member sits, when the last version is not loaded', () => {
+    const rows = groupVersionRows([
+      row(9),
+      row(5, { coalesced_into: 6 }),
+      row(4, { coalesced_into: 6 }),
+    ])
+    expect(rows.map((r) => r.kind)).toEqual(['version', 'orphan'])
+    expect(rows[1]).toMatchObject({ kind: 'orphan', into: 6 })
+    expect(rows[1]?.coalesced).toHaveLength(2)
+  })
+
+  it('never folds a version that carries no pointer, even when it is not restorable', () => {
+    const rows = groupVersionRows([row(3, { restorable: false }), row(2)])
+    expect(rows.map((r) => r.kind)).toEqual(['version', 'version'])
+    expect(rows.every((r) => r.coalesced.length === 0)).toBe(true)
+  })
+
+  it('a row is released by a pointer or by restorable false; a server without the fields never releases', () => {
+    expect(isReleasedVersion(row(5, { coalesced_into: 6 }))).toBe(true)
+    expect(isReleasedVersion(row(5, { restorable: false }))).toBe(true)
+    expect(isReleasedVersion(row(5, { coalesced_into: null, restorable: true }))).toBe(false)
+    expect(isReleasedVersion(row(5))).toBe(false)
+    expect(isReleasedVersion(null)).toBe(false)
+  })
+
+  it('a restore refused with version_coalesced is not the working-copy conflict, and keeps its key', () => {
+    expect(restoreRefusal(failure('version_coalesced', { status: 409 }) as never)).toEqual({
+      key: 'vhsErrVersionCoalesced',
+      dropKey: false,
+    })
+    expect(restoreRefusal(failure('file_chunk_missing') as never)).toEqual({
+      key: 'vhsErrFileChunkMissing',
+      dropKey: false,
+    })
+    expect(restoreRefusal(failure('conflict') as never)).toEqual({
+      key: 'vhsRestoreConflict',
+      dropKey: true,
+    })
+  })
+
+  it('a failed download names the two released-version codes, any other failure stays generic', () => {
+    expect(downloadErrorKey(failure('version_coalesced') as never)).toBe('vhsErrVersionCoalesced')
+    expect(downloadErrorKey(failure('file_chunk_missing') as never)).toBe('vhsErrFileChunkMissing')
+    expect(downloadErrorKey(failure('write_failed') as never)).toBe('vhsDownloadFailed')
+    expect(openErrorKey(failure('version_coalesced') as never)).toBe('vhsErrVersionCoalesced')
+    expect(openErrorKey(failure('unsupported_format') as never)).toBe('vhsOpenUnsupported')
+    expect(openErrorKey(failure('network') as never)).toBe('vhsPreviewError')
   })
 })

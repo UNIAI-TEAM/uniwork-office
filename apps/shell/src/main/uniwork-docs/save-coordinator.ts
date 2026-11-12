@@ -251,6 +251,8 @@ export interface SaveCoordinatorDeps {
   prepareEditLock?(path: string): Promise<'held' | 'park' | 'proceed'>
   /** EL-1(b): lock id of a held path, sent as commit `edit_lock_id` */
   editLockId?(path: string): string | null
+  /** UNI-2510: ULID of the editor opening of a path; stored on each intent, sent as `editor_session_id` */
+  editorSessionId?(path: string): string | null
   /** EL-1(b) B8: holder summary for a synthesised park 423 */
   editLockHolder?(path: string): UniworkDocEditLock | null
   /** EL-1(b): 423 on commit while held — session becomes 'lost' */
@@ -930,6 +932,7 @@ export class SaveCoordinator {
   ): IntentRecordV2 {
     const id = this.uuid()
     const at = this.now().toISOString()
+    const editorSessionId = this.deps.editorSessionId?.(doc.path) ?? null
     return {
       v: 2,
       intentId: `office-intent-${id}`,
@@ -949,6 +952,9 @@ export class SaveCoordinator {
       // UNI-2212: the conversion this commit declares is fixed with the intent, so a retry after
       // the binding changed (a view launch, a reopen) still sends the same one
       conversion: doc.binding.legacyFrom ? conversionFor(doc.binding.legacyFrom) : null,
+      // UNI-2510: one id per opening of the editor, fixed with the intent (a retry, an offline
+      // push or a conflict re-save of these bytes keeps it); absent when the host gives none
+      ...(editorSessionId ? { editorSessionId } : {}),
     }
   }
 
@@ -1422,6 +1428,9 @@ export class SaveCoordinator {
             // UNI-2212: a converted copy of a legacy document declares its conversion, the one its
             // intent was minted with (an intent from before the snapshot reads the binding)
             ...(conversion ? { conversion } : {}),
+            // UNI-2510: the editor opening the save was made in, fixed with the intent so a retry or
+            // a later queue push commits under the same id
+            ...(intent.editorSessionId ? { editorSessionId: intent.editorSessionId } : {}),
           })
         } catch (error) {
           // only the COMMIT leg is tagged, and only for an answer the server

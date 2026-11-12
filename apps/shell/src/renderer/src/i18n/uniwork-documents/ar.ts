@@ -36,7 +36,8 @@ export const ar = {
   uwErrNotFound: 'لم يعد هذا المستند موجودًا.',
   uwErrDeleted: 'تم حذف هذا المستند في UniWork.',
   uwErrConflict: 'حفظ شخص ما نسخة أحدث أولًا.',
-  uwErrQuotaExceeded: 'مساحة التخزين في UniWork ممتلئة.',
+  uwErrQuotaExceeded:
+    'مساحة التخزين في UniWork ممتلئة. إذا كنت قد رفعت للتو إصدارًا آخر، فحاول مرة أخرى بعد بضع دقائق.',
   uwErrTooLarge: 'هذا الملف كبير جدًا على UniWork.',
   uwErrUnsupportedFormat: 'نوع الملف هذا غير مدعوم في UniWork Office.',
   uwErrEngineIncompatible: 'هذا الإصدار من UniWork Office لا يمكنه فتح هذا المستند.',

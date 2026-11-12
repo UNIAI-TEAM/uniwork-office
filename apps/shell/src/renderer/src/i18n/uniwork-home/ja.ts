@@ -241,7 +241,8 @@ export const ja = {
   fuRepUploadMissing: 'ファイルがストレージに届きませんでした。',
   fuRepSizeMismatch: 'アップロードされたサイズが元のファイルと一致しません。',
   fuRepUnsupportedMedia: 'ファイルの内容が形式と一致しません。',
-  fuRepStorageQuota: 'ストレージがいっぱいです。空き容量を確保してください。',
+  fuRepStorageQuota:
+    'ストレージがいっぱいです。空き容量を確保してください。別のバージョンをアップロードしたばかりの場合は、数分後にもう一度お試しください。',
   fuRepNotFound: 'このアップロードでファイルが見つかりませんでした。',
   fuRepPartsInvalid: '大きなファイルの各部分が一致しません。',
   fuRepMissingEtag: 'ファイルがストレージに届いたことを確認できませんでした。',

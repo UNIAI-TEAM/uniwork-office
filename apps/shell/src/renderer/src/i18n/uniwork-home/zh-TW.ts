@@ -230,7 +230,7 @@ export const zhTW = {
   fuRepUploadMissing: '檔案從未到達儲存空間。',
   fuRepSizeMismatch: '上傳的大小與原始檔案不符。',
   fuRepUnsupportedMedia: '檔案內容與其格式不符。',
-  fuRepStorageQuota: '儲存空間已滿，請釋出空間。',
+  fuRepStorageQuota: '儲存空間已滿，請釋出空間。如果你剛上傳了另一個版本，請幾分鐘後再試。',
   fuRepNotFound: '在本次上傳中找不到此檔案。',
   fuRepPartsInvalid: '大型檔案的各部分不相符。',
   fuRepMissingEtag: '無法確認檔案已到達儲存空間。',

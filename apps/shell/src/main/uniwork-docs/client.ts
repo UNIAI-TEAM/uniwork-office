@@ -15,6 +15,7 @@ import type {
 import { TransportError } from '../uniwork-auth/transport'
 import { UniworkDocError, errorFromResponse, parseRetryAfter } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
+import { isEditorSessionId } from './editor-session-id'
 import { isLegacyConversion, type LegacyConversion } from './legacy-cloud'
 import { DEFAULT_DOCUMENT_LIMITS, parseDocumentLimits, type DocumentLimits } from './limits'
 import {
@@ -379,6 +380,11 @@ export interface UniworkDocsClient {
      * the server may change its format along this pair (and only this pair); omitted otherwise
      */
     conversion?: LegacyConversion
+    /**
+     * UNI-2510: ULID of the editor opening this save belongs to (the server groups the versions
+     * of one opening); omitted when the save has none (an older intent, the copy flow)
+     */
+    editorSessionId?: string
   }): Promise<CommitReceipt>
   /**
    * What became of a commit intent (G5-07). A 410 `commit_intent_unknown` is
@@ -1530,6 +1536,11 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           upload_id: input.uploadId,
           base_revision: input.baseRevision,
           ...(input.editLockId ? { edit_lock_id: input.editLockId } : {}),
+          // UNI-2510: the opening of the editor this save came from; a malformed id is left out
+          // (the server answers it 400), an old server ignores the field
+          ...(isEditorSessionId(input.editorSessionId)
+            ? { editor_session_id: input.editorSessionId }
+            : {}),
           ...(input.conversion
             ? { conversion: { from_format: input.conversion.from, to_format: input.conversion.to } }
             : {}),

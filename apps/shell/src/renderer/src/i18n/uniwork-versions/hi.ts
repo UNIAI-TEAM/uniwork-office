@@ -46,11 +46,20 @@ export const hi = {
   vhsLockedByMe:
     'आप यह दस्तावेज़ किसी दूसरी विंडो में संपादित कर रहे हैं। वहाँ सहेजें या बंद करें, फिर दोबारा प्रयास करें।',
   vhsReasonUpload: 'अपलोड किया गया',
-  vhsReasonManual: 'मैन्युअल संस्करण',
+  vhsReasonManual: 'मैन्युअल',
   vhsReasonAuto: 'स्वचालित',
   vhsReasonRestore: 'पुनर्स्थापना',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'अन्य',
+  vhsCoalescedGroupOne: 'इस सत्र में {n} बार सेव किया गया',
+  vhsCoalescedGroupOther: 'इस सत्र में {n} बार सेव किया गया',
+  vhsCoalescedOrphanOne: '{n} सेव संपादन सत्र के अंतिम संस्करण में मिला दिए गए',
+  vhsCoalescedOrphanOther: '{n} सेव संपादन सत्र के अंतिम संस्करण में मिला दिए गए',
+  vhsReleasedNoContent: 'इस संस्करण में खोलने या डाउनलोड करने के लिए कोई सामग्री नहीं बची है।',
+  vhsErrVersionCoalesced:
+    'यह संस्करण अपने संपादन सत्र के अंतिम संस्करण में मिला दिया गया है, इसलिए इसकी अपनी कोई सामग्री नहीं है। इसके बजाय वह अंतिम संस्करण खोलें।',
+  vhsErrFileChunkMissing:
+    'यह फ़ाइल पढ़ी नहीं जा सकी क्योंकि इसके संग्रहीत डेटा का एक हिस्सा गायब है। कुछ मिनट बाद फिर कोशिश करें; यदि समस्या बनी रहे तो व्यवस्थापक को बताएं।',
   vhsClose: 'बंद करें',
   vhsCancel: 'रद्द करें',
 } satisfies Record<keyof typeof zh, string>

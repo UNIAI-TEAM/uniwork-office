@@ -47,11 +47,21 @@ export const ru = {
   vhsLockedByMe:
     'Вы редактируете этот документ в другом окне. Сохраните или закройте его там и повторите.',
   vhsReasonUpload: 'загружена',
-  vhsReasonManual: 'ручная версия',
+  vhsReasonManual: 'ручная',
   vhsReasonAuto: 'автоматически',
   vhsReasonRestore: 'восстановление',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'другое',
+  vhsCoalescedGroupOne: 'Сохранений в этом сеансе: {n}',
+  vhsCoalescedGroupOther: 'Сохранений в этом сеансе: {n}',
+  vhsCoalescedOrphanOne: 'Сохранений, объединённых с последней версией сеанса редактирования: {n}',
+  vhsCoalescedOrphanOther:
+    'Сохранений, объединённых с последней версией сеанса редактирования: {n}',
+  vhsReleasedNoContent: 'У этой версии не осталось содержимого, которое можно открыть или скачать.',
+  vhsErrVersionCoalesced:
+    'Эта версия объединена с последней версией своего сеанса редактирования и поэтому не имеет собственного содержимого. Откройте вместо неё эту последнюю версию.',
+  vhsErrFileChunkMissing:
+    'Не удалось прочитать этот файл: часть его сохранённых данных отсутствует. Повторите попытку через несколько минут; если ошибка не исчезнет, сообщите администратору.',
   vhsClose: 'Закрыть',
   vhsCancel: 'Отмена',
 } satisfies Record<keyof typeof zh, string>

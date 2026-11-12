@@ -46,11 +46,22 @@ export const ms = {
   vhsLockedByMe:
     'Anda sedang menyunting dokumen ini dalam tetingkap lain. Simpan atau tutup di sana, kemudian cuba lagi.',
   vhsReasonUpload: 'dimuat naik',
-  vhsReasonManual: 'versi manual',
+  vhsReasonManual: 'manual',
   vhsReasonAuto: 'automatik',
   vhsReasonRestore: 'pemulihan',
   vhsReasonAgent: 'agent',
   vhsReasonUnknown: 'lain-lain',
+  vhsCoalescedGroupOne: '{n} simpanan dalam sesi ini',
+  vhsCoalescedGroupOther: '{n} simpanan dalam sesi ini',
+  vhsCoalescedOrphanOne:
+    '{n} simpanan telah digabungkan ke dalam versi terakhir sesi penyuntingannya',
+  vhsCoalescedOrphanOther:
+    '{n} simpanan telah digabungkan ke dalam versi terakhir sesi penyuntingannya',
+  vhsReleasedNoContent: 'Versi ini tidak lagi mempunyai kandungan untuk dibuka atau dimuat turun.',
+  vhsErrVersionCoalesced:
+    'Versi ini telah digabungkan ke dalam versi terakhir sesi penyuntingannya, jadi ia tiada kandungan sendiri. Buka versi terakhir itu sebagai ganti.',
+  vhsErrFileChunkMissing:
+    'Fail ini tidak dapat dibaca kerana sebahagian data yang disimpan hilang. Cuba lagi dalam beberapa minit; jika masih gagal, maklumkan kepada pentadbir.',
   vhsClose: 'Tutup',
   vhsCancel: 'Batal',
 } satisfies Record<keyof typeof zh, string>

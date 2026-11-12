@@ -12,8 +12,12 @@ import { useFocusAfterLastPage } from './use-focus-after-last-page'
 import {
   canWriteVersions,
   createErrorKey,
+  downloadErrorKey,
   formatWhen,
+  groupVersionRows,
+  isReleasedVersion,
   newIntentKey,
+  openErrorKey,
   pageText,
   reasonKey,
   restoreRefusal,
@@ -32,6 +36,11 @@ export interface VersionHistorySheetProps {
   shareApi?: UniworkShareApi
   /** a checkpoint or a restore landed: the list that opened the sheet reads its row again */
   onChanged?: () => void
+  /**
+   * a download or open the server refused: the host's toast says why (the web sheet's `toast.error`),
+   * so the sentence outlives the row that asked
+   */
+  onNotice: (message: string, tone: 'ok' | 'error') => void
 }
 
 /** no member list in this shell: every name stays unknown and the author line waits (web: not ready) */
@@ -56,6 +65,7 @@ function VersionHistoryBody({
   bridge,
   shareApi,
   onChanged,
+  onNotice,
 }: VersionHistorySheetProps) {
   const { t, dateLocale } = useI18n()
   const api = bridge ?? getDocHistoryBridge()
@@ -69,6 +79,7 @@ function VersionHistoryBody({
       onClose={onClose}
       row={row}
       onChanged={onChanged}
+      onNotice={onNotice}
     />
   )
 }
@@ -83,6 +94,7 @@ function VersionHistoryView({
   onClose,
   row,
   onChanged,
+  onNotice,
 }: {
   api: UniworkDocHistoryApi
   shareApi: UniworkShareApi | undefined
@@ -91,6 +103,7 @@ function VersionHistoryView({
   onClose: () => void
   row: VersionHistoryTarget
   onChanged?: () => void
+  onNotice: (message: string, tone: 'ok' | 'error') => void
 }) {
   const titleId = useId()
   const descriptionId = useId()
@@ -98,11 +111,12 @@ function VersionHistoryView({
   const canWrite = canWriteVersions(row)
   const shelved = !!row.shelvedAt
   const list = useDocVersions(api, row.id, true)
+  const historyRows = groupVersionRows(list.rows)
   const directory = useShareDirectory(shareApi ?? NO_MEMBERS, true)
   const listRef = useRef<HTMLUListElement>(null)
   const markLoadMore = useFocusAfterLastPage(
     listRef,
-    list.rows.length,
+    historyRows.length,
     list.hasMore,
     list.loadingMore,
   )
@@ -120,11 +134,10 @@ function VersionHistoryView({
   /** the version a restore made current; before any restore the newest row is */
   const [currentNo, setCurrentNo] = useState<number | null>(null)
 
-  const [rowError, setRowError] = useState<StringKey | null>(null)
   const [busy, setBusy] = useState<{ kind: 'open' | 'download'; no: number } | null>(null)
   const [preview, setPreview] = useState<
     | { no: number; state: 'loading' }
-    | { no: number; state: 'error' }
+    | { no: number; state: 'error'; key: StringKey }
     | { no: number; state: 'ready'; text: string }
     | null
   >(null)
@@ -226,7 +239,6 @@ function VersionHistoryView({
   const view = async (version: DocVersion) => {
     // the row buttons stay focusable while busy (aria-disabled): a press then does nothing
     if (busy !== null) return
-    setRowError(null)
     if (version.kind === 'page') {
       const request = ++previewRequest.current
       setPreview({ no: version.version, state: 'loading' })
@@ -237,7 +249,7 @@ function VersionHistoryView({
       setPreview(
         result.ok
           ? { no: version.version, state: 'ready', text: pageText(result.value.content) }
-          : { no: version.version, state: 'error' },
+          : { no: version.version, state: 'error', key: openErrorKey(result) },
       )
       return
     }
@@ -248,7 +260,7 @@ function VersionHistoryView({
     if (!alive.current) return
     setBusy(null)
     if (!result.ok) {
-      setRowError(result.error === 'unsupported_format' ? 'vhsOpenUnsupported' : 'vhsPreviewError')
+      onNotice(t(openErrorKey(result)), 'error')
       return
     }
     // the copy opened in a tab behind the sheet: leave it so the tab is what the person sees
@@ -257,7 +269,6 @@ function VersionHistoryView({
 
   const download = async (version: DocVersion) => {
     if (busy !== null) return
-    setRowError(null)
     setBusy({ kind: 'download', no: version.version })
     const result = await api
       .downloadVersion({
@@ -269,7 +280,9 @@ function VersionHistoryView({
     if (!alive.current) return
     setBusy(null)
     // a cancelled save dialog is the person's choice, not a failure
-    if (!result.ok && result.error !== 'dialog_canceled') setRowError('vhsDownloadFailed')
+    if (!result.ok && result.error !== 'dialog_canceled') {
+      onNotice(t(downloadErrorKey(result)), 'error')
+    }
   }
 
   return (
@@ -355,12 +368,6 @@ function VersionHistoryView({
           <p className="uw-versions-note">{t(shelved ? 'vhsShelvedBlocked' : 'vhsManageOnly')}</p>
         )}
 
-        {rowError && (
-          <p role="alert" className="uw-versions-error uw-versions-row-error">
-            {t(rowError)}
-          </p>
-        )}
-
         {list.status === 'loading' ? (
           <p className="uw-versions-loading" aria-busy="true">
             {t('vhsLoading')}
@@ -379,7 +386,29 @@ function VersionHistoryView({
         ) : (
           <>
             <ul className="uw-versions-list" ref={listRef}>
-              {list.rows.map((version) => {
+              {historyRows.map((row) => {
+                if (row.kind === 'orphan') {
+                  return (
+                    <li
+                      key={`group-${row.into}`}
+                      className="uw-versions-row"
+                      data-testid="version-orphan"
+                      tabIndex={-1}
+                    >
+                      <p className="uw-versions-muted">
+                        {t(
+                          row.coalesced.length === 1
+                            ? 'vhsCoalescedOrphanOne'
+                            : 'vhsCoalescedOrphanOther',
+                          { n: row.coalesced.length },
+                        )}
+                      </p>
+                    </li>
+                  )
+                }
+                const { version, coalesced } = row
+                // a released version has no file left: nothing here can open, download or restore it
+                const released = isReleasedVersion(version)
                 const author = authorName(version)
                 return (
                   <li
@@ -422,38 +451,55 @@ function VersionHistoryView({
                           )}
                         </p>
                       )}
+                      {coalesced.length > 0 && (
+                        <p className="uw-versions-row-meta" data-testid="version-group">
+                          {t(
+                            coalesced.length + 1 === 1
+                              ? 'vhsCoalescedGroupOne'
+                              : 'vhsCoalescedGroupOther',
+                            { n: coalesced.length + 1 },
+                          )}
+                        </p>
+                      )}
+                      {released && (
+                        <p className="uw-versions-row-meta" data-testid="version-released">
+                          {t('vhsReleasedNoContent')}
+                        </p>
+                      )}
                     </div>
                     <div className="uw-versions-row-actions">
-                      <button
-                        type="button"
-                        className="uw-versions-icon-btn"
-                        aria-label={t('vhsPreviewTitle', { no: version.version })}
-                        title={t('vhsView')}
-                        aria-disabled={busy !== null || undefined}
-                        aria-busy={
-                          (busy?.kind === 'open' && busy.no === version.version) || undefined
-                        }
-                        onClick={() => void view(version)}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-                          <path
-                            d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.4"
-                            strokeLinejoin="round"
-                          />
-                          <circle
-                            cx="8"
-                            cy="8"
-                            r="2"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.4"
-                          />
-                        </svg>
-                      </button>
-                      {version.kind !== 'page' && (
+                      {!released && (
+                        <button
+                          type="button"
+                          className="uw-versions-icon-btn"
+                          aria-label={t('vhsPreviewTitle', { no: version.version })}
+                          title={t('vhsView')}
+                          aria-disabled={busy !== null || undefined}
+                          aria-busy={
+                            (busy?.kind === 'open' && busy.no === version.version) || undefined
+                          }
+                          onClick={() => void view(version)}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+                            <path
+                              d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.4"
+                              strokeLinejoin="round"
+                            />
+                            <circle
+                              cx="8"
+                              cy="8"
+                              r="2"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.4"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                      {version.kind !== 'page' && !released && (
                         <button
                           type="button"
                           className="uw-versions-icon-btn"
@@ -477,7 +523,7 @@ function VersionHistoryView({
                           </svg>
                         </button>
                       )}
-                      {canWrite && (
+                      {canWrite && !released && (
                         <button
                           type="button"
                           className="uw-versions-icon-btn"
@@ -618,7 +664,7 @@ function PagePreview({
   t: T
   preview:
     | { no: number; state: 'loading' }
-    | { no: number; state: 'error' }
+    | { no: number; state: 'error'; key: StringKey }
     | { no: number; state: 'ready'; text: string }
   onClose: () => void
 }) {
@@ -650,9 +696,12 @@ function PagePreview({
           <p className="uw-versions-muted" aria-busy="true">
             {t('vhsLoading')}
           </p>
+        ) : preview.state === 'error' && preview.key === 'vhsErrVersionCoalesced' ? (
+          // a version that gave its file back has nothing to show: a plain note, not a failure (web)
+          <p className="uw-versions-muted">{t(preview.key)}</p>
         ) : preview.state === 'error' ? (
           <p role="alert" className="uw-versions-error">
-            {t('vhsPreviewError')}
+            {t(preview.key)}
           </p>
         ) : preview.text ? (
           <pre className="uw-versions-preview-text" tabIndex={0}>

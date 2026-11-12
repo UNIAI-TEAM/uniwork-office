@@ -36,7 +36,8 @@ export const id = {
   uwErrNotFound: 'Dokumen ini sudah tidak ada.',
   uwErrDeleted: 'Dokumen ini telah dihapus di UniWork.',
   uwErrConflict: 'Seseorang sudah menyimpan versi yang lebih baru.',
-  uwErrQuotaExceeded: 'Penyimpanan UniWork Anda penuh.',
+  uwErrQuotaExceeded:
+    'Penyimpanan UniWork Anda penuh. Jika Anda baru saja mengunggah versi lain, coba lagi dalam beberapa menit.',
   uwErrTooLarge: 'File ini terlalu besar untuk UniWork.',
   uwErrUnsupportedFormat: 'Jenis file ini tidak didukung di UniWork Office.',
   uwErrEngineIncompatible: 'Versi UniWork Office ini tidak dapat membuka dokumen ini.',

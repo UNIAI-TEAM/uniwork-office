@@ -238,6 +238,31 @@ describe('error envelope mapping', () => {
       edit_lock_id: '01J8X4LOCK0N1P2Q3R4S5T6U7V',
     })
   })
+
+  it('UNI-2510: commit sends editor_session_id when it is a ULID, and drops a malformed one', async () => {
+    const fetch = vi.fn<FetchLike>(async () => envelope(500, 'internal'))
+    const input = {
+      documentId: DOC,
+      uploadId: 'up_1',
+      baseRevision: '41',
+      idempotencyKey: 'office-key-1',
+    }
+    await client(fetch)
+      .commit({ ...input, editorSessionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV' })
+      .catch(() => undefined)
+    await client(fetch)
+      .commit({ ...input, editorSessionId: 'not-a-ulid' })
+      .catch(() => undefined)
+    expect(JSON.parse(String(fetch.mock.calls[0]![1].body))).toEqual({
+      upload_id: 'up_1',
+      base_revision: '41',
+      editor_session_id: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    })
+    expect(JSON.parse(String(fetch.mock.calls[1]![1].body))).toEqual({
+      upload_id: 'up_1',
+      base_revision: '41',
+    })
+  })
 })
 
 describe('UNI-2212 legacy conversion commit (c5 wire contract)', () => {
@@ -293,6 +318,21 @@ describe('UNI-2212 legacy conversion commit (c5 wire contract)', () => {
       upload_id: UPLOAD,
       base_revision: '1',
     })
+  })
+
+  it('UNI-2510: an old server that ignores editor_session_id still completes the commit', async () => {
+    // `converted` is the whole answer of a server that knows nothing of editor sessions: no session fields
+    const fetch = vi.fn<FetchLike>(async () => json(200, converted))
+    const receipt = await client(fetch).commit({
+      ...input,
+      editorSessionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    })
+    expect(JSON.parse(String(fetch.mock.calls[0]![1].body))).toEqual({
+      upload_id: UPLOAD,
+      base_revision: '1',
+      editor_session_id: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    })
+    expect(receipt).toMatchObject({ documentId: DOC, revision: '2', version: 2 })
   })
 
   it('refuses a cross-family or unknown pair before anything is sent', async () => {

@@ -36,7 +36,7 @@ export const zhTW = {
   uwErrNotFound: '此文件已不存在。',
   uwErrDeleted: '此文件已在 UniWork 中刪除。',
   uwErrConflict: '有人先儲存了較新的版本。',
-  uwErrQuotaExceeded: '你的 UniWork 儲存空間已滿。',
+  uwErrQuotaExceeded: '你的 UniWork 儲存空間已滿。如果你剛上傳了另一個版本，請幾分鐘後再試。',
   uwErrTooLarge: '此檔案太大，無法存入 UniWork。',
   uwErrUnsupportedFormat: 'UniWork Office 不支援此檔案類型。',
   uwErrEngineIncompatible: '此版本的 UniWork Office 無法開啟此文件。',

@@ -230,7 +230,7 @@ export const he = {
   fuRepUploadMissing: 'הקובץ מעולם לא הגיע לאחסון.',
   fuRepSizeMismatch: 'הגודל שהועלה אינו תואם לקובץ המקורי.',
   fuRepUnsupportedMedia: 'תוכן הקובץ אינו תואם לפורמט שלו.',
-  fuRepStorageQuota: 'האחסון מלא. פנו מקום.',
+  fuRepStorageQuota: 'האחסון מלא. פנו מקום. אם הרגע העליתם גרסה אחרת, נסו שוב בעוד כמה דקות.',
   fuRepNotFound: 'הקובץ לא נמצא בהעלאה הזו.',
   fuRepPartsInvalid: 'החלקים של הקובץ הגדול אינם תואמים.',
   fuRepMissingEtag: 'לא ניתן לאשר שהקובץ הגיע לאחסון.',

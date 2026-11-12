@@ -237,7 +237,8 @@ export const pt = {
   fuRepUploadMissing: 'O arquivo nunca chegou ao armazenamento.',
   fuRepSizeMismatch: 'O tamanho enviado não corresponde ao do arquivo original.',
   fuRepUnsupportedMedia: 'O conteúdo do arquivo não corresponde ao seu formato.',
-  fuRepStorageQuota: 'O armazenamento está cheio. Libere espaço.',
+  fuRepStorageQuota:
+    'O armazenamento está cheio. Libere espaço. Se você acabou de enviar outra versão, tente novamente em alguns minutos.',
   fuRepNotFound: 'O arquivo não foi encontrado neste envio.',
   fuRepPartsInvalid: 'As partes do arquivo grande não correspondem.',
   fuRepMissingEtag: 'Não foi possível confirmar que o arquivo chegou ao armazenamento.',

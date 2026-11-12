@@ -240,7 +240,8 @@ export const es = {
   fuRepUploadMissing: 'El archivo nunca llegó al almacenamiento.',
   fuRepSizeMismatch: 'El tamaño subido no coincide con el del archivo original.',
   fuRepUnsupportedMedia: 'El contenido del archivo no coincide con su formato.',
-  fuRepStorageQuota: 'El almacenamiento está lleno. Libera espacio.',
+  fuRepStorageQuota:
+    'El almacenamiento está lleno. Libera espacio. Si acabas de subir otra versión, inténtalo de nuevo en unos minutos.',
   fuRepNotFound: 'No se encontró el archivo en esta subida.',
   fuRepPartsInvalid: 'Las partes del archivo grande no coinciden.',
   fuRepMissingEtag: 'No se pudo confirmar que el archivo llegó al almacenamiento.',

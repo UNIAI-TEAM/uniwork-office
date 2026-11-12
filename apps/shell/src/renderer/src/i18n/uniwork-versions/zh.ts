@@ -42,11 +42,20 @@ export const zh = {
   vhsLockedByOther: '其他人正在编辑此文档。请等他们完成或接管编辑后再试。',
   vhsLockedByMe: '你正在另一个窗口中编辑此文档。请先在那里保存或关闭，然后重试。',
   vhsReasonUpload: '已上传',
-  vhsReasonManual: '手动版本',
+  vhsReasonManual: '手动',
   vhsReasonAuto: '自动',
   vhsReasonRestore: '恢复',
   vhsReasonAgent: 'Agent',
   vhsReasonUnknown: '其他',
+  vhsCoalescedGroupOne: '此会话中保存了 {n} 次',
+  vhsCoalescedGroupOther: '此会话中保存了 {n} 次',
+  vhsCoalescedOrphanOne: '{n} 次保存已合并到其编辑会话的最后一个版本',
+  vhsCoalescedOrphanOther: '{n} 次保存已合并到其编辑会话的最后一个版本',
+  vhsReleasedNoContent: '此版本已没有可打开或下载的内容。',
+  vhsErrVersionCoalesced:
+    '此版本已合并到其编辑会话的最后一个版本，因此没有自己的内容。请改为打开该最后一个版本。',
+  vhsErrFileChunkMissing:
+    '无法读取此文件，因为其存储数据缺失了一部分。请几分钟后重试；如果仍然失败，请告知管理员。',
   vhsClose: '关闭',
   vhsCancel: '取消',
 }

@@ -145,6 +145,7 @@ import {
   createUniworkDocs,
   type UniworkDocsHandle,
 } from './uniwork-docs/wiring'
+import { watchEditorLoads } from './uniwork-docs/editor-load-hook'
 import { createFolderUploadWiring } from './uniwork-docs/folder-upload/wire'
 import { DEFAULT_DOCUMENT_LIMITS } from './uniwork-docs/limits'
 import { offlineTabMenuItem, unpinTabDocument } from './uniwork-sync/offline-library/menu'
@@ -479,6 +480,7 @@ import {
   detachedSetFileFor,
   detachedWebContentsFor,
   detachedRetitleFile,
+  detachedFilePathFor,
   setDetachedTitleDecorator,
   detachedSetTitleFor,
   detachedWindowForWebContents,
@@ -3874,6 +3876,21 @@ function installUiScale(): void {
     currentUiScale = scale
     tabManager?.layout()
     refreshTitleBarOverlay()
+  })
+}
+
+/**
+ * UNI-2510: a view showing a UniWork document that loads again (crash reload, a module's own
+ * reload) is a new editor session for the web's `editor_session_id`. `web-contents-created` covers
+ * tab views and detached windows; contents with no document path are ignored.
+ */
+function installEditorSessionReload(): void {
+  app.on('web-contents-created', (_event, contents) => {
+    watchEditorLoads(
+      contents,
+      (wcId) => tabManager?.describeWebContents(wcId)?.filePath ?? detachedFilePathFor(wcId),
+      (path) => uniworkDocs?.service.noteEditorLoaded(path),
+    )
   })
 }
 
@@ -7582,6 +7599,7 @@ app.whenReady().then(async () => {
     console.error('[mcp] failed to start on boot:', error)
   })
   installUiScale()
+  installEditorSessionReload()
   createShellWindow()
   // deferred to ready: labels need currentLang(), which reads app.getLocale()
   if (!app.isPackaged) {

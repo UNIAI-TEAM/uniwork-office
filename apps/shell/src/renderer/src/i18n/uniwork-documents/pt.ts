@@ -36,7 +36,8 @@ export const pt = {
   uwErrNotFound: 'Este documento não existe mais.',
   uwErrDeleted: 'Este documento foi excluído no UniWork.',
   uwErrConflict: 'Alguém salvou uma versão mais recente antes.',
-  uwErrQuotaExceeded: 'Seu armazenamento no UniWork está cheio.',
+  uwErrQuotaExceeded:
+    'Seu armazenamento no UniWork está cheio. Se você acabou de enviar outra versão, tente novamente em alguns minutos.',
   uwErrTooLarge: 'Este arquivo é grande demais para o UniWork.',
   uwErrUnsupportedFormat: 'Este tipo de arquivo não é compatível com o UniWork Office.',
   uwErrEngineIncompatible: 'Esta versão do UniWork Office não pode abrir este documento.',

@@ -49,11 +49,23 @@ export const de = {
   vhsLockedByMe:
     'Sie bearbeiten dieses Dokument in einem anderen Fenster. Speichern oder schließen Sie es dort und versuchen Sie es dann erneut.',
   vhsReasonUpload: 'hochgeladen',
-  vhsReasonManual: 'manuelle Version',
+  vhsReasonManual: 'manuell',
   vhsReasonAuto: 'automatisch',
   vhsReasonRestore: 'Wiederherstellung',
   vhsReasonAgent: 'Agent',
   vhsReasonUnknown: 'sonstige',
+  vhsCoalescedGroupOne: '{n} Speicherung in dieser Sitzung',
+  vhsCoalescedGroupOther: '{n} Speicherungen in dieser Sitzung',
+  vhsCoalescedOrphanOne:
+    '{n} Speicherung wurde in die letzte Version ihrer Bearbeitungssitzung zusammengeführt',
+  vhsCoalescedOrphanOther:
+    '{n} Speicherungen wurden in die letzte Version ihrer Bearbeitungssitzung zusammengeführt',
+  vhsReleasedNoContent:
+    'Diese Version hat keinen Inhalt mehr, der sich öffnen oder herunterladen ließe.',
+  vhsErrVersionCoalesced:
+    'Diese Version wurde in die letzte Version ihrer Bearbeitungssitzung zusammengeführt und hat daher keinen eigenen Inhalt. Öffnen Sie stattdessen diese letzte Version.',
+  vhsErrFileChunkMissing:
+    'Diese Datei konnte nicht gelesen werden, weil ein Teil ihrer gespeicherten Daten fehlt. Versuchen Sie es in ein paar Minuten erneut; wenn der Fehler bleibt, informieren Sie einen Administrator.',
   vhsClose: 'Schließen',
   vhsCancel: 'Abbrechen',
 } satisfies Record<keyof typeof zh, string>

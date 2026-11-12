@@ -238,7 +238,8 @@ export const nl = {
   fuRepUploadMissing: 'Het bestand heeft de opslag nooit bereikt.',
   fuRepSizeMismatch: 'De geüploade grootte komt niet overeen met het oorspronkelijke bestand.',
   fuRepUnsupportedMedia: 'De inhoud van het bestand komt niet overeen met het formaat.',
-  fuRepStorageQuota: 'De opslag is vol. Maak ruimte vrij.',
+  fuRepStorageQuota:
+    'De opslag is vol. Maak ruimte vrij. Als je zojuist een andere versie hebt geüpload, probeer het over een paar minuten opnieuw.',
   fuRepNotFound: 'Het bestand is niet gevonden in deze upload.',
   fuRepPartsInvalid: 'De delen van het grote bestand komen niet overeen.',
   fuRepMissingEtag: 'Kon niet bevestigen dat het bestand de opslag heeft bereikt.',
