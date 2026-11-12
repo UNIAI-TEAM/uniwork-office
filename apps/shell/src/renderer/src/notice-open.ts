@@ -110,16 +110,15 @@ export async function openNotice(
         await env.markRead(n.id)
         return
       }
-      if (state.versions) {
-        // the Version history sheet lives in the Documents home: the host brings it on screen (documents-intent-bus)
-        openDocumentVersions({ documentId: n.resource_id, workspaceId: n.workspace_id })
-        await env.markRead(n.id)
-        return
-      }
       const opened = await openUniworkDocument(
         { documentId: n.resource_id, title: named },
         window.aiOffice,
       )
+      // as the web: a file saved through an AI client opens with its version history on screen; the
+      // history sheet lives in the Documents home, so the host brings it up for the document (documents-intent-bus)
+      if (opened && state.versions) {
+        openDocumentVersions({ documentId: n.resource_id, workspaceId: n.workspace_id })
+      }
       if (opened || state.untitled) await env.markRead(n.id)
       return
     }
