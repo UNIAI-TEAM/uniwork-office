@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   htmlExportPath,
+  markdownExportPath,
   pdfExportPath,
   printScaleOption,
   validPrintDim,
@@ -78,5 +79,21 @@ describe('htmlExportPath', () => {
     expect(htmlExportPath('/tmp/report')).toBe('/tmp/report.html')
     expect(htmlExportPath('/tmp/report.v2')).toBe('/tmp/report.v2.html')
     expect(htmlExportPath('/tmp/report.pdf')).toBe('/tmp/report.pdf.html')
+  })
+})
+
+describe('markdownExportPath', () => {
+  it('keeps the picked .md/.markdown name', () => {
+    expect(markdownExportPath('/tmp/report.md')).toBe('/tmp/report.md')
+    expect(markdownExportPath('C:\\out\\Untitled.MD')).toBe('C:\\out\\Untitled.MD')
+    expect(markdownExportPath('/tmp/report.markdown')).toBe('/tmp/report.markdown')
+  })
+
+  it('swaps a typed .docx for .md and appends to anything else', () => {
+    expect(markdownExportPath('/tmp/report.docx')).toBe('/tmp/report.md')
+    expect(markdownExportPath('/tmp/report.DOCX')).toBe('/tmp/report.md')
+    expect(markdownExportPath('/tmp/report')).toBe('/tmp/report.md')
+    expect(markdownExportPath('/tmp/report.v2')).toBe('/tmp/report.v2.md')
+    expect(markdownExportPath('/tmp/report.pdf')).toBe('/tmp/report.pdf.md')
   })
 })

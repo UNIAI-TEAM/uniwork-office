@@ -76,6 +76,17 @@ export function htmlExportPath(picked: string): string {
   return `${picked}.html`
 }
 
+/**
+ * The file an "Export as Markdown" save dialog result lands on: a picked `.md`/`.markdown` name
+ * is kept as typed, a typed `.docx` becomes `.md` so the export never targets the open document,
+ * anything else gets `.md`.
+ */
+export function markdownExportPath(picked: string): string {
+  if (/\.(md|markdown)$/i.test(picked)) return picked
+  if (/\.docx$/i.test(picked)) return picked.replace(/\.docx$/i, '.md')
+  return `${picked}.md`
+}
+
 /** the document's own paper size for the CUPS print route: the renderer reads
  * it off the pagination preview's first sheet (twips), and printToPDF bakes
  * the pages at that size instead of Chromium's Letter default. Absent or
