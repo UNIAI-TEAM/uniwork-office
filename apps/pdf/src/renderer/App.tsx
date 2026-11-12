@@ -1677,6 +1677,7 @@ export default function App() {
       if (previous) void previous.loadingTask.destroy()
       return loaded.numPages
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is not referentially stable (CLAUDE.md)
     [history],
   )
 
@@ -1729,6 +1730,7 @@ export default function App() {
         setStatus('error')
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is not referentially stable (CLAUDE.md)
     [loadDoc],
   )
 
