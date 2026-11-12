@@ -18,6 +18,7 @@ export const ms = {
   intgSkillsRead: 'Detail',
   intgSkillsMine: 'Kemahiran saya',
   intgSkillsRecommended: 'Disyorkan',
+  intgSkillsCatAll: 'Semua',
   intgSkillsCatOffice: 'Pejabat',
   intgSkillsCatBusiness: 'Perniagaan',
   intgSkillsCatData: 'Data',

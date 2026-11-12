@@ -17,6 +17,7 @@ export const ar = {
   intgSkillsRead: 'التفاصيل',
   intgSkillsMine: 'مهاراتي',
   intgSkillsRecommended: 'موصى بها',
+  intgSkillsCatAll: 'الكل',
   intgSkillsCatOffice: 'مكتب',
   intgSkillsCatBusiness: 'أعمال',
   intgSkillsCatData: 'بيانات',

@@ -17,6 +17,7 @@ export const he = {
   intgSkillsRead: 'פרטים',
   intgSkillsMine: 'הכישורים שלי',
   intgSkillsRecommended: 'מומלצות',
+  intgSkillsCatAll: 'הכול',
   intgSkillsCatOffice: 'משרד',
   intgSkillsCatBusiness: 'עסקים',
   intgSkillsCatData: 'נתונים',

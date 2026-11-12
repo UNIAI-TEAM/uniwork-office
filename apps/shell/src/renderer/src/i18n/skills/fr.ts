@@ -18,6 +18,7 @@ export const fr = {
   intgSkillsRead: 'Détails',
   intgSkillsMine: 'Mes compétences',
   intgSkillsRecommended: 'Recommandées',
+  intgSkillsCatAll: 'Tous',
   intgSkillsCatOffice: 'Bureau',
   intgSkillsCatBusiness: 'Entreprise',
   intgSkillsCatData: 'Données',

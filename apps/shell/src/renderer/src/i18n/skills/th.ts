@@ -17,6 +17,7 @@ export const th = {
   intgSkillsRead: 'รายละเอียด',
   intgSkillsMine: 'สกิลของฉัน',
   intgSkillsRecommended: 'แนะนำ',
+  intgSkillsCatAll: 'ทั้งหมด',
   intgSkillsCatOffice: 'สำนักงาน',
   intgSkillsCatBusiness: 'ธุรกิจ',
   intgSkillsCatData: 'ข้อมูล',

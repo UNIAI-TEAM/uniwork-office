@@ -18,6 +18,7 @@ export const nl = {
   intgSkillsRead: 'Details',
   intgSkillsMine: 'Mijn vaardigheden',
   intgSkillsRecommended: 'Aanbevolen',
+  intgSkillsCatAll: 'Alles',
   intgSkillsCatOffice: 'Kantoor',
   intgSkillsCatBusiness: 'Zakelijk',
   intgSkillsCatData: 'Data',

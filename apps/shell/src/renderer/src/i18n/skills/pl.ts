@@ -18,6 +18,7 @@ export const pl = {
   intgSkillsRead: 'Szczegóły',
   intgSkillsMine: 'Moje umiejętności',
   intgSkillsRecommended: 'Polecane',
+  intgSkillsCatAll: 'Wszystkie',
   intgSkillsCatOffice: 'Biuro',
   intgSkillsCatBusiness: 'Biznes',
   intgSkillsCatData: 'Dane',

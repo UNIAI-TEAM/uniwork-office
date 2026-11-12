@@ -18,6 +18,7 @@ export const ja = {
   intgSkillsRead: '詳細',
   intgSkillsMine: 'マイスキル',
   intgSkillsRecommended: 'おすすめ',
+  intgSkillsCatAll: 'すべて',
   intgSkillsCatOffice: 'オフィス',
   intgSkillsCatBusiness: 'ビジネス',
   intgSkillsCatData: 'データ',

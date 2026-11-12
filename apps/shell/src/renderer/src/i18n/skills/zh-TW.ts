@@ -17,6 +17,7 @@ export const zhTW = {
   intgSkillsRead: '詳情',
   intgSkillsMine: '我的技能',
   intgSkillsRecommended: '推薦',
+  intgSkillsCatAll: '全部',
   intgSkillsCatOffice: '辦公',
   intgSkillsCatBusiness: '商務',
   intgSkillsCatData: '資料',
