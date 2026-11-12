@@ -151,6 +151,7 @@ export async function stageSnapshot(input: StageInput): Promise<StageOutcome> {
   try {
     main = (
       await input.docs.downloadStream(documentId, manifest.main.version, {
+        maxBytes: MAX_PIN_FILE_BYTES,
         signal: input.signal,
         onProgress: ({ receivedBytes }) =>
           input.onProgress?.({ receivedBytes: Math.min(receivedBytes, totalBytes), totalBytes }),

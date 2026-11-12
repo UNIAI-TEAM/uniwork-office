@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { AccountManager } from '../src/main/uniwork-auth/manager'
@@ -1280,75 +1283,104 @@ describe('document sources (UNI-1961)', () => {
     expect(await codeOf(api.listSources({ workspaceId: 'ws_1' }))).toBe('not_found')
   })
 
-  it('downloads canonical compound source ids across all four prefixes and refuses opaque or malformed ids (R1-1)', async () => {
-    const fetch = vi.fn<FetchLike>(
-      async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }),
-    )
-    const api = client(fetch)
-    for (const sourceId of ['chat:att_1', 'task:att_1', 'meeting:att_1', 'email:att_1']) {
-      expect(await api.downloadSource('ws_1', sourceId)).toEqual({
-        bytes: new Uint8Array([1, 2, 3]),
-      })
+  it('downloads canonical compound source ids across all four prefixes to disk and refuses opaque or malformed ids (R1-1)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'uw-client-src-'))
+    try {
+      const fetch = vi.fn<FetchLike>(
+        async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }),
+      )
+      const api = client(fetch)
+      for (const sourceId of ['chat:att_1', 'task:att_1', 'meeting:att_1', 'email:att_1']) {
+        const dest = join(dir, `${sourceId.replace(':', '-')}.bin`)
+        expect(await api.downloadSource('ws_1', sourceId, { destinationPath: dest })).toEqual({
+          path: dest,
+          bytes: 3,
+        })
+        expect([...readFileSync(dest)]).toEqual([1, 2, 3])
+      }
+      expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+        `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/chat%3Aatt_1/download`,
+        `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/task%3Aatt_1/download`,
+        `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/meeting%3Aatt_1/download`,
+        `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/email%3Aatt_1/download`,
+      ])
+      fetch.mockClear()
+      for (const bad of ['src_1', '../x', 'other:att_1', 'task:', `task:${'a'.repeat(65)}`]) {
+        expect(
+          await codeOf(
+            api.downloadSource('ws_1', bad, { destinationPath: join(dir, 'never.bin') }),
+          ),
+        ).toBe('not_found')
+      }
+      expect(fetch).not.toHaveBeenCalled()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
-    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
-      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/chat%3Aatt_1/download`,
-      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/task%3Aatt_1/download`,
-      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/meeting%3Aatt_1/download`,
-      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/email%3Aatt_1/download`,
-    ])
-    fetch.mockClear()
-    for (const bad of ['src_1', '../x', 'other:att_1', 'task:', `task:${'a'.repeat(65)}`]) {
-      expect(await codeOf(api.downloadSource('ws_1', bad))).toBe('not_found')
-    }
-    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('enforces the 256 MiB source download cap incrementally and cancels oversized streams at the crossing (R1-4, R1-12, R1-15)', async () => {
-    const maxBytes = 256 * 1024 * 1024
-    let declaredPulls = 0
-    const declaredApi = client(async () => {
-      const body = new ReadableStream<Uint8Array>(
-        {
-          pull(controller) {
-            declaredPulls += 1
-            controller.enqueue(new Uint8Array(1024))
+    const dir = mkdtempSync(join(tmpdir(), 'uw-client-cap-'))
+    try {
+      const maxBytes = 256 * 1024 * 1024
+      let declaredPulls = 0
+      const declaredApi = client(async () => {
+        const body = new ReadableStream<Uint8Array>(
+          {
+            pull(controller) {
+              declaredPulls += 1
+              controller.enqueue(new Uint8Array(1024))
+            },
           },
-        },
-        { highWaterMark: 0 },
-      )
-      return new Response(body, {
-        status: 200,
-        headers: { 'Content-Length': String(maxBytes + 1) },
+          { highWaterMark: 0 },
+        )
+        return new Response(body, {
+          status: 200,
+          headers: { 'Content-Length': String(maxBytes + 1) },
+        })
       })
-    })
-    expect(await codeOf(declaredApi.downloadSource('ws_1', 'task:att_1'))).toBe('too_large')
-    expect(declaredPulls).toBe(0)
+      const declaredDest = join(dir, 'declared.bin')
+      expect(
+        await codeOf(
+          declaredApi.downloadSource('ws_1', 'task:att_1', { destinationPath: declaredDest }),
+        ),
+      ).toBe('too_large')
+      expect(declaredPulls).toBe(0)
+      expect(readdirSync(dir)).toEqual([])
 
-    const chunk = new Uint8Array(16 * 1024 * 1024)
-    let pulls = 0
-    let cancelled = false
-    const streamApi = client(async () => {
-      const body = new ReadableStream<Uint8Array>(
-        {
-          pull(controller) {
-            pulls += 1
-            if (pulls > 20) {
-              controller.close()
-              return
-            }
-            controller.enqueue(chunk)
+      const chunk = new Uint8Array(16 * 1024 * 1024)
+      let pulls = 0
+      let cancelled = false
+      const streamApi = client(async () => {
+        const body = new ReadableStream<Uint8Array>(
+          {
+            pull(controller) {
+              pulls += 1
+              if (pulls > 20) {
+                controller.close()
+                return
+              }
+              controller.enqueue(chunk)
+            },
+            cancel() {
+              cancelled = true
+            },
           },
-          cancel() {
-            cancelled = true
-          },
-        },
-        { highWaterMark: 0 },
-      )
-      return new Response(body, { status: 200 })
-    })
-    expect(await codeOf(streamApi.downloadSource('ws_1', 'task:att_1'))).toBe('too_large')
-    expect(cancelled).toBe(true)
-    expect(pulls).toBe(17)
+          { highWaterMark: 0 },
+        )
+        return new Response(body, { status: 200 })
+      })
+      const streamDest = join(dir, 'stream.bin')
+      expect(
+        await codeOf(
+          streamApi.downloadSource('ws_1', 'task:att_1', { destinationPath: streamDest }),
+        ),
+      ).toBe('too_large')
+      expect(cancelled).toBe(true)
+      expect(pulls).toBe(17)
+      expect(readdirSync(dir)).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('rejects shelve and unshelve responses whose document id does not match the requested id (R1-9)', async () => {

@@ -12,6 +12,8 @@ import {
   type SourceViewResult,
   type SourceViewState,
 } from '../../shared/source-view'
+import type { DownloadFileResult, DownloadResult, DownloadStreamFileOptions } from './client'
+import { UniworkDocError } from './errors'
 import type { UniworkModuleSeam } from './modules'
 
 /*
@@ -157,8 +159,12 @@ export interface SourceViewOpenerDeps {
   storeLocked(): boolean
   /** `documentLimits.max_bytes` of the connected server */
   documentMaxBytes(): number
-  /** UNI-1961's client call: `GET /workspaces/{ws}/documents/sources/{id}/download` */
-  downloadSource(workspaceId: string, sourceId: string): Promise<{ bytes: Uint8Array }>
+  /** UNI-1961 / UNI-2525: `GET /workspaces/{ws}/documents/sources/{id}/download` streamed to disk */
+  downloadSource(
+    workspaceId: string,
+    sourceId: string,
+    options: DownloadStreamFileOptions,
+  ): Promise<DownloadFileResult | DownloadResult>
   /** the shell's open router (`routeDocumentPath`) */
   openPath(path: string): boolean | Promise<boolean>
   /**
@@ -312,14 +318,6 @@ export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOp
     key: string,
   ): Promise<SourceViewResult<OpenSourceValue>> => {
     const startedAt = epoch
-    let bytes: Uint8Array
-    try {
-      bytes = (await deps.downloadSource(input.workspaceId, input.sourceId)).bytes
-    } catch (error) {
-      return fail(mapDownloadError(error))
-    }
-    // the row's size is the renderer's word: the editors refuse anything over the max
-    if (bytes.byteLength > deps.documentMaxBytes()) return fail('too_large')
     // the sweep removes the whole preview root: write only after it is done
     await Promise.resolve(deps.startupSweep).catch(() => undefined)
     if (epoch !== startedAt) return fail('not_signed_in')
@@ -327,10 +325,48 @@ export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOp
     const hash = createHash('sha256').update(key).digest('hex').slice(0, 16)
     const dir = join(sessionDir(), hash)
     const path = join(dir, safeFileName(input.name, extension))
-    try {
+    let dirCreated = false
+    const ensureDir = async (): Promise<void> => {
+      if (epoch !== startedAt) throw new UniworkDocError('not_signed_in')
+      if (dirCreated) return
       // owner-only: the plaintext of an attachment must not be readable by other users
       await fs.mkdir(dir, { recursive: true, mode: 0o700 })
-      await fs.writeFile(path, bytes)
+      dirCreated = true
+    }
+    let downloaded: DownloadFileResult | DownloadResult
+    try {
+      downloaded = await deps.downloadSource(input.workspaceId, input.sourceId, {
+        destinationPath: path,
+        maxBytes: deps.documentMaxBytes(),
+        beforeOpen: ensureDir,
+        beforeRename: async () => {
+          if (epoch !== startedAt) throw new UniworkDocError('not_signed_in')
+        },
+      })
+    } catch (error) {
+      if (dirCreated) await removeDir(dir)
+      return fail(mapDownloadError(error))
+    }
+    if (epoch !== startedAt) {
+      if (dirCreated) await removeDir(dir)
+      return fail('not_signed_in')
+    }
+    try {
+      if ('bytes' in downloaded && downloaded.bytes instanceof Uint8Array) {
+        // fallback for test doubles returning in-memory bytes
+        if (downloaded.bytes.byteLength > deps.documentMaxBytes()) {
+          if (dirCreated) await removeDir(dir)
+          return fail('too_large')
+        }
+        await ensureDir()
+        await fs.writeFile(path, downloaded.bytes)
+      } else if (
+        typeof downloaded.bytes === 'number' &&
+        downloaded.bytes > deps.documentMaxBytes()
+      ) {
+        if (dirCreated) await removeDir(dir)
+        return fail('too_large')
+      }
       // a courtesy only: the registry, not the file mode, is what makes the view read-only
       await fs.chmod(path, 0o400).catch(() => undefined)
     } catch {
