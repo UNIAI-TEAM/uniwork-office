@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createCanvas } from '@napi-rs/canvas'
 
 type IpcHandler = (event: { sender: { id: number } }, request: unknown) => unknown
 const handlers = new Map<string, IpcHandler>()
@@ -44,7 +45,11 @@ vi.mock('electron', () => ({
   },
 }))
 
-import { buildExportImagePaths } from '../src/main/export-images'
+import {
+  buildExportImagePaths,
+  encodeExportPage,
+  EXPORT_JPEG_QUALITY,
+} from '../src/main/export-images'
 import { createPdfView } from '../src/main/pdf-main'
 import { PDF_CHANNELS } from '../src/shared/ipc'
 import type { ExportImagesResult } from '../src/shared/ipc'
@@ -111,8 +116,90 @@ describe('PDF image export paths', () => {
   })
 
   it('rejects unsafe page values in the path builder', () => {
-    expect(() => buildExportImagePaths(resolve(dir), 'page', ['../escape'])).toThrow(
+    expect(() => buildExportImagePaths(resolve(dir), 'page', ['../escape'], 'png')).toThrow(
       /invalid page numbers/,
     )
+  })
+
+  it('writes jpg files when the request asks for jpg', async () => {
+    const result = await invoke({
+      images: ['YQ=='],
+      pageNumbers: [3],
+      baseName: 'page',
+      format: 'jpg',
+    })
+
+    expect(result).toEqual({ ok: true, savedDir: dir, count: 1 })
+    expect(readdirSync(dir)).toEqual(['page-p3.jpg'])
+    expect(readFileSync(join(dir, 'page-p3.jpg'), 'utf8')).toBe('a')
+    expect(state.showItemInFolder).toHaveBeenCalledWith(join(resolve(dir), 'page-p3.jpg'))
+  })
+
+  it('encodes JPG export bytes as a valid JPEG (SOI FFD8 / EOI FFD9) at the chosen quality', async () => {
+    const canvas = createCanvas(16, 16)
+    const ctx = canvas.getContext('2d')
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        ctx.fillStyle = `rgb(${(x * 37 + y * 13) % 256}, ${(x * 19 + y * 53) % 256}, ${(x * 71 + y * 29) % 256})`
+        ctx.fillRect(x, y, 1, 1)
+      }
+    }
+    const expected92 = Buffer.from(
+      canvas.toDataURL('image/jpeg', 0.92).split(',')[1] ?? '',
+      'base64',
+    )
+    const encoded50 = Buffer.from(canvas.toDataURL('image/jpeg', 0.5).split(',')[1] ?? '', 'base64')
+    const toDataURLSpy = vi.spyOn(canvas, 'toDataURL')
+
+    const b64 = encodeExportPage(canvas, 'jpg')
+    expect(EXPORT_JPEG_QUALITY).toBe(0.92)
+    expect(toDataURLSpy).toHaveBeenCalledWith('image/jpeg', 0.92)
+
+    const result = await invoke({
+      images: [b64],
+      pageNumbers: [1],
+      baseName: 'page',
+      format: 'jpg',
+    })
+    expect(result).toEqual({ ok: true, savedDir: dir, count: 1 })
+    const written = readFileSync(join(dir, 'page-p1.jpg'))
+    expect(written[0]).toBe(0xff)
+    expect(written[1]).toBe(0xd8)
+    expect(written[written.length - 2]).toBe(0xff)
+    expect(written[written.length - 1]).toBe(0xd9)
+    expect(written.includes(Buffer.from([0xff, 0xdb]))).toBe(true)
+    expect(written.includes(Buffer.from([0xff, 0xc0]))).toBe(true)
+    expect(written.equals(expected92)).toBe(true)
+    expect(written.equals(encoded50)).toBe(false)
+  })
+
+  it('builds jpg paths in the path builder', () => {
+    expect(buildExportImagePaths(resolve(dir), 'page', [3], 'jpg')).toEqual([
+      join(resolve(dir), 'page-p3.jpg'),
+    ])
+  })
+
+  it('treats any format other than jpg as png', async () => {
+    const result = await invoke({
+      images: ['Yg=='],
+      pageNumbers: [1],
+      baseName: 'page',
+      format: 'gif',
+    })
+
+    expect(result).toEqual({ ok: true, savedDir: dir, count: 1 })
+    expect(readdirSync(dir)).toEqual(['page-p1.png'])
+  })
+
+  it('rejects duplicate page numbers regardless of format', async () => {
+    const result = await invoke({
+      images: ['YQ==', 'Yg=='],
+      pageNumbers: [3, 3],
+      baseName: 'page',
+      format: 'jpg',
+    })
+
+    expect(result).toEqual({ ok: false, error: 'pdf: invalid page numbers' })
+    expect(state.showOpenDialog).not.toHaveBeenCalled()
   })
 })

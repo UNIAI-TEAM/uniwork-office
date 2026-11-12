@@ -45,6 +45,24 @@ import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-c
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { PDF_CHANNELS, PDF_READ_CHUNK_BYTES } from '../shared/ipc'
+import { printJobOptions, printOutcome } from '@genoffice/electron-utils/print-job'
+import {
+  printFileViaCups,
+  printPdfViaCups,
+  printToPdfOptionsFor,
+} from '@genoffice/electron-utils/print-cups'
+import { DRIVER_OPTION_NAMES, queryPrinterOptions } from '@genoffice/electron-utils/printer-options'
+
+/** 1-based file page positions for the lp `-P` page-list: integers within a
+ * real document's reach, undefined = the whole document. Anything else is
+ * dropped wholesale — a half-valid list would silently print the wrong
+ * subset. */
+function validPrintPages(pages: unknown): number[] | undefined {
+  if (pages === undefined) return undefined
+  if (!Array.isArray(pages) || pages.length === 0 || pages.length > 100_000) return undefined
+  const clean = pages.filter((n) => typeof n === 'number' && Number.isInteger(n) && n >= 1)
+  return clean.length === pages.length ? clean : undefined
+}
 import { hasPendingSaveEdits } from './save-pending'
 import { CertificateEncryptionError, WrongPasswordError, decryptDocument } from './pdf-crypt'
 import { buildExportImagePaths, hasValidExportPageNumbers } from './export-images'
@@ -1250,6 +1268,52 @@ function registerPdfIpc(): void {
     uniworkCommentAuthor(openPathByWc.get(e.sender.id)),
   )
 
+  ipcMain.handle(PDF_CHANNELS.printers, async (e) => {
+    const printers = await e.sender.getPrintersAsync()
+    return printers.map((p) => ({ name: p.name, displayName: p.displayName || p.name }))
+  })
+
+  ipcMain.handle(PDF_CHANNELS.print, async (e, job: unknown) => {
+    if (uniworkIsLocked(openPathByWc.get(e.sender.id) ?? null)) return { ok: false }
+    const opts = printJobOptions(job)
+    // the renderer's print stylesheet already lays one rasterized page per sheet
+    if (process.platform === 'darwin' && opts.silent) {
+      // Chromium's silent print on macOS can drop the job outright — no queue
+      // entry, no callback error (genoffice#2347). Route through CUPS:
+      // printToPDF bakes the sheets at the document's own paper size (the
+      // renderer measured it), and lp spools a real, diagnosable job.
+      const printed = await e.sender.printToPDF(
+        printToPdfOptionsFor({
+          marginsIn: { top: 0, bottom: 0, left: 0, right: 0 },
+          ...(opts.pageSizeIn
+            ? { widthIn: opts.pageSizeIn.width, heightIn: opts.pageSizeIn.height }
+            : {}),
+        }),
+      )
+      return printPdfViaCups(printed, opts)
+    }
+    return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+      e.sender.print({ margins: { marginType: 'none' }, ...opts }, (success, failureReason) => {
+        resolve(printOutcome(success, failureReason, opts.silent))
+      })
+    })
+  })
+
+  ipcMain.handle(PDF_CHANNELS.printFile, async (e, request: unknown) => {
+    if (typeof request !== 'object' || request === null) {
+      throw new Error('pdf: malformed print-file request')
+    }
+    const req = request as Record<string, unknown>
+    if (typeof req.path !== 'string' || !allowedByWc.get(e.sender.id)?.has(req.path)) {
+      throw new Error('pdf: path not granted to this view')
+    }
+    if (uniworkIsLocked(req.path)) return { ok: false }
+    const opts = printJobOptions(req)
+    // the pages travel beside the job: 1-based file positions the renderer
+    // validated against the opened document, spooled as lp's -P page-list
+    const pages = validPrintPages(req.pages)
+    return printFileViaCups(req.path, opts, pages)
+  })
   ipcMain.handle(PDF_CHANNELS.readFile, async (e, path: unknown) => {
     if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {
       throw new Error('pdf: path not granted to this view')
@@ -1286,6 +1350,15 @@ function registerPdfIpc(): void {
       }
     },
   )
+  // The driver option groups one queue advertises, for the print dialog's
+  // dropdowns. The queue name becomes an lpoptions argument, so it is
+  // charset-guarded here; an unknown queue resolves to no groups and the
+  // dialog simply shows nothing extra.
+  ipcMain.handle(PDF_CHANNELS.printerOptions, async (_e, queue: unknown) => {
+    if (typeof queue !== 'string' || !/^[A-Za-z0-9_.+-]{1,128}$/.test(queue)) return []
+    const groups = await queryPrinterOptions(queue)
+    return groups.filter((g) => DRIVER_OPTION_NAMES.includes(g.name))
+  })
 
   // pdf.js has already accepted `password` for these bytes on the render side;
   // a failure here therefore means the standard handler refused it
@@ -2116,6 +2189,7 @@ function registerPdfIpc(): void {
       if (uniworkIsLocked(openPathByWc.get(e.sender.id) ?? null))
         return { ok: true, canceled: true }
       const { images, pageNumbers, baseName } = request ?? {}
+      const ext = request?.format === 'jpg' ? 'jpg' : 'png'
       if (!Array.isArray(images) || images.length === 0)
         return { ok: false, error: 'pdf: no images' }
       if (!hasValidExportPageNumbers(pageNumbers, images.length))
@@ -2129,7 +2203,7 @@ function registerPdfIpc(): void {
       const dir = picked.filePaths[0]
       if (picked.canceled || !dir) return { ok: true, canceled: true }
       try {
-        const outputPaths = buildExportImagePaths(dir, baseName, pageNumbers)
+        const outputPaths = buildExportImagePaths(dir, baseName, pageNumbers, ext)
         for (const [i, b64] of images.entries()) {
           await writeFile(outputPaths[i]!, Buffer.from(b64, 'base64'))
         }

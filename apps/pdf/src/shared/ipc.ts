@@ -1,6 +1,10 @@
 import type { AiPanelPrefs } from '@genoffice/ui'
 import type { Lang } from '@genoffice/i18n'
 import type { AiSettings, AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
+import type { PrintDuplex, PrintJobOptions, PrinterInfo } from '@genoffice/electron-utils/print-job'
+import type { PrinterOption } from '@genoffice/electron-utils/printer-options'
+export type { PrintDuplex, PrintJobOptions, PrinterInfo }
+export type { PrinterOption }
 
 /** largest slice readFileChunk hands over IPC; the renderer loops over them */
 export const PDF_READ_CHUNK_BYTES = 8 * 1024 * 1024
@@ -67,6 +71,10 @@ export const PDF_CHANNELS = {
   saveAsResult: 'pdf:save-as-result',
   saveAsFlow: 'pdf:save-as-flow',
   printRequest: 'pdf:print-request',
+  print: 'pdf:print',
+  printFile: 'pdf:print-file',
+  printerOptions: 'pdf:printer-options',
+  printers: 'pdf:printers',
   fileRenamed: 'pdf:file-renamed',
   getLanguage: 'app:get-language',
   languageChanged: 'app:language-changed',
@@ -964,13 +972,26 @@ export interface CropPagesRequest {
 
 export type CropPagesResult = { ok: true } | { ok: false; error: string }
 
-/** Export pages as PNG: renderer rasterizes the bitmaps, main process shows a dialog and writes to disk */
+/** Export pages as PNG or JPEG: renderer rasterizes the bitmaps, main process shows a dialog and writes to disk */
 export interface ExportImagesRequest {
-  /** base64 PNGs (without the data: prefix), in page order */
+  /** base64 PNGs or JPEGs (without the data: prefix), in page order, matching format */
   images: string[]
   /** 1-based page numbers, same length as images, used for file names */
   pageNumbers: number[]
   baseName: string
+  /** Image encoding; anything other than 'jpg' falls back to png */
+  format?: 'png' | 'jpg'
+}
+
+export const EXPORT_JPEG_QUALITY = 0.92
+
+export function encodeExportPage(
+  canvas: { toDataURL(type?: string, quality?: unknown): string },
+  format: 'png' | 'jpg' = 'png',
+): string {
+  return format === 'jpg'
+    ? (canvas.toDataURL('image/jpeg', EXPORT_JPEG_QUALITY).split(',')[1] ?? '')
+    : (canvas.toDataURL('image/png').split(',')[1] ?? '')
 }
 
 export type ExportImagesResult =
@@ -1210,6 +1231,21 @@ export interface PdfApi {
   onSaveAsFlow(handler: (inFlight: boolean) => void): () => void
   /** Shell menu Print → renderer runs its print flow (save, rasterize, system dialog) */
   onPrintRequest(handler: () => void): () => void
+  /** print this window's print stylesheet output on a named printer ('' = OS default)
+   *  without the system dialog; ok=false without error = canceled */
+  print(job: PrintJobOptions): Promise<{ ok: boolean; error?: string }>
+  /** macOS CUPS route: spool the flushed file itself through lp — the vector
+   *  original reaches the driver untouched (no rasterization pass). pages are
+   *  1-based file pages; undefined = the whole document. ok=false without
+   *  error = canceled (never happens on this route; both sides report). */
+  printFile(
+    job: PrintJobOptions & { path: string; pages?: number[] },
+  ): Promise<{ ok: boolean; error?: string }>
+  /** installed printers for the in-app print dialog */
+  listPrinters(): Promise<PrinterInfo[]>
+  /** the driver option groups a queue advertises (quality, color, media type),
+   *  for the print dialog's driver-options dropdowns; empty when none */
+  printerOptions(queue: string): Promise<PrinterOption[]>
   /** The file was renamed or moved from the shell (home Folders / Files pane); the viewer follows the new path */
   onFileRenamed(handler: (newPath: string) => void): () => void
   getLanguage(): Promise<Lang>

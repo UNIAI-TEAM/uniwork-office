@@ -1,6 +1,133 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { EventEmitter } from 'node:events'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import type { execFile, spawn } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { PassThrough } from 'node:stream'
+import type { CupsPrintJob } from '@genoffice/electron-utils/print-cups'
+import { printJobOptions } from '@genoffice/electron-utils/print-job'
+import type { PrinterOption } from '@genoffice/electron-utils/printer-options'
+type IpcHandler = (
+  event: {
+    sender: {
+      id: number
+      printToPDF?: (opts: unknown) => Promise<Buffer>
+      print?: (opts: unknown, cb: (ok: boolean, reason: string) => void) => void
+    }
+  },
+  ...args: unknown[]
+) => unknown
+
+const ipcHandlers = new Map<string, IpcHandler>()
+const ipcState = vi.hoisted(() => ({
+  senderId: 1,
+  spawnCalls: [] as Array<{ cmd: string; args: readonly string[]; opts: unknown }>,
+  execFileCalls: [] as Array<{ cmd: string; args: readonly string[] }>,
+  lpOptionsStdout: '',
+  lpOptionsError: null as Error | null,
+}))
+
+const spawnMock = vi.fn((cmd: string, args: readonly string[], opts: unknown) => {
+  const child = Object.assign(new EventEmitter(), {
+    stdin: new PassThrough(),
+    stdout: new PassThrough(),
+    stderr: new PassThrough(),
+  })
+  ipcState.spawnCalls.push({ cmd, args, opts })
+  queueMicrotask(() => child.emit('close', 0))
+  return child
+})
+
+const execFileMock = vi.fn(
+  (
+    cmd: string,
+    args: readonly string[],
+    cb: (err: Error | null, stdout: string, stderr: string) => void,
+  ) => {
+    ipcState.execFileCalls.push({ cmd, args })
+    queueMicrotask(() => cb(ipcState.lpOptionsError, ipcState.lpOptionsStdout, ''))
+  },
+)
+
+vi.mock('@genoffice/electron-utils/print-cups', async (importOriginal) => {
+  const actual = await importOriginal<{
+    printPdfViaCups: (
+      pdf: Uint8Array,
+      job: CupsPrintJob,
+      spawnFn?: typeof spawn,
+    ) => Promise<{ ok: boolean; error?: string }>
+    printFileViaCups: (
+      path: string,
+      job: CupsPrintJob,
+      pages?: readonly number[],
+      spawnFn?: typeof spawn,
+    ) => Promise<{ ok: boolean; error?: string }>
+  }>()
+  return {
+    ...actual,
+    printPdfViaCups: (pdf: Uint8Array, job: CupsPrintJob) =>
+      actual.printPdfViaCups(pdf, job, spawnMock as unknown as typeof spawn),
+    printFileViaCups: (path: string, job: CupsPrintJob, pages?: readonly number[]) =>
+      actual.printFileViaCups(path, job, pages, spawnMock as unknown as typeof spawn),
+  }
+})
+
+vi.mock('@genoffice/electron-utils/printer-options', async (importOriginal) => {
+  const actual = await importOriginal<{
+    queryPrinterOptions: (queue: string, execFileFn?: typeof execFile) => Promise<PrinterOption[]>
+  }>()
+  return {
+    ...actual,
+    queryPrinterOptions: (queue: string) =>
+      actual.queryPrinterOptions(queue, execFileMock as unknown as typeof execFile),
+  }
+})
+
+vi.mock('electron', () => ({
+  app: {
+    on: vi.fn(),
+    whenReady: vi.fn(() => new Promise(() => {})),
+    getPath: vi.fn(() => process.cwd()),
+  },
+  dialog: { showOpenDialog: vi.fn() },
+  shell: { showItemInFolder: vi.fn(), openExternal: vi.fn() },
+  BrowserWindow: class {
+    static fromWebContents = vi.fn(() => null)
+    static getFocusedWindow = vi.fn(() => null)
+  },
+  WebContentsView: class {
+    webContents = {
+      id: ipcState.senderId,
+      once: vi.fn(),
+      on: vi.fn(),
+      setWindowOpenHandler: vi.fn(),
+      loadURL: vi.fn(),
+      loadFile: vi.fn(),
+    }
+  },
+  ipcMain: {
+    handle: vi.fn((channel: string, handler: IpcHandler) => {
+      ipcHandlers.set(channel, handler)
+    }),
+    on: vi.fn((channel: string, handler: IpcHandler) => {
+      ipcHandlers.set(channel, handler)
+    }),
+    removeHandler: vi.fn(),
+  },
+}))
+
+import { createPdfView } from '../src/main/pdf-main'
+import { setUniworkDocumentPolicy } from '../src/main/uniwork-policy'
+import { PDF_CHANNELS } from '../src/shared/ipc'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { printPdf, printScaleForAreas, PRINT_DIALOG_TIMEOUT_MS } from '../src/renderer/print'
+import {
+  filterPageParity,
+  maySpoolOriginal,
+  printPdf,
+  printScaleForAreas,
+  PRINT_DIALOG_TIMEOUT_MS,
+} from '../src/renderer/print'
 
 function fakeDoc(numPages: number, render = vi.fn(() => ({ promise: Promise.resolve() }))) {
   const getPage = vi.fn(async () => ({
@@ -183,6 +310,46 @@ describe('printPdf', () => {
 /** US-Letter page area at scale 1 (PDF points²) */
 const LETTER_AREA = 612 * 792
 
+describe('printPdf with a printer job', () => {
+  it('prints through the main process instead of the system dialog', async () => {
+    const { doc } = fakeDoc(2)
+    let imgsAtPrintTime = 0
+    const print = vi.fn(async () => {
+      imgsAtPrintTime = document.querySelectorAll('.pdf-print-root img').length
+      return { ok: true }
+    })
+    ;(window as unknown as { pdfApi: unknown }).pdfApi = { print }
+
+    const job = { deviceName: 'HP', copies: 2, collate: true, duplex: 'longEdge' as const }
+    await printPdf(doc, undefined, job)
+
+    // the measured first page rides along for the CUPS print route's paper size
+    expect(print).toHaveBeenCalledWith({ ...job, pageSizeIn: { width: 8.5, height: 11 } })
+    expect(imgsAtPrintTime).toBe(2)
+    expect(window.print).not.toHaveBeenCalled()
+    expect(document.querySelector('.pdf-print-root')).toBeNull()
+  })
+
+  it('surfaces a main-process failure and still releases the print root', async () => {
+    const { doc } = fakeDoc(1)
+    ;(window as unknown as { pdfApi: unknown }).pdfApi = {
+      print: vi.fn(async () => ({ ok: false, error: 'printer offline' })),
+    }
+    await expect(printPdf(doc, undefined, { deviceName: '' })).rejects.toThrow('printer offline')
+    expect(document.querySelector('.pdf-print-root')).toBeNull()
+  })
+})
+
+describe('filterPageParity', () => {
+  it('keeps odd or even file pages and passes everything through for all', () => {
+    const pages = [1, 2, 3, 4, 5]
+    expect(filterPageParity(pages, 'all')).toBe(pages)
+    expect(filterPageParity(pages, 'odd')).toEqual([1, 3, 5])
+    expect(filterPageParity(pages, 'even')).toEqual([2, 4])
+    expect(filterPageParity([3], 'even')).toEqual([])
+  })
+})
+
 describe('printScaleForAreas', () => {
   it('uses the 200 DPI target while the document fits the pixel budget', () => {
     expect(printScaleForAreas([LETTER_AREA])).toBeCloseTo(200 / 72, 10)
@@ -277,5 +444,196 @@ describe('printPdf render scale', () => {
     // NaN pages are skipped and huge pages render at their own reduced scale
     // rather than aborting the whole print
     expect(imgsAtPrintTime).toBe(2)
+  })
+})
+
+describe('maySpoolOriginal', () => {
+  it('spools the original only when the file is not password-protected on disk', () => {
+    expect(maySpoolOriginal(null)).toBe(true)
+    expect(maySpoolOriginal('secret')).toBe(false)
+  })
+})
+
+describe('macOS lp printFile route with granted path', () => {
+  let grantDir = ''
+  let grantedPath = ''
+
+  beforeAll(() => {
+    grantDir = mkdtempSync(join(tmpdir(), 'pdf-print-grant-'))
+    grantedPath = join(grantDir, 'Report (final).pdf')
+    writeFileSync(grantedPath, '%PDF-1.4\n%%EOF\n')
+    createPdfView(grantedPath)
+  })
+
+  afterAll(() => {
+    rmSync(grantDir, { recursive: true, force: true })
+  })
+
+  beforeEach(() => {
+    ipcState.spawnCalls.length = 0
+    ipcState.execFileCalls.length = 0
+    ipcState.lpOptionsStdout = ''
+    ipcState.lpOptionsError = null
+    setUniworkDocumentPolicy(null)
+  })
+
+  afterEach(() => {
+    setUniworkDocumentPolicy(null)
+  })
+
+  function invokePrintFile(request: unknown): Promise<{ ok: boolean; error?: string }> {
+    return ipcHandlers.get(PDF_CHANNELS.printFile)!(
+      { sender: { id: ipcState.senderId } },
+      request,
+    ) as Promise<{ ok: boolean; error?: string }>
+  }
+
+  it('rejects an ungranted path before spawning lp', async () => {
+    await expect(
+      invokePrintFile({
+        deviceName: 'Office_LaserJet',
+        copies: 1,
+        collate: true,
+        duplex: 'simplex',
+        path: join(grantDir, 'ungranted.pdf'),
+      }),
+    ).rejects.toThrow('pdf: path not granted to this view')
+    expect(ipcState.spawnCalls).toHaveLength(0)
+  })
+
+  it('returns { ok: false } without spawning lp when the granted path is locked', async () => {
+    setUniworkDocumentPolicy({
+      isBound: () => true,
+      isReadOnly: () => false,
+      isLocked: (p) => p === grantedPath,
+      isAutosaveEnabled: () => true,
+    })
+    const result = await invokePrintFile({
+      deviceName: 'Office_LaserJet',
+      copies: 1,
+      collate: true,
+      duplex: 'simplex',
+      path: grantedPath,
+    })
+    expect(result).toEqual({ ok: false })
+    expect(ipcState.spawnCalls).toHaveLength(0)
+  })
+
+  it('builds lp argv array with the granted path after -- and no shell string', async () => {
+    const result = await invokePrintFile({
+      deviceName: 'Office_LaserJet',
+      copies: 2,
+      collate: true,
+      duplex: 'longEdge' as const,
+      pages: [1, 2, 3, 5],
+      path: grantedPath,
+    })
+
+    expect(result).toEqual({ ok: true })
+    expect(ipcState.spawnCalls).toHaveLength(1)
+    expect(ipcState.spawnCalls[0]!.cmd).toBe('/usr/bin/lp')
+    expect(Array.isArray(ipcState.spawnCalls[0]!.args)).toBe(true)
+    expect(ipcState.spawnCalls[0]!.args).toEqual([
+      '-d',
+      'Office_LaserJet',
+      '-n',
+      '2',
+      '-o',
+      'Collate=True',
+      '-o',
+      'sides=two-sided-long-edge',
+      '-P',
+      '1-3,5',
+      '--',
+      grantedPath,
+    ])
+    expect(ipcState.spawnCalls[0]!.args.slice(-2)).toEqual(['--', grantedPath])
+    expect(ipcState.spawnCalls[0]!.opts).toEqual({ stdio: ['pipe', 'pipe', 'pipe'] })
+    expect(ipcState.spawnCalls[0]!.opts).not.toHaveProperty('shell')
+  })
+
+  function invokePrinterOptions(queue: unknown): Promise<PrinterOption[]> {
+    return ipcHandlers.get(PDF_CHANNELS.printerOptions)!(
+      { sender: { id: ipcState.senderId } },
+      queue,
+    ) as Promise<PrinterOption[]>
+  }
+
+  it('guards PDF_CHANNELS.printerOptions queue names and filters groups to DRIVER_OPTION_NAMES', async () => {
+    expect(await invokePrinterOptions('Office LaserJet; id')).toEqual([])
+    expect(await invokePrinterOptions('')).toEqual([])
+    expect(await invokePrinterOptions(123)).toEqual([])
+    expect(ipcState.execFileCalls).toHaveLength(0)
+
+    ipcState.lpOptionsStdout = [
+      'PageSize/Media Size: *Letter A4',
+      'cupsPrintQuality/Quality: Draft *Normal High',
+      'ColorModel/Color Mode: *RGB Gray',
+      'Duplex/2-Sided Printing: *None DuplexNoTumble',
+      'MediaType/Media Type: *Plain Glossy',
+    ].join('\n')
+
+    const groups = await invokePrinterOptions('Office_LaserJet')
+    expect(ipcState.execFileCalls).toEqual([
+      { cmd: '/usr/bin/lpoptions', args: ['-p', 'Office_LaserJet', '-l'] },
+    ])
+    expect(groups.map((g) => g.name)).toEqual(['cupsPrintQuality', 'ColorModel', 'MediaType'])
+  })
+
+  it('round-trips chosen driver options into the print call and lp arguments while dropping invalid ones', async () => {
+    const { doc } = fakeDoc(1)
+    const print = vi.fn(async (req: unknown) =>
+      invokePrintFile({
+        ...(req as Record<string, unknown>),
+        path: grantedPath,
+      }),
+    )
+    Object.assign(window, { pdfApi: { print } })
+
+    const validDriverOptions = [
+      { name: 'cupsPrintQuality', value: 'High' },
+      { name: 'ColorModel', value: 'Gray' },
+      { name: 'MediaType', value: 'Plain' },
+    ]
+    const driverOptions = [
+      ...validDriverOptions,
+      { name: 'bad name', value: 'High' },
+      { name: 'ColorModel', value: 'Gray;rm -rf /' },
+    ]
+    const job = {
+      deviceName: 'Office_LaserJet',
+      copies: 1,
+      collate: true,
+      duplex: 'simplex' as const,
+      driverOptions,
+    }
+    await printPdf(doc, undefined, job)
+
+    expect(print).toHaveBeenCalledWith({
+      ...job,
+      pageSizeIn: { width: 8.5, height: 11 },
+    })
+    const parsed = printJobOptions(job)
+    expect(parsed.driverOptions).toEqual(validDriverOptions)
+    expect(ipcState.spawnCalls).toHaveLength(1)
+    expect(ipcState.spawnCalls[0]!.cmd).toBe('/usr/bin/lp')
+    expect(ipcState.spawnCalls[0]!.args).toEqual([
+      '-d',
+      'Office_LaserJet',
+      '-n',
+      '1',
+      '-o',
+      'Collate=True',
+      '-o',
+      'sides=one-sided',
+      '-o',
+      'cupsPrintQuality=High',
+      '-o',
+      'ColorModel=Gray',
+      '-o',
+      'MediaType=Plain',
+      '--',
+      grantedPath,
+    ])
   })
 })

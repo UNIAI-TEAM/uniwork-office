@@ -532,9 +532,20 @@ describe('page operations', () => {
     expect(
       await s.api.exportImages({ images: [png, png], pageNumbers: [1, 2], baseName: 'Report' }),
     ).toEqual({ ok: true, savedDir: 'Report-images.zip', count: 2 })
+    expect(
+      await s.api.exportImages({
+        images: [btoa('jpg'), btoa('jpg')],
+        pageNumbers: [1, 2],
+        baseName: 'Report',
+        format: 'jpg',
+      }),
+    ).toEqual({ ok: true, savedDir: 'Report-images.zip', count: 2 })
+    expect(s.zips[1]!.map((f) => f.name)).toEqual(['Report-p1.png', 'Report-p2.png'])
+    expect(s.zips[2]!.map((f) => f.name)).toEqual(['Report-p1.jpg', 'Report-p2.jpg'])
     expect(s.downloads.map((d) => d.name)).toEqual([
       'Report-p1.pdf',
       'Report.zip',
+      'Report-images.zip',
       'Report-images.zip',
     ])
   })

@@ -121,11 +121,22 @@ import {
   remapOutlinePages,
   remapOutlineTree,
 } from './heading-outline'
-import { printPdf } from './print'
+import { filterPageParity, maySpoolOriginal, printPdf, type PageParity } from './print'
 import { readFileBytes } from './file-bytes'
-import type { PdfEncryptionInput, PdfPermissions } from '../shared/ipc'
+import type {
+  PdfEncryptionInput,
+  PdfPermissions,
+  PrintDuplex,
+  PrinterInfo,
+  PrinterOption,
+} from '../shared/ipc'
 import { mayChangeProtection } from './protection-gate'
-import { MAX_REDACTION_REGIONS } from '../shared/ipc'
+import { encodeExportPage, MAX_REDACTION_REGIONS } from '../shared/ipc'
+/// Printer option that is not a device name (Electron: '' = OS default printer)
+const PRINT_SYSTEM_DIALOG = '\u0000system-dialog'
+// macOS's print sheet already carries copies/duplex, so it stays the default there
+const IS_MAC = navigator.platform.toLowerCase().includes('mac')
+const PRINT_DUPLEX_MODES: PrintDuplex[] = ['simplex', 'longEdge', 'shortEdge']
 import { PasswordDialog } from './PasswordDialog'
 import { StaticTextDialog } from './StaticTextDialog'
 import { PropertiesDialog } from './PropertiesDialog'
@@ -1148,6 +1159,20 @@ export default function App() {
   const [printMode, setPrintMode] = useState<'all' | 'current' | 'custom'>('all')
   const [printInput, setPrintInput] = useState('')
   const [printInvalid, setPrintInvalid] = useState(false)
+  const [printParity, setPrintParity] = useState<PageParity>('all')
+  const [printers, setPrinters] = useState<PrinterInfo[]>([])
+  const [printDevice, setPrintDevice] = useState(IS_MAC ? PRINT_SYSTEM_DIALOG : '')
+  const [printCopies, setPrintCopies] = useState(1)
+  const [printCollate, setPrintCollate] = useState(true)
+  const [printDuplex, setPrintDuplex] = useState<PrintDuplex>('simplex')
+  // the chosen printer's driver option groups (quality, color, media type) and
+  // what the user picked from them; empty for the system dialog and on
+  // platforms where the CUPS route does not run
+  const [driverOptions, setDriverOptions] = useState<PrinterOption[]>([])
+  // bumped on every printer switch: a slow printerOptions() answer from an
+  // earlier queue must not overwrite the current queue's groups
+  const driverOptionsRequest = useRef(0)
+  const [driverChoices, setDriverChoices] = useState<Record<string, string>>({})
   /** Page-crop dialog: rendered page bitmap + which page it shows */
   const [pageCropDlg, setPageCropDlg] = useState<{ png: string; origIdx: number } | null>(null)
   const [cropAllPages, setCropAllPages] = useState(false)
@@ -6002,8 +6027,8 @@ export default function App() {
     }
   }, [livePreviewRects, scale, pageGeom, rotDelta, filePath])
 
-  /** Export PNG: current page or all visible pages, 150dpi equivalent */
-  const exportImages = (allPages: boolean) =>
+  /** Export PNG or JPG: current page or all visible pages, 150dpi equivalent */
+  const exportImages = (allPages: boolean, format: 'png' | 'jpg' = 'png') =>
     flushThen(async () => {
       if (!doc || exporting) return
       setExporting(true)
@@ -6021,7 +6046,7 @@ export default function App() {
           canvas.width = Math.floor(viewport.width)
           canvas.height = Math.floor(viewport.height)
           await page.render({ canvas, viewport }).promise
-          images.push(canvas.toDataURL('image/png').split(',')[1] ?? '')
+          images.push(encodeExportPage(canvas, format))
           pageNumbers.push(visList.indexOf(origIdx) + 1)
         }
         canvas.width = 0
@@ -6030,6 +6055,7 @@ export default function App() {
           images,
           pageNumbers,
           baseName: fileName.replace(/\.pdf$/i, ''),
+          format,
         })
         if (!result.ok) opFailed(result.error)
       } catch (err) {
@@ -6591,7 +6617,12 @@ export default function App() {
     setPrintMode('all')
     setPrintInput(String(printCurrentPage))
     setPrintInvalid(false)
+    setPrintParity('all')
     setPrintDlg(true)
+    window.pdfApi
+      .listPrinters()
+      .then(setPrinters)
+      .catch(() => undefined)
   }
 
   /** Print: save first (markups/forms/page ops all into the file), then reload from the file to render, avoiding a destroyed old doc */
@@ -6603,13 +6634,38 @@ export default function App() {
   const printDoc = async (pages?: number[]) => {
     if (printBusyRef.current) return
     printBusyRef.current = true
+    const job =
+      printDevice === PRINT_SYSTEM_DIALOG
+        ? undefined
+        : {
+            deviceName: printDevice,
+            copies: printCopies,
+            collate: printCollate,
+            duplex: printDuplex,
+            driverOptions: driverOptions
+              .filter(
+                (g) =>
+                  driverChoices[g.name] !== undefined && driverChoices[g.name] !== g.defaultValue,
+              )
+              .map((g) => ({ name: g.name, value: driverChoices[g.name]! })),
+          }
     try {
       await flushThen(async () => {
         setPrinting(true)
         try {
+          if (job && IS_MAC && maySpoolOriginal(diskPasswordRef.current)) {
+            // macOS named printer: lp spools the flushed file itself — the
+            // vector original reaches the driver untouched, instead of a
+            // 150-200 DPI raster pass (genoffice#2347's route, quality half).
+            // An encrypted file stays encrypted on disk, which CUPS' pdftopdf
+            // cannot open, so those fall through to the raster path below.
+            const r = await window.pdfApi.printFile({ ...job, pages, path: filePath })
+            if (!r.ok && r.error) opFailed(r.error)
+            return
+          }
           const data = await readFileBytes(window.pdfApi, filePath)
           await withLoadedPdf(data, diskPasswordRef.current ?? passwordRef.current, (pdoc) =>
-            printPdf(pdoc, pages),
+            printPdf(pdoc, pages, job),
           )
         } catch (err) {
           opFailed(err instanceof Error ? err.message : String(err))
@@ -6624,23 +6680,19 @@ export default function App() {
 
   /** Print dialog confirm: visible page numbers → 1-based file pages */
   const confirmPrint = () => {
-    if (printMode === 'all') {
-      setPrintDlg(false)
-      void printDoc()
-      return
-    }
-    if (printMode === 'current') {
-      setPrintDlg(false)
-      void printDoc([printCurrentPage])
-      return
-    }
-    const pages = parsePageRanges(printInput, pageCount)
-    if (!pages || pages.length === 0) {
+    const pages =
+      printMode === 'all'
+        ? Array.from({ length: pageCount }, (_x, i) => i + 1)
+        : printMode === 'current'
+          ? [printCurrentPage]
+          : parsePageRanges(printInput, pageCount)
+    const subset = pages ? filterPageParity(pages, printParity) : []
+    if (subset.length === 0) {
       setPrintInvalid(true)
       return
     }
     setPrintDlg(false)
-    void printDoc(pages)
+    void printDoc(printMode === 'all' && printParity === 'all' ? undefined : subset)
   }
 
   /** Capability surface for AI tools; rebuilt each render (AiPanel mirrors it via refs to get the latest) */
@@ -8223,17 +8275,30 @@ export default function App() {
                     </button>
                   )}
                   {cap('saveAs') && (
-                    <button
-                      className="rb-big"
-                      data-tip={t('exportImagesAll')}
-                      disabled={exporting}
-                      onClick={() => void exportImages(true)}
-                    >
-                      <span className="rb-big-icon">
-                        <IconExportImg />
-                      </span>
-                      <span>{exporting ? t('exporting') : t('exportImages')}</span>
-                    </button>
+                    <>
+                      <button
+                        className="rb-big"
+                        data-tip={t('exportImagesAll')}
+                        disabled={exporting}
+                        onClick={() => void exportImages(true)}
+                      >
+                        <span className="rb-big-icon">
+                          <IconExportImg />
+                        </span>
+                        <span>{exporting ? t('exporting') : t('exportImages')}</span>
+                      </button>
+                      <button
+                        className="rb-big"
+                        data-tip={t('exportImagesAllJpg')}
+                        disabled={exporting}
+                        onClick={() => void exportImages(true, 'jpg')}
+                      >
+                        <span className="rb-big-icon">
+                          <IconExportImg />
+                        </span>
+                        <span>{exporting ? t('exporting') : t('exportImagesJpg')}</span>
+                      </button>
+                    </>
                   )}
                   <button
                     className="rb-big"
@@ -11219,12 +11284,113 @@ export default function App() {
               <div className="pdf-modal-mask" onClick={() => setPrintDlg(false)}>
                 <div className="pdf-modal" onClick={(e) => e.stopPropagation()}>
                   <div className="pdf-modal-title">{t('print')}</div>
+                  <label className="pdf-modal-row pdf-print-field">
+                    <span>{t('printPrinter')}</span>
+                    <select
+                      className="pdf-modal-input"
+                      value={printDevice}
+                      onChange={(e) => {
+                        const request = ++driverOptionsRequest.current
+                        setPrintDevice(e.target.value)
+                        setDriverChoices({})
+                        setDriverOptions([])
+                        if (e.target.value && IS_MAC)
+                          void window.pdfApi
+                            .printerOptions(e.target.value)
+                            .then((options) => {
+                              if (request === driverOptionsRequest.current)
+                                setDriverOptions(options)
+                            })
+                            .catch(() => {
+                              if (request === driverOptionsRequest.current) setDriverOptions([])
+                            })
+                      }}
+                    >
+                      <option value="">{t('printDefaultPrinter')}</option>
+                      {printers.map((p) => (
+                        <option key={p.name} value={p.name}>
+                          {p.displayName}
+                        </option>
+                      ))}
+                      <option value={PRINT_SYSTEM_DIALOG}>{t('printSystemDialog')}</option>
+                    </select>
+                  </label>
+                  <div className="pdf-modal-row pdf-print-field">
+                    <label className="pdf-print-copies">
+                      <span>{t('printCopies')}</span>
+                      <input
+                        className="pdf-modal-input"
+                        type="number"
+                        min={1}
+                        max={999}
+                        value={printCopies}
+                        disabled={printDevice === PRINT_SYSTEM_DIALOG}
+                        onChange={(e) =>
+                          setPrintCopies(
+                            Math.min(999, Math.max(1, Math.round(Number(e.target.value)) || 1)),
+                          )
+                        }
+                      />
+                    </label>
+                    <label className="pdf-modal-check">
+                      <input
+                        type="checkbox"
+                        checked={printCollate}
+                        disabled={printDevice === PRINT_SYSTEM_DIALOG || printCopies < 2}
+                        onChange={(e) => setPrintCollate(e.target.checked)}
+                      />
+                      {t('printCollate')}
+                    </label>
+                  </div>
+                  <label className="pdf-modal-row pdf-print-field">
+                    <span>{t('printDuplex')}</span>
+                    <select
+                      className="pdf-modal-input"
+                      value={printDuplex}
+                      disabled={printDevice === PRINT_SYSTEM_DIALOG}
+                      onChange={(e) => setPrintDuplex(e.target.value as PrintDuplex)}
+                    >
+                      {PRINT_DUPLEX_MODES.map((m) => (
+                        <option key={m} value={m}>
+                          {t(
+                            m === 'simplex'
+                              ? 'printDuplexOff'
+                              : m === 'longEdge'
+                                ? 'printDuplexLong'
+                                : 'printDuplexShort',
+                          )}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {driverOptions.map((group) => (
+                    <label key={group.name} className="pdf-modal-row pdf-print-field">
+                      <span>{group.translation}</span>
+                      <select
+                        className="pdf-modal-input"
+                        value={driverChoices[group.name] ?? group.defaultValue ?? group.values[0]}
+                        onChange={(e) =>
+                          setDriverChoices((c) => ({ ...c, [group.name]: e.target.value }))
+                        }
+                      >
+                        {group.values.map((v) => (
+                          <option key={v} value={v}>
+                            {v}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                  <div className="pdf-print-divider" />
                   <label className="pdf-modal-row">
                     <input
                       type="radio"
                       name="print-range"
                       checked={printMode === 'all'}
-                      onChange={() => setPrintMode('all')}
+                      onChange={() => {
+                        setPrintMode('all')
+                        setPrintInvalid(false)
+                      }}
                     />
                     <span>{t('printRangeAll')}</span>
                   </label>
@@ -11233,7 +11399,10 @@ export default function App() {
                       type="radio"
                       name="print-range"
                       checked={printMode === 'current'}
-                      onChange={() => setPrintMode('current')}
+                      onChange={() => {
+                        setPrintMode('current')
+                        setPrintInvalid(false)
+                      }}
                     />
                     <span>
                       {t('printRangeCurrent')} ({printCurrentPage})
@@ -11266,6 +11435,24 @@ export default function App() {
                         }
                       }}
                     />
+                  )}
+                  <label className="pdf-modal-row pdf-print-field">
+                    <span>{t('printSubset')}</span>
+                    <select
+                      className="pdf-modal-input"
+                      value={printParity}
+                      onChange={(e) => {
+                        setPrintParity(e.target.value as PageParity)
+                        setPrintInvalid(false)
+                      }}
+                    >
+                      <option value="all">{t('printSubsetAll')}</option>
+                      <option value="odd">{t('printSubsetOdd')}</option>
+                      <option value="even">{t('printSubsetEven')}</option>
+                    </select>
+                  </label>
+                  {printInvalid && printMode !== 'custom' && (
+                    <div className="pdf-modal-hint pdf-print-empty">{t('printSubsetEmpty')}</div>
                   )}
                   <div className="pdf-modal-actions">
                     <button className="pdf-modal-btn" onClick={() => setPrintDlg(false)}>
