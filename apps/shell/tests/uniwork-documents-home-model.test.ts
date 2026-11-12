@@ -11,6 +11,7 @@ import {
   folderCardsUnderTypePick,
   getDocumentsHomeNavEntry,
   hasActiveFilters,
+  moveStartFolder,
   rowsUnderTypePick,
   splitAndSortItems,
   typePickHidesFolders,
@@ -1127,5 +1128,45 @@ describe('UNI-2196 (D3): Drive panel model', () => {
     expect(rows.map((r) => r.id)).toEqual(['d', 'a'])
     expect(rows[0]!.text).toBe('uhDriveActOther')
     expect(rows[1]!.text).toBe('Minh · uhDriveActLinked')
+  })
+})
+
+describe('moveStartFolder (UNI-2513)', () => {
+  const base = { folderId: 'A1', myFolderId: 'MY', query: '' } as const
+
+  it('a root doc found by search inside A1 starts at the root', () => {
+    expect(
+      moveStartFolder({ ...base, parentId: null, subView: 'workspace', query: 'plan' }),
+    ).toBeNull()
+  })
+
+  it('a root folder card found by search inside A1 starts at the root, not inside A1', () => {
+    expect(
+      moveStartFolder({ ...base, parentId: undefined, subView: 'workspace', query: 'root folder' }),
+    ).toBeNull()
+  })
+
+  it('a nested search hit starts at its own parent, not the open folder', () => {
+    expect(
+      moveStartFolder({ ...base, parentId: 'A1', subView: 'workspace', folderId: 'A', query: 'x' }),
+    ).toBe('A1')
+  })
+
+  it('a parentless My Folder row starts at My Folder', () => {
+    expect(moveStartFolder({ ...base, parentId: null, subView: 'my-folder' })).toBe('MY')
+  })
+
+  it('a parentless Starred / Recent row starts at the root even though a folder was left open', () => {
+    expect(moveStartFolder({ ...base, parentId: null, subView: 'starred' })).toBeNull()
+    expect(moveStartFolder({ ...base, parentId: undefined, subView: 'recent' })).toBeNull()
+  })
+
+  it('a row of the A1 folder view (no search) starts at A1, with or without a parent id', () => {
+    expect(moveStartFolder({ ...base, parentId: 'A1', subView: 'workspace' })).toBe('A1')
+    expect(moveStartFolder({ ...base, parentId: null, subView: 'workspace' })).toBe('A1')
+  })
+
+  it('a shared-with-me row starts at the root even with a parent id', () => {
+    expect(moveStartFolder({ ...base, parentId: 'OWNER', subView: 'shared-with-me' })).toBeNull()
   })
 })
