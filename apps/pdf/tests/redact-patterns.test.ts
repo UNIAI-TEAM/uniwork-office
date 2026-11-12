@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import { IBAN_LENGTHS, findPattern } from '../src/renderer/redact-patterns'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  IBAN_LENGTHS,
+  REDACT_PATTERNS,
+  cccdCheck,
+  findPattern,
+  mstCheck,
+} from '../src/renderer/redact-patterns'
 import type { RedactPattern } from '../src/renderer/redact-patterns'
+import { redactFindStringsFor } from '../src/renderer/i18n/redact-find-strings'
 import { findPatternsInIndex, patternMarks } from '../src/renderer/search'
 import type { SearchIndex } from '../src/renderer/search'
 
@@ -385,5 +392,224 @@ describe('findPatternsInIndex skipPage', () => {
     const kept = findPatternsInIndex(index, ['email'], (i) => i === 0)
     expect(kept).toHaveLength(1)
     expect(kept[0]!.text).toBe('x@y.co')
+  })
+})
+
+describe('redact patterns — CCCD', () => {
+  it('matches unseparated and 3-3-3-3 / 4-4-4 grouped synthetic CCCDs with valid province and century/gender', () => {
+    expect(
+      found(
+        'cccd',
+        'CCCD 001090012345, 079195012345, 048202012345, 096320012345; ' +
+          'grouped 079 195 012 345, 079-195-012-345, 079.195.012.345, ' +
+          '0010 9001 2345, 0010-9001-2345, 0010.9001.2345.',
+      ),
+    ).toEqual([
+      '001090012345',
+      '079195012345',
+      '048202012345',
+      '096320012345',
+      '079 195 012 345',
+      '079-195-012-345',
+      '079.195.012.345',
+      '0010 9001 2345',
+      '0010-9001-2345',
+      '0010.9001.2345',
+    ])
+    expect(cccdCheck('079095012345')).toBe(true)
+    expect(cccdCheck('001200012345')).toBe(true)
+  })
+
+  it('rejects invalid province codes, implausible centuries/years, wrong length and mixed separators', () => {
+    for (const bad of [
+      '000090012345',
+      '097090012345',
+      '123090012345',
+      '079495012345',
+      '079500012345',
+      '079695012345',
+      '079700012345',
+      '079895012345',
+      '079900012345',
+      '079299012345',
+      '079385012345',
+      '07909501234',
+      '0790950123456',
+      '079-195.012 345',
+      '0010 9001 2345 6789',
+    ]) {
+      expect(found('cccd', bad), bad).toEqual([])
+    }
+  })
+
+  it('matches birth year up to the current year at call time and rejects current year + 1', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2027-06-15T00:00:00Z'))
+      expect(cccdCheck('079227012345')).toBe(true)
+      expect(cccdCheck('079228012345')).toBe(false)
+      expect(found('cccd', 'CCCD 079227012345 vs 079228012345')).toEqual(['079227012345'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('redact patterns — MST', () => {
+  it('matches 10-digit and 10-3 branch MSTs with valid mod-11 check digit', () => {
+    expect(
+      found(
+        'mst',
+        'MST: 0101248141, TP.HCM 0301248149, Đà Nẵng 0401248142, ' +
+          'chi nhánh 0101248141-001 và 0301248149-015.',
+      ),
+    ).toEqual(['0101248141', '0301248149', '0401248142', '0101248141-001', '0301248149-015'])
+    expect(mstCheck([0, 1, 0, 1, 2, 4, 8, 1, 4, 1])).toBe(true)
+    expect(mstCheck([0, 1, 0, 1, 2, 4, 8, 1, 4, 2])).toBe(false)
+  })
+
+  it('rejects bad check digits, 00 prefix, malformed branch suffixes and wrong lengths', () => {
+    for (const bad of [
+      '0101248142',
+      '0301248148',
+      '0401248141',
+      '0101248142-001',
+      '0001248148',
+      '0101248141-000',
+      '0101248141-12',
+      '0101248141-1234',
+      '010124814',
+      '01012481410',
+    ]) {
+      expect(found('mst', bad), bad).toEqual([])
+    }
+  })
+})
+
+describe('redact patterns — Vietnamese phone and labels', () => {
+  it('matches unlabelled VN mobile (03,05,07,08,09), landline (02x), and +84 / 84 forms', () => {
+    expect(
+      found(
+        'phone',
+        'Mobile 0912345678, 0387654321, 0567891234, 0789123456, 0812345679; ' +
+          'landline 0243825123, 0283822123; ' +
+          'intl +84912345678, +84243825123, 84912345678, 84243825123, +84 912 345 678, 84 912 345 678.',
+      ),
+    ).toEqual([
+      '0912345678',
+      '0387654321',
+      '0567891234',
+      '0789123456',
+      '0812345679',
+      '0243825123',
+      '0283822123',
+      '+84912345678',
+      '+84243825123',
+      '84912345678',
+      '84243825123',
+      '+84 912 345 678',
+      '84 912 345 678',
+    ])
+  })
+
+  it('rejects unlabelled numbers with retired/invalid prefixes or wrong lengths', () => {
+    for (const bad of [
+      '0012345678',
+      '0123456789',
+      '0412345678',
+      '0612345678',
+      '+84123456789',
+      '84123456789',
+      '84412345678',
+      '091234567',
+      '09123456789',
+      '+8491234567',
+      '+849123456789',
+    ]) {
+      expect(found('phone', bad), bad).toEqual([])
+    }
+  })
+
+  it('matches SĐT, ĐT, Điện thoại and Tel labels case- and accent-insensitively', () => {
+    const lines = [
+      'SĐT: 0123456789',
+      'sđt 0412345678',
+      'SDT. 0612345678',
+      'sdt: 0912345678',
+      'ĐT: 0123456789',
+      'đt 0412345678',
+      'DT. 0612345678',
+      'Điện thoại: 0123456789',
+      'điện thoại 0412345678',
+      'DIEN THOAI: 0612345678',
+      'Số điện thoại: 0912345678',
+      'Tel: 0123456789',
+      'Tél. 0412345678',
+      'TEL 0612345678',
+    ]
+    expect(found('phone', lines.join('\n'))).toEqual([
+      '0123456789',
+      '0412345678',
+      '0612345678',
+      '0912345678',
+      '0123456789',
+      '0412345678',
+      '0612345678',
+      '0123456789',
+      '0412345678',
+      '0612345678',
+      '0912345678',
+      '0123456789',
+      '0412345678',
+      '0612345678',
+    ])
+  })
+})
+
+describe('redact patterns — CCCD and MST precedence over phone', () => {
+  it('never matches a valid CCCD or MST span as a phone number', () => {
+    const text =
+      'CCCD 079195012345, 079 195 012 345, 079-195-012-345, 079.195.012.345, ' +
+      '0010 9001 2345, 0010-9001-2345, 0010.9001.2345; ' +
+      'MST 0101248141, 0301248149, 0101248141-001, 0301248149-015; ' +
+      'SĐT 0912345678.'
+    expect(found('phone', text)).toEqual(['0912345678'])
+    expect(found('cccd', text)).toEqual([
+      '079195012345',
+      '079 195 012 345',
+      '079-195-012-345',
+      '079.195.012.345',
+      '0010 9001 2345',
+      '0010-9001-2345',
+      '0010.9001.2345',
+    ])
+    expect(found('mst', text)).toEqual([
+      '0101248141',
+      '0301248149',
+      '0101248141-001',
+      '0301248149-015',
+    ])
+
+    const index: SearchIndex = [
+      {
+        text,
+        lower: text.toLowerCase(),
+        items: [{ start: 0, end: text.length, x: 0, y: 700, w: 500, h: 10 }],
+      },
+    ]
+    const hits = findPatternsInIndex(index, REDACT_PATTERNS)
+    expect(hits.filter((h) => h.pattern === 'phone').map((h) => h.text)).toEqual(['0912345678'])
+    expect(hits.filter((h) => h.pattern === 'cccd')).toHaveLength(7)
+    expect(hits.filter((h) => h.pattern === 'mst')).toHaveLength(4)
+  })
+
+  it('exposes CCCD and Mã số thuế labels in i18n while keeping US SSN', () => {
+    const vi = redactFindStringsFor('vi')
+    expect(vi.redactPatternCccd).toContain('CCCD')
+    expect(vi.redactPatternMst).toBe('Mã số thuế')
+    expect(vi.redactPatternSsn).toBe('Số an sinh xã hội Mỹ')
+    const en = redactFindStringsFor('en')
+    expect(en.redactPatternCccd).toContain('CCCD')
+    expect(en.redactPatternMst).toContain('MST')
   })
 })

@@ -220,6 +220,28 @@ describe('find_sensitive_info', () => {
     expect(res.isError).toBe(true)
     expect(ro.addRedactions).not.toHaveBeenCalled()
   })
+
+  it('accepts cccd and mst patterns and applies precedence over phone', async () => {
+    const vnText = 'CCCD 079 195 012 345, MST 0101248141-001, SĐT 0912345678'
+    const vnIndex: SearchIndex = [
+      {
+        text: vnText,
+        lower: vnText.toLowerCase(),
+        items: [{ start: 0, end: vnText.length, x: 0, y: 700, w: 570, h: 10 }],
+      },
+    ]
+    const deps = makeDeps({ searchIndex: () => Promise.resolve(vnIndex) })
+    const result = await executePdfTool(
+      deps,
+      call('find_sensitive_info', { patterns: ['cccd', 'mst', 'phone'] }),
+    )
+    expect(result.isError).toBeFalsy()
+    expect(result.output).toContain('Page 1 [cccd]: 079 195 012 345')
+    expect(result.output).toContain('Page 1 [mst]: 0101248141-001')
+    expect(result.output).toContain('Page 1 [phone]: 0912345678')
+    expect(result.output).not.toContain('Page 1 [phone]: 079 195 012 345')
+    expect(result.output).not.toContain('Page 1 [phone]: 0101248141-001')
+  })
 })
 
 describe('read_pages', () => {

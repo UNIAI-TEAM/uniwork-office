@@ -395,6 +395,8 @@ const REDACT_PATTERN_LABELS: Record<RedactPattern, StringKey> = {
   email: 'redactPatternEmail',
   'credit-card': 'redactPatternCreditCard',
   ssn: 'redactPatternSsn',
+  cccd: 'redactPatternCccd',
+  mst: 'redactPatternMst',
   date: 'redactPatternDate',
   iban: 'redactPatternIban',
 }

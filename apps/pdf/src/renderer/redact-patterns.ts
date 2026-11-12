@@ -1,18 +1,21 @@
 /**
  * Sensitive-information patterns for Search & Redact (Acrobat's Find Text ▸ Patterns):
  * phone numbers, email addresses, credit card numbers, US Social Security numbers,
- * dates and IBANs. Ported from pdfcraft's crates/redact/src/patterns.rs. Each matcher
- * is deterministic and returns [start, end) offsets into the page text, which the
- * caller maps onto text-item geometry.
+ * Vietnamese Citizen IDs (CCCD), Vietnamese tax IDs (MST), dates and IBANs. Ported from
+ * pdfcraft's crates/redact/src/patterns.rs. Each matcher is deterministic and returns
+ * [start, end) offsets into the page text, which the caller maps onto text-item geometry.
  */
 
-export type RedactPattern = 'phone' | 'email' | 'credit-card' | 'ssn' | 'date' | 'iban'
+export type RedactPattern =
+  'phone' | 'email' | 'credit-card' | 'ssn' | 'cccd' | 'mst' | 'date' | 'iban'
 
 export const REDACT_PATTERNS: readonly RedactPattern[] = [
   'phone',
   'email',
   'credit-card',
   'ssn',
+  'cccd',
+  'mst',
   'date',
   'iban',
 ]
@@ -61,15 +64,24 @@ function runContinues(s: S, k: number, step: 1 | -1, seps: string): boolean {
   }
 }
 
+const LABEL_CHAR_RE = /^[\p{Alphabetic}\p{M}]$/u
+const isLabelChar = (c: string | undefined): boolean => c !== undefined && LABEL_CHAR_RE.test(c)
+
+function foldLabel(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/[\u0130\u0131]/g, 'i')
+    .toLowerCase()
+}
+
 const PHONE_LABELS = new Set([
   'tel',
-  'tél',
   'tele',
   'telefon',
   'telefono',
-  'teléfono',
   'telephone',
-  'téléphone',
   'phone',
   'ph',
   'cell',
@@ -79,26 +91,170 @@ const PHONE_LABELS = new Set([
   'mobile',
   'mob',
   'mobil',
-  'móvil',
   'movil',
   'handy',
   'fax',
   'tlf',
   'telf',
   'gsm',
+  'sdt',
+  'dt',
+  'dien thoai',
 ])
+
+const NON_PHONE_ID_LABELS: Record<string, true> = {
+  id: true,
+  cccd: true,
+  cmnd: true,
+  mst: true,
+  ssn: true,
+  iban: true,
+}
 
 /** Whether the text before `i` is a phone label, with one to four spaces, colons or dots between. */
 function labelled(s: S, i: number): boolean {
   let j = i
   while (i - j < 4 && ' :.\u00a0'.includes(at(s, j - 1) ?? 'x')) j--
   const end = j
-  while (end - j < 12 && isAlpha(at(s, j - 1))) j--
-  if (end === i || isAlnum(at(s, j - 1))) return false
-  return PHONE_LABELS.has(s.slice(j, end).toLowerCase())
+  while (end - j < 16 && isLabelChar(at(s, j - 1))) j--
+  if (end === i || end === j) return false
+  const word1 = foldLabel(s.slice(j, end))
+  if (!isAlnum(at(s, j - 1)) && PHONE_LABELS.has(word1)) return true
+  let k = j
+  while (j - k < 2 && (at(s, k - 1) === ' ' || at(s, k - 1) === '\u00a0')) k--
+  if (k === j) return false
+  const w0End = k
+  while (w0End - k < 16 && isLabelChar(at(s, k - 1))) k--
+  if (w0End === k || isAlnum(at(s, k - 1))) return false
+  return PHONE_LABELS.has(`${foldLabel(s.slice(k, w0End))} ${word1}`)
+}
+
+function nonPhoneIdLabelled(s: S, i: number): boolean {
+  let j = i
+  while (i - j < 4 && ' :.\u00a0'.includes(at(s, j - 1) ?? 'x')) j--
+  const end = j
+  while (end - j < 12 && isLabelChar(at(s, j - 1))) j--
+  if (end === i || end === j || isAlnum(at(s, j - 1))) return false
+  return NON_PHONE_ID_LABELS[foldLabel(s.slice(j, end))] === true
+}
+
+/** Whether `[start, end)` is joined to another digit group by a single space, dash, dot or slash. */
+function joinedToDigits(s: S, start: number, end: number): boolean {
+  if (' -./'.includes(at(s, start - 1) ?? 'x') && isDigit(at(s, start - 2))) return true
+  if (' -./'.includes(at(s, end) ?? 'x') && isDigit(at(s, end + 1))) return true
+  return false
+}
+
+/** Validate 12-digit Vietnamese CCCD: province 001..096, century/gender 0..9 + birth year. */
+export function cccdCheck(digits: string, maxYear = new Date().getFullYear()): boolean {
+  if (digits.length !== 12 || ![...digits].every(isDigit)) return false
+  const province = Number(digits.slice(0, 3))
+  if (province < 1 || province > 96) return false
+  const genderCentury = Number(digits[3])
+  const yy = Number(digits.slice(4, 6))
+  const birthYear = 1900 + Math.floor(genderCentury / 2) * 100 + yy
+  return birthYear >= 1900 && birthYear <= maxYear
+}
+
+function cccd(s: S, i: number): number | null {
+  if (s[i] !== '0' || isAlnum(at(s, i - 1)) || at(s, i - 1) === '+' || labelled(s, i)) return null
+  const g = (from: number, n: number): boolean => {
+    for (let k = from; k < from + n; k++) if (!isDigit(at(s, k))) return false
+    return true
+  }
+  // Unseparated 12 digits.
+  if (g(i, 12) && !isAlnum(at(s, i + 12)) && !joinedToDigits(s, i, i + 12)) {
+    if (cccdCheck(s.slice(i, i + 12))) return 12
+  }
+  // Grouped 3-3-3-3 with uniform space, dot or dash.
+  const sep3 = at(s, i + 3)
+  if (
+    sep3 !== undefined &&
+    ' .-'.includes(sep3) &&
+    g(i, 3) &&
+    g(i + 4, 3) &&
+    at(s, i + 7) === sep3 &&
+    g(i + 8, 3) &&
+    at(s, i + 11) === sep3 &&
+    g(i + 12, 3) &&
+    !isAlnum(at(s, i + 15)) &&
+    !joinedToDigits(s, i, i + 15)
+  ) {
+    const digits =
+      s.slice(i, i + 3) + s.slice(i + 4, i + 7) + s.slice(i + 8, i + 11) + s.slice(i + 12, i + 15)
+    if (cccdCheck(digits)) return 15
+  }
+  // Grouped 4-4-4 with uniform space, dot or dash.
+  const sep4 = at(s, i + 4)
+  if (
+    sep4 !== undefined &&
+    ' .-'.includes(sep4) &&
+    g(i, 4) &&
+    g(i + 5, 4) &&
+    at(s, i + 9) === sep4 &&
+    g(i + 10, 4) &&
+    !isAlnum(at(s, i + 14)) &&
+    !joinedToDigits(s, i, i + 14)
+  ) {
+    const digits = s.slice(i, i + 4) + s.slice(i + 5, i + 9) + s.slice(i + 10, i + 14)
+    if (cccdCheck(digits)) return 14
+  }
+  return null
+}
+
+const MST_WEIGHTS = [31, 29, 23, 19, 17, 13, 7, 5, 3] as const
+
+/** Official Vietnamese MST mod-11 check digit on the 10-digit main tax code. */
+export function mstCheck(digits: readonly number[]): boolean {
+  if (digits.length !== 10) return false
+  let sum = 0
+  for (let k = 0; k < 9; k++) sum += digits[k]! * MST_WEIGHTS[k]!
+  return 10 - (sum % 11) === digits[9]
+}
+
+function mst(s: S, i: number): number | null {
+  if (!isDigit(s[i]) || isAlnum(at(s, i - 1)) || at(s, i - 1) === '+' || labelled(s, i)) return null
+  if (number(s, i, 10, 10) !== 10) return null
+  const digits = [...s.slice(i, i + 10)].map(Number)
+  if ((digits[0] === 0 && digits[1] === 0) || !mstCheck(digits)) return null
+  let end = i + 10
+  if (at(s, end) === '-' && number(s, end + 1, 3, 3) === 3) {
+    if (s.slice(end + 1, end + 4) === '000') return null
+    end += 4
+  }
+  if (isAlnum(at(s, end)) || joinedToDigits(s, i, end)) return null
+  return end - i
+}
+
+const VN_PHONE_NSN_FIRST = '235789'
+
+/** Unseparated Vietnamese phone: 0 + 9 digits (mobile 03/05/07/08/09, landline 02x), +84 or 84 form. */
+function vnPhoneUnlabelled(s: S, i: number): number | null {
+  if (isAlnum(at(s, i - 1)) || at(s, i - 1) === '+') return null
+  if (!labelled(s, i) && nonPhoneIdLabelled(s, i)) return null
+  let nsnStart: number
+  if (s[i] === '0') {
+    nsnStart = i + 1
+  } else if (s.startsWith('+84', i)) {
+    nsnStart = i + 3
+  } else if (s.startsWith('84', i)) {
+    nsnStart = i + 2
+  } else {
+    return null
+  }
+  const first = at(s, nsnStart)
+  if (first === undefined || !VN_PHONE_NSN_FIRST.includes(first)) return null
+  if (number(s, nsnStart, 9, 9) !== 9) return null
+  const end = nsnStart + 9
+  if (isAlnum(at(s, end)) || joinedToDigits(s, i, end)) return null
+  return end - i
 }
 
 function phone(s: S, i: number): number | null {
+  // Spans matched as CCCD or MST are never also phone.
+  if (cccd(s, i) !== null || mst(s, i) !== null) return null
+  const vn = vnPhoneUnlabelled(s, i)
+  if (vn !== null) return vn
   const SEPS = ' -.()'
   // A slash joins the area code to the number in Italian and German landlines ("0426/123456").
   const RUN_SEPS = ' -.()/'
@@ -148,7 +304,11 @@ function phone(s: S, i: number): number | null {
     const trunk = trunkZero && n >= 7 && n <= 15 && lead >= 2 && date(s, i) === null
     ok = nanp || trunk
   }
-  return ok ? end - i : null
+  if (!ok) return null
+  for (let k = i; k < end; k++) {
+    if (cccd(s, k) !== null || mst(s, k) !== null) return null
+  }
+  return end - i
 }
 
 /** Scripts written without spaces between words: their letters never join an address. */
@@ -391,6 +551,8 @@ const MATCHERS: Record<RedactPattern, (s: S, i: number) => number | null> = {
   email,
   'credit-card': creditCard,
   ssn,
+  cccd,
+  mst,
   date,
   iban,
 }
