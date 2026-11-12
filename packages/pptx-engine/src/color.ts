@@ -4,7 +4,7 @@
  * placeholder (lstStyle defRPr default colors) to avoid a circular dependency.
  */
 import { type Theme, resolveSchemeColor, sysColorHex } from './theme'
-import { asXmlNode, type XmlNode } from './xml-utils'
+import { asXmlNode, percentFraction, type XmlNode } from './xml-utils'
 
 /**
  * Resolve a color node + modifiers: srgbClr/schemeClr/sysClr, supporting alpha
@@ -242,12 +242,12 @@ const PRESET_COLORS_LOWER = new Map<string, string>(
   Object.entries(PRESET_COLORS).map(([k, v]) => [k.toLowerCase(), v]),
 )
 
-/** Apply lumMod/lumOff/tint/shade/satMod/alpha modifiers (percentages, in units of 1/1000%). */
+/** Apply lumMod/lumOff/tint/shade/satMod/alpha modifiers (ST_Percentage: 1/1000 % or "50%"). */
 export function applyColorMods(hex: string, mods: XmlNode | undefined): string {
   let { r, g, b } = hexToRgb(hex)
   const pct = (k: string): number | undefined => {
     const v = asXmlNode(mods?.[k])['@_val']
-    return v != null ? (parseInt(String(v), 10) || 0) / 100000 : undefined
+    return v != null ? (percentFraction(v) ?? 0) : undefined
   }
   const lumMod = pct('a:lumMod')
   const lumOff = pct('a:lumOff')
