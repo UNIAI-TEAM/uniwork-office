@@ -213,8 +213,8 @@ describe('version_created via an AI client (B7)', () => {
   }
 
   it('says who updated which file through which client, in vi and en', () => {
-    expect(say('vi', withTitle(via()))).toBe('An đã cập nhật file “Kế hoạch Q4” qua ChatGPT')
-    expect(say('en', withTitle(via()))).toBe('An updated the file “Kế hoạch Q4” via ChatGPT')
+    expect(say('vi', withTitle(via()))).toBe('An đã cập nhật file "Kế hoạch Q4" qua ChatGPT')
+    expect(say('en', withTitle(via()))).toBe('An updated the file "Kế hoạch Q4" via ChatGPT')
   })
 
   it('trims the client', () => {

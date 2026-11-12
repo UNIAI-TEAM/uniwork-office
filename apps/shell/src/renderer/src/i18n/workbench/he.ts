@@ -102,7 +102,7 @@ export const he = {
   wbNotif_document_changed_version_created_one: '{actor} הוסיף/ה גרסה חדשה ל-“{document}”',
   wbNotif_document_changed_version_created_untitled: '{actor} הוסיף/ה גרסה חדשה למסמך',
   wbNotif_document_changed_version_created_via_one:
-    '{actor} עדכן/ה את הקובץ “{document}” דרך {client}',
+    '{actor} עדכן/ה את הקובץ "{document}" דרך {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} העביר/ה לסל המחזור את התיקייה שמכילה {count} מהמסמכים שלך; המסמכים הועברו לשורש סביבת העבודה',
   wbNotif_document_changed_relocated_one:

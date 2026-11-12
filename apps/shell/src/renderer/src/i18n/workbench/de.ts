@@ -124,7 +124,7 @@ export const de = {
   wbNotif_document_changed_version_created_untitled:
     '{actor} hat einem Dokument eine neue Version hinzugefügt',
   wbNotif_document_changed_version_created_via_one:
-    '{actor} hat die Datei “{document}” über {client} aktualisiert',
+    '{actor} hat die Datei "{document}" über {client} aktualisiert',
   wbNotif_document_changed_relocated_many:
     '{actor} hat den Ordner mit {count} Ihrer Dokumente in den Papierkorb verschoben; die Dokumente liegen jetzt im Stammverzeichnis des Arbeitsbereichs',
   wbNotif_document_changed_relocated_one:

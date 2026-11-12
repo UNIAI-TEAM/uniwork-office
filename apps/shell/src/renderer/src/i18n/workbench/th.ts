@@ -105,7 +105,7 @@ export const th = {
   wbNotif_document_changed_version_created_one: '{actor} เพิ่มเวอร์ชันใหม่ให้ “{document}”',
   wbNotif_document_changed_version_created_untitled:
     '{actor} เพิ่มเวอร์ชันใหม่ให้เอกสารหนึ่งรายการ',
-  wbNotif_document_changed_version_created_via_one: '{actor} อัปเดตไฟล์ “{document}” ผ่าน {client}',
+  wbNotif_document_changed_version_created_via_one: '{actor} อัปเดตไฟล์ "{document}" ผ่าน {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} ย้ายโฟลเดอร์ที่มีเอกสารของคุณ {count} รายการไปที่ถังขยะ เอกสารถูกย้ายไปที่รากของเวิร์กสเปซ',
   wbNotif_document_changed_relocated_one:

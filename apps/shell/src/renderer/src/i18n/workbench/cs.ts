@@ -112,7 +112,7 @@ export const cs = {
   wbNotif_document_changed_version_created_one: '{actor} přidal(a) novou verzi k “{document}”',
   wbNotif_document_changed_version_created_untitled: '{actor} přidal(a) novou verzi k dokumentu',
   wbNotif_document_changed_version_created_via_one:
-    '{actor} aktualizoval(a) soubor “{document}” přes {client}',
+    '{actor} aktualizoval(a) soubor "{document}" přes {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} přesunul(a) do koše složku s vašimi dokumenty ({count}); dokumenty jsou nyní v kořeni pracovního prostoru',
   wbNotif_document_changed_relocated_one:

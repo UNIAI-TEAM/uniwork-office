@@ -100,7 +100,7 @@ export const ar = {
   wbNotif_document_changed_version_created_one: 'أضاف {actor} إصدارًا جديدًا إلى “{document}”',
   wbNotif_document_changed_version_created_untitled: 'أضاف {actor} إصدارًا جديدًا إلى مستند',
   wbNotif_document_changed_version_created_via_one:
-    'قام {actor} بتحديث الملف “{document}” عبر {client}',
+    'قام {actor} بتحديث الملف "{document}" عبر {client}',
   wbNotif_document_changed_relocated_many:
     'نقل {actor} المجلد الذي يضم {count} من مستنداتك إلى سلة المحذوفات؛ أصبحت المستندات الآن في جذر مساحة العمل',
   wbNotif_document_changed_relocated_one:

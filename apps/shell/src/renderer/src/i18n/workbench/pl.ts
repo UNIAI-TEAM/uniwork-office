@@ -111,7 +111,7 @@ export const pl = {
   wbNotif_document_changed_version_created_one: '{actor} dodał(a) nową wersję do “{document}”',
   wbNotif_document_changed_version_created_untitled: '{actor} dodał(a) nową wersję do dokumentu',
   wbNotif_document_changed_version_created_via_one:
-    '{actor} zaktualizował(a) plik “{document}” przez {client}',
+    '{actor} zaktualizował(a) plik "{document}" przez {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} przeniósł(a) do kosza folder z Twoimi dokumentami ({count}); dokumenty trafiły do katalogu głównego przestrzeni roboczej',
   wbNotif_document_changed_relocated_one:

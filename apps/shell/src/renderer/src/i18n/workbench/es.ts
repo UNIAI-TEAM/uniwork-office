@@ -112,7 +112,7 @@ export const es = {
   wbNotif_document_changed_version_created_untitled:
     '{actor} añadió una nueva versión a un documento',
   wbNotif_document_changed_version_created_via_one:
-    '{actor} actualizó el archivo “{document}” a través de {client}',
+    '{actor} actualizó el archivo "{document}" a través de {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} movió a la papelera la carpeta que contiene {count} de tus documentos; los documentos ahora están en la raíz del espacio de trabajo',
   wbNotif_document_changed_relocated_one:

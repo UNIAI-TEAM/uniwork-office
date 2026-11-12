@@ -369,7 +369,7 @@ export const en = {
   wbNotif_document_changed_version_created_one: '{actor} added a new version to “{document}”',
   wbNotif_document_changed_version_created_untitled: '{actor} added a new version to a document',
   wbNotif_document_changed_version_created_via_one:
-    '{actor} updated the file “{document}” via {client}',
+    '{actor} updated the file "{document}" via {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} moved the folder holding {count} of your documents to trash; the documents are now at the workspace root',
   wbNotif_document_changed_relocated_one:

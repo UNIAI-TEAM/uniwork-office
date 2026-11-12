@@ -116,7 +116,7 @@ export const fr = {
   wbNotif_document_changed_version_created_untitled:
     '{actor} a ajouté une nouvelle version à un document',
   wbNotif_document_changed_version_created_via_one:
-    '{actor} a mis à jour le fichier “{document}” via {client}',
+    '{actor} a mis à jour le fichier "{document}" via {client}',
   wbNotif_document_changed_relocated_many:
     "{actor} a mis à la corbeille le dossier contenant {count} de vos documents ; les documents sont maintenant à la racine de l'espace de travail",
   wbNotif_document_changed_relocated_one:

@@ -374,7 +374,7 @@ export const vi = {
   wbNotif_document_changed_version_created_untitled:
     '{actor} đã tạo phiên bản mới cho một tài liệu',
   wbNotif_document_changed_version_created_via_one:
-    '{actor} đã cập nhật file “{document}” qua {client}',
+    '{actor} đã cập nhật file "{document}" qua {client}',
   wbNotif_document_changed_relocated_many:
     '{actor} đã chuyển thư mục chứa {count} tài liệu của bạn vào thùng rác; các tài liệu được đưa về gốc workspace',
   wbNotif_document_changed_relocated_one:
