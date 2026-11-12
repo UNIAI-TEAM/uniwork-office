@@ -2,7 +2,7 @@ import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
 
 import type { ChangePlan } from '../src/domain/workbook.types'
-import { applyPlanToXlsx } from '../src/gateway/xlsx-gateway'
+import { applyCellEditsToXlsx, applyPlanToXlsx } from '../src/gateway/xlsx-gateway'
 
 const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -84,5 +84,36 @@ describe('non-finite cell values', () => {
     const zip = await JSZip.loadAsync(mutation.buffer)
     const sheet = await zip.file('xl/worksheets/sheet1.xml')!.async('string')
     expect(sheet).toContain('<c r="A1"><v>42.5</v></c>')
+  })
+
+  it('writes single-space cell attributes when refreshing a styled formula cached value', async () => {
+    const mutation = await applyCellEditsToXlsx(
+      await fixture(),
+      [
+        {
+          sheetName: 'Data',
+          row: 1,
+          column: 2,
+          writeValue: true,
+          cell: { value: null, formula: '=A2&"-x"' },
+          style: { bold: true },
+        },
+      ],
+      [],
+      [],
+      undefined,
+      [],
+      [],
+      [],
+      [],
+      [],
+      null,
+      [],
+      [],
+      [{ sheetName: 'Data', cells: [{ row: 1, column: 2, value: '10-x' }] }],
+    )
+    const zip = await JSZip.loadAsync(mutation.buffer)
+    const sheet = await zip.file('xl/worksheets/sheet1.xml')!.async('string')
+    expect(sheet).toContain('<c r="C2" s="2" t="str"><f>A2&amp;"-x"</f><v>10-x</v></c>')
   })
 })
