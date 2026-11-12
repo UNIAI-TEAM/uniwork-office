@@ -1895,6 +1895,39 @@ button.check-item:hover {
   margin: 0;
 }
 
+.workbook-opening-bar {
+  width: 240px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+.workbook-opening-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+.workbook-opening-percent {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.workbook-opening-cancel {
+  margin-top: 4px;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.workbook-opening-cancel:hover {
+  background: var(--surface-hover);
+}
+
 .csv-empty-notice {
   position: absolute;
   z-index: 20;

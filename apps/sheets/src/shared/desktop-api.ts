@@ -3088,6 +3088,8 @@ export interface DesktopApi {
   onDocumentThemeChanged(handler: (theme: DocTheme) => void): () => void
   /** shell-wide AutoSave default (see useAutoSavePref) */
   getAutoSaveDefault(): Promise<AutoSaveDefault>
+  /** the ceiling a delimited import may reach, in MB (the user's setting) */
+  getCsvImportLimit(): Promise<number>
   onAutoSaveDefaultChanged(handler: (value: AutoSaveDefault) => void): () => void
   /** web only: opens the in-frame AI settings dialog (UniWork-stored provider keys) */
   openAiSettings?(): Promise<void>
@@ -3102,6 +3104,16 @@ export interface DesktopApi {
    */
   onChromePressed(handler: () => void): () => void
   selectWorkbook(): Promise<WorkbookFile | { passwordRequired: true; path: string } | null>
+  /** How far a delimited import is: 'read' parses the text, 'write' builds the
+   *  workbook. The fraction is 0..1 within the phase. `null` means the import
+   *  is over — the bar belongs to one import and must not outlive it. */
+  onImportProgress?: (
+    listener: (
+      progress: { readonly phase: 'read' | 'write'; readonly fraction: number } | null,
+    ) => void,
+  ) => (() => void) | undefined
+  /** Stop the delimited import that is running for this tab */
+  cancelImport?: () => Promise<void>
   openEncryptedWorkbook(path: string, password: string): Promise<WorkbookFile | null>
   updateWorkbookPassword(
     sessionId: string,

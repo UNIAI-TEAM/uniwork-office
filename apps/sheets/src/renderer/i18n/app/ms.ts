@@ -521,6 +521,7 @@ export const ms = {
   appColumnLabel: 'Lajur {col}',
   appBridgeUnavailable: 'Jambatan fail desktop tidak tersedia. Mulakan semula aplikasi Electron.',
   appOpenCanceled: 'Pemilihan buku kerja dibatalkan.',
+  appImportCanceled: 'Import dibatalkan.',
   appOpeningWorkbook: 'Membuka buku kerja…',
   appOpenStalled: 'Buku kerja tidak dapat dibuka.',
   appOpenRetry: 'Cuba lagi',

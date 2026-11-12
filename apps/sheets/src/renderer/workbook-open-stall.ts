@@ -37,6 +37,19 @@ export function createOpenStallTimer(
 }
 
 /**
+ * Whether the opening screen's stall countdown should run: paused while
+ * waiting on the user's encrypted-workbook password or while a delimited
+ * import is actively reporting progress, and restarted afterwards.
+ */
+export function shouldRunOpenStallTimer(state: {
+  openingWorkbook: boolean
+  awaitingEncryptedPassword: boolean
+  importingDelimited: boolean
+}): boolean {
+  return state.openingWorkbook && !state.awaitingEncryptedPassword && !state.importingDelimited
+}
+
+/**
  * Once the grid is mounted: what an opening screen shown at boot waits for.
  * `open` pulls the queued workbook; `stalled` means nothing will ever arrive
  * (no queued path and no open running), so the tab shows the failure at once.

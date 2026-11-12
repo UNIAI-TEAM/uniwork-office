@@ -12,6 +12,7 @@ import {
   isNumericCell,
   parseCsv,
 } from '@genoffice/xlsx-gateway/gateway/csv-import'
+import { CSV_IMPORT_DEFAULT_LIMIT_MB } from '@genoffice/xlsx-gateway/gateway/csv-limits'
 import type { AdvancedFilterColumn, AdvancedFilterCriteria } from './AdvancedFilterDialog'
 import {
   buildLabelMatrix,
@@ -65,6 +66,25 @@ const CSV_CHARSET_BY_LANG: Record<string, string> = {
   ko: 'euc-kr',
 }
 
+/**
+ * Resolves the user's delimited import ceiling in MB from the desktop bridge.
+ * Missing (web frame safeApi -> undefined), non-finite, non-positive, or
+ * rejected IPC answers clamp to CSV_IMPORT_DEFAULT_LIMIT_MB so the byte check
+ * never becomes NaN or 0.
+ */
+export async function resolveCsvImportLimitMb(
+  getLimit?: (() => Promise<unknown>) | undefined,
+): Promise<number> {
+  try {
+    const rawMb = await getLimit?.()
+    return typeof rawMb === 'number' && Number.isFinite(rawMb) && rawMb > 0
+      ? rawMb
+      : CSV_IMPORT_DEFAULT_LIMIT_MB
+  } catch {
+    return CSV_IMPORT_DEFAULT_LIMIT_MB
+  }
+}
+
 /// Data → From Text/CSV: reads a delimited file (encoding and delimiter
 /// sniffed by the shared CSV pipeline) into the active sheet at the selection.
 export function handleImportCsv(ctx: DataToolsContext): void {
@@ -74,16 +94,18 @@ export function handleImportCsv(ctx: DataToolsContext): void {
   input.onchange = () => {
     const file = input.files?.[0]
     if (!file) return
-    if (file.size > 32 * 1024 * 1024) {
-      ctx.setMessage(t('appCsvTooLarge'))
-      return
-    }
-    void file
-      .arrayBuffer()
-      .then((buffer) => {
-        importCsvText(ctx, decodeCsvBuffer(new Uint8Array(buffer), CSV_CHARSET_BY_LANG[getLang()]))
-      })
-      .catch(() => ctx.setMessage(t('appCsvTooLarge')))
+    void (async () => {
+      // the same ceiling the open path uses (the user's setting): one limit
+      // for every way a delimited file comes in
+      // a failed or missing settings IPC falls back to the default, never to no limit
+      const limitMb = await resolveCsvImportLimitMb(() => window.desktopApi?.getCsvImportLimit?.())
+      if (file.size > limitMb * 1024 * 1024) {
+        ctx.setMessage(t('appCsvTooLarge'))
+        return
+      }
+      const buffer = await file.arrayBuffer()
+      importCsvText(ctx, decodeCsvBuffer(new Uint8Array(buffer), CSV_CHARSET_BY_LANG[getLang()]))
+    })().catch(() => ctx.setMessage(t('appCsvTooLarge')))
   }
   input.click()
 }

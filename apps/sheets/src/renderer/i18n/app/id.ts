@@ -520,6 +520,7 @@ export const id = {
   appColumnLabel: 'Kolom {col}',
   appBridgeUnavailable: 'Jembatan file desktop tidak tersedia. Mulai ulang aplikasi Electron.',
   appOpenCanceled: 'Pemilihan buku kerja dibatalkan.',
+  appImportCanceled: 'Impor dibatalkan.',
   appOpeningWorkbook: 'Membuka buku kerja…',
   appOpenStalled: 'Buku kerja tidak dapat dibuka.',
   appOpenRetry: 'Coba lagi',

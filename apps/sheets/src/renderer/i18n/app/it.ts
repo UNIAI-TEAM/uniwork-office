@@ -553,6 +553,7 @@ export const it = {
   appColumnLabel: 'Colonna {col}',
   appBridgeUnavailable: "Il bridge dei file desktop non è disponibile. Riavvia l'app Electron.",
   appOpenCanceled: 'Selezione della cartella di lavoro annullata.',
+  appImportCanceled: 'Importazione annullata.',
   appOpeningWorkbook: 'Apertura della cartella di lavoro…',
   appOpenStalled: 'Impossibile aprire la cartella di lavoro.',
   appOpenRetry: 'Riprova',

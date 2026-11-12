@@ -578,6 +578,7 @@ export const fr = {
   appBridgeUnavailable:
     "Le pont de fichiers du bureau est indisponible. Redémarrez l'application Electron.",
   appOpenCanceled: 'Sélection du classeur annulée.',
+  appImportCanceled: 'Import annulé.',
   appOpeningWorkbook: 'Ouverture du classeur…',
   appOpenStalled: "Impossible d'ouvrir le classeur.",
   appOpenRetry: 'Réessayer',

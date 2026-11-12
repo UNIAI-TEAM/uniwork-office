@@ -523,6 +523,7 @@ export const cs = {
   appBridgeUnavailable:
     'Souborové rozhraní počítače není k dispozici. Restartujte aplikaci Electron.',
   appOpenCanceled: 'Výběr sešitu zrušen.',
+  appImportCanceled: 'Import zrušen.',
   appOpeningWorkbook: 'Otevírání sešitu…',
   appOpenStalled: 'Sešit se nepodařilo otevřít.',
   appOpenRetry: 'Zkusit znovu',

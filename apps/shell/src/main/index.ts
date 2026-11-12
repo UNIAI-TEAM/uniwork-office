@@ -219,7 +219,7 @@ import {
   authorizeMcpDocWrite,
   recoveryCopyMtime as docsRecoveryCopyMtime,
 } from '../../../docs/src/main/docs-main'
-import { blankXlsxBuffer } from '@genoffice/xlsx-gateway/gateway/csv-import'
+import { blankXlsxBuffer } from '@genoffice/xlsx-gateway/gateway/csv-import-xlsx'
 import { blankPdfBuffer } from '../../../pdf/src/main/blank-pdf'
 import { mergePdfBytes, splitPdfBytes } from '../../../pdf/src/main/save-pdf'
 import {
@@ -265,6 +265,7 @@ import {
   stopSheetsSidecar,
   recoveryCopyMtime as sheetsRecoveryCopyMtime,
 } from '../../../sheets/src/main/sheets-main'
+import { setDelimitedImportLimit } from '../../../sheets/src/main/csv-import-limit'
 import {
   configureSlidesRuntime,
   discardSlidesRecovery,
@@ -357,13 +358,14 @@ import type {
   FileSearchPage,
   FileSearchQuery,
 } from '../shared/home-api'
-import { HOME_CHANNELS } from '../shared/home-api'
+import { CSV_IMPORT_LIMIT_CHOICES_MB, HOME_CHANNELS } from '../shared/home-api'
 import { UNIWORK_DOC_CHANNELS } from '../shared/home-api'
 import { OPEN_DIALOG_EXTENSIONS } from '../shared/open-extensions'
 import { isAllowedWbKey, type WbKvMap } from './workbench-db'
 import { ACTIVE_WORKSPACE_STORE_KEY } from './uniwork-askuni/service'
 import { WorkbenchAccounts, loadWorkbenchSnapshot } from './workbench-accounts'
 import { exportWorkbenchBackup, importWorkbenchBackup } from './workbench-backup'
+import { csvImportLimitMb } from './csv-import-limit'
 import {
   normalizeAiPanelPrefs,
   sameAiPanelPrefs,
@@ -729,6 +731,15 @@ function currentDocTheme(): DocTheme {
   const saved = readAppSettings(APP_SETTINGS_PATH()).documentTheme
   cachedDocTheme = saved === 'light' || saved === 'dark' ? saved : 'follow'
   return cachedDocTheme
+}
+
+/**
+ * The ceiling a delimited import (a .csv/.tsv opened as a workbook) may reach,
+ * in MB. The editors take it through setDelimitedImportLimit, so the value the
+ * user picks applies to the next file they open.
+ */
+function currentCsvImportLimitMb(): number {
+  return csvImportLimitMb(readAppSettings(APP_SETTINGS_PATH()))
 }
 
 let cachedAutoSaveDefault: AutoSaveDefault | null = null
@@ -5745,6 +5756,18 @@ function registerHomeIpc(): void {
     for (const wc of webContents.getAllWebContents()) wc.send('app:auto-save-default-changed', next)
   })
 
+  guardedIpc.handle(HOME_CHANNELS.getCsvImportLimit, (): number => currentCsvImportLimitMb())
+  ipcMain.handle('app:get-csv-import-limit', (): number => currentCsvImportLimitMb())
+  guardedIpc.handle(HOME_CHANNELS.setCsvImportLimit, (_event, mb: unknown) => {
+    if (typeof mb !== 'number' || !Number.isInteger(mb)) return
+    if (!CSV_IMPORT_LIMIT_CHOICES_MB.includes(mb as (typeof CSV_IMPORT_LIMIT_CHOICES_MB)[number])) {
+      return
+    }
+    if (mb === currentCsvImportLimitMb()) return
+    writeAppSettings(APP_SETTINGS_PATH(), { csvImportLimitMb: mb })
+    setDelimitedImportLimit(mb * 1024 * 1024)
+  })
+
   guardedIpc.handle(HOME_CHANNELS.getRestoreLastSession, () =>
     restoreLastSessionEnabled(readAppSettings(APP_SETTINGS_PATH())),
   )
@@ -7423,6 +7446,9 @@ app.whenReady().then(async () => {
     const dockIcon = join(app.getAppPath(), 'build', 'icon-mac.png')
     if (existsSync(dockIcon)) app.dock?.setIcon(dockIcon)
   }
+  // the editors take the ceiling before anything can be opened: the headless
+  // export opens documents too
+  setDelimitedImportLimit(currentCsvImportLimitMb() * 1024 * 1024)
   // first scan waits for the windows to come up; later ones follow folder changes
   setTimeout(() => ensureFileIndexer()?.refresh(), 4000)
   installRendererProtocol({

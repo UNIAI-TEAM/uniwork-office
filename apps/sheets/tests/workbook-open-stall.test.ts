@@ -3,6 +3,7 @@ import {
   WORKBOOK_OPEN_STALL_MS,
   bootOpenAction,
   createOpenStallTimer,
+  shouldRunOpenStallTimer,
 } from '../src/renderer/workbook-open-stall'
 
 beforeEach(() => {
@@ -45,6 +46,57 @@ describe('opening screen stall timer', () => {
     expect(onStall).not.toHaveBeenCalled()
     vi.advanceTimersByTime(200)
     expect(onStall).toHaveBeenCalledTimes(1)
+  })
+
+  it('pauses while a delimited import progress card is shown and restarts a fresh bound afterwards', () => {
+    const onStall = vi.fn()
+    const timer = createOpenStallTimer(onStall, WORKBOOK_OPEN_STALL_MS)
+    let stalled = false
+    const syncTimer = (state: {
+      openingWorkbook: boolean
+      awaitingEncryptedPassword: boolean
+      importingDelimited: boolean
+    }): (() => void) | undefined => {
+      if (shouldRunOpenStallTimer(state)) {
+        timer.start()
+        return timer.done
+      }
+      stalled = false
+      return undefined
+    }
+
+    // Open starts before the first import progress tick arrives
+    const stopBeforeImport = syncTimer({
+      openingWorkbook: true,
+      awaitingEncryptedPassword: false,
+      importingDelimited: false,
+    })
+    vi.advanceTimersByTime(20_000)
+
+    // Delimited import progress card appears (importProgress !== null): timer stops
+    stopBeforeImport?.()
+    syncTimer({
+      openingWorkbook: true,
+      awaitingEncryptedPassword: false,
+      importingDelimited: true,
+    })
+    // Even a multi-minute CSV import never triggers the 60s stall notice
+    vi.advanceTimersByTime(WORKBOOK_OPEN_STALL_MS * 3)
+    expect(onStall).not.toHaveBeenCalled()
+    expect(stalled).toBe(false)
+
+    // Import finishes (importProgress === null) while sidecar open continues:
+    // timer restarts with a fresh full WORKBOOK_OPEN_STALL_MS window
+    const stopAfterImport = syncTimer({
+      openingWorkbook: true,
+      awaitingEncryptedPassword: false,
+      importingDelimited: false,
+    })
+    vi.advanceTimersByTime(WORKBOOK_OPEN_STALL_MS - 1)
+    expect(onStall).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(onStall).toHaveBeenCalledTimes(1)
+    stopAfterImport?.()
   })
 })
 

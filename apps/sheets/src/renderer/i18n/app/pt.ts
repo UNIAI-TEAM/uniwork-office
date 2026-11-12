@@ -555,6 +555,7 @@ export const pt = {
   appBridgeUnavailable:
     'A ponte de arquivos do desktop está indisponível. Reinicie o aplicativo Electron.',
   appOpenCanceled: 'Seleção de pasta de trabalho cancelada.',
+  appImportCanceled: 'Importação cancelada.',
   appOpeningWorkbook: 'Abrindo pasta de trabalho…',
   appOpenStalled: 'Não foi possível abrir a pasta de trabalho.',
   appOpenRetry: 'Tentar novamente',
