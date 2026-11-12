@@ -9435,7 +9435,7 @@ export default function App() {
                             }
                           }}
                         >
-                          {failedPages.has(origIdx) ? (
+                          {failedPages.has(origIdx + 1) ? (
                             <div className="pdf-page-broken">
                               <span>{t('loadError')}</span>
                               <span>#{origIdx + 1}</span>
