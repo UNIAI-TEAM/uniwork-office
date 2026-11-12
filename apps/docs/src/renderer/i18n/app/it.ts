@@ -148,6 +148,7 @@ export const it = {
   appCommentsTitleDoc: 'Commenti nel documento ({n})',
   appCommentPlaceholder: 'Scrivi un commento…',
   appCommentBtn: 'Commenta',
+  appAttachImage: 'Allega immagine',
   appUnknownAuthor: '(Autore sconosciuto)',
   appResolved: 'Risolto',
   appResolvedComments: 'Commenti risolti ({n})',

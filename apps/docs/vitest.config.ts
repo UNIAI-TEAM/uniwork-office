@@ -21,8 +21,20 @@ export default defineConfig({
       '@genoffice/electron-utils/headless-export': local(
         '../../packages/electron-utils/src/headless-export.ts',
       ),
+      '@genoffice/electron-utils/print-cups': local(
+        '../../packages/electron-utils/src/print-cups.ts',
+      ),
       '@genoffice/electron-utils/print-job': local(
         '../../packages/electron-utils/src/print-job.ts',
+      ),
+      '@genoffice/electron-utils/generated-images': local(
+        '../../packages/electron-utils/src/generated-images.ts',
+      ),
+      '@genoffice/electron-utils/remote-image': local(
+        '../../packages/electron-utils/src/remote-image.ts',
+      ),
+      '@genoffice/electron-utils/safe-remote-url': local(
+        '../../packages/electron-utils/src/safe-remote-url.ts',
       ),
       '@genoffice/electron-utils/atomic-write': local(
         '../../packages/electron-utils/src/atomic-write.ts',

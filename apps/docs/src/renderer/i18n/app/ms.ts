@@ -149,6 +149,7 @@ export const ms = {
   appCommentsTitleDoc: 'Komen dalam dokumen ({n})',
   appCommentPlaceholder: 'Taip komen…',
   appCommentBtn: 'Komen',
+  appAttachImage: 'Sisipkan gambar',
   appUnknownAuthor: '(Pengarang tidak dikenali)',
   appResolved: 'Diselesaikan',
   appResolvedComments: 'Komen yang diselesaikan ({n})',

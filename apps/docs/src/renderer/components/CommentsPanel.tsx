@@ -8,13 +8,17 @@ import {
   type ReactNode,
 } from 'react'
 import type { Node as PmNode } from '@tiptap/pm/model'
-import type { CommentInfo } from '@genoffice/docx-engine'
+import type { CommentImage, CommentInfo } from '@genoffice/docx-engine'
 import { isWebFrame } from '../capabilities'
 import { displayCommentAuthor } from '../comment-author'
 import { useI18n } from '../i18n/locale'
 import { absoluteDate, authorInitials, authorInk } from '../editor/comment-card'
 import { revWhen } from '../editor/margin-annotations'
-import { IconCheck, IconComment } from './icons'
+import { commentImageFromFile } from '../review-actions'
+import { IconCheck, IconComment, IconPicture } from './icons'
+
+/** the composer's thumbnail and the card's picture, as a displayable URL */
+const commentImageSrc = (image: CommentImage): string => `data:${image.mime};base64,${image.base64}`
 
 /** anchor text quoted from the document, to orient comments whose range spans paragraphs (one DOM pass for all threads) */
 function collectAnchorTexts(): Map<string, string> {
@@ -101,7 +105,7 @@ export const CommentsPanel = memo(function CommentsPanel({
   composing: boolean
   /** read-only view of comments: no edit/delete/reply/resolve/new-comment controls */
   readOnly?: boolean
-  onSubmitNew: (text: string) => void
+  onSubmitNew: (text: string, image?: CommentImage) => void
   /** Reply to a comment (anchor shares the parent comment's range) */
   onReply: (parentId: string, text: string) => void
   /** Replace a comment's or reply's text in place; author, date and anchor stay */
@@ -119,6 +123,7 @@ export const CommentsPanel = memo(function CommentsPanel({
   const paneRef = useRef<HTMLElement>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  const [draftImage, setDraftImage] = useState<CommentImage | null>(null)
   const draftRef = useRef<HTMLTextAreaElement>(null)
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -211,8 +216,17 @@ export const CommentsPanel = memo(function CommentsPanel({
   const submit = () => {
     const text = draft.trim()
     if (!text) return
-    onSubmitNew(text)
+    onSubmitNew(text, draftImage ?? undefined)
     setDraft('')
+    setDraftImage(null)
+  }
+
+  /** a picked or pasted picture joins the draft; failures are silent (a comment needs no picture) */
+  const stageImage = (file: File | null | undefined) => {
+    if (!file) return
+    void commentImageFromFile(file).then((image) => {
+      if (image) setDraftImage(image)
+    })
   }
 
   const authorLabel = (author: string) =>
@@ -352,7 +366,14 @@ export const CommentsPanel = memo(function CommentsPanel({
             actions={headActions(c, true, replies)}
           />
           {anchor && <div className="comment-anchor">“{anchor.slice(0, 60)}”</div>}
-          {editing ? editBox : <div className="comment-text">{c.text}</div>}
+          {editing ? (
+            editBox
+          ) : (
+            <>
+              <div className="comment-text">{c.text}</div>
+              {c.image && <img className="comment-image" src={commentImageSrc(c.image)} alt="" />}
+            </>
+          )}
         </div>
         {replies.map((r) => (
           <div key={r.id} className="comment-reply">
@@ -365,7 +386,10 @@ export const CommentsPanel = memo(function CommentsPanel({
             {!readOnly && editingId === r.id ? (
               editBox
             ) : (
-              <div className="comment-text">{r.text}</div>
+              <>
+                <div className="comment-text">{r.text}</div>
+                {r.image && <img className="comment-image" src={commentImageSrc(r.image)} alt="" />}
+              </>
             )}
           </div>
         ))}
@@ -422,8 +446,39 @@ export const CommentsPanel = memo(function CommentsPanel({
                 onCancelNew()
               }
             }}
+            onPaste={(e) => {
+              const file = Array.from(e.clipboardData.files).find((f) =>
+                f.type.startsWith('image/'),
+              )
+              if (file) {
+                e.preventDefault()
+                stageImage(file)
+              }
+            }}
           />
+          {draftImage && (
+            <div className="comment-image-preview">
+              <img src={commentImageSrc(draftImage)} alt="" />
+              <button type="button" aria-label={t('appCancel')} onClick={() => setDraftImage(null)}>
+                ✕
+              </button>
+            </div>
+          )}
           <div className="comment-compose-actions">
+            <button
+              type="button"
+              aria-label={t('appAttachImage')}
+              data-tip={t('appAttachImage')}
+              onClick={() => {
+                const input = document.createElement('input')
+                input.type = 'file'
+                input.accept = 'image/png,image/jpeg,image/gif'
+                input.onchange = () => stageImage(input.files?.[0])
+                input.click()
+              }}
+            >
+              <IconPicture size={14} />
+            </button>
             <button onClick={onCancelNew}>{t('appCancel')}</button>
             <button className="primary" disabled={!draft.trim()} onClick={submit}>
               {t('appCommentBtn')}

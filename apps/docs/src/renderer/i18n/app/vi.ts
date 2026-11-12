@@ -142,6 +142,7 @@ export const vi = {
   appCommentsTitleDoc: 'Bình luận trong tài liệu ({n})',
   appCommentPlaceholder: 'Nhập bình luận…',
   appCommentBtn: 'Bình luận',
+  appAttachImage: 'Đính kèm ảnh',
   appUnknownAuthor: '(Tác giả không xác định)',
   appResolved: 'Đã giải quyết',
   appResolvedComments: 'Bình luận đã giải quyết ({n})',

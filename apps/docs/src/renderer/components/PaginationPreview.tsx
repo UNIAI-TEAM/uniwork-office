@@ -35,6 +35,7 @@ import {
   sectionColGeom,
   sectionFirstPages,
   sectionGeoms,
+  sectionPageCounts,
   outerTableRows,
   sectionVertical,
   verticalBlockShift,
@@ -952,9 +953,8 @@ export function PaginationPreview({
   colFlow,
   colMode,
   hf,
-  watermark,
   watermarkDirty,
-  watermarkPicture,
+  pendingWatermark,
   blockMetaOf,
   blockPlans,
   layout,
@@ -988,11 +988,10 @@ export function PaginationPreview({
   /** canvas column mode: 'uniform' = whole-page CSS multicol, 'mixed' = per-block layout decorations */
   colMode: 'none' | 'uniform' | 'mixed'
   hf: HfSet
-  watermark: string | null
-  /** unsaved Design → Watermark edit: draw `watermark` as the ghost text and hide the parsed WordArt shape */
+  /** unsaved Design → Watermark edit: hide the parsed watermark shape, draw `pendingWatermark` instead */
   watermarkDirty?: boolean
-  /** unsaved picture watermark (set_watermark image): drawn in place of the parsed watermark shape */
-  watermarkPicture?: HfImage | null
+  /** the unsaved watermark as the header image it will parse back as (text or picture) */
+  pendingWatermark?: HfImage | null
   /** docxIndex → parse-layer pagination constraints (keepNext/widow/table-row flags) */
   blockMetaOf?: BlockMetaOf
   /** model-side block facts for measureBlocks (App builds them from the editor state) */
@@ -1134,7 +1133,7 @@ export function PaginationPreview({
         hfHs: SectionHfHeights[]
         rowSplits: RowSplitPatch[]
       } => {
-        const splitOut: SliceOutputs = { rowSplits: [] }
+        const splitOut: SliceOutputs = { rowSplits: [], floatSplits: [] }
         if (live.length > 0) {
           // each section's header/footer variant heights → body push-down (matching the canvas)
           const refs = effectiveHfRefs(live)
@@ -1176,6 +1175,7 @@ export function PaginationPreview({
                 ? (si) => live[Math.min(si, live.length - 1)].titlePg
                 : () => hf.titlePg,
             pageNumberFmtOf: (si) => live[Math.min(si, live.length - 1)]?.pageNumberFmt,
+            floatSplits: splitOut.floatSplits,
           })
           return { cuts, geoms, hfHs, rowSplits: splitOut.rowSplits ?? [] }
         }
@@ -1215,6 +1215,7 @@ export function PaginationPreview({
           evenOddHf: hf.evenOddHf,
           titlePgOf: () => hf.titlePg,
           pageNumberFmtOf: () => sections[0]?.pageNumberFmt,
+          floatSplits: splitOut.floatSplits,
         })
         return { cuts, geoms: [singleGeom], hfHs: [hfPx], rowSplits: splitOut.rowSplits ?? [] }
       }
@@ -1550,6 +1551,7 @@ export function PaginationPreview({
   const effRefs = useMemo(() => effectiveHfRefs(secs), [secs])
   const nums = useMemo(() => slices.map((s) => s.pageNo), [slices])
   const firsts = useMemo(() => sectionFirstPages(slices), [slices])
+  const sectionPages = useMemo(() => sectionPageCounts(slices), [slices])
 
   // line positions of endnote entries in virtual coordinates (matching appendEndnotesBlock's line boxes)
   const endnoteRows = useMemo(() => {
@@ -1743,11 +1745,6 @@ export function PaginationPreview({
                   ...(markupOn ? markupTransform : {}),
                 }}
               >
-                {watermark && watermarkDirty && (
-                  <div className="page-watermark" aria-hidden="true">
-                    {watermark}
-                  </div>
-                )}
                 {drawPageBorder && (
                   <div
                     className={`pv-page-border${pageBorder.zOrder === 'back' ? ' pv-page-border-back' : ''}`}
@@ -1761,6 +1758,7 @@ export function PaginationPreview({
                       borderRight: pageBorder.sides.right?.css,
                       borderBottom: pageBorder.sides.bottom?.css,
                       borderLeft: pageBorder.sides.left?.css,
+                      boxShadow: pageBorder.boxShadow,
                     }}
                   >
                     {(['top', 'right', 'bottom', 'left'] as const).map((name) => {
@@ -1776,7 +1774,7 @@ export function PaginationPreview({
                   </div>
                 )}
                 {[
-                  ...(watermarkDirty && watermarkPicture ? [watermarkPicture] : []),
+                  ...(watermarkDirty && pendingWatermark ? [pendingWatermark] : []),
                   ...(parts.headerImages ?? []).filter(
                     (img) =>
                       img.floating &&
@@ -1864,6 +1862,7 @@ export function PaginationPreview({
                     onCommit={() => {}}
                     pageNo={pageNoText}
                     pageTotal={slices.length}
+                    sectionPages={sectionPages[i]}
                     style={
                       parts.headerColumnPx !== undefined
                         ? { width: parts.headerColumnPx }
@@ -2209,6 +2208,7 @@ export function PaginationPreview({
                     onCommit={() => {}}
                     pageNo={pageNoText}
                     pageTotal={slices.length}
+                    sectionPages={sectionPages[i]}
                     style={
                       parts.footerColumnPx !== undefined
                         ? { width: parts.footerColumnPx }
