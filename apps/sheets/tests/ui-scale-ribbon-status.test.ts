@@ -69,6 +69,8 @@ describe('Sheets ribbon status message under the interface scale', () => {
       '.thread-hover-card',
       '.format-cells-dialog.print-dialog',
       '.engine-unavailable',
+      '.note-hover-card',
+      '.univer-popup > section > .univer-overflow-y-auto',
     ])
     const offenders: string[] = []
     for (const m of css
