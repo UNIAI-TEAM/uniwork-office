@@ -15796,8 +15796,10 @@ tr > .page-gap-cut {
   }
 }
 
-/* the tab row scrolls sideways instead of stretching the whole document */
-@media (max-width: 700px) {
+/* the tab row scrolls sideways instead of stretching the whole document. The breakpoint sits
+   above the width the tabs plus the Word-style Comments/mode cluster need (about 790-810 px), so
+   a 768 px frame scrolls the row rather than the page; keep it in step with FILE_MENU_FIXED_QUERY */
+@media (max-width: 900px) {
   .ribbon-tabs {
     overflow-x: auto;
     scrollbar-width: none;

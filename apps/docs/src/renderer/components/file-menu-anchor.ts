@@ -1,10 +1,10 @@
 // UNI-1931 (SVF-1): at phone width the ribbon's tab row is a sideways scroller and the File menu is
-// `position: fixed` (styles.css, max-width 700px) so the row does not clip it. A fixed box with auto
+// `position: fixed` (styles.css, max-width 900px) so the row does not clip it. A fixed box with auto
 // offsets keeps the unscrolled static position, so Ribbon measures the File tab instead and anchors
 // the menu from that rectangle.
 
 /** the viewport width at and below which the tab row scrolls and the File menu is fixed */
-export const FILE_MENU_FIXED_QUERY = '(max-width: 700px)'
+export const FILE_MENU_FIXED_QUERY = '(max-width: 900px)'
 
 const EDGE = 8
 const GAP = 2
