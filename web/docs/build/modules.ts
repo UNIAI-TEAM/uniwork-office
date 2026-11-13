@@ -82,8 +82,13 @@ export const WEB_MODULES: Readonly<Record<WebModule, WebModuleSpec>> = {
     // the save core imports main's redaction.ts (createHash('sha256') over image data). Redaction
     // is off on the web (capability `redaction`), but the import is static: the Slides shim is the
     // real synchronous SHA-256, so the bundle resolves and a stray call still hashes correctly
+    // save-pdf.ts also imports ./pdf-crypt (AES/RC4 over createCipheriv, which the SHA-256 shim
+    // does not have). Password protection is desktop-only on the web (encrypted files open
+    // read-only, the Protection entry is hidden), so that import resolves to a stand-in that
+    // throws a clear error instead of pulling node:crypto ciphers into the bundle (UNI-2527)
     aliases: {
       'node:crypto': 'web/modules/slides/shims/crypto.ts',
+      './pdf-crypt': 'web/modules/pdf/pdf-crypt-web.ts',
     },
   },
   markdown: {
