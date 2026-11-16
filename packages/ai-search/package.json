@@ -7,7 +7,7 @@
 <<<<<<< ours
   "description": "UniWork cloud tools (web/image search, image generation, media analysis) for the editors' AI. No Electron deps; runs in the main process.",
 =======
-  "description": "Shared web/image search (Genspark, Serper, Serply, SearchApi, Tavily, Parallel, DuckDuckGo fallback) for docs/sheets/slides AI. No Electron deps; runs in main process (Node fetch).",
+  "description": "UniWork cloud tools (web/image search, image generation, media analysis) for the editors' AI. No Electron deps; runs in the main process.",
 >>>>>>> theirs
   "exports": {
     ".": "./src/index.ts"

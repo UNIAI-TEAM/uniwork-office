@@ -46,7 +46,7 @@ genoffice capabilities --json                        # whether the UniWork Offic
 genoffice docs read report.docx [--range 0-9] [--html] [--full] [--comments] [--revisions] [--header-footer] [--properties] --json   # blocks (--full: whole text), comment threads, tracked changes, header/footer text, document properties
 genoffice docs apply report.docx --ops ops.json [--dry-run]           # apply_ops entries + insert_content / replace_blocks / insert_image / insert_chart / edit_chart / set_header_footer / reply_comment / resolve_comment / set_properties (document metadata) / wrap_content_control / unwrap_content_control
 =======
-genoffice capabilities --json                        # which cloud features GenOffice has configured (no network call)
+genoffice capabilities --json                        # which cloud features UniWork Office has configured (no network call)
 genoffice search "electron headless export" [--images] [--max 6] --json
 genoffice image "isometric office, soft light" --aspect 16:9 --out hero.png
 genoffice media photo.jpg --ask "What text is in this picture?" --json
@@ -246,12 +246,12 @@ available only inside the UniWork Office app, through UniWork cloud tools.
 
 `search`, `image` and `media` reuse the editors' provider routing. Search uses
 the selected Serper / Serply / SearchApi / Tavily / Parallel provider when its key is configured;
-otherwise Genspark is the default when signed in (`~/.genoffice/auth.json`)
+otherwise UniWork is the default when signed in (`~/.genoffice/auth.json`)
 and cloud tools are on, then Parallel's free, rate-limited Search MCP, then
 DuckDuckGo. Parallel
 and Tavily provide web search only. Image generation and media analysis use
 the corresponding provider chosen in the app's AI settings
-(`GenOffice/ai-settings.json` in the platform config directory, override with
+(`UniWork Office/ai-settings.json` in the platform config directory, override with
 `GENOFFICE_AI_SETTINGS`). `HTTPS_PROXY` / `HTTP_PROXY` / `ALL_PROXY` are honoured.
 Search results, image bytes and analysis text come back in the JSON `detail`;
 `image` also writes the file. These are the only commands that send data off

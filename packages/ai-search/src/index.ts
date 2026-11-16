@@ -416,7 +416,7 @@ async function firecrawlWebSearch(
 }
 
 /** The keyless endpoint identifies the calling app by this header instead of a key. */
-const KEENABLE_TITLE = 'GenOffice'
+const KEENABLE_TITLE = 'UniWork Office'
 const KEENABLE_SNIPPET_CHARS = 500
 
 /**

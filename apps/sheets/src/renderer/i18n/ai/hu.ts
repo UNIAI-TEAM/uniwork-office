@@ -5,7 +5,7 @@ export const hu = {
   aiEmptyBuildTitle: 'Hagyd, hogy az AI elkészítse a munkafüzetet',
   aiEmptyBuildBody:
     'Írd le a szükséges táblázatot, adatot vagy diagramot — az AI a helyén hozza létre.',
-  aiGskLoginBtn: 'Bejelentkezés a Gensparkba',
+  aiGskLoginBtn: 'Bejelentkezés a UniWorkba',
   aiUndelivered: 'Nem sikerült elküldeni',
   aiRetry: 'Újra',
   aiOpenAssistant: 'AI-asszisztens megnyitása',
@@ -50,13 +50,13 @@ export const hu = {
   aiFileTooltip:
     'SHA-256: {sha}\nMentéskor csak a szerkesztett bejegyzések íródnak felül; minden más megmarad.',
   aiFileMeta: '{sheets} munkalap · {entries} bejegyzés',
-  aiGensparkAccount: 'Genspark-fiók',
+  aiGensparkAccount: 'UniWork-fiók',
   aiAccountChecking: 'Ellenőrzés…',
   aiLoggedIn: 'Bejelentkezve',
   aiLoggedInAs: 'Bejelentkezve: {email}',
-  aiNotLoggedIn: 'Nem vagy bejelentkezve (az AI-funkciókhoz Genspark-fiók szükséges)',
+  aiNotLoggedIn: 'Nem vagy bejelentkezve (az AI-funkciókhoz UniWork-fiók szükséges)',
   aiWaitingBrowserLogin: 'Várakozás a böngészős bejelentkezésre…',
-  aiLoginGenspark: 'Bejelentkezés a Gensparkba',
+  aiLoginGenspark: 'Bejelentkezés a UniWorkba',
   aiModel: 'Modell',
   aiCancel: 'Mégse',
   aiSave: 'Mentés',
@@ -69,7 +69,7 @@ export const hu = {
   aiNetworkError:
     'Hálózati probléma: nem sikerült elérni az AI-szolgáltatást. Ellenőrizd a kapcsolatot, és próbáld újra',
   aiCreditsExhausted:
-    'Elfogytak a Genspark-kreditjeid. Töltsd fel az egyenlegedet a genspark.ai/pricing oldalon, majd próbáld újra',
+    'Elfogytak a UniWork-kreditjeid. Töltsd fel az egyenlegedet a uniworkos.com/pricing oldalon, majd próbáld újra',
   aiToolWorkbookContext: 'Munkafüzet-információk beolvasása',
   aiToolReadRange: 'Tartomány beolvasása',
   aiToolReadRangeOf: 'Tartomány beolvasása: {range}',

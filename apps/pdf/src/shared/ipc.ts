@@ -821,7 +821,7 @@ export interface SavePdfRequest {
 <<<<<<< ours
       author when it has one. Omitted → 'UniWork Office' */
 =======
-      author when it has one. Omitted → 'GenOffice' */
+      author when it has one. Omitted → 'UniWork Office' */
 >>>>>>> theirs
   annotationAuthor?: string
   /** Saved markup annotations to remove (applied before every other stage) */

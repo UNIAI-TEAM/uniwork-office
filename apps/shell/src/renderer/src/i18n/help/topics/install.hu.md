@@ -1,4 +1,4 @@
-# A GenOffice telepítése
+# A UniWork Office telepítése
 
 Minden build elérhető a [Releases oldalon](https://github.com/genspark-ai/genoffice/releases/latest). Mindegyik a `main` ágból készül; a macOS- és Windows-telepítők alá vannak írva.
 
@@ -18,7 +18,7 @@ A régebbi verziók is megmaradnak a Releases oldalon.
 
 ## macOS-en
 
-Nyisd meg a `.dmg` fájlt, és húzd a **GenOffice**-ot az Alkalmazások mappába. Az Intel-es buildnél az első indításkor meg kell erősítened a megnyitást: kattints jobb gombbal az alkalmazásra az Alkalmazások mappában ▸ Megnyitás. Ez csak annyit jelent, hogy a Gatekeeper aláíratlannak tűnő lemezképpel találkozott, nem azt, hogy a letöltés megsérült.
+Nyisd meg a `.dmg` fájlt, és húzd a **UniWork Office**-ot az Alkalmazások mappába. Az Intel-es buildnél az első indításkor meg kell erősítened a megnyitást: kattints jobb gombbal az alkalmazásra az Alkalmazások mappában ▸ Megnyitás. Ez csak annyit jelent, hogy a Gatekeeper aláíratlannak tűnő lemezképpel találkozott, nem azt, hogy a letöltés megsérült.
 
 ## Windowson
 

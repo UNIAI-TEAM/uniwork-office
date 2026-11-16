@@ -36,5 +36,5 @@ Minden szerkesztőben előhívható az AI-panel: jelölj ki valamit, adj egy uta
 
 ## Adatvédelem
 
-- Az utasítások és a vonatkozó dokumentumtartalom az **általad beállított modellszolgáltatóhoz** kerül (Genspark által üzemeltetett vagy egyéni végpont, lásd a következő fejezetet); ha nincs beállítva, nem megy el semmi.
+- Az utasítások és a vonatkozó dokumentumtartalom az **általad beállított modellszolgáltatóhoz** kerül (UniWork által üzemeltetett vagy egyéni végpont, lásd a következő fejezetet); ha nincs beállítva, nem megy el semmi.
 - A helyi fájlokat máshová nem tölti fel a program; a BYOK-kulcsok az alkalmazás beállítási fájljában tárolódnak ezen a gépen, és csak a kérések fejlécében kerülnek elküldésre.

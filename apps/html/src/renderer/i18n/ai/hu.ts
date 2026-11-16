@@ -4,7 +4,7 @@ export const hu = {
   aiCollapsePanel: 'Panel összecsukása',
   aiComposerPlaceholder: 'Kérd meg az AI-t a dokumentum megírására vagy szerkesztésére…',
   aiCopyReplyTitle: 'Válasz másolása',
-  aiCreditsExhausted: 'Elfogytak a kreditek — töltsd fel az egyenleged a genspark.ai oldalon',
+  aiCreditsExhausted: 'Elfogytak a kreditek — töltsd fel az egyenleged a uniworkos.com oldalon',
   aiEmptyTitle: 'Tervezz oldalt az AI-val',
   aiEmptyBody:
     'Termékbemutató oldal, jelentés, plakát — mondd el, mire való és kinek készül; az AI először egy koncepciót javasol, majd elkészíti az oldalt',

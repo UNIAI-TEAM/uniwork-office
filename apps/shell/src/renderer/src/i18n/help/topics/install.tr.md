@@ -1,4 +1,4 @@
-# GenOffice'i yükleme
+# UniWork Office'i yükleme
 
 Her derleme [Sürümler sayfasında](https://github.com/genspark-ai/genoffice/releases/latest) yayımlanır. Hepsi `main` dalından gelir; macOS ve Windows yükleyicileri imzalıdır.
 
@@ -18,11 +18,11 @@ Eski sürümler Sürümler sayfasında kalmaya devam eder.
 
 ## macOS'te
 
-`.dmg` dosyasını açın ve **GenOffice**'i Uygulamalar klasörüne sürükleyin. Intel derlemesinde ilk açılışta uygulamayı açmayı onaylamanız istenir: Uygulamalar'da uygulamaya sağ tıklayın ▸ Aç. Bu, Gatekeeper'ın imzasız görünen bir disk görüntüsüyle karşılaşmasıdır; bozuk bir indirme değildir.
+`.dmg` dosyasını açın ve **UniWork Office**'i Uygulamalar klasörüne sürükleyin. Intel derlemesinde ilk açılışta uygulamayı açmayı onaylamanız istenir: Uygulamalar'da uygulamaya sağ tıklayın ▸ Aç. Bu, Gatekeeper'ın imzasız görünen bir disk görüntüsüyle karşılaşmasıdır; bozuk bir indirme değildir.
 
 ## Windows'ta
 
-`.exe` yükleyicisini çalıştırın. GenOffice'i Başlat menüsüne ekler ve `.docx`, `.xlsx`, `.pptx`, `.pdf` ve benzeri uzantıları kaydeder; böylece bir dosyaya çift tıklamak onu açar.
+`.exe` yükleyicisini çalıştırın. UniWork Office'i Başlat menüsüne ekler ve `.docx`, `.xlsx`, `.pptx`, `.pdf` ve benzeri uzantıları kaydeder; böylece bir dosyaya çift tıklamak onu açar.
 
 ## Linux'ta
 

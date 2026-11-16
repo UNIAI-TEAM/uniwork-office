@@ -1,6 +1,6 @@
 # Menyambungkan ejen penulisan kod
 
-GenOffice bercakap dengan Model Context Protocol, jadi ejen penulisan kod boleh membaca, menulis dan memaparkan dokumen anda melalui enjin yang sama seperti yang digunakan oleh aplikasi. Ejen itu tidak meneka format fail: ia mendapat skema op bertip daripada definisi yang sama seperti yang disahkan oleh pelaku.
+UniWork Office bercakap dengan Model Context Protocol, jadi ejen penulisan kod boleh membaca, menulis dan memaparkan dokumen anda melalui enjin yang sama seperti yang digunakan oleh aplikasi. Ejen itu tidak meneka format fail: ia mendapat skema op bertip daripada definisi yang sama seperti yang disahkan oleh pelaku.
 
 ## Mendaftarkannya dari aplikasi
 
@@ -14,7 +14,7 @@ Tempatnya ialah **Tetapan ▸ Integrasi**. Panel itu mempunyai dua bahagian, dan
 
 - “Tukar ~/Downloads/report.md kepada dokumen Word”
 - “Buat pembentangan 6 slaid tentang hasil S3 kami”
-- “Tukar budget.xlsx kepada PDF dan buka dalam GenOffice”
+- “Tukar budget.xlsx kepada PDF dan buka dalam UniWork Office”
 
 ## Mendaftarkannya dari baris arahan
 
@@ -76,7 +76,7 @@ Ejen yang tidak tahu kosa kata op akan meneka. Skill itu membawa rujukan dan pan
 
 ## Apa yang boleh dicapainya dalam aplikasi
 
-Pelayan itu tidak terhad kepada fail pada cakera. Selagi GenOffice berjalan, ejen juga boleh bekerja melalui tetingkap:
+Pelayan itu tidak terhad kepada fail pada cakera. Selagi UniWork Office berjalan, ejen juga boleh bekerja melalui tetingkap:
 
 - **`open_in_genoffice`** membuka fail dalam satu tab dan memberikan tumpu kepadanya.
 - **`open_documents`** menyenaraikan setiap dokumen yang anda buka — id, jenis, laluan, dan sama ada ia mempunyai perubahan yang belum disimpan —, kemudian membaca kandungan terkini sesuatu dokumen, menyimpannya di tempatnya, atau menutupnya, dengan menyimpan dahulu melainkan anda menyuruhnya membuang.

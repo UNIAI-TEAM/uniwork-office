@@ -388,7 +388,7 @@ export const zoteroStrings = defineStrings({
       'Zotero ile bağlantı kurulamadı. Zotero uygulamasını başlatın ve açık tutun.',
     zoteroOperationError: 'Zotero işlemi başarısız oldu.',
     zoteroNoteFieldsUnsupported:
-      'Bu belgenin dipnotlarında veya son notlarında GenOffice tarafından henüz güncellenemeyen Zotero alıntıları var. Kaynakçanın bozulmaması için Zotero komutları burada kapatıldı.',
+      'Bu belgenin dipnotlarında veya son notlarında UniWork Office tarafından henüz güncellenemeyen Zotero alıntıları var. Kaynakçanın bozulmaması için Zotero komutları burada kapatıldı.',
     zoteroGroup: 'Zotero',
   },
   hu: {
@@ -407,7 +407,7 @@ export const zoteroStrings = defineStrings({
       'Nem sikerült csatlakozni a Zoterohoz. Indítsd el a Zoterót, és hagyd futni.',
     zoteroOperationError: 'A Zotero-művelet nem sikerült.',
     zoteroNoteFieldsUnsupported:
-      'Ez a dokumentum lábjegyzetekben vagy végjegyzetekben tartalmaz Zotero-hivatkozásokat, amelyeket a GenOffice egyelőre nem tud frissíteni. A Zotero-parancsok itt le vannak tiltva, hogy az irodalomjegyzék érintetlen maradjon.',
+      'Ez a dokumentum lábjegyzetekben vagy végjegyzetekben tartalmaz Zotero-hivatkozásokat, amelyeket a UniWork Office egyelőre nem tud frissíteni. A Zotero-parancsok itt le vannak tiltva, hogy az irodalomjegyzék érintetlen maradjon.',
     zoteroGroup: 'Zotero',
   },
 })
