@@ -3,7 +3,11 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { openPptx } from '@genoffice/pptx-engine'
+<<<<<<< ours
 import { buildRenderSlide, type PictureRenderNode, type ShapeRenderNode } from '../src/index'
+=======
+import { buildRenderSlide, type ShapeRenderNode } from '../src/index'
+>>>>>>> theirs
 import type { TextElement } from '@genoffice/pptx-engine'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -998,7 +1002,7 @@ describe('picture spPr fill backdrop (napierone 0027)', () => {
 })
 
 describe('metafile pictures get an opaque white backdrop (PlanS academy banner)', () => {
-  it('sets bgColor for EMF data URLs and leaves raster images alone', async () => {
+  it('sets bgColor for EMF data URLs and leaves raster images and WMF alone', async () => {
     const { deck } = await openPptx(enginePptx('01_standard_business.pptx'))
     const slide = deck.slides[0]!
     const mk = (dataUrl: string): any => ({
@@ -1022,17 +1026,32 @@ describe('metafile pictures get an opaque white backdrop (PlanS academy banner)'
           mk('data:image/png;base64,AAAA'),
           mk('genoffice-slide-media://archive/emf?mime=image%2Fx-emf'),
           mk('genoffice-slide-media://archive/png?mime=image%2Fpng'),
+<<<<<<< ours
+=======
+          mk('data:image/x-wmf;base64,AAAA'),
+          mk('genoffice-slide-media://archive/wmf?mime=image%2Fx-wmf'),
+>>>>>>> theirs
         ],
         decorations: [],
       },
       deck.size,
       { fitWidthPx: 1280 },
     )
+<<<<<<< ours
     const [emf, png, lazyEmf, lazyPng] = rs.nodes as PictureRenderNode[]
+=======
+    const [emf, png, lazyEmf, lazyPng, wmf, lazyWmf] = rs.nodes as any[]
+>>>>>>> theirs
     expect(emf.bgColor).toBe('#FFFFFF')
     expect(png.bgColor).toBeUndefined()
     expect(lazyEmf.bgColor).toBe('#FFFFFF')
     expect(lazyPng.bgColor).toBeUndefined()
+<<<<<<< ours
+=======
+    // a WMF plays back transparent: the shape behind it shows through
+    expect(wmf.bgColor).toBeUndefined()
+    expect(lazyWmf.bgColor).toBeUndefined()
+>>>>>>> theirs
   })
 
   it('a clrChange metafile drops the white DC backing (the recolor sees through it)', async () => {

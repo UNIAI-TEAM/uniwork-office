@@ -1,5 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
+<<<<<<< ours
 import type { CSSProperties } from 'react'
+=======
+>>>>>>> theirs
 import type { WikiSuggestState } from '../editor/wikiSuggest'
 import { useI18n } from '../i18n/locale'
 
@@ -13,6 +16,7 @@ interface Props {
 }
 
 const NO_ITEMS: WikiSuggestState['items'] = []
+<<<<<<< ours
 const GAP = 4
 const EDGE = 8
 const STATUS_BAR_HEIGHT = 24
@@ -51,6 +55,10 @@ export function placeWikiSuggestMenu(
   }
 }
 /**
+=======
+
+/**
+>>>>>>> theirs
  * The `[[` suggester's popup: vault notes, shallowest first, filtered live,
  * and — while the query names something no note has — a last row that creates
  * that note (Obsidian's "Create new note"), keyboard and click both fine.
@@ -108,7 +116,11 @@ export const WikiSuggestMenu = forwardRef<WikiSuggestMenuHandle, Props>(function
   return (
     <div
       className="slash-menu wiki-suggest"
+<<<<<<< ours
       style={placeWikiSuggestMenu(rect, count)}
+=======
+      style={{ position: 'fixed', top: rect.bottom + 4, left: rect.left }}
+>>>>>>> theirs
       onMouseDown={(e) => e.preventDefault()}
     >
       {count === 0 ? (

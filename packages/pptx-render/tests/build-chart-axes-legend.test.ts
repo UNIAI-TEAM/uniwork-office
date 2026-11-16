@@ -80,7 +80,9 @@ describe('chart rendering: deleted axes, spacer series, legend order, pie of pie
       legendOrder: [0, 2],
     }
     const node = buildChartNode('r', 'e', model, box, vp, metrics)!
-    expect(node.swatches).toHaveLength(2)
+    // bar key as a swatch, line key as a line segment; the deleted entry draws neither
+    expect(node.swatches).toHaveLength(1)
+    expect(node.polylines.filter((l) => l.points.length === 4)).toHaveLength(1)
     expect(texts(node)).toContain('CCA')
     expect(texts(node)).toContain('Growth')
     expect(texts(node)).not.toContain('Empty')
@@ -296,5 +298,16 @@ describe('chart rendering: typeface, tick label position, axis titles, per-point
     expect(byText(node, 'New features, 55%')).toBeUndefined()
     expect(node.labels.some((l) => l.text.includes('Other'))).toBe(false)
     expect(byText(node, '20')).toBeDefined()
+  })
+})
+
+describe('seriesless chart', () => {
+  it('renders an empty chart frame (no title, no chip) like PowerPoint', () => {
+    const model: ChartModel = { kind: 'bar', categories: [], series: [], title: 'Orders' }
+    const node = buildChartNode('r', 'e', model, box, vp, metrics)!
+    expect(node).not.toBeNull()
+    expect(node.type).toBe('chart')
+    expect(node.bars).toEqual([])
+    expect(texts(node)).toEqual([])
   })
 })

@@ -1,3 +1,4 @@
+<<<<<<< ours
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MindMapTreeNode } from '@genoffice/agent-core'
 import {
@@ -7,13 +8,28 @@ import {
   MIND_MAP_EXPORT_COLORS,
   MIND_MAP_METRICS,
 } from './mind-map'
+=======
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { MindMapTreeNode } from '@genoffice/agent-core'
+import {
+  countMindMapNodes,
+  layoutMindMap,
+  MIND_MAP_EXPORT_COLORS,
+  MIND_MAP_METRICS,
+  type MindMapOrientation,
+} from '@genoffice/agent-core/mind-map'
+>>>>>>> theirs
 import { useI18n } from '../i18n/locale'
 
 /**
  * Interactive mind map card rendered inside an assistant message (the
  * NotebookLM-style diagram): a self-drawn SVG tidy tree with collapsible
  * branches, wheel zoom + drag pan, node-click-to-ask, block-citation jumps
+<<<<<<< ours
  * and PNG export. No diagram library — plain SVG keeps the bundle flat and
+=======
+ * and PNG/SVG export. No diagram library — plain SVG keeps the bundle flat and
+>>>>>>> theirs
  * gives full control over node-level interaction.
  */
 
@@ -29,11 +45,23 @@ interface MindMapCardProps {
   onAsk: (label: string) => void
   /** click a node's block badge: jump to the cited document block */
   onJumpBlock: (index: number) => void
+<<<<<<< ours
 }
 
 export function MindMapCard({ tree, onAsk, onJumpBlock }: MindMapCardProps) {
   const { t } = useI18n()
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
+=======
+  /** insert button: hands over the palette-baked export SVG and its layout
+   *  size; the receiver writes it into the document */
+  onInsert?: (svg: string, size: { width: number; height: number }) => void
+}
+
+export function MindMapCard({ tree, onAsk, onJumpBlock, onInsert }: MindMapCardProps) {
+  const { t } = useI18n()
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
+  const [orientation, setOrientation] = useState<MindMapOrientation>('top-down')
+>>>>>>> theirs
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 8, y: 8 })
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -41,11 +69,19 @@ export function MindMapCard({ tree, onAsk, onJumpBlock }: MindMapCardProps) {
   const zoomRef = useRef(1)
   const dragRef = useRef<{ id: number; x: number; y: number } | null>(null)
 
+<<<<<<< ours
   const layout = useMemo(() => layoutMindMap(tree, collapsed), [tree, collapsed])
+=======
+  const layout = useMemo(
+    () => layoutMindMap(tree, collapsed, { orientation }),
+    [tree, collapsed, orientation],
+  )
+>>>>>>> theirs
   const totalNodes = useMemo(() => countMindMapNodes(tree), [tree])
 
   const fitView = useCallback(() => {
     const vp = viewportRef.current
+<<<<<<< ours
     const root = layout.nodes.find((n) => n.depth === 0) ?? { x: 0, y: 0 }
     const view = fitMindMapView(
       layout,
@@ -79,6 +115,20 @@ export function MindMapCard({ tree, onAsk, onJumpBlock }: MindMapCardProps) {
     observer.observe(vp)
     return () => observer.disconnect()
   }, [tree])
+=======
+    zoomRef.current = 1
+    setZoom(1)
+    setPan({ x: 8, y: vp ? Math.max(8, (vp.clientHeight - layout.height) / 2) : 8 })
+  }, [layout.height])
+
+  // fit once per new map (collapse toggles keep the user's view)
+  const lastTreeRef = useRef<MindMapTreeNode | null>(null)
+  useEffect(() => {
+    if (lastTreeRef.current === tree) return
+    lastTreeRef.current = tree
+    fitView()
+  }, [tree, fitView])
+>>>>>>> theirs
 
   // Ctrl/Cmd+wheel zooms around the cursor (Chromium reports a trackpad pinch
   // as ctrl+wheel) — the same gesture the editor canvas uses. A plain wheel is
@@ -129,19 +179,31 @@ export function MindMapCard({ tree, onAsk, onJumpBlock }: MindMapCardProps) {
     if (dragRef.current?.id === e.pointerId) dragRef.current = null
   }
 
+<<<<<<< ours
   /** Serialize the SVG, bake in the fixed export palette, rasterize 2x, download. */
   const exportPng = () => {
     const svg = svgRef.current
     if (!svg) return
     const { width, height } = layout
+=======
+  /** Serialize the live SVG into the standalone export file: the fixed palette
+   *  baked in over the data-export attributes, white background, font stack
+   *  inline. Both exports are built from this one file. */
+  const serializeExportSvg = (svg: SVGSVGElement): string => {
+>>>>>>> theirs
     const clone = svg.cloneNode(true) as SVGSVGElement
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
     clone.setAttribute('font-family', EXPORT_FONT)
     const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
     bg.setAttribute('x', '0')
     bg.setAttribute('y', '0')
+<<<<<<< ours
     bg.setAttribute('width', String(width))
     bg.setAttribute('height', String(height))
+=======
+    bg.setAttribute('width', String(layout.width))
+    bg.setAttribute('height', String(layout.height))
+>>>>>>> theirs
     bg.setAttribute('fill', MIND_MAP_EXPORT_COLORS.background)
     clone.insertBefore(bg, clone.firstChild)
     const c = MIND_MAP_EXPORT_COLORS
@@ -171,20 +233,58 @@ export function MindMapCard({ tree, onAsk, onJumpBlock }: MindMapCardProps) {
         set({ fill: c.toggleText, 'font-size': '10' })
       }
     }
+<<<<<<< ours
     const raw = new XMLSerializer().serializeToString(clone)
     const svgUrl = URL.createObjectURL(new Blob([raw], { type: 'image/svg+xml;charset=utf-8' }))
+=======
+    return new XMLSerializer().serializeToString(clone)
+  }
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  /** Vector export: the same baked file the PNG rasterizes, kept editable. */
+  const exportSvg = () => {
+    const svg = svgRef.current
+    if (!svg) return
+    downloadBlob(
+      new Blob([serializeExportSvg(svg)], { type: 'image/svg+xml;charset=utf-8' }),
+      'mindmap.svg',
+    )
+  }
+
+  /** Raster export: render the baked SVG at 2x and download the PNG. */
+  const exportPng = () => {
+    const svg = svgRef.current
+    if (!svg) return
+    const svgUrl = URL.createObjectURL(
+      new Blob([serializeExportSvg(svg)], { type: 'image/svg+xml;charset=utf-8' }),
+    )
+>>>>>>> theirs
     const img = new Image()
     img.onload = () => {
       URL.revokeObjectURL(svgUrl)
       const scale = 2
       const canvas = document.createElement('canvas')
+<<<<<<< ours
       canvas.width = Math.round(width * scale)
       canvas.height = Math.round(height * scale)
+=======
+      canvas.width = Math.round(layout.width * scale)
+      canvas.height = Math.round(layout.height * scale)
+>>>>>>> theirs
       const ctx = canvas.getContext('2d')
       if (!ctx) return
       ctx.scale(scale, scale)
       ctx.drawImage(img, 0, 0)
       canvas.toBlob((blob) => {
+<<<<<<< ours
         if (!blob) return
         const pngUrl = URL.createObjectURL(blob)
         const a = document.createElement('a')
@@ -192,6 +292,9 @@ export function MindMapCard({ tree, onAsk, onJumpBlock }: MindMapCardProps) {
         a.download = 'mindmap.png'
         a.click()
         URL.revokeObjectURL(pngUrl)
+=======
+        if (blob) downloadBlob(blob, 'mindmap.png')
+>>>>>>> theirs
       }, 'image/png')
     }
     img.onerror = () => URL.revokeObjectURL(svgUrl)
@@ -208,6 +311,51 @@ export function MindMapCard({ tree, onAsk, onJumpBlock }: MindMapCardProps) {
         <span className="ai-mindmap-actions">
           <button
             type="button"
+<<<<<<< ours
+=======
+            className="ai-mindmap-btn ai-mindmap-layout-btn"
+            onClick={() =>
+              setOrientation((prev) => (prev === 'top-down' ? 'left-right' : 'top-down'))
+            }
+            data-tip={
+              orientation === 'top-down'
+                ? t('aiMindMapLayoutLeftRight')
+                : t('aiMindMapLayoutTopDown')
+            }
+            aria-label={t('aiMindMapToggleLayout')}
+          >
+            {/* the glyph shows the layout in use: root on top, or root in the middle */}
+            <svg
+              viewBox="0 0 20 20"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              {orientation === 'top-down' ? (
+                <>
+                  <path d="M10 5v3.5M10 8.5H5.5v3M10 8.5h4.5v3" />
+                  <circle cx="10" cy="3.5" r="1.5" />
+                  <circle cx="5.5" cy="13" r="1.5" />
+                  <circle cx="14.5" cy="13" r="1.5" />
+                </>
+              ) : (
+                <>
+                  <path d="M10 10H4M10 10h6" />
+                  <circle cx="10" cy="10" r="1.5" />
+                  <circle cx="2.5" cy="10" r="1.5" />
+                  <circle cx="17.5" cy="10" r="1.5" />
+                </>
+              )}
+            </svg>
+          </button>
+          <button
+            type="button"
+>>>>>>> theirs
             className="ai-mindmap-btn"
             onClick={fitView}
             data-tip={t('aiMindMapReset')}
@@ -250,6 +398,61 @@ export function MindMapCard({ tree, onAsk, onJumpBlock }: MindMapCardProps) {
               <path d="M4 13v2a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 16 15v-2" />
             </svg>
           </button>
+<<<<<<< ours
+=======
+          <button
+            type="button"
+            className="ai-mindmap-btn"
+            onClick={exportSvg}
+            data-tip={t('aiMindMapExportSvg')}
+            aria-label={t('aiMindMapExportSvg')}
+          >
+            <svg
+              viewBox="0 0 20 20"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <rect x="13" y="3" width="4" height="4" rx="1" />
+              <rect x="3" y="13" width="4" height="4" rx="1" />
+              <path d="M13 5H9a4 4 0 0 0-4 4v4" />
+            </svg>
+          </button>
+          {onInsert && (
+            <button
+              type="button"
+              className="ai-mindmap-btn"
+              onClick={() => {
+                const svg = svgRef.current
+                if (svg)
+                  onInsert(serializeExportSvg(svg), { width: layout.width, height: layout.height })
+              }}
+              data-tip={t('aiMindMapInsert')}
+              aria-label={t('aiMindMapInsert')}
+            >
+              <svg
+                viewBox="0 0 20 20"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M11 3H6.5A1.5 1.5 0 0 0 5 4.5v11A1.5 1.5 0 0 0 6.5 17h7a1.5 1.5 0 0 0 1.5-1.5V7L11 3z" />
+                <path d="M11 3v4h4" />
+                <path d="M10 10v4M8 12h4" />
+              </svg>
+            </button>
+          )}
+>>>>>>> theirs
         </span>
       </div>
       <div

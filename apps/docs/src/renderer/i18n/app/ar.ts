@@ -387,6 +387,8 @@ export const ar = {
   appLangHindi: 'الهندية',
   appLangTraditionalChinese: 'الصينية التقليدية',
   appLangVietnamese: 'الفيتنامية',
+  appLangTurkish: 'التركية',
+  appLangHungarian: 'المجرية',
   appWrapTextMenu: 'التفاف النص',
   appViewImage: 'عرض الصورة',
   appSaveImageAs: 'حفظ الصورة باسم…',
@@ -540,6 +542,7 @@ export const ar = {
   appUpdateStyleTip: 'تحديث هذا النمط بتنسيق التحديد الحالي (يُكتب مرة أخرى في styles.xml)',
   appNewStyleFromSelection: 'نمط جديد من التحديد الحالي',
   appStyleNamePlaceholder: 'اسم النمط',
+<<<<<<< ours
   appWebConflictTitle: 'تم تعديل هذا المستند في مكان آخر',
   appWebConflictBody: 'تغييراتك ليست على UniWork بعد وتبقى في هذا المتصفح حتى تسجّل الخروج.',
   appWebConflictOverwrite: 'استبدال…',
@@ -580,6 +583,11 @@ export const ar = {
     'هذا المستند محمي بكلمة مرور. تُحفظ المستندات المدمجة كملفات عادية بدون كلمة مرور، لذا يمكن لأي شخص يفتحها قراءة محتواها. هل تريد الدمج على أي حال؟',
   appMergeWarnUniwork:
     'هذا المستند ينتمي إلى UniWork. تُحفظ المستندات المدمجة على جهازك كملفات محلية عادية خارج UniWork. هل تريد الدمج على أي حال؟',
+=======
+  appMergeSourceLoaded: 'تم تحميل {name} ({n} سجلًا)',
+  appMergeWritten: 'تمت كتابة {n} مستندًا',
+  appMergeNothingToWrite: 'لا يوجد ما يكتب',
+>>>>>>> theirs
   appReviewPaneTitle: 'المراجعات',
   appReviewPaneCount: '{n} تغييرات',
   appReviewPaneHidden: '{n} مخفية بواسطة عوامل التصفية',

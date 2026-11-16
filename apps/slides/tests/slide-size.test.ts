@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+<<<<<<< ours
 import { createBlankPptx, openPptx, savePptx, setSlideSize } from '@genoffice/pptx-engine'
 import { validatePptx, xmllintAvailable } from '../../../tools/ooxml-validate/validate-pptx.mjs'
+=======
+>>>>>>> theirs
 import {
   defaultNewSlideSize,
   emuToLength,
@@ -9,8 +12,11 @@ import {
   presetSize,
   saveDefaultNewSlideSize,
 } from '../src/renderer/slide-size'
+<<<<<<< ours
 import { vi as viGenofficeSlides } from '../src/renderer/i18n/genoffice-slides/vi'
 import { vi as viRibbon } from '../src/renderer/i18n/ribbon/vi'
+=======
+>>>>>>> theirs
 
 describe('matchSlideSizePreset', () => {
   it('recognises each preset in both orientations', () => {
@@ -77,6 +83,7 @@ describe('defaultNewSlideSize', () => {
     expect(defaultNewSlideSize()).toBeNull()
   })
 })
+<<<<<<< ours
 
 describe('A4 / portrait round-trip save and reopen', () => {
   it('saves and reopens an A4 portrait deck with the requested EMU size and valid OOXML', async () => {
@@ -100,3 +107,5 @@ describe('vi slide size terminology', () => {
     expect(viGenofficeSlides.ribbonSlideSizeCustomTitle).toBe('Kích cỡ trang chiếu tùy chỉnh')
   })
 })
+=======
+>>>>>>> theirs

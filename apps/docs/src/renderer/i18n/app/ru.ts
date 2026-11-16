@@ -398,6 +398,8 @@ export const ru = {
   appLangHindi: 'хинди',
   appLangTraditionalChinese: 'китайский (традиционный)',
   appLangVietnamese: 'вьетнамский',
+  appLangTurkish: 'турецкий',
+  appLangHungarian: 'венгерский',
   appWrapTextMenu: 'Обтекание текстом',
   appViewImage: 'Открыть изображение',
   appSaveImageAs: 'Сохранить изображение как…',
@@ -553,6 +555,7 @@ export const ru = {
     'Обновить этот стиль по формату текущего выделения (записывается обратно в styles.xml)',
   appNewStyleFromSelection: 'Создать стиль из текущего выделения',
   appStyleNamePlaceholder: 'Имя стиля',
+<<<<<<< ours
   appWebConflictTitle: 'Этот документ был изменён в другом месте',
   appWebConflictBody:
     'Ваших изменений ещё нет в UniWork; они хранятся в этом браузере, пока вы не выйдете.',
@@ -599,6 +602,11 @@ export const ru = {
     'Этот документ защищён паролем. Объединённые документы сохраняются как обычные файлы без пароля, поэтому любой, кто их откроет, сможет прочитать содержимое. Всё равно объединить?',
   appMergeWarnUniwork:
     'Этот документ принадлежит UniWork. Объединённые документы сохраняются на вашем компьютере как обычные локальные файлы вне UniWork. Всё равно объединить?',
+=======
+  appMergeSourceLoaded: 'Загружено {name} (записей: {n})',
+  appMergeWritten: 'Записано документов: {n}',
+  appMergeNothingToWrite: 'Нечего записывать',
+>>>>>>> theirs
   appReviewPaneTitle: 'Исправления',
   appReviewPaneCount: 'Изменений: {n}',
   appReviewPaneHidden: 'Скрыто фильтрами: {n}',

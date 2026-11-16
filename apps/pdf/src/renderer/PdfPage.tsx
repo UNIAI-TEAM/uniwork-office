@@ -166,13 +166,21 @@ export function MarkupOverlay({
           if (m.type === 'highlight') {
             style.background = `rgba(${r * 255}, ${g * 255}, ${b * 255}, 0.4)`
           } else if (m.type === 'squiggly') {
+<<<<<<< ours
             // Wavy line pinned to the quad's baseline edge; the stretched viewBox keeps
+=======
+            // Wavy line pinned to the quad's bottom edge; the stretched viewBox keeps
+>>>>>>> theirs
             // the wave periodic at any quad width while non-scaling-stroke keeps the
             // stroke 2px at any zoom (matches the saved annotation's appearance)
             const bar = `rgb(${r * 255}, ${g * 255}, ${b * 255})`
             const points = Array.from({ length: 21 }, (_, k) => {
               const y = k % 2 === 0 ? 3 : k % 4 === 1 ? 0.7 : 5.3
+<<<<<<< ours
               return sideways ? `${baselineLeft ? y : 6 - y},${k * 5}` : `${k * 5},${y}`
+=======
+              return `${k * 5},${y}`
+>>>>>>> theirs
             }).join(' ')
             return (
               <div
@@ -181,6 +189,7 @@ export function MarkupOverlay({
                 style={style}
               >
                 <svg
+<<<<<<< ours
                   width={sideways ? '6' : '100%'}
                   height={sideways ? '100%' : '6'}
                   viewBox={sideways ? '0 0 6 100' : '0 0 100 6'}
@@ -192,6 +201,13 @@ export function MarkupOverlay({
                       ? { top: 0, ...(baselineLeft ? { left: 0 } : { right: 0 }) }
                       : { bottom: 0, left: 0 }),
                   }}
+=======
+                  width="100%"
+                  height="6"
+                  viewBox="0 0 100 6"
+                  preserveAspectRatio="none"
+                  style={{ position: 'absolute', bottom: 0, left: 0, overflow: 'visible' }}
+>>>>>>> theirs
                   aria-hidden
                 >
                   <polyline

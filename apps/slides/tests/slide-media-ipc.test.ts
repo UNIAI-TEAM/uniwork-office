@@ -1,3 +1,4 @@
+<<<<<<< ours
 import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -12,6 +13,12 @@ type ProtocolHandler = (request: { url: string }) => Response | Promise<Response
 
 const handlers = new Map<string, IpcHandler>()
 const protocolHandlers = new Map<string, ProtocolHandler>()
+=======
+import { tmpdir } from 'node:os'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const handlers = new Map<string, (...args: never[]) => unknown>()
+>>>>>>> theirs
 const broadcasts: Array<{ id: number; channel: string; payload: unknown }> = []
 
 vi.mock('electron', () => ({
@@ -22,6 +29,7 @@ vi.mock('electron', () => ({
     whenReady: () => Promise.resolve(),
   },
   dialog: {},
+<<<<<<< ours
   clipboard: {
     writeBuffer: () => {},
     readBuffer: () => Buffer.alloc(0),
@@ -31,6 +39,11 @@ vi.mock('electron', () => ({
   },
   ipcMain: {
     handle: (channel: string, fn: IpcHandler) => handlers.set(channel, fn),
+=======
+  clipboard: { writeBuffer: () => {} },
+  ipcMain: {
+    handle: (channel: string, fn: (...args: never[]) => unknown) => handlers.set(channel, fn),
+>>>>>>> theirs
     on: () => {},
     removeHandler: () => {},
   },
@@ -43,12 +56,16 @@ vi.mock('electron', () => ({
   },
   Menu: { buildFromTemplate: () => ({}), setApplicationMenu: () => {} },
   session: {
+<<<<<<< ours
     defaultSession: {
       protocol: {
         handle: (scheme: string, fn: ProtocolHandler) => protocolHandlers.set(scheme, fn),
       },
       setDisplayMediaRequestHandler: () => {},
     },
+=======
+    defaultSession: { protocol: { handle: () => {} }, setDisplayMediaRequestHandler: () => {} },
+>>>>>>> theirs
   },
   nativeImage: {},
   shell: {},
@@ -67,23 +84,36 @@ vi.mock('../src/main/shaped-metrics', () => ({
   shapedMeasure: () => ({ width: 0 }),
 }))
 
+<<<<<<< ours
 import {
   addPicture,
   addElement,
   addMedia,
   addModel3d,
   copySlide,
+=======
+import { serialize } from 'node:v8'
+import {
+  addPicture,
+  addElement,
+>>>>>>> theirs
   createBlankPptx,
   duplicateSlide,
   openPptx,
   savePptx,
   replacePictureBytes,
+<<<<<<< ours
   setSlideBackgroundImage,
   type PictureElement,
   type SlideBundle,
   type TextElement,
 } from '@genoffice/pptx-engine'
 import { appClipboard, lastSlidePaste } from '../src/session/app-clipboard'
+=======
+  type PictureElement,
+  type TextElement,
+} from '@genoffice/pptx-engine'
+>>>>>>> theirs
 import { registerSlidesIpc } from '../src/main/slides-main'
 import {
   buildAllRenderSlides,
@@ -91,6 +121,7 @@ import {
   rebuildSlide,
   readSlideMedia,
   pruneMediaSources,
+<<<<<<< ours
   restoreSnapshot,
   takeSnapshot,
   sessions,
@@ -169,6 +200,22 @@ function makeEmf(): Uint8Array {
   return emf
 }
 
+=======
+  takeSnapshot,
+  sessions,
+  type Session,
+} from '../src/main/session-state'
+import { mergeSlideUpdate } from '../src/shared/slide-update'
+import type { PasteSlideResult } from '../src/shared/ipc'
+import type { PictureRenderNode, RenderSlide } from '@genoffice/pptx-render'
+
+const FIT = 1280
+const WC = 1
+let session: Session
+function call(channel: string, ...args: unknown[]): any {
+  return (handlers.get(channel) as (...args: unknown[]) => unknown)({ sender: { id: WC } }, ...args)
+}
+>>>>>>> theirs
 beforeAll(() => registerSlidesIpc())
 beforeEach(async () => {
   await new Promise<void>((resolve) => setImmediate(resolve))
@@ -218,7 +265,11 @@ describe('slide media IPC payload', () => {
     expect(JSON.stringify(r).includes('data:image/')).toBe(false)
     expect(payloadBytes).toBeLessThan(32 * 1024)
     expect(r.slides).toHaveLength(1)
+<<<<<<< ours
     const url = (r.slides[0]!.nodes[0] as PictureRenderNode).dataUrl!
+=======
+    const url = (r.slides[0].nodes[0] as PictureRenderNode).dataUrl!
+>>>>>>> theirs
     expect(url.startsWith('genoffice-slide-media://')).toBe(true)
     expect(readSlideMedia(url)?.body.byteLength).toBe(size)
   })
@@ -241,8 +292,13 @@ describe('slide media IPC payload', () => {
       expect(serialize(deleted).byteLength).toBeLessThan(32 * 1024)
       current = mergeSlideUpdate(current, deleted)
       expect(current.map((s) => s.partPath)).toEqual([before[0]!.partPath])
+<<<<<<< ours
       expect(call<RenderSlide[]>('slides:undo').map((s) => s.partPath)).toEqual(added.order)
       expect(call<RenderSlide[]>('slides:redo').map((s) => s.partPath)).toEqual(deleted.order)
+=======
+      expect((call('slides:undo') as RenderSlide[]).map((s) => s.partPath)).toEqual(added.order)
+      expect((call('slides:redo') as RenderSlide[]).map((s) => s.partPath)).toEqual(deleted.order)
+>>>>>>> theirs
       const saved = await openPptx(await savePptx(session.opened))
       expect(saved.deck.slides.map((s) => s.path)).toEqual(deleted.order)
       const picture = saved.deck.slides[0]!.elements.find(
@@ -271,9 +327,15 @@ describe('slide media IPC payload', () => {
         expect(payloadBytes).toBeLessThan(32 * 1024)
         current = mergeSlideUpdate(current, result)
         expect(current).toEqual(buildAllRenderSlides(session.opened, FIT))
+<<<<<<< ours
         const undone = call<RenderSlide[]>('slides:undo')
         expect(serialize(undone).byteLength).toBeLessThan(32 * 1024)
         const redone = call<RenderSlide[]>('slides:redo')
+=======
+        const undone = call('slides:undo') as RenderSlide[]
+        expect(serialize(undone).byteLength).toBeLessThan(32 * 1024)
+        const redone = call('slides:redo') as RenderSlide[]
+>>>>>>> theirs
         expect(redone).toEqual(current)
       }
       expect(current.map((s) => s.partPath)).not.toEqual(original)
@@ -297,6 +359,7 @@ describe('slide media IPC payload', () => {
       const bytes = addImage(1024)
       const fixture = await savePptx(session.opened)
       session.opened = await openPptx(fixture)
+<<<<<<< ours
       const original = await JSZip.loadAsync(fixture)
       call('slides:copy-slides', { slideIndexes: [0] })
       const result = call<PasteSlideResult>(channel, {
@@ -304,6 +367,16 @@ describe('slide media IPC payload', () => {
         slideIndexes: [0],
         fitWidthPx: FIT,
       })
+=======
+      const JSZip = (await import('jszip')).default
+      const original = await JSZip.loadAsync(fixture)
+      call('slides:copy-slides', { slideIndexes: [0] })
+      const result = call(channel, {
+        afterIndex: 0,
+        slideIndexes: [0],
+        fitWidthPx: FIT,
+      }) as PasteSlideResult
+>>>>>>> theirs
       const saved = await savePptx(session.opened)
       const reopened = await openPptx(saved)
       const output = await JSZip.loadAsync(saved)
@@ -344,7 +417,11 @@ describe('slide media IPC payload', () => {
     async (size) => {
       const bytes = addImage(size)
       const before = buildAllRenderSlides(session.opened, FIT)
+<<<<<<< ours
       const result = await call<Promise<SlideUpdate>>('slides:edit-background', {
+=======
+      const result = await call('slides:edit-background', {
+>>>>>>> theirs
         slideIndex: 0,
         kind: 'solid',
         color: 'FF0000',
@@ -379,10 +456,14 @@ describe('slide media IPC payload', () => {
         paragraphs: [{ runs: [{ text: 'needle' }] }],
       })
       const before = buildAllRenderSlides(session.opened, FIT)
+<<<<<<< ours
       const result = call<{ count: number; update: SlideUpdate }>('slides:find-replace', {
         find: 'needle',
         replace: 'replacement',
       })
+=======
+      const result = call('slides:find-replace', { find: 'needle', replace: 'replacement' })
+>>>>>>> theirs
       expect(result.count).toBe(1)
       expect(result.update.slides).toHaveLength(1)
       expect(serialize(result).byteLength).toBeLessThan(32 * 1024)
@@ -417,7 +498,11 @@ describe('slide media IPC payload', () => {
     const result = call('slides:paste-slide', { afterIndex: 0, fitWidthPx: FIT })
     expect(serialize(result).byteLength).toBeLessThan(32 * 1024)
     expect(
+<<<<<<< ours
       result.slides[0]!.nodes.filter((n: { type: string }) => n.type === 'picture'),
+=======
+      result.slides[0].nodes.filter((n: { type: string }) => n.type === 'picture'),
+>>>>>>> theirs
     ).toHaveLength(6)
   })
 
@@ -467,8 +552,13 @@ describe('slide media IPC payload', () => {
       before[0]!.partPath,
       before[1]!.partPath,
       before[2]!.partPath,
+<<<<<<< ours
       result.slides[0]!.partPath,
       result.slides[1]!.partPath,
+=======
+      result.slides[0].partPath,
+      result.slides[1].partPath,
+>>>>>>> theirs
       before[3]!.partPath,
     ])
     const saved = await openPptx(await savePptx(session.opened))
@@ -504,11 +594,19 @@ describe('slide media IPC payload', () => {
       const bytes = addImage(1024 * 1024)
       const before = buildAllRenderSlides(session.opened, FIT)
       call('slides:copy-slides', { slideIndexes: [0] })
+<<<<<<< ours
       const result = call<PasteSlideResult>('slides:paste-slide', {
         afterIndex: 0,
         fitWidthPx: FIT,
         mode,
       })
+=======
+      const result = call('slides:paste-slide', {
+        afterIndex: 0,
+        fitWidthPx: FIT,
+        mode,
+      }) as PasteSlideResult
+>>>>>>> theirs
       const merged = mergeSlideUpdate(before, result)
       expect(result.index).toBe(1)
       expect(result.count).toBe(1)
@@ -519,9 +617,15 @@ describe('slide media IPC payload', () => {
       expect(
         Buffer.compare(Buffer.from(readSlideMedia(picture.dataUrl!)!.body), Buffer.from(bytes)),
       ).toBe(0)
+<<<<<<< ours
       const undone = call<RenderSlide[]>('slides:undo')
       expect(undone.map((s) => s.partPath)).toEqual(before.map((s) => s.partPath))
       const redone = call<RenderSlide[]>('slides:redo')
+=======
+      const undone = call('slides:undo') as RenderSlide[]
+      expect(undone.map((s) => s.partPath)).toEqual(before.map((s) => s.partPath))
+      const redone = call('slides:redo') as RenderSlide[]
+>>>>>>> theirs
       expect(redone.map((s) => s.partPath)).toEqual(merged.map((s) => s.partPath))
       expect(serialize(redone).byteLength).toBeLessThan(32 * 1024)
       const saved = await openPptx(await savePptx(session.opened))
@@ -598,6 +702,7 @@ describe('slide media IPC payload', () => {
     expect(makeMediaResolver(session.opened, slide.path)(restored.mediaRef!)).toBe(original)
     expect(readSlideMedia('genoffice-slide-media://archive/unknown')).toBeNull()
   })
+<<<<<<< ours
 
   // ── Fork-only test (1): multi-media deck round-trip ─────────────────────────
   it('round-trips a deck with PNG, video, audio, Record narration, 3D model, TIFF, themed SVG, and EMF through all slide edits', async () => {
@@ -1342,4 +1447,6 @@ describe('slide media IPC payload', () => {
     expect(printHtml).not.toContain('genoffice-slide-media:')
     expect(printHtml).toContain('data:image/png;base64,AAAA')
   })
+=======
+>>>>>>> theirs
 })

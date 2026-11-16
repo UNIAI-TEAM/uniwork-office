@@ -72,7 +72,10 @@ import { parseRunBorderAttr } from './run-border'
 import { parseTextOutlineAttr } from './text-outline'
 import { charScaleXAttr, parseGlowAttr, parseTextEffectAttr } from './text-effects'
 import { SHAPE_INLINE_WRAP, shapeWrapOf } from './floating-z-order'
+<<<<<<< ours
 import { REDACT_BDR } from './redaction'
+=======
+>>>>>>> theirs
 import { holdsDeclaredWidth, resolveTableWidth } from './table-geometry'
 import {
   DEFAULT_CELL_MAR,
@@ -152,6 +155,7 @@ function redactLabelIn(rawRPr: string): string {
     .replace(/&amp;/g, '&')
 }
 
+<<<<<<< ours
 const REDACT_BDR_ELEMENT_RE = /<w:bdr\b[^>]*>[\s\S]*?<\/w:bdr>|<w:bdr\b[^>]*\/>/g
 
 /** whether a w:bdr element is the exact border written by setRedaction (no author attributes) */
@@ -204,6 +208,8 @@ function stripRedactRPr(rawRPr: string): string | undefined {
   return stripped
 }
 
+=======
+>>>>>>> theirs
 export function blocksToPmDoc(
   blocks: Block[],
   sections?: SectionInfo[],
@@ -1781,6 +1787,7 @@ function runMarks(run: Run): PmMark[] {
     // lifted out of the raw rPr and the run is re-tagged: without it the
     // border survives a reopen but the document quietly stops withholding
     // anything, and a model can read the whole thing again.
+<<<<<<< ours
     const isRedacted = typeof run.rawRPr === 'string' && REDACT_RPR_RE.test(run.rawRPr)
     if (isRedacted) {
       marks.push({
@@ -1795,6 +1802,16 @@ function runMarks(run: Run): PmMark[] {
       isRedacted && hasRedactBdrInRPr(run.rawRPr!) && isRedactRunBorder(run.bdr)
         ? undefined
         : run.bdr
+=======
+    if (typeof run.rawRPr === 'string' && REDACT_RPR_RE.test(run.rawRPr)) {
+      marks.push({
+        type: 'redaction',
+        // bdr and rawRPr are what the save path needs to write the mark back;
+        // docTextStyle already carries the border, this re-asserts it on ours
+        attrs: { label: redactLabelIn(run.rawRPr), rawRPr: run.rawRPr },
+      })
+    }
+>>>>>>> theirs
     marks.push({
       type: 'docTextStyle',
       attrs: {
@@ -3578,6 +3595,7 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       continue
     }
     if (node.type === 'docNoteRef') {
+<<<<<<< ours
       const base = atomBase(node)
       const hasRedact = node.marks?.some((m) => m.type === 'redaction') ?? false
       const markerRawRPr =
@@ -3589,12 +3607,21 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       const rawRPr = mergeRawRPr(markerRawRPr, base.rawRPr)
       runs.push({
         ...base,
+=======
+      const markerRawRPr = node.attrs?.rawRPr
+      runs.push({
+        ...atomBase(node),
+>>>>>>> theirs
         text: String(node.attrs?.num ?? 1),
         noteRef: {
           kind: (node.attrs?.kind as 'footnote' | 'endnote') ?? 'footnote',
           id: String(node.attrs?.id ?? ''),
         },
+<<<<<<< ours
         ...(rawRPr ? { rawRPr } : {}),
+=======
+        ...(typeof markerRawRPr === 'string' && markerRawRPr ? { rawRPr: markerRawRPr } : {}),
+>>>>>>> theirs
       })
       continue
     }
@@ -3655,7 +3682,11 @@ export function inlineToRuns(content: PmNode[]): Run[] {
             : undefined
         const rawRPr = mergeRawRPr(imageRawRPr, base.rawRPr)
         runs.push({
+<<<<<<< ours
           ...base,
+=======
+          ...atomBase(node),
+>>>>>>> theirs
           text: '',
           ...(rawRPr ? { rawRPr } : {}),
           image: {
@@ -3697,6 +3728,7 @@ function symRuns(run: Run): Run[] {
   return [...run.text].map((ch) => ({ ...plain, text: ch, ...(ch === glyph ? { sym } : {}) }))
 }
 
+<<<<<<< ours
 /** top-level child elements of an rPr fragment (depth-aware, attrs kept) */
 function splitRPrChildren(xml: string): Array<{ name: string; xml: string }> {
   const out: Array<{ name: string; xml: string }> = []
@@ -3743,6 +3775,8 @@ function mergeRawRPr(
   return `${authOpen}${kept.map((c) => c.xml).join('')}${authChildren.map((c) => c.xml).join('')}</w:rPr>`
 }
 
+=======
+>>>>>>> theirs
 /** an atom's marks carry its revision / comment / character style; dropping them lost the w:ins wrapper */
 function atomBase(node: PmNode): Partial<Run> {
   if (!node.marks?.length) return {}
@@ -3761,7 +3795,11 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       // byte for byte because the run model never manages a custom element.
       // Setting run.bdr as well would only duplicate what rPr already has.
       if (typeof mark.attrs?.rawRPr === 'string' && mark.attrs.rawRPr) {
+<<<<<<< ours
         redactRawRPr = mark.attrs.rawRPr
+=======
+        run.rawRPr = mark.attrs.rawRPr
+>>>>>>> theirs
       }
     } else if (mark.type === 'bold') run.bold = true
     else if (mark.type === 'italic') run.italic = true

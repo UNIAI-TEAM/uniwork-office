@@ -57,7 +57,10 @@ import {
   isSymbolFontFamily,
   useDismissablePopover,
   useRibbonCollapse,
+<<<<<<< ours
   UniAiMark,
+=======
+>>>>>>> theirs
   useScrollWindow,
 } from '@genoffice/ui'
 import { HIGHLIGHT_CSS } from '../editor/extensions'
@@ -306,11 +309,17 @@ interface RibbonProps {
   onOpen: () => void
   onSave: () => void
   onSaveAs: () => void
+<<<<<<< ours
   /** File ▸ Save as a copy: web bridge only — the locked-out tab's copy (UNI-1920); absent on desktop */
   onSaveCopy?: () => void
   onExportPdf?: () => void
   onPrint?: () => void
   onConvert: (format: ConvertFormat) => void
+=======
+  onConvert: (format: ConvertFormat) => void
+  /** File ▸ Name with AI…: ask the model for a name and offer it in the dialog */
+  onNameWithAi: () => void
+>>>>>>> theirs
   showAi: boolean
   onToggleAi: () => void
   section: SectionSettings | null
@@ -782,10 +791,15 @@ function RibbonInner({
   onOpen,
   onSave,
   onSaveAs,
+<<<<<<< ours
   onSaveCopy,
   onExportPdf,
   onPrint,
   onConvert,
+=======
+  onConvert,
+  onNameWithAi,
+>>>>>>> theirs
   showAi,
   onToggleAi,
   section,
@@ -2291,6 +2305,7 @@ function RibbonInner({
     </button>
   )
 
+<<<<<<< ours
   // each target needs the file system or the print engine: the web frame hides what its host
   // did not grant (cap keys exportPdf / exportHtml / exportMarkdown / exportImages)
   const convertEntries = (
@@ -2319,6 +2334,27 @@ function RibbonInner({
   const fileMenuConvertItems = renderConvertItems(
     onExportPdf ? convertEntries.filter(([format]) => format !== 'pdf') : convertEntries,
   )
+=======
+  const convertItems = (
+    [
+      ['pdf', 'ribbonConvertPdf'],
+      ['html', 'ribbonConvertHtml'],
+      ['md', 'ribbonConvertMarkdown'],
+      ['images', 'ribbonConvertImages'],
+    ] as const
+  ).map(([format, key]) => (
+    <button
+      key={format}
+      disabled={!hasDoc}
+      onClick={() => {
+        setDropdown(null)
+        onConvert(format)
+      }}
+    >
+      {t(key)}
+    </button>
+  ))
+>>>>>>> theirs
 
   return (
     <div
@@ -2342,6 +2378,7 @@ function RibbonInner({
               {t('ribbonTabFile')}
             </button>
             {dropdown === 'file' && (
+<<<<<<< ours
               <div data-rb-panel="" className="file-menu" ref={fileMenuRef}>
                 {cap('open') && (
                   <button
@@ -2418,6 +2455,47 @@ function RibbonInner({
                     {fileMenuConvertItems}
                   </>
                 )}
+=======
+              <div data-rb-panel="" className="file-menu">
+                <button
+                  onClick={() => {
+                    setDropdown(null)
+                    onOpen()
+                  }}
+                >
+                  {t('ribbonOpen')} <span className="file-menu-key">Ctrl+O</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setDropdown(null)
+                    onSave()
+                  }}
+                >
+                  {t('ribbonSave')} <span className="file-menu-key">Ctrl+S</span>
+                </button>
+                <button
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setDropdown(null)
+                    onSaveAs()
+                  }}
+                >
+                  {t('ribbonSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
+                </button>
+                <button
+                  className="qa-name-with-ai"
+                  disabled={!hasDoc}
+                  onClick={() => {
+                    setDropdown(null)
+                    onNameWithAi()
+                  }}
+                >
+                  {t('ribbonNameWithAi')}
+                </button>
+                <div className="file-menu-sep" />
+                {convertItems}
+>>>>>>> theirs
               </div>
             )}
           </div>
@@ -2904,6 +2982,7 @@ function RibbonInner({
                   <div className="table-tool-row">
                     {(
                       [
+<<<<<<< ours
                         [
                           'left',
                           <IconAlignLeft key="l" />,
@@ -2931,6 +3010,11 @@ function RibbonInner({
                             'align-right',
                           ),
                         ],
+=======
+                        ['left', <IconAlignLeft key="l" />, t('ribbonAlignLeftTip')],
+                        ['center', <IconAlignCenter key="c" />, t('ribbonAlignCenterTip')],
+                        ['right', <IconAlignRight key="r" />, t('ribbonAlignRightTip')],
+>>>>>>> theirs
                       ] as const
                     ).map(([value, icon, label]) => (
                       <button
@@ -2941,7 +3025,12 @@ function RibbonInner({
                             : 'table-tool-button'
                         }
                         disabled={!canEdit}
+<<<<<<< ours
                         {...label}
+=======
+                        data-tip={label}
+                        aria-label={label}
+>>>>>>> theirs
                         onClick={() => {
                           if (!canEdit) return
                           editor
@@ -3737,6 +3826,7 @@ function RibbonInner({
                         aria-expanded={dropdown === 'convert'}
                         onClick={() => setDropdown((v) => (v === 'convert' ? null : 'convert'))}
                       >
+<<<<<<< ours
                         <span className="rb-big-icon">
                           <IconConvert size={22} />
                           <IconCaret />
@@ -3752,10 +3842,81 @@ function RibbonInner({
                   </div>
                   <div className="ribbon-group-label">{t('ribbonConvert')}</div>
                 </div>
+=======
+                        <path d="M4 5H20" strokeLinecap="round" />
+                        <path d="M4 9H16" strokeLinecap="round" />
+                        <path d="M4 13H11" strokeLinecap="round" />
+                        <path d="M4 17H10" strokeLinecap="round" />
+                        <path
+                          d="M17 14L17.2579 14.697C17.5961 15.611 17.7652 16.068 18.0986 16.4014C18.432 16.7348 18.889 16.9039 19.803 17.2421L20.5 17.5L19.803 17.7579C18.889 18.0961 18.432 18.2652 18.0986 18.5986C17.7652 18.932 17.5961 19.389 17.2579 20.303L17 21L16.7421 20.303C16.4039 19.389 16.2348 18.932 15.9014 18.5986C15.568 18.2652 15.111 18.0961 14.197 17.7579L13.5 17.5L14.197 17.2421C15.111 16.9039 15.568 16.7348 15.9014 16.4014C16.2348 16.068 16.4039 15.611 16.7421 14.697L17 14Z"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </span>
+                  <span>{t('aiTidyBtn')}</span>
+                </button>
+                <button
+                  className="rb-big ai-entry"
+                  disabled={docEmpty}
+                  data-tip={t('aiMindMapBtn')}
+                  onClick={() => onAiPreset(t('aiMindMapPrompt'))}
+                >
+                  <span className="rb-big-icon">
+                    <span className="ai-feature-icon" aria-hidden="true">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="2.5" y="9.5" width="6" height="5" rx="1.5" />
+                        <rect x="15.5" y="4" width="6" height="5" rx="1.5" />
+                        <rect x="15.5" y="15" width="6" height="5" rx="1.5" />
+                        <path d="M8.5 12h3.5M12 12V6.5h3.5M12 12v5.5h3.5" />
+                      </svg>
+                    </span>
+                  </span>
+                  <span>{t('aiMindMapBtn')}</span>
+                </button>
+              </div>
+              <div className="ribbon-group-label">Genspark AI</div>
+            </div>
+>>>>>>> theirs
 
                 <div className="ribbon-sep" />
               </>
             )}
+
+            <div className="ribbon-group">
+              <div className="ribbon-group-items">
+                <div className="rb-split-wrap">
+                  <button
+                    className={`rb-big${dropdown === 'convert' ? ' active' : ''}`}
+                    disabled={!hasDoc}
+                    data-tip={t('ribbonConvertTip')}
+                    aria-expanded={dropdown === 'convert'}
+                    onClick={() => setDropdown((v) => (v === 'convert' ? null : 'convert'))}
+                  >
+                    <span className="rb-big-icon">
+                      <IconConvert size={22} />
+                      <IconCaret />
+                    </span>
+                    <span>{t('ribbonConvert')}</span>
+                  </button>
+                  {dropdown === 'convert' && (
+                    <div data-rb-panel="" className="spacing-menu paste-menu" role="menu">
+                      {convertItems}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="ribbon-group-label">{t('ribbonConvert')}</div>
+            </div>
+
+            <div className="ribbon-sep" />
 
             {/* ---- Clipboard ---- */}
             <div className="ribbon-group">
@@ -4080,7 +4241,10 @@ function RibbonInner({
                     disabled={!canEdit}
                     data-tip={t('ribbonClearFormatting')}
                     aria-label={t('ribbonClearFormatting')}
+<<<<<<< ours
                     aria-keyshortcuts={shortcutAria('clear-formatting') || undefined}
+=======
+>>>>>>> theirs
                     onClick={() => clearAllFormatting(editor, sub, styles)}
                   >
                     <IconClearFormat />
@@ -4915,8 +5079,6 @@ function RibbonInner({
             onZoom={onZoom}
             onZoomFit={onZoomFit}
             onZoomDialog={onZoomDialog}
-            showAi={showAi}
-            onToggleAi={onToggleAi}
             darkPage={darkPage}
             onDarkPage={onDarkPage}
             showRuler={showRuler}

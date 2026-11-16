@@ -98,7 +98,10 @@ import {
   type TableModel,
   type TextboxDisplay,
   type TextboxListMarker,
+<<<<<<< ours
   UNDRAWABLE_FRAME_COLOR,
+=======
+>>>>>>> theirs
 } from '@genoffice/docx-engine'
 import {
   substituteBullet,
@@ -2762,6 +2765,7 @@ export function rowPadSideExpr(cellMars: CellMarTwips[], side: 'top' | 'bottom')
     const v = m?.[side]
     if (v === undefined) inherits = true
     else explicit = Math.max(explicit, v)
+<<<<<<< ours
   }
   if (explicit < 0) return fallback
   const px = `${(explicit / 15).toFixed(2)}px`
@@ -2776,6 +2780,22 @@ export function rowPadVarsCss(cellMars: CellMarTwips[]): string[] {
     if (!cellMars.some((m) => m?.[side] !== undefined)) continue
     out.push(`--doc-row-pad-${side === 'top' ? 't' : 'b'}:${rowPadSideExpr(cellMars, side)}`)
   }
+=======
+  }
+  if (explicit < 0) return fallback
+  const px = `${(explicit / 15).toFixed(2)}px`
+  return inherits ? `max(${px}, ${fallback})` : px
+}
+
+/** `--doc-row-pad-t/b` on a tr: the row-wide vertical cell padding (see rowPadSideExpr);
+ *  absent when no cell declares the side, so the table default applies directly */
+export function rowPadVarsCss(cellMars: CellMarTwips[]): string[] {
+  const out: string[] = []
+  for (const side of ['top', 'bottom'] as const) {
+    if (!cellMars.some((m) => m?.[side] !== undefined)) continue
+    out.push(`--doc-row-pad-${side === 'top' ? 't' : 'b'}:${rowPadSideExpr(cellMars, side)}`)
+  }
+>>>>>>> theirs
   return out
 }
 
@@ -3160,6 +3180,7 @@ export function tableTextDragPlugin(): Plugin {
     return el?.closest?.('td, th') ?? null
   }
   return new Plugin({
+<<<<<<< ours
     view(editorView) {
       const doc = editorView.dom.ownerDocument ?? document
       const clear = () => {
@@ -3171,6 +3192,18 @@ export function tableTextDragPlugin(): Plugin {
         destroy() {
           doc.removeEventListener('mouseup', clear, true)
           doc.removeEventListener('dragstart', clear, true)
+=======
+    view() {
+      const clear = () => {
+        activeCell = null
+      }
+      document.addEventListener('mouseup', clear, true)
+      document.addEventListener('dragstart', clear, true)
+      return {
+        destroy() {
+          document.removeEventListener('mouseup', clear, true)
+          document.removeEventListener('dragstart', clear, true)
+>>>>>>> theirs
         },
       }
     },
@@ -5609,15 +5642,26 @@ function wireProtectedInteractionMode(
   setEditing(false)
   const doc = dom.ownerDocument ?? document
   dom.addEventListener('mousedown', onMouseDown, true)
+<<<<<<< ours
   doc.addEventListener('mouseup', onMouseUp, true)
+=======
+  document.addEventListener('mouseup', onMouseUp, true)
+>>>>>>> theirs
   dom.addEventListener('dragstart', onDragStart, true)
   dom.addEventListener('dblclick', onDoubleClick, true)
   doc.addEventListener('mousedown', onDocumentMouseDown, true)
   dom.addEventListener('keydown', onKeyDown, true)
+<<<<<<< ours
   doc.addEventListener('selectionchange', onSelectionChange)
   return () => {
     dom.removeEventListener('mousedown', onMouseDown, true)
     doc.removeEventListener('mouseup', onMouseUp, true)
+=======
+  document.addEventListener('selectionchange', onSelectionChange)
+  return () => {
+    dom.removeEventListener('mousedown', onMouseDown, true)
+    document.removeEventListener('mouseup', onMouseUp, true)
+>>>>>>> theirs
     dom.removeEventListener('dragstart', onDragStart, true)
     dom.removeEventListener('dblclick', onDoubleClick, true)
     doc.removeEventListener('mousedown', onDocumentMouseDown, true)
@@ -5626,7 +5670,11 @@ function wireProtectedInteractionMode(
     for (const type of INPUT_GUARD_EVENTS) {
       keyGuardRoot?.removeEventListener(type, onViewInput, true)
     }
+<<<<<<< ours
     doc.removeEventListener('selectionchange', onSelectionChange)
+=======
+    document.removeEventListener('selectionchange', onSelectionChange)
+>>>>>>> theirs
   }
 }
 

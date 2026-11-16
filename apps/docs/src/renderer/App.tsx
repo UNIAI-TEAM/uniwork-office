@@ -27,6 +27,7 @@ import {
   rememberAiPanelOpen,
   createZoomWheelClassifier,
   useAutoSavePref,
+<<<<<<< ours
   useImageGenerationOffered,
   useAiSidebarEnabled,
 } from '@genoffice/ui'
@@ -36,6 +37,12 @@ import {
   requestRespellKick,
   spellingEditInFlight,
 } from './editor/respell-kick-gate'
+=======
+  useAiSidebarEnabled,
+} from '@genoffice/ui'
+import { commentAnchors, commentIdsAt, wordRangeAtCaret } from './editor/comments'
+import { isCommandLetter } from './command-letter'
+>>>>>>> theirs
 import { setFieldInstr, toggleAllFieldCodes, type FieldRange } from './editor/field-codes'
 import { linkTarget } from './editor/link-actions'
 import { FieldDialog } from './components/FieldDialog'
@@ -109,24 +116,37 @@ import {
 } from '@genoffice/docx-engine'
 import type {
   AiDocContent,
+<<<<<<< ours
   AiPresetPayload,
+=======
+>>>>>>> theirs
   AiSettings,
   MenuCommand,
   MergeDataSource,
   OpenDocxResult,
 } from '../shared/ipc'
+<<<<<<< ours
 import { defaultAiSettings } from '@genoffice/ai-provider/browser'
 import {
   buildMailMergeFiles,
   fieldInsertedLabel,
   mergeWrittenLabel,
   mergeWriteWarning,
+=======
+import { AI_PROVIDERS } from '../shared/ipc'
+import {
+  buildMailMergeFiles,
+>>>>>>> theirs
   type MailMergeRequest,
   type MailMergeResponse,
 } from './mail-merge/output'
 import { ZoteroDocumentController } from './zotero/controller'
+<<<<<<< ours
 import { AiPanel, AI_REVISION_AUTHOR } from './ai/AiPanel'
 import { aiProtectionOf } from './ai/docs-skill'
+=======
+import { AiPanel, aiRevisionAuthor } from './ai/AiPanel'
+>>>>>>> theirs
 import type { AiCommentsAccess, AiDocExtras, AiHeaderFooterAccess } from './ai/tools'
 import { createAiSideState, type AiSideSlice, type AiSideState } from './ai/run-snapshot'
 import {
@@ -576,6 +596,7 @@ import {
   newFile as newFileImpl,
   printDoc as printDocImpl,
   save as saveImpl,
+  suggestedSaveAsName,
   writeRecoveryCopy as writeRecoveryCopyImpl,
   type FileActionContext,
   type PendingPdfExport,
@@ -658,6 +679,7 @@ import {
 } from './review-actions'
 import { authorName, onAuthorNameChanged } from './author-name'
 
+<<<<<<< ours
 /** The commands App's window handler runs; their keys come from the docs shortcut table. */
 const APP_SHORTCUTS = [
   'save',
@@ -718,6 +740,9 @@ type AppShortcut = (typeof APP_SHORTCUTS)[number]
 const matchAppShortcut = createShortcutMatcher(APP_SHORTCUTS) as (
   e: KeyboardEvent,
 ) => AppShortcut | null
+=======
+const IS_MAC = navigator.platform.toLowerCase().includes('mac')
+>>>>>>> theirs
 
 const twipsToPx = (twips: number) => (twips / 1440) * 96
 
@@ -851,6 +876,19 @@ function blockNoteScanRuns(b: Block): NonNullable<Block['runs']> {
   return out
 }
 
+<<<<<<< ours
+=======
+const DEFAULT_SETTINGS: AiSettings = {
+  provider: 'anthropic',
+  providers: Object.fromEntries(
+    AI_PROVIDERS.map((p) => [
+      p.id,
+      { apiKey: '', model: p.defaultModel, baseUrl: p.needsBaseUrl ? '' : undefined },
+    ]),
+  ) as AiSettings['providers'],
+}
+
+>>>>>>> theirs
 /** Table menu items that are plain editor commands (the dialogs and Distribute Rows are handled inline) */
 const TABLE_MENU_COMMANDS: Partial<Record<MenuCommand, (widthPx: number) => Command>> = {
   'table-insert-rows-above': (w) => insertRowsOrColumns(1, 'above', w),
@@ -930,6 +968,7 @@ export function App() {
     errorKey: '' | 'appDocPwdWrong'
   } | null>(null)
   const [_recent, setRecent] = useState<string[]>([])
+<<<<<<< ours
   const [settings, setSettings] = useState<AiSettings>(defaultAiSettings)
   // capability-gated: when the platform has no AI the dock never shows, whatever
   // the stored preference or a stray setShowAi(true) says
@@ -943,6 +982,10 @@ export function App() {
     () => aiPanelInitiallyOpen('aidocs.showAi') && !isNarrowViewport(),
   )
   const showAi = aiEnabled && showAiPref
+=======
+  const [settings, setSettings] = useState<AiSettings>(DEFAULT_SETTINGS)
+  const [showAi, setShowAi] = useState(() => aiPanelInitiallyOpen('aidocs.showAi'))
+>>>>>>> theirs
   // Settings › "show the AI sidebar" off hides the panel and its rail the way Word
   // treats the Copilot pane: an explicit Ask-AI action (ribbon, context menu,
   // shortcut, preset) still opens the panel for this document, and closing it
@@ -1112,6 +1155,15 @@ export function App() {
   const [showReviewPane, setShowReviewPane] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('print')
   const [readMode, setReadMode] = useState(false)
+  // Read mode is a print-layout reading, so a view pick and Read Mode are exclusive
+  const switchView = (mode: ViewMode) => {
+    setViewMode(mode)
+    setReadMode(false)
+  }
+  const setReadModeExclusive = (v: boolean) => {
+    if (v) setViewMode('print')
+    setReadMode(v)
+  }
   const [showGrid, setShowGrid] = useState(false)
   const [splitView, setSplitView] = useState(false)
   const [showPagePreview, setShowPagePreview] = useState(false)
@@ -1737,6 +1789,10 @@ export function App() {
     editor.storage.trackChanges.trackMoves = tcOptions.trackMoves
     editor.storage.trackChanges.trackFormatting = tcOptions.trackFormatting
     editor.view.dispatch(editor.state.tr.setMeta('addToHistory', false))
+<<<<<<< ours
+=======
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+>>>>>>> theirs
   }, [tcOptions, editor])
 
   // every header/footer consumer (strips, gaps, heights, preview, AI, save) reads
@@ -2338,6 +2394,14 @@ export function App() {
     editor.commands.setStoryViewActive(viewMode === 'story')
   }, [editor, viewMode])
 
+<<<<<<< ours
+=======
+  // Backstop for paths that bypass the view buttons (read-only opens land in read mode)
+  useEffect(() => {
+    if (readMode && viewMode !== 'print') setViewMode('print')
+  }, [readMode, viewMode])
+
+>>>>>>> theirs
   // window title follows the document, so the OS window list and Switch Window show file names
   useEffect(() => {
     document.title = doc ? doc.fileName : 'UniWork Docs'
@@ -2889,6 +2953,68 @@ export function App() {
     [],
   )
 
+  // ---- Mailings: the data source and the merge ----
+
+  /** the recipient list the user picked; null until they pick one */
+  const [mergeSource, setMergeSource] = useState<MergeDataSource | null>(null)
+
+  /** open the file dialog and read the recipient list the user chose */
+  const pickMergeDataSource = useCallback(async () => {
+    const result = await window.desktop.pickMergeDataSource()
+    if (!result) return
+    if (!result.ok) {
+      setStatus(result.error)
+      return
+    }
+    setMergeSource(result.source)
+    setStatus(
+      t('appMergeSourceLoaded', {
+        name: result.source.name,
+        n: result.source.records.length,
+      }),
+    )
+  }, [])
+
+  /** build the merged documents and write them where the user says */
+  const mergeMailings = useCallback(
+    async (request: MailMergeRequest): Promise<MailMergeResponse> => {
+      try {
+        const files = await buildMailMergeFiles(fileCtxRef.current, request)
+        if (files.length === 0) return { ok: false, error: t('appMergeNothingToWrite') }
+        const written = await window.desktop.writeMergeOutput({
+          mode: request.mode,
+          files: files.map((file) => ({
+            name: file.name,
+            data: file.bytes.buffer.slice(
+              file.bytes.byteOffset,
+              file.bytes.byteOffset + file.bytes.byteLength,
+            ) as ArrayBuffer,
+          })),
+        })
+        if (written.ok) {
+          setStatus(t('appMergeWritten', { n: written.count ?? files.length }))
+        }
+        return written
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+    [],
+  )
+
+  /**
+   * The reader asked the model for a name on a document that already has one.
+   *
+   * The stem is a proposal for the Save As dialog, never a rename: the dialog
+   * is where the reader confirms, and moving a file that may be open elsewhere
+   * or synced is not ours to do quietly.
+   */
+  const nameWithAi = useCallback(async () => {
+    const proposed = await suggestedSaveAsName(fileCtxRef.current)
+    if (!proposed) return
+    await saveImpl(fileCtxRef.current, true, false, proposed)
+  }, [])
+
   // inserting a section break needs one save for the new section to take effect; the
   // flag is consumed in the render after state commit, guaranteeing the save closure
   // sees the latest sectionsDirty/trailingStartType
@@ -3389,6 +3515,7 @@ export function App() {
     setStatus(t('appPgNumFormatSet'))
   }, [pgNumModal, sections, activeSection, editor])
 
+<<<<<<< ours
   const exportPdf = useCallback((outPath?: string) => {
     if (!cap('exportPdf')) return Promise.resolve(false)
     return exportPdfImpl(fileCtxRef.current, outPath)
@@ -3423,6 +3550,22 @@ export function App() {
     if (r.reason === 'cancelled') return
     showToast(t('appCopySaveFailed'), 'error')
   }, [])
+=======
+  const exportPdf = useCallback(
+    (outPath?: string) => exportPdfImpl(fileCtxRef.current, outPath),
+    [],
+  )
+  const exportHtml = useCallback(
+    (outPath?: string) => exportHtmlImpl(fileCtxRef.current, outPath),
+    [],
+  )
+  const exportMarkdown = useCallback(
+    (outPath?: string) => exportMarkdownImpl(fileCtxRef.current, outPath),
+    [],
+  )
+  const exportImages = useCallback(() => exportImagesImpl(fileCtxRef.current), [])
+  const printDoc = useCallback(() => printDocImpl(fileCtxRef.current), [])
+>>>>>>> theirs
 
   // for real-device verification: trigger export directly via CDP (same as __pageDebug)
   useEffect(() => {
@@ -3549,9 +3692,12 @@ export function App() {
     setInkAnnotations,
     setInksDirty,
     setCompareResult,
+<<<<<<< ours
     server: serverActiveRef.current
       ? { startThread: () => serverCommentsRef.current?.startThread() }
       : null,
+=======
+>>>>>>> theirs
     get revisionFilter() {
       return revisionFilterRef.current
     },
@@ -3607,12 +3753,19 @@ export function App() {
     if (!editor) return
     const { from, to } = editor.state.selection
     if (from === to) return
+<<<<<<< ours
     // Never seed with the selected text: the label is what the model sees, so
     // pre-filling the hidden value would leak it on a bare Enter press.
     setRedactTarget({
       from,
       to,
       seed: '',
+=======
+    setRedactTarget({
+      from,
+      to,
+      seed: editor.state.doc.textBetween(from, to, ' ').trim().slice(0, 24),
+>>>>>>> theirs
     })
   }, [editor])
 
@@ -3770,15 +3923,23 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comments])
 
+<<<<<<< ours
   /** Uncapped width-fit ratio (%) from the scroller's measured size (with the narrow-pane readable floor) */
+=======
+  /** Uncapped width-fit ratio (%) from the scroller's measured size */
+>>>>>>> theirs
   const rawFitWidth = useCallback(() => {
     if (!section) return null
     const scroller = document.querySelector('.editor-scroll')
     if (!scroller) return null
+<<<<<<< ours
     return widthFitZoom(
       ((scroller.clientWidth - 48) / (twipsToPx(section.pageWidth) + markupExtra)) * 100,
       scroller.clientWidth,
     )
+=======
+    return ((scroller.clientWidth - 48) / (twipsToPx(section.pageWidth) + markupExtra)) * 100
+>>>>>>> theirs
   }, [section, markupExtra])
 
   /** Last auto-fit: if current zoom still equals its value → "fit mode", re-fit on size changes */
@@ -6366,6 +6527,19 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [reviewEntries, selectionHead, activeStoryId],
   )
+<<<<<<< ours
+=======
+  // the AI panel list counts every pending change, untouched by the Show Markup filters
+  const allReviewEntries = useMemo(
+    () => (editor ? buildReviewEntries(editor.state.doc, allRevisions, reviewAuthors) : []),
+    [editor, allRevisions, reviewAuthors],
+  )
+  const activeAllReviewIndex = useMemo(
+    () => allReviewEntries.findIndex(isActiveEntry),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allReviewEntries, selectionHead, activeStoryId],
+  )
+>>>>>>> theirs
   useEffect(() => {
     if (!editor) return
     const refreshSelection = () => {
@@ -6380,6 +6554,7 @@ export function App() {
       editor.off('selectionUpdate', refreshSelection)
     }
   }, [editor])
+<<<<<<< ours
   useEffect(() => {
     if (!editor) return
     const refreshSelection = () =>
@@ -6390,6 +6565,8 @@ export function App() {
       editor.off('selectionUpdate', refreshSelection)
     }
   }, [editor])
+=======
+>>>>>>> theirs
   useEffect(() => {
     if (!editor) return
     let timer = 0
@@ -6548,6 +6725,21 @@ export function App() {
     }
   }, [save])
 
+  // Save runs ahead of the editor keymaps (capture phase): with a non-Latin
+  // layout active the keystroke otherwise reaches the editor's own bindings and
+  // the report sees Ctrl+S undo the last edit instead of saving the document.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && isCommandLetter(e, 's')) {
+        e.preventDefault()
+        e.stopPropagation()
+        void save(e.shiftKey)
+      }
+    }
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
+  }, [save])
+
   useEffect(() => {
     // editing shortcuts only fire when focus is in an editor surface (main
     // ProseMirror, textbox sub-editor, in-place table cell) or nowhere at all —
@@ -6558,12 +6750,161 @@ export function App() {
       return !!(el as HTMLElement).closest('.ProseMirror, td[contenteditable]')
     }
     const handler = (e: KeyboardEvent) => {
+<<<<<<< ours
       // Print: with a document the native menu / browser owns the shortcut; with none it must
       // not vanish silently (printDoc answers with the "open a document" message)
       if (isNoDocumentPrintKey(e, !!doc, cap('print'))) {
         e.preventDefault()
         void printDoc()
         return
+=======
+      const canEdit = !!editor?.isEditable && focusInEditor()
+      if ((e.metaKey || e.ctrlKey) && isCommandLetter(e, 'o')) {
+        e.preventDefault()
+        void openFile()
+      }
+      if ((e.metaKey || e.ctrlKey) && isCommandLetter(e, 'f')) {
+        e.preventDefault()
+        if (doc) {
+          // bump even when the panel is already open: focus returns to the find box
+          setShowFind(true)
+          setFindFocusInput((n) => n + 1)
+        }
+      }
+      // Word's replace: Ctrl+H everywhere (macOS Cmd+H is the system hide role,
+      // which never reaches the renderer, so this branch is Ctrl+H there too)
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && isCommandLetter(e, 'h')) {
+        e.preventDefault()
+        if (doc) {
+          setShowFind(true)
+          setFindFocusReplace((n) => n + 1)
+        }
+      }
+      // Go To: ⌥⌘G on the Mac (Word for Mac), Ctrl+G elsewhere (⇧⌘G stays Word Count)
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        e.altKey === IS_MAC &&
+        e.code === 'KeyG' &&
+        doc
+      ) {
+        e.preventDefault()
+        setShowFind(true)
+        setFindFocusGoTo((n) => n + 1)
+      }
+      // Word dialog shortcuts: Font ⌘D / Paragraph ⌥⌘M / Hyperlink ⌘K
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        isCommandLetter(e, 'd') &&
+        doc &&
+        canEdit
+      ) {
+        e.preventDefault()
+        setShowFontDialog(true)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyM' && doc && canEdit) {
+        e.preventDefault()
+        setShowParaDialog(true)
+      }
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        isCommandLetter(e, 'k') &&
+        doc &&
+        canEdit
+      ) {
+        e.preventDefault()
+        setShowLinkModal(true)
+      }
+      if (e.key === 'F9' && e.altKey && doc && editor) {
+        e.preventDefault()
+        toggleAllFieldCodes(editor.view)
+      } else if (e.key === 'F9' && doc && editor?.isEditable) {
+        e.preventDefault()
+        updateFields()
+      }
+      // Word alignment shortcuts
+      const ALIGN_KEYS: Record<string, 'left' | 'center' | 'right' | 'justify'> = {
+        l: 'left',
+        e: 'center',
+        r: 'right',
+        j: 'justify',
+      }
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        e.key in ALIGN_KEYS &&
+        editor &&
+        canEdit
+      ) {
+        e.preventDefault()
+        // route into a focused textbox sub-editor, like the ribbon does
+        const target = getActiveSubEditor() ?? editor
+        setSelectionAlign(target, ALIGN_KEYS[e.key])
+      }
+      // Word line-spacing shortcuts ⌘1 / ⌘2 / ⌘5; e.code because shifted-digit
+      // layouts (AZERTY) make e.key unreliable
+      const SPACING_KEYS: Record<string, number> = { Digit1: 1, Digit2: 2, Digit5: 1.5 }
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        e.code in SPACING_KEYS &&
+        editor &&
+        canEdit
+      ) {
+        e.preventDefault()
+        const attrs = { lineSpacing: SPACING_KEYS[e.code], lineRule: null, lineRawTwips: null }
+        setParaAttrs(getActiveSubEditor() ?? editor, attrs)
+      }
+      // Paragraph styles ⌥⌘0 Normal / ⌥⌘1..3 headings (Ctrl+Shift+N is taken by New Window)
+      const STYLE_KEYS: Record<string, 'p' | 'h1' | 'h2' | 'h3'> = {
+        Digit0: 'p',
+        Digit1: 'h1',
+        Digit2: 'h2',
+        Digit3: 'h3',
+      }
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.altKey &&
+        !e.shiftKey &&
+        e.code in STYLE_KEYS &&
+        editor &&
+        canEdit
+      ) {
+        e.preventDefault()
+        // textboxes have no heading nodes — same gate as the ribbon style gallery
+        if (!getActiveSubEditor())
+          applyParagraphStyle(editor, STYLE_KEYS[e.code], ribbonStylesRef.current)
+      }
+      // Word grow/shrink font ⇧⌘. / ⇧⌘, — via the ribbon closure so bursts stay coalesced
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        !e.altKey &&
+        (e.code === 'Period' || e.code === 'Comma') &&
+        editor &&
+        canEdit
+      ) {
+        e.preventDefault()
+        ribbonActionsRef.current.stepFontSize?.(e.code === 'Period' ? 1 : -1)
+      }
+      // Word's one-point nudge ⌘] / ⌘[
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        (e.code === 'BracketRight' || e.code === 'BracketLeft') &&
+        editor &&
+        canEdit
+      ) {
+        e.preventDefault()
+        ribbonActionsRef.current.nudgeFontSize?.(e.code === 'BracketRight' ? 1 : -1)
+>>>>>>> theirs
       }
       const command = matchAppShortcut(e)
       if (!command) return
@@ -6582,10 +6923,49 @@ export function App() {
           .run()
         return true
       }
+<<<<<<< ours
       const onTarget = (apply: (ed: Editor) => void) => {
         if (!target) return false
         apply(target)
         return true
+=======
+      // Word's Shift+F3 case ring
+      if (e.shiftKey && e.key === 'F3' && editor && canEdit) {
+        e.preventDefault()
+        const target = getActiveSubEditor() ?? editor
+        applyCase(target, nextCaseMode(selectionText(target)))
+      }
+      // Clear character formatting ⌃␣ (Word uses Ctrl+Space on both platforms)
+      if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.code === 'Space' && canEdit) {
+        e.preventDefault()
+        ;(getActiveSubEditor() ?? editor)?.chain().focus().unsetAllMarks().run()
+      }
+      // Indent ⌃M / outdent ⌃⇧M and hanging indent ⌘T / ⇧⌘T. Ctrl-only on both
+      // platforms: ⌘M minimizes the window, and indenting a paragraph on the way
+      // out would be a silent edit.
+      if (e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'KeyM' && editor && canEdit) {
+        e.preventDefault()
+        if (!getActiveSubEditor()) stepParagraphIndent(editor, e.shiftKey ? -1 : 1)
+      }
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.code === 'KeyT' && editor && canEdit) {
+        e.preventDefault()
+        if (!getActiveSubEditor()) stepHangingIndent(editor, e.shiftKey ? -1 : 1)
+      }
+      // Clear paragraph formatting — Word's Ctrl+Q (⌘Q quits on macOS)
+      if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.code === 'KeyQ' && canEdit) {
+        e.preventDefault()
+        if (editor && !getActiveSubEditor()) clearParagraphFormatting(editor)
+      }
+      // Formatting marks: ⌘8 in Word for Mac, Ctrl+Shift+8 on Windows
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.code === 'Digit8' && doc) {
+        e.preventDefault()
+        setShowMarks((v) => !v)
+      }
+      // Track changes ⇧⌘E; forced by an editing restriction it cannot be turned off
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.code === 'KeyE' && doc) {
+        e.preventDefault()
+        if (!isProtected && !trackChangesForced) toggleTrackChangesByUser()
+>>>>>>> theirs
       }
       // still handled inside a textbox, where the command has nothing to change
       const onBody = (apply: (ed: Editor) => void) => {
@@ -6711,8 +7091,11 @@ export function App() {
     insertField,
     runAiProofread,
     trackChangesForced,
+<<<<<<< ours
     printDoc,
     showFind,
+=======
+>>>>>>> theirs
     isProtected,
     toggleTrackChangesByUser,
   ])
@@ -6756,6 +7139,9 @@ export function App() {
           break
         case 'save-as':
           void save(true)
+          break
+        case 'name-with-ai':
+          void nameWithAi()
           break
         case 'undo':
           editor?.chain().focus().undo().run()
@@ -6938,6 +7324,7 @@ export function App() {
     openFile,
     openRecent,
     save,
+    nameWithAi,
     exportPdf,
     exportHtml,
     exportMarkdown,
@@ -7490,7 +7877,7 @@ export function App() {
           : undefined
       },
       reply: (parentId, text) =>
-        replyToCommentImpl(reviewCtxRef.current, parentId, text, AI_REVISION_AUTHOR),
+        replyToCommentImpl(reviewCtxRef.current, parentId, text, aiRevisionAuthor()),
       resolve: (id) => {
         const ctx = reviewCtxRef.current
         if (!ctx.comments.some((c) => c.id === id)) return false
@@ -7502,7 +7889,7 @@ export function App() {
           reviewCtxRef.current,
           range,
           text,
-          meta.author ?? AI_REVISION_AUTHOR,
+          meta.author ?? aiRevisionAuthor(),
           meta.initials,
         ),
       remove: (id) => {
@@ -7924,15 +8311,22 @@ export function App() {
     onOpen: () => void openFile(),
     onSave: () => void save(false),
     onSaveAs: () => void save(true),
+<<<<<<< ours
     onExportPdf: () => void exportPdf(),
     onSaveCopy: () => void saveCopyDoc(),
     onPrint: () => void printDoc(),
+=======
+>>>>>>> theirs
     onConvert: (format: ConvertFormat) => {
       if (format === 'pdf') void exportPdf()
       else if (format === 'html') void exportHtml()
       else if (format === 'md') void exportMarkdown()
       else exportImages()
     },
+<<<<<<< ours
+=======
+    onNameWithAi: () => void nameWithAi(),
+>>>>>>> theirs
     onToggleAi: () => setShowAi((v) => !v),
     onSection: (next: SectionSettings) => {
       // layout applies to the cursor's section; the final section's sectPr goes through SaveOptions.section (also drives canvas geometry)
@@ -8073,8 +8467,8 @@ export function App() {
     },
     onProtectDoc: () => setShowProtectDialog(true),
     onCompare: () => void compareWithFile(),
-    onViewMode: setViewMode,
-    onReadMode: setReadMode,
+    onViewMode: switchView,
+    onReadMode: setReadModeExclusive,
     onShowGrid: setShowGrid,
     onSplitView: setSplitView,
     onPagePreview: () => setShowPagePreview(true),
@@ -8151,6 +8545,7 @@ export function App() {
       editor.view.dispatch(tr.setSelection(TextSelection.near($pos, 1)).setMeta(TRACK_IGNORE, true))
     },
     onCommentBalloon: (id) => {
+<<<<<<< ours
       if (isReadOnlyProfile() && serverMode === null) return
       if (serverMode) {
         // server threads live in the host panel: open it on the clicked thread
@@ -8158,6 +8553,8 @@ export function App() {
         setCommentFocus({ id, nonce: Date.now() })
         return
       }
+=======
+>>>>>>> theirs
       if (iconClickTarget(commentsUi) === 'focus') setCommentFocus({ id, nonce: Date.now() })
       else setCommentPopup(id)
     },
@@ -8282,6 +8679,246 @@ export function App() {
       histState,
     ],
   )
+
+  // ---- Multiple Pages: the grid is a function of zoom × pane width ----
+  const [paneW, setPaneW] = useState(0)
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!doc || !el) return
+    const ro = new ResizeObserver(() => setPaneW(el.clientWidth))
+    ro.observe(el)
+    setPaneW(el.clientWidth)
+    return () => ro.disconnect()
+  }, [doc])
+  const mpPaperW = canvasBox ? paperWidthPx(sections, canvasSection) : 0
+  const mpSlotW = mpPaperW + markupExtra
+  // differing paper widths keep the single column (their sheets are drawn per page)
+  const mpUniform = !sections.some((s) => pageLeftPx(s.settings, mpPaperW) > 0.5)
+  const mpCols =
+    doc && viewMode === 'print' && !readMode && mpUniform && multipageMode
+      ? multipageColumns(paneW, mpSlotW, zoom)
+      : 1
+  const mpWanted = mpCols >= 2
+  const [mpFrames, setMpFrames] = useState<PageFrame[]>([])
+  const canvasPageH = canvasBox?.height ?? 0
+  useEffect(() => {
+    if (!mpWanted) {
+      setMpFrames((prev) => (prev.length ? [] : prev))
+      return
+    }
+    const wrap = editor?.view.dom.closest<HTMLElement>('.page-wrap')
+    if (!wrap) return
+    const frames = pageFramesFromGaps(wrap, zoom / 100, undefined, pageLayoutRef.current?.cuts)
+    // the canvas ends where the content ends; the grid shows the last sheet whole
+    const last = frames[frames.length - 1]
+    if (last && last.bottom - last.top < canvasPageH) last.bottom = last.top + canvasPageH
+    setMpFrames(frames)
+  }, [doc, editor, mpWanted, zoom, layoutRev, canvasPageH])
+  const multipage = mpWanted && mpFrames.length >= 2
+  const mpLayout = useMemo(
+    () =>
+      multipage
+        ? // every slot is a full sheet: a mid-paragraph cut leaves its canvas frame a
+          // few px short of the paper, and Word's grid is equal-height
+          layoutMultipage(
+            mpFrames.map((f) => Math.max(canvasPageH, f.bottom - f.top)),
+            mpCols,
+            mpSlotW,
+          )
+        : null,
+    [multipage, mpFrames, mpCols, mpSlotW, canvasPageH],
+  )
+  const [mpActive, setMpActive] = useState(0)
+  const mpActiveIdx = Math.max(0, Math.min(mpActive, mpFrames.length - 1))
+  multipageActiveRef.current = multipage ? mpActiveIdx : null
+  mpFramesRef.current = mpFrames
+
+  const [mpSnap, setMpSnap] = useState<CanvasSnapshot | null>(null)
+  useEffect(() => {
+    if (!multipage) {
+      setMpSnap(null)
+      return
+    }
+    const wrap = editor?.view.dom.closest<HTMLElement>('.page-wrap')
+    if (!wrap) return
+    const raf = requestAnimationFrame(() => setMpSnap(snapshotCanvas(wrap, zoom / 100)))
+    return () => cancelAnimationFrame(raf)
+  }, [multipage, editor, zoom, layoutRev, mpFrames, mpActiveIdx])
+
+  /** the page under the caret, so the live window follows selection moves and page turns */
+  const mpFollowCaret = useCallback(() => {
+    if (!editor || multipageActiveRef.current == null) return
+    const frames = mpFramesRef.current
+    const wrap = editor.view.dom.closest<HTMLElement>('.page-wrap')
+    if (!wrap || frames.length === 0) return
+    let y: number
+    try {
+      y = editor.view.coordsAtPos(editor.state.selection.head).top
+    } catch {
+      return
+    }
+    const canvasY = (y - wrap.getBoundingClientRect().top) / (zoomLiveRef.current / 100)
+    let idx = 0
+    for (let i = 1; i < frames.length; i++) if (frames[i].top <= canvasY + 0.5) idx = i
+    setMpActive(idx)
+  }, [editor])
+  useEffect(() => {
+    if (!editor || !multipage) return
+    const onTr = ({ transaction }: { transaction: Transaction }) => {
+      // a typed change settles on its page after the next pagination pass
+      if (!transaction.docChanged && transaction.selectionSet) mpFollowCaret()
+    }
+    editor.on('transaction', onTr)
+    return () => {
+      editor.off('transaction', onTr)
+    }
+  }, [editor, multipage, mpFollowCaret])
+  useEffect(() => {
+    if (multipage) mpFollowCaret()
+  }, [multipage, mpFrames, mpFollowCaret])
+
+  /** a click on a painted page moves the live editor there and lands the caret under the pointer */
+  const mpPickRef = useRef<{ x: number; y: number } | null>(null)
+  const onMpPick = useCallback((index: number, x: number, y: number) => {
+    mpPickRef.current = { x, y }
+    setMpActive(index)
+  }, [])
+  useLayoutEffect(() => {
+    const pick = mpPickRef.current
+    if (!pick || !editor) return
+    mpPickRef.current = null
+    const view = editor.view
+    const wrap = view.dom.closest<HTMLElement>('.page-wrap')
+    const frames = mpFramesRef.current
+    const frame = frames[mpActiveIdx]
+    if (!wrap || !frame) return
+    const z = zoomLiveRef.current / 100
+    const wrapTop = wrap.getBoundingClientRect().top
+    const pageOf = (pos: number): number => {
+      const y = (view.coordsAtPos(pos).top - wrapTop) / z
+      let idx = 0
+      for (let i = 1; i < frames.length; i++) if (frames[i].top <= y + 0.5) idx = i
+      return idx
+    }
+    let pos = view.posAtCoords({ left: pick.x, top: pick.y })?.pos ?? null
+    if (pos != null && pageOf(pos) !== mpActiveIdx) pos = null
+    if (pos == null) {
+      // the pointer is on blank paper whose nearest caret slot is another
+      // page's: take the picked page's block nearest to the pointer instead
+      const canvasY = (pick.y - wrapTop) / z
+      let best: { el: HTMLElement; d: number; r: DOMRect } | null = null
+      for (const el of Array.from(view.dom.children) as HTMLElement[]) {
+        if (el.classList.contains('ProseMirror-widget')) continue
+        const r = el.getBoundingClientRect()
+        const top = (r.top - wrapTop) / z
+        const bottom = (r.bottom - wrapTop) / z
+        if (bottom <= frame.top || top >= frame.bottom) continue
+        const d = canvasY < top ? top - canvasY : canvasY > bottom ? canvasY - bottom : 0
+        if (!best || d < best.d) best = { el, d, r }
+      }
+      if (best) {
+        const x = Math.min(Math.max(pick.x, best.r.left + 1), best.r.right - 1)
+        const y = Math.min(Math.max(pick.y, best.r.top + 1), best.r.bottom - 1)
+        pos = view.posAtCoords({ left: x, top: y })?.pos ?? null
+      }
+    }
+    if (pos != null) {
+      const sel = TextSelection.near(view.state.doc.resolve(pos), 1)
+      view.dispatch(view.state.tr.setSelection(sel))
+    }
+    view.focus()
+  }, [mpActiveIdx, editor])
+
+  /** scroller offset of the active slot's top edge (CSS px) */
+  const mpActiveSlotTop = useCallback((): number | null => {
+    const scroller = scrollContainerRef.current
+    const grid = scroller?.querySelector<HTMLElement>('.doc-zoom')
+    const slot = mpLayout?.slots[mpActiveIdx]
+    if (!scroller || !grid || !slot) return null
+    const gridTop =
+      grid.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
+    return gridTop + slot.top * (zoom / 100)
+  }, [mpLayout, mpActiveIdx, zoom])
+  // a caret-driven page turn may land on a slot outside the viewport (zoom
+  // changes keep their own anchoring below)
+  const mpSeenActiveRef = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const scroller = scrollContainerRef.current
+    const seen = mpSeenActiveRef.current
+    mpSeenActiveRef.current = multipage ? mpActiveIdx : null
+    if (!multipage || !scroller || !mpLayout || seen === mpActiveIdx) return
+    const top = mpActiveSlotTop()
+    if (top == null) return
+    const slot = mpLayout.slots[mpActiveIdx]
+    const bottom = top + slot.height * (zoom / 100)
+    const viewTop = scroller.scrollTop
+    const viewBottom = viewTop + scroller.clientHeight
+    if (bottom > viewTop && top < viewBottom) return
+    scroller.scrollTop = Math.max(0, top - 26)
+    scrollPosRef.current = { left: scroller.scrollLeft, top: scroller.scrollTop }
+  }, [multipage, mpActiveIdx, mpLayout, mpActiveSlotTop, zoom])
+
+  const multipagePrevRef = useRef({ on: false, cols: 1 })
+  useLayoutEffect(() => {
+    const prevZoom = prevZoomRef.current
+    prevZoomRef.current = zoom
+    const anchor = zoomAnchorRef.current
+    zoomAnchorRef.current = null
+    const container = scrollContainerRef.current
+    const page = container?.querySelector<HTMLElement>('.doc-zoom')
+    if (!container || !page) return
+    // the Multiple Pages grid re-flows when its column count changes: keep
+    // the active page in view instead of a point that no longer exists
+    const prevMp = multipagePrevRef.current
+    const colsNow = multipage ? mpCols : 1
+    multipagePrevRef.current = { on: multipage, cols: colsNow }
+    if (multipage !== prevMp.on || colsNow !== prevMp.cols) {
+      let top = mpActiveSlotTop()
+      if (top == null && editor) {
+        // grid collapsed: the caret's page in the single column
+        try {
+          const c = editor.view.coordsAtPos(editor.state.selection.head)
+          top = c.top - container.getBoundingClientRect().top + container.scrollTop - 120
+        } catch {
+          top = null
+        }
+      }
+      if (top != null) {
+        container.scrollTop = Math.max(0, top - 26)
+        scrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop }
+      }
+      return
+    }
+    if (prevZoom === zoom) return
+
+    const ratio = zoom / prevZoom
+    const vx = anchor ? anchor.vx : container.clientWidth / 2
+    const vy = anchor ? anchor.vy : container.clientHeight / 2
+    const cs = getComputedStyle(container)
+    const padLeft = parseFloat(cs.paddingLeft) || 0
+    const innerWidth = container.clientWidth - padLeft - (parseFloat(cs.paddingRight) || 0)
+    const containerRect = container.getBoundingClientRect()
+    const pageRect = page.getBoundingClientRect()
+    const pageLeft = pageRect.left - containerRect.left + container.scrollLeft
+    const pageTop = pageRect.top - containerRect.top + container.scrollTop
+    const prevPageLeft = padLeft + Math.max(0, (innerWidth - pageRect.width / ratio) / 2)
+    const prev = scrollPosRef.current
+
+    const docX = Math.max(0, prev.left + vx - prevPageLeft)
+    const docY = Math.max(0, prev.top + vy - pageTop)
+    container.scrollLeft = pageLeft + docX * ratio - vx
+    container.scrollTop = pageTop + docY * ratio - vy
+    scrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop }
+  }, [zoom, multipage, mpCols, mpActiveSlotTop, editor])
+
+  useEffect(() => {
+    if (!editor) return
+    editor.view.dispatch(
+      editor.state.tr
+        .setMeta(formattingMarksPluginKey, { on: showMarks, breaks: sectionBreakMap(sections) })
+        .setMeta('addToHistory', false),
+    )
+  }, [editor, showMarks, sections, lang])
 
   // ---- Multiple Pages: the grid is a function of zoom × pane width ----
   const [paneW, setPaneW] = useState(0)
@@ -8767,7 +9404,11 @@ export function App() {
       />
 
       <div className="app-main">
+<<<<<<< ours
         {doc && aiEnabled && (
+=======
+        {doc && (
+>>>>>>> theirs
           <div
             className={`ai-dock${showAi ? '' : ' collapsed'}${
               !aiSidebarEnabled && !showAi ? ' ai-dock-off' : ''
@@ -8786,7 +9427,10 @@ export function App() {
               preset={aiPreset}
               presetSeen={aiPresetSeen}
               open={showAi}
+<<<<<<< ours
               dockHidden={readMode}
+=======
+>>>>>>> theirs
               hideRail={!aiSidebarEnabled}
               onExpand={() => setShowAi(true)}
               onCollapse={() => setShowAi(false)}
@@ -8802,10 +9446,26 @@ export function App() {
               pageSetupAccess={aiPageSetupAccess}
               docExtras={aiDocExtras}
               notesAccess={aiNotesAccess}
+<<<<<<< ours
               readOnly={uniwork.readOnly}
               bound={uniwork.bound}
               protection={aiProtectionOf(protection, writeLocked)}
               sideState={aiSideState}
+=======
+              trackChanges={trackChanges}
+              trackChangesLocked={isProtected || trackChangesForced}
+              onTrackChangesToggle={() => setTrackChanges((v) => !v)}
+              revisionCount={revisionCount}
+              onRevisions={(action) => {
+                if (!isProtected && !trackChangesForced) handleRevision(action, 'all')
+              }}
+              reviewEntries={allReviewEntries}
+              activeReviewIndex={activeAllReviewIndex}
+              onRevisionSelect={showRevision}
+              onRevisionRange={(action, rev) => {
+                if (!isProtected && !trackChangesForced) handleRevisionRange(action, rev)
+              }}
+>>>>>>> theirs
             />
           </div>
         )}
@@ -9092,6 +9752,7 @@ export function App() {
                         onPick={onMpPick}
                       />
                     )}
+<<<<<<< ours
                   </div>
                 ) : refusedMessage ? (
                   <div
@@ -9101,6 +9762,8 @@ export function App() {
                   >
                     <h2 className="start-refused-title">{t('appWebFatalTitle')}</h2>
                     <p className="start-refused-body">{statusText(refusedMessage, t)}</p>
+=======
+>>>>>>> theirs
                   </div>
                 ) : (
                   <div className="start-screen start-booting">{t('appStartOpening')}</div>
@@ -9145,6 +9808,7 @@ export function App() {
                 </span>
               </button>
             )}
+<<<<<<< ours
             {doc && serverMode && editor && (
               <ServerCommentsHost
                 key={`${serverMode.documentId}\u0000${serverMode.path}`}
@@ -9164,6 +9828,9 @@ export function App() {
               />
             )}
             {doc && !serverMode && !isReadOnlyProfile() && commentsUi.panel && (
+=======
+            {doc && commentsUi.panel && (
+>>>>>>> theirs
               <CommentsPanel
                 comments={comments}
                 docNode={editor.state.doc}
@@ -9297,10 +9964,7 @@ export function App() {
                     className={`status-view-btn${viewMode === 'print' && !readMode ? ' on' : ''}`}
                     data-tip={t('ribbonPrintLayout')}
                     aria-label={t('ribbonPrintLayout')}
-                    onClick={() => {
-                      setViewMode('print')
-                      setReadMode(false)
-                    }}
+                    onClick={() => switchView('print')}
                   >
                     <IconPrintLayout size={14} />
                   </button>
@@ -9308,7 +9972,7 @@ export function App() {
                     className={`status-view-btn${viewMode === 'web' ? ' on' : ''}`}
                     data-tip={t('ribbonWebLayout')}
                     aria-label={t('ribbonWebLayout')}
-                    onClick={() => setViewMode('web')}
+                    onClick={() => switchView('web')}
                   >
                     <IconWebLayout size={14} />
                   </button>
@@ -9316,7 +9980,7 @@ export function App() {
                     className={`status-view-btn${viewMode === 'outline' ? ' on' : ''}`}
                     data-tip={t('ribbonOutlineView')}
                     aria-label={t('ribbonOutlineView')}
-                    onClick={() => setViewMode('outline')}
+                    onClick={() => switchView('outline')}
                   >
                     <IconOutlineView size={14} />
                   </button>
@@ -9324,7 +9988,11 @@ export function App() {
                     className={`status-view-btn${viewMode === 'story' ? ' on' : ''}`}
                     data-tip={t('ribbonStoryView')}
                     aria-label={t('ribbonStoryView')}
+<<<<<<< ours
                     onClick={() => setViewMode('story')}
+=======
+                    onClick={() => switchView('story')}
+>>>>>>> theirs
                   >
                     <IconStoryView size={14} />
                   </button>
@@ -9332,7 +10000,7 @@ export function App() {
                     className={`status-view-btn${readMode ? ' on' : ''}`}
                     data-tip={t('ribbonReadMode')}
                     aria-label={t('ribbonReadMode')}
-                    onClick={() => setReadMode((v) => !v)}
+                    onClick={() => setReadModeExclusive(!readMode)}
                   >
                     <IconReadMode size={14} />
                   </button>
@@ -9499,17 +10167,24 @@ export function App() {
       {doc && redactTarget && (
         <RedactDialog
           seed={redactTarget.seed}
+<<<<<<< ours
           onCancel={() => {
             setRedactTarget(null)
             editor?.view.focus()
           }}
+=======
+          onCancel={() => setRedactTarget(null)}
+>>>>>>> theirs
           onSubmit={(label) => {
             // re-assert the captured range: the command marks the selection,
             // and the reader may have clicked somewhere while deciding
             if (editor)
               editor
                 .chain()
+<<<<<<< ours
                 .focus()
+=======
+>>>>>>> theirs
                 .setTextSelection({ from: redactTarget.from, to: redactTarget.to })
                 .setRedaction(label)
                 .run()
@@ -9717,7 +10392,11 @@ export function App() {
       )}
 
       {doc && showPrintDialog && (
+<<<<<<< ours
         <PrintDialog onClose={closePrintDialog} setStatus={setStatus} onSavePdf={exportPdf} />
+=======
+        <PrintDialog editor={editor} onClose={closePrintDialog} setStatus={setStatus} />
+>>>>>>> theirs
       )}
 
       {stats && <WordCountDialog stats={stats} onClose={() => setStats(null)} />}

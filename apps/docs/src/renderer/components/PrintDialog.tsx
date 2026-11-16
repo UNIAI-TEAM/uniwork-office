@@ -1,7 +1,8 @@
 /**
  * Print dialog modeled on Word's print sheet (same pattern as the slides app):
  * live page preview on the left (a scaled clone of the pagination-preview page
- * that will actually print), range options on the right. "Print" hides the
+ * that will actually print), printer/copies/duplex and range options on the
+ * right (a chosen printer prints silently; "System print dialog" defers to the OS). "Print" hides the
  * unselected .pv-page sheets via pv-print-skip and hands the preview pages to
  * the system print dialog.
  *
@@ -10,20 +11,33 @@
  * preview source, so what the dialog shows is exactly what prints.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+<<<<<<< ours
+=======
+import type { Editor } from '@tiptap/core'
+>>>>>>> theirs
 import type { PrintDuplex, PrintPaper, PrinterInfo } from '../../shared/ipc'
 import { useI18n } from '../i18n/locale'
+import { blockIdAtSelection, initialPrintPageIndex, pageBlockIds } from '../print-page-of-selection'
 import { parsePrintRange } from '../print-range'
 import { clearPrintZoom, setPrintZoom } from '../print-zoom'
 
 type RangeMode = 'all' | 'current' | 'custom'
 
+<<<<<<< ours
 // Printer option values that are not device names (Electron: '' = OS default).
+=======
+/// Printer option values that are not device names (Electron: '' = OS default).
+>>>>>>> theirs
 const DEFAULT_PRINTER = ''
 const SYSTEM_DIALOG = '\u0000system-dialog'
 // macOS's print sheet already carries copies/duplex/paper, so it stays the
 // default there; Windows 11's dialog buries them under "More settings".
 const IS_MAC = navigator.platform.toLowerCase().includes('mac')
 const DUPLEX_MODES: PrintDuplex[] = ['simplex', 'longEdge', 'shortEdge']
+<<<<<<< ours
+=======
+
+>>>>>>> theirs
 const pvPages = (): HTMLElement[] => [
   ...document.querySelectorAll<HTMLElement>('.pagination-preview .pv-page'),
 ]
@@ -45,16 +59,26 @@ function paperOfPreview(): PrintPaper | undefined {
 export function PrintDialog({
   onClose,
   setStatus,
+<<<<<<< ours
   onSavePdf,
 }: {
   onClose: () => void
   setStatus: (s: string) => void
   /** Save as PDF fallback when printing is impossible; resolves true once a file was written */
   onSavePdf: () => Promise<boolean>
+=======
+  editor,
+}: {
+  onClose: () => void
+  setStatus: (s: string) => void
+  editor: Editor | null
+>>>>>>> theirs
 }) {
   const { t } = useI18n()
   const [pageCount, setPageCount] = useState(0)
   const [page, setPage] = useState(0)
+  /** The initial preview page is resolved once the sheets exist; later navigation wins. */
+  const initialPageRef = useRef(false)
   const [rangeMode, setRangeMode] = useState<RangeMode>('all')
   const [customRange, setCustomRange] = useState('')
   const [printing, setPrinting] = useState(false)
@@ -64,21 +88,50 @@ export function PrintDialog({
   const [collate, setCollate] = useState(true)
   const [duplex, setDuplex] = useState<PrintDuplex>('simplex')
   const systemDialog = deviceName === SYSTEM_DIALOG
+<<<<<<< ours
   /** why printing did not happen, when Save as PDF is the way forward (no printer / print failure) */
   const [printProblem, setPrintProblem] = useState<{ error?: string } | null>(null)
+=======
+>>>>>>> theirs
   const paneRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
 
   // The pagination preview measures and slices asynchronously; poll until the
   // .pv-page count is stable (and keep tracking it, e.g. re-slices on resize).
+  // Once the sheets exist, open the preview on the page holding the caret.
   useEffect(() => {
     let last = -1
     const timer = window.setInterval(() => {
-      const n = pvPages().length
-      if (n > 0 && n === last) setPageCount(n)
+      const sheets = pvPages()
+      const n = sheets.length
+      if (n > 0 && n === last) {
+        setPageCount(n)
+        if (!initialPageRef.current) {
+          initialPageRef.current = true
+          // Functional update: navigation the reader already did wins.
+          setPage((shown) =>
+            shown === 0
+              ? initialPrintPageIndex(pageBlockIds(sheets), blockIdAtSelection(editor))
+              : shown,
+          )
+        }
+      }
       last = n
     }, 250)
     return () => window.clearInterval(timer)
+  }, [editor])
+
+  useEffect(() => {
+    let alive = true
+    window.desktop
+      .listPrinters()
+      .then((list) => {
+        if (alive) setPrinters(list)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
   }, [])
 
   useEffect(() => {
@@ -169,7 +222,10 @@ export function PrintDialog({
     // (hidden) preview keeps its layout while unselected sheets don't print.
     els.forEach((el, i) => el.classList.toggle('pv-print-skip', !sel.has(i)))
     const scale = setPrintZoom('printer')
+<<<<<<< ours
     setPrintProblem(null)
+=======
+>>>>>>> theirs
     try {
       const r = await window.desktop.print(
         scale,

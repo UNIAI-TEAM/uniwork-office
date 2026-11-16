@@ -2045,16 +2045,28 @@ export async function saveDocx(
   // A root that already declares `xmlns:mc` (every Word-saved file does) must
   // not get a second one: a duplicate attribute is the same parse error this
   // block exists to prevent. Its existing Ignorable list is extended instead.
+<<<<<<< ours
   if (newDocumentXml.includes(`<${REDACT_EL}`)) {
     const root = /<w:document\b[^>]*>/.exec(newDocumentXml)?.[0]
     if (root) {
       let next = root
       if (!/\bxmlns:mc=/.test(next)) {
+=======
+  if (
+    newDocumentXml.includes(`<${REDACT_EL}`) &&
+    !new RegExp(`<w:document[^>]*xmlns:${REDACT_PREFIX}=`).test(newDocumentXml)
+  ) {
+    const root = /<w:document\b[^>]*>/.exec(newDocumentXml)?.[0]
+    if (root) {
+      let next = root
+      if (!/xmlns:mc=/.test(next)) {
+>>>>>>> theirs
         next = next.replace(
           '<w:document',
           '<w:document xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"',
         )
       }
+<<<<<<< ours
       if (!new RegExp(`\\bxmlns:${REDACT_PREFIX}=`).test(next)) {
         next = next.replace('<w:document', `<w:document xmlns:${REDACT_PREFIX}="${REDACT_NS}"`)
       }
@@ -2067,6 +2079,16 @@ export async function saveDocx(
           next = next.replace(
             ignorable[0],
             `mc:Ignorable=${quote}${existing ? `${existing} ${REDACT_PREFIX}` : REDACT_PREFIX}${quote}`,
+=======
+      next = next.replace('<w:document', `<w:document xmlns:${REDACT_PREFIX}="${REDACT_NS}"`)
+      const ignorable = /mc:Ignorable="([^"]*)"/.exec(next)
+      if (ignorable) {
+        if (!new RegExp(`\\b${REDACT_PREFIX}\\b`).test(ignorable[1] ?? '')) {
+          const existing = (ignorable[1] ?? '').trim()
+          next = next.replace(
+            /mc:Ignorable="[^"]*"/,
+            `mc:Ignorable="${existing ? `${existing} ${REDACT_PREFIX}` : REDACT_PREFIX}"`,
+>>>>>>> theirs
           )
         }
       } else {
@@ -2076,6 +2098,7 @@ export async function saveDocx(
       // unless the root asks for it to be preserved verbatim — and a root that
       // already preserves other elements needs ours added to that list, the
       // same way the Ignorable list above is extended
+<<<<<<< ours
       const preserve = /\bmc:PreserveElements=(["'])([^"']*)\1/.exec(next)
       if (preserve) {
         const quote = preserve[1]
@@ -2085,14 +2108,27 @@ export async function saveDocx(
           next = next.replace(
             preserve[0],
             `mc:PreserveElements=${quote}${existing ? `${existing} ${REDACT_EL}` : REDACT_EL}${quote}`,
+=======
+      const preserve = /mc:PreserveElements="([^"]*)"/.exec(next)
+      if (preserve) {
+        if (!new RegExp(`\\b${REDACT_EL}\\b`).test(preserve[1] ?? '')) {
+          const existing = (preserve[1] ?? '').trim()
+          next = next.replace(
+            /mc:PreserveElements="[^"]*"/,
+            `mc:PreserveElements="${existing ? `${existing} ${REDACT_EL}` : REDACT_EL}"`,
+>>>>>>> theirs
           )
         }
       } else {
         next = next.replace('<w:document', `<w:document mc:PreserveElements="${REDACT_EL}"`)
       }
+<<<<<<< ours
       if (next !== root) {
         newDocumentXml = newDocumentXml.replace(root, next)
       }
+=======
+      newDocumentXml = newDocumentXml.replace(root, next)
+>>>>>>> theirs
     }
   }
 

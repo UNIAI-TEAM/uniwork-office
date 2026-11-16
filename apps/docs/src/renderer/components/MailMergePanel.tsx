@@ -4,11 +4,15 @@ import { mergeFieldInstruction } from '@genoffice/docx-engine'
 import type { MergeDataSource, MergeOutputMode } from '../../shared/ipc'
 import type { PmNode } from '../editor/convert'
 import { documentText, substituteMergeFields } from '../mail-merge/template'
+<<<<<<< ours
 import {
   mergedCountLabel,
   type MailMergeRequest,
   type MailMergeResponse,
 } from '../mail-merge/output'
+=======
+import type { MailMergeRequest, MailMergeResponse } from '../mail-merge/output'
+>>>>>>> theirs
 import {
   AVERY_5160,
   clampGridCount,
@@ -57,7 +61,11 @@ export function MailMergePanel({
   onRecordIndex,
   onClose,
 }: MailMergePanelProps) {
+<<<<<<< ours
   const { t, lang } = useI18n()
+=======
+  const { t } = useI18n()
+>>>>>>> theirs
   const modalKeys = useModalKeys(onClose)
   const [mode, setMode] = useState<MergeOutputMode>('perRecord')
   const [namePattern, setNamePattern] = useState('')
@@ -123,7 +131,11 @@ export function MailMergePanel({
         setBusy(false)
         return
       }
+<<<<<<< ours
       setDone(mergedCountLabel(t, lang, result.count ?? records.length))
+=======
+      setDone(t('ribbonMailingsMerged', { n: result.count ?? records.length }))
+>>>>>>> theirs
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -196,69 +208,108 @@ export function MailMergePanel({
           <div className="mailmerge-section">
             <div className="mailmerge-label">{t('ribbonMailingsOutput')}</div>
             <div className="modal-row">
+<<<<<<< ours
               <label className="protect-check mailmerge-radio">
+=======
+              <label className="mailmerge-radio">
+>>>>>>> theirs
                 <input
                   type="radio"
                   name="mailmerge-output"
                   checked={mode === 'perRecord'}
                   onChange={() => setMode('perRecord')}
                 />
+<<<<<<< ours
                 <span className="ctl" aria-hidden="true" />
                 {t('ribbonMailingsOutputPerRecord')}
               </label>
               <label className="protect-check mailmerge-radio">
+=======
+                {t('ribbonMailingsOutputPerRecord')}
+              </label>
+              <label className="mailmerge-radio">
+>>>>>>> theirs
                 <input
                   type="radio"
                   name="mailmerge-output"
                   checked={mode === 'single'}
                   onChange={() => setMode('single')}
                 />
+<<<<<<< ours
                 <span className="ctl" aria-hidden="true" />
+=======
+>>>>>>> theirs
                 {t('ribbonMailingsOutputSingle')}
               </label>
             </div>
             <div className="modal-row">
+<<<<<<< ours
               <label className="protect-check mailmerge-radio">
+=======
+              <label className="mailmerge-radio">
+>>>>>>> theirs
                 <input
                   type="radio"
                   name="mailmerge-output"
                   checked={mode === 'labels'}
                   onChange={() => setMode('labels')}
                 />
+<<<<<<< ours
                 <span className="ctl" aria-hidden="true" />
                 {t('ribbonMailingsOutputLabels')}
               </label>
               <label className="protect-check mailmerge-radio">
+=======
+                {t('ribbonMailingsOutputLabels')}
+              </label>
+              <label className="mailmerge-radio">
+>>>>>>> theirs
                 <input
                   type="radio"
                   name="mailmerge-output"
                   checked={mode === 'envelopes'}
                   onChange={() => setMode('envelopes')}
                 />
+<<<<<<< ours
                 <span className="ctl" aria-hidden="true" />
+=======
+>>>>>>> theirs
                 {t('ribbonMailingsOutputEnvelopes')}
               </label>
             </div>
             {mode === 'labels' && (
               <div className="mailmerge-pattern">
+<<<<<<< ours
                 <label className="protect-check mailmerge-radio">
+=======
+                <label className="mailmerge-radio">
+>>>>>>> theirs
                   <input
                     type="radio"
                     name="mailmerge-stock"
                     checked={labelStock === 'avery5160'}
                     onChange={() => setLabelStock('avery5160')}
                   />
+<<<<<<< ours
                   <span className="ctl" aria-hidden="true" />
                   {t('ribbonMailingsStock5160')}
                 </label>
                 <label className="protect-check mailmerge-radio">
+=======
+                  {t('ribbonMailingsStock5160')}
+                </label>
+                <label className="mailmerge-radio">
+>>>>>>> theirs
                   <input
                     type="radio"
                     name="mailmerge-stock"
                     checked={labelStock === 'custom'}
                     onChange={() => setLabelStock('custom')}
                   />
+<<<<<<< ours
                   <span className="ctl" aria-hidden="true" />
+=======
+>>>>>>> theirs
                   {t('ribbonMailingsStockCustom')}
                 </label>
                 {droppedLabelBlocks > 0 && (

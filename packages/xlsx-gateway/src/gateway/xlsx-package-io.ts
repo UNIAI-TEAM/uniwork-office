@@ -34,6 +34,10 @@ import type {
   SheetVisualAddition,
   SheetFormulaValues,
   SheetCellImageAddition,
+<<<<<<< ours
+=======
+  ExternalLinkOps,
+>>>>>>> theirs
 } from './xlsx-gateway'
 import { planCellEditsToXlsx, syncFileBestEffort } from './xlsx-gateway'
 import { normalizeOoxmlPartPrefix } from './xlsx-namespace'
@@ -114,6 +118,8 @@ export interface StreamingSaveRequest {
   readonly slicerState?: SheetSlicerState | null | undefined
   /// Recalculated formula-cell values written into <v>
   readonly formulaValues?: readonly SheetFormulaValues[] | undefined
+  /// External-link breaks and source retargets, resolved on the final contents
+  readonly externalLinkOps?: ExternalLinkOps | null | undefined
   readonly themeState?: WorkbookThemeState | null | undefined
   readonly workbookProtectionState?: { readonly lockStructure: boolean } | null | undefined
   readonly protectedRangeStates?: readonly SheetProtectedRangesState[] | undefined
@@ -181,7 +187,10 @@ export async function saveWorkbookViaSidecar(
   request: StreamingSaveRequest,
 ): Promise<StreamingSaveResult> {
   const workDir = await mkdtemp(join(tmpdir(), 'ai-excel-save-'))
-  const temporaryTarget = join(dirname(request.targetPath), `.${randomUUID()}.tmp.xlsx`)
+  const temporaryTarget = join(
+    dirname(request.targetPath),
+    `${basename(request.targetPath)}.${randomUUID()}.tmp`,
+  )
   try {
     const manifest = manifestResultSchema.parse(
       await request.client.archiveManifest(request.sourcePath),
@@ -216,6 +225,10 @@ export async function saveWorkbookViaSidecar(
       request.tabColorStates ?? [],
       request.tableEdits ?? [],
       request.cellImageAdditions ?? [],
+<<<<<<< ours
+=======
+      request.externalLinkOps ?? null,
+>>>>>>> theirs
       request.redactionStates ?? null,
       request.slicerState ?? null,
     )

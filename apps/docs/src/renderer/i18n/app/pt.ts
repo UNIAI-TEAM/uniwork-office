@@ -396,6 +396,8 @@ export const pt = {
   appLangHindi: 'híndi',
   appLangTraditionalChinese: 'chinês tradicional',
   appLangVietnamese: 'vietnamita',
+  appLangTurkish: 'turco',
+  appLangHungarian: 'húngaro',
   appWrapTextMenu: 'Quebra de texto automática',
   appViewImage: 'Ver imagem',
   appSaveImageAs: 'Salvar imagem como…',
@@ -549,6 +551,7 @@ export const pt = {
   appUpdateStyleTip: 'Atualizar este estilo com a seleção atual (gravado de volta em styles.xml)',
   appNewStyleFromSelection: 'Novo estilo a partir da seleção atual',
   appStyleNamePlaceholder: 'Nome do estilo',
+<<<<<<< ours
   appWebConflictTitle: 'Este documento foi alterado em outro lugar',
   appWebConflictBody:
     'Suas alterações ainda não estão no UniWork e ficam neste navegador até você sair.',
@@ -596,6 +599,11 @@ export const pt = {
     'Este documento está protegido por senha. Os documentos mesclados são salvos como arquivos comuns, sem senha, e qualquer pessoa que os abrir poderá ler o conteúdo. Mesclar mesmo assim?',
   appMergeWarnUniwork:
     'Este documento pertence ao UniWork. Os documentos mesclados são salvos no seu computador como arquivos locais comuns, fora do UniWork. Mesclar mesmo assim?',
+=======
+  appMergeSourceLoaded: '{name} carregado ({n} registros)',
+  appMergeWritten: '{n} documentos gravados',
+  appMergeNothingToWrite: 'Não há nada a gravar',
+>>>>>>> theirs
   appReviewPaneTitle: 'Revisões',
   appReviewPaneCount: '{n} alterações',
   appReviewPaneHidden: '{n} ocultas por filtros',

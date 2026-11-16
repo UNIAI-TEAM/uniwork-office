@@ -1,17 +1,45 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { useI18n } from './i18n/locale'
+<<<<<<< ours
 import { applySpellReplacement, type SpellWorkbookLike } from './spell-apply'
 import {
   collectWorkbookTextCells,
   indexOfWordOf,
   runSheetSpellCheck,
   spellEngineHasDictionary,
+=======
+import {
+  collectWorkbookTextCells,
+  indexOfWordOf,
+  replaceInRichDoc,
+  replaceSuggestion,
+  runSheetSpellCheck,
+  type RichDoc,
+  type SpellCellRef,
+>>>>>>> theirs
   type SpellFinding,
   type SpellSnapshot,
 } from './spell-check'
 import { loadLearnedWords, saveLearnedWords } from './spellcheck-pref'
 
+<<<<<<< ours
+=======
+/**
+ * Structural slice of Univer's FWorkbook/FWorksheet the dialog needs; keeps
+ * the component off the full facade types (and unit-testable in principle).
+ */
+interface SpellWorkbookLike {
+  getSheets(): { getSheetId(): string; getSheetName(): string }[] | null
+  getSnapshot(): unknown
+  getSheetBySheetId(sheetId: string): SpellWorksheetLike | null
+}
+
+interface SpellWorksheetLike {
+  getRange(row: number, column: number): { setValue(value: string): unknown }
+}
+
+>>>>>>> theirs
 /** Stable identity for one finding row: the flagged word in one cell. */
 const findingKey = (finding: SpellFinding): string =>
   `${finding.cell.sheetId}:${finding.cell.address}:${finding.word}`
@@ -23,6 +51,21 @@ const excerpt = (text: string, at: number, keep = 90): string => {
   return `${start > 0 ? '…' : ''}${text.slice(start, start + keep)}${start + keep < text.length ? '…' : ''}`
 }
 
+<<<<<<< ours
+=======
+/** The live snapshot cell, as the replacement's starting point. */
+function liveCell(
+  snapshot: SpellSnapshot,
+  sheetId: string,
+  row: number,
+  column: number,
+): SpellCellRef | null {
+  const cell = snapshot.sheets[sheetId]?.cellData?.[String(row)]?.[String(column)]
+  if (!cell || typeof cell.v !== 'string') return null
+  return { sheetId, sheetName: '', address: '', row, column, text: cell.v }
+}
+
+>>>>>>> theirs
 /**
  * Review ▸ Spelling / F7 (Excel's Spelling dialog, list form). The whole
  * workbook's string cells are collected locally and checked against the
@@ -59,11 +102,14 @@ export function SpellingDialog({
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [truncated, setTruncated] = useState(false)
   const learnedRef = useRef<Set<string>>(new Set())
+<<<<<<< ours
   // the dictionary probe is answered once per dialog open; Recheck reuses it
   const hasDictionaryRef = useRef<boolean | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   // read during render, before effects: whatever owned focus when F7 was hit
   const [opener] = useState(() => document.activeElement as HTMLElement | null)
+=======
+>>>>>>> theirs
 
   /** One synchronous pass over the workbook; bumped by Recheck and re-open. */
   const startRun = () => {
@@ -77,11 +123,14 @@ export function SpellingDialog({
       setPhase('unavailable')
       return
     }
+<<<<<<< ours
     hasDictionaryRef.current ??= spellEngineHasDictionary(engine)
     if (!hasDictionaryRef.current) {
       setPhase('unavailable')
       return
     }
+=======
+>>>>>>> theirs
     setPhase('done')
     learnedRef.current = new Set(loadLearnedWords().map((word) => word.toLowerCase()))
     // the runtime snapshot is a structural superset of SpellSnapshot; the
@@ -95,10 +144,14 @@ export function SpellingDialog({
       isWithheld,
     )
     setTruncated(capped)
+<<<<<<< ours
     const found = runSheetSpellCheck(cells, engine, learnedRef.current, sessionIgnoredRef.current)
     setFindings(found)
     // the actions only render for the selected finding: open on the first one
     setSelectedKey(found[0] ? findingKey(found[0]) : null)
+=======
+    setFindings(runSheetSpellCheck(cells, engine, learnedRef.current, sessionIgnoredRef.current))
+>>>>>>> theirs
   }
 
   useEffect(() => {
@@ -106,6 +159,7 @@ export function SpellingDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+<<<<<<< ours
   // Take focus on open so Escape works at once; give it back on close.
   useEffect(() => {
     panelRef.current?.focus()
@@ -126,6 +180,8 @@ export function SpellingDialog({
     onJumpTo(finding.cell.sheetId, finding.cell.row, finding.cell.column)
   }
 
+=======
+>>>>>>> theirs
   const dropFinding = (key: string): void => {
     setFindings((previous) => previous.filter((finding) => findingKey(finding) !== key))
     setSelectedKey((current) => (current === key ? null : current))
@@ -147,8 +203,49 @@ export function SpellingDialog({
     setMessage(t('appSpellLearned', { word }))
   }
 
+<<<<<<< ours
   const applySuggestion = (finding: SpellFinding, suggestion: string): void => {
     if (applySpellReplacement(getWorkbook(), finding, suggestion)) {
+=======
+  /**
+   * Writes one replacement into a cell, against its CURRENT value — the user
+   * may have edited it since the scan — through Univer so undo, journal and
+   * dirty state all see it. A rich-text cell (cell.p) keeps its runs: the
+   * replacement rewrites the document's dataStream and shifts the runs, the
+   * shape Excel's own in-cell corrector leaves behind.
+   */
+  const applyToCell = (finding: SpellFinding, suggestion: string): boolean => {
+    const workbook = getWorkbook()
+    const worksheet = workbook?.getSheetBySheetId(finding.cell.sheetId)
+    if (!workbook || !worksheet) return false
+    const snapshot = workbook.getSnapshot() as SpellSnapshot
+    const live = liveCell(snapshot, finding.cell.sheetId, finding.cell.row, finding.cell.column)
+    if (live === null) return false
+    const rich = (
+      snapshot.sheets[finding.cell.sheetId]?.cellData?.[String(finding.cell.row)]?.[
+        String(finding.cell.column)
+      ] as { p?: RichDoc } | undefined
+    )?.p
+    if (rich !== undefined && rich !== null) {
+      const doc = replaceInRichDoc(rich, finding.word, suggestion)
+      if (doc === null) return false
+      // setValues takes the full cell object (ICellData), which is what
+      // carries the document; the cast only erases the facade's branded types
+      const range = worksheet.getRange(finding.cell.row, finding.cell.column) as unknown as {
+        setValues(values: { v: string; p: RichDoc }[][]): unknown
+      }
+      range.setValues([[{ v: replaceSuggestion(live.text, finding.word, suggestion), p: doc }]])
+      return true
+    }
+    const next = replaceSuggestion(live.text, finding.word, suggestion)
+    if (next === live.text) return false
+    worksheet.getRange(finding.cell.row, finding.cell.column).setValue(next)
+    return true
+  }
+
+  const applySuggestion = (finding: SpellFinding, suggestion: string): void => {
+    if (applyToCell(finding, suggestion)) {
+>>>>>>> theirs
       dropFinding(findingKey(finding))
       setMessage(t('appSpellChanged', { address: finding.cell.address }))
     } else {
@@ -160,7 +257,11 @@ export function SpellingDialog({
     const same = findings.filter((entry) => entry.word === finding.word)
     let changed = 0
     for (const entry of same) {
+<<<<<<< ours
       if (applySpellReplacement(getWorkbook(), entry, suggestion)) changed += 1
+=======
+      if (applyToCell(entry, suggestion)) changed += 1
+>>>>>>> theirs
     }
     if (changed > 0) {
       setFindings((previous) => previous.filter((entry) => entry.word !== finding.word))
@@ -184,9 +285,13 @@ export function SpellingDialog({
 
   return (
     <div
+<<<<<<< ours
       ref={panelRef}
       tabIndex={-1}
       className="find-replace-panel spell-panel"
+=======
+      className="find-replace-panel"
+>>>>>>> theirs
       role="dialog"
       aria-label={t('appSpellTitle')}
       onKeyDown={(event) => {
@@ -224,6 +329,7 @@ export function SpellingDialog({
                   <tr
                     key={key}
                     className={key === selectedKey ? 'spell-selected' : undefined}
+<<<<<<< ours
                     tabIndex={0}
                     aria-selected={key === selectedKey}
                     onClick={() => selectFinding(finding)}
@@ -231,6 +337,11 @@ export function SpellingDialog({
                       if (event.key !== 'Enter' && event.key !== ' ') return
                       event.preventDefault()
                       selectFinding(finding)
+=======
+                    onClick={() => {
+                      setSelectedKey(key)
+                      onJumpTo(finding.cell.sheetId, finding.cell.row, finding.cell.column)
+>>>>>>> theirs
                     }}
                   >
                     <td>{`${finding.cell.sheetName}!${finding.cell.address}`}</td>

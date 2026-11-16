@@ -4,9 +4,12 @@ import { AI_SKILLS_LABELS } from './strings-ai-skills'
 import { useDismissablePopover } from './popover-dismiss'
 import './ai-skills.css'
 
+<<<<<<< ours
 /** maximum skills attached to one message (Q6) */
 export const MAX_ATTACHED_SKILLS = 3
 
+=======
+>>>>>>> theirs
 /** one installed skill as the menu shows it */
 export interface AiSkillsMenuEntry {
   name: string
@@ -26,7 +29,10 @@ export function AiSkillsMenu({
   listSkills,
   selected,
   onToggle,
+<<<<<<< ours
   maxSkills = MAX_ATTACHED_SKILLS,
+=======
+>>>>>>> theirs
   onAddFile,
   onManage,
 }: {
@@ -35,8 +41,11 @@ export function AiSkillsMenu({
   readonly listSkills: () => Promise<readonly AiSkillsMenuEntry[]>
   readonly selected: readonly string[]
   readonly onToggle: (name: string) => void
+<<<<<<< ours
   /** maximum selectable skills per message (default MAX_ATTACHED_SKILLS = 3) */
   readonly maxSkills?: number | undefined
+=======
+>>>>>>> theirs
   /** absent in apps that take no attachments: the menu then opens on the skills page */
   readonly onAddFile?: (() => void) | undefined
   /** absent when there is no settings page to jump to */
@@ -51,7 +60,10 @@ export function AiSkillsMenu({
   const btnRef = useRef<HTMLButtonElement | null>(null)
   const popRef = useRef<HTMLDivElement | null>(null)
   const searchRef = useRef<HTMLInputElement | null>(null)
+<<<<<<< ours
   const atLimit = selected.length >= maxSkills
+=======
+>>>>>>> theirs
 
   const close = useCallback(() => setOpen(false), [])
   useDismissablePopover(open, close, { inside: () => [btnRef.current, popRef.current] })
@@ -111,6 +123,7 @@ export function AiSkillsMenu({
         </svg>
       </button>
       {open && (
+<<<<<<< ours
         <div
           ref={popRef}
           className="ai-plus-pop"
@@ -151,6 +164,9 @@ export function AiSkillsMenu({
             }
           }}
         >
+=======
+        <div ref={popRef} className="ai-plus-pop" role="menu" style={popStyle}>
+>>>>>>> theirs
           {page === 'root' ? (
             <>
               <button
@@ -201,6 +217,7 @@ export function AiSkillsMenu({
                   value={query}
                   placeholder={strings.searchPlaceholder}
                   onChange={(e) => setQuery(e.target.value)}
+<<<<<<< ours
                 />
               </div>
               {atLimit && (
@@ -208,6 +225,13 @@ export function AiSkillsMenu({
                   {strings.maxSkillsHint}
                 </div>
               )}
+=======
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setOpen(false)
+                  }}
+                />
+              </div>
+>>>>>>> theirs
               <div className="ai-plus-list" role="group" aria-label={strings.skills}>
                 {shown && shown.length === 0 && (
                   <div className="ai-plus-empty">
@@ -216,19 +240,28 @@ export function AiSkillsMenu({
                 )}
                 {shown?.map((s) => {
                   const on = selected.includes(s.name)
+<<<<<<< ours
                   const disabled = !on && atLimit
+=======
+>>>>>>> theirs
                   return (
                     <button
                       key={s.name}
                       type="button"
                       role="menuitemcheckbox"
                       aria-checked={on}
+<<<<<<< ours
                       disabled={disabled}
                       className={`ai-plus-skill${on ? ' on' : ''}`}
                       onClick={() => {
                         if (!disabled) onToggle(s.name)
                       }}
                       title={disabled ? strings.maxSkillsHint : s.description}
+=======
+                      className={`ai-plus-skill${on ? ' on' : ''}`}
+                      onClick={() => onToggle(s.name)}
+                      title={s.description}
+>>>>>>> theirs
                     >
                       <span className="ai-plus-avatar" aria-hidden>
                         {s.name.slice(0, 1).toUpperCase()}

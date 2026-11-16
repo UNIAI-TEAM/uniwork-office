@@ -1,5 +1,9 @@
 /**
+<<<<<<< ours
  * The shell window's geometry across sessions — the
+=======
+ * The shell window's geometry across sessions (issue genoffice#2049) — the
+>>>>>>> theirs
  * position and size the app reopens with.
  *
  * The state lives in userData/app-settings.json, the file the issue names,

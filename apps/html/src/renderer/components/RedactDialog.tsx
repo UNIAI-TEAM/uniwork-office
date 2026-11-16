@@ -36,7 +36,10 @@ export function RedactDialog({ seed, onSubmit, onCancel }: Props) {
         // Escape is handled here rather than by a document listener so the app's
         // own shortcuts see a dialog that is already closing
         if (e.key === 'Escape') {
+<<<<<<< ours
           e.preventDefault()
+=======
+>>>>>>> theirs
           e.stopPropagation()
           onCancel()
         }

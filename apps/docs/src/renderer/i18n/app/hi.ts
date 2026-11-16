@@ -394,6 +394,8 @@ export const hi = {
   appLangHindi: 'हिंदी',
   appLangTraditionalChinese: 'पारंपरिक चीनी',
   appLangVietnamese: 'वियतनामी',
+  appLangTurkish: 'तुर्की',
+  appLangHungarian: 'हंगेरियन',
   appWrapTextMenu: 'टेक्स्ट रैप करें',
   appViewImage: 'छवि देखें',
   appSaveImageAs: 'छवि इस रूप में सहेजें…',
@@ -547,6 +549,7 @@ export const hi = {
   appUpdateStyleTip: 'वर्तमान चयन से इस शैली को अपडेट करें (styles.xml में वापस लिखा जाता है)',
   appNewStyleFromSelection: 'वर्तमान चयन से नई शैली',
   appStyleNamePlaceholder: 'शैली का नाम',
+<<<<<<< ours
   appWebConflictTitle: 'यह दस्तावेज़ कहीं और बदला गया है',
   appWebConflictBody:
     'आपके बदलाव अभी UniWork पर नहीं हैं और साइन आउट करने तक इस ब्राउज़र में रखे जाते हैं।',
@@ -593,6 +596,11 @@ export const hi = {
     'यह दस्तावेज़ पासवर्ड से सुरक्षित है। मर्ज किए गए दस्तावेज़ बिना पासवर्ड के सामान्य फ़ाइलों के रूप में सहेजे जाएंगे, इसलिए इन्हें खोलने वाला कोई भी सामग्री पढ़ सकता है। फिर भी मर्ज करें?',
   appMergeWarnUniwork:
     'यह दस्तावेज़ UniWork का है। मर्ज किए गए दस्तावेज़ आपके कंप्यूटर पर UniWork के बाहर सामान्य स्थानीय फ़ाइलों के रूप में सहेजे जाएंगे। फिर भी मर्ज करें?',
+=======
+  appMergeSourceLoaded: '{name} लोड हुई ({n} रिकॉर्ड)',
+  appMergeWritten: '{n} दस्तावेज़ लिखे गए',
+  appMergeNothingToWrite: 'लिखने के लिए कुछ नहीं है',
+>>>>>>> theirs
   appReviewPaneTitle: 'संशोधन',
   appReviewPaneCount: '{n} परिवर्तन',
   appReviewPaneHidden: '{n} फ़िल्टर द्वारा छिपाए गए',

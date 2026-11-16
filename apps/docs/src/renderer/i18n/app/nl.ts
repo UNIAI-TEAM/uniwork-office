@@ -405,6 +405,8 @@ export const nl = {
   appLangHindi: 'Hindi',
   appLangTraditionalChinese: 'Traditioneel Chinees',
   appLangVietnamese: 'Vietnamees',
+  appLangTurkish: 'Turks',
+  appLangHungarian: 'Hongaars',
   appWrapTextMenu: 'Tekstterugloop',
   appViewImage: 'Afbeelding bekijken',
   appSaveImageAs: 'Afbeelding opslaan als…',
@@ -559,6 +561,7 @@ export const nl = {
     'Deze stijl bijwerken met de huidige selectie (teruggeschreven naar styles.xml)',
   appNewStyleFromSelection: 'Nieuwe stijl op basis van de huidige selectie',
   appStyleNamePlaceholder: 'Stijlnaam',
+<<<<<<< ours
   appWebConflictTitle: 'Dit document is elders gewijzigd',
   appWebConflictBody:
     'Je wijzigingen staan nog niet op UniWork en blijven in deze browser tot je je afmeldt.',
@@ -606,6 +609,11 @@ export const nl = {
     'Dit document is met een wachtwoord beveiligd. De samengevoegde documenten worden als gewone bestanden zonder wachtwoord opgeslagen, dus iedereen die ze opent kan de inhoud lezen. Toch samenvoegen?',
   appMergeWarnUniwork:
     'Dit document hoort bij UniWork. De samengevoegde documenten worden als gewone lokale bestanden buiten UniWork op je computer opgeslagen. Toch samenvoegen?',
+=======
+  appMergeSourceLoaded: '{name} geladen ({n} records)',
+  appMergeWritten: '{n} documenten geschreven',
+  appMergeNothingToWrite: 'Er is niets te schrijven',
+>>>>>>> theirs
   appReviewPaneTitle: 'Revisies',
   appReviewPaneCount: '{n} wijzigingen',
   appReviewPaneHidden: '{n} verborgen door filters',

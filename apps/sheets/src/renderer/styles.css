@@ -947,7 +947,11 @@ html.genoffice-popover-open .ribbon-tabs {
      * .5px offsets, and against the 5px classic scrollbar lane Chromium rounds
      * the scrolled content up: a 45px band offered 40, a 46px band measured
      * 41 on macOS but still read scrollHeight 43 on Linux, where the Review
+<<<<<<< ours
      * tab's letterform glyphs (🧮 文 🗨) sit on font-metric fractions no other
+=======
+     * tab's letterform glyphs (🧮 U+6587 🗨) sit on font-metric fractions no other
+>>>>>>> theirs
      * tab hits. 48px gives the rounded content room without moving anything
      * inside the band. */
   height: 48px;
@@ -1751,10 +1755,13 @@ button.check-item:hover {
 .status-bar,
 .copilot {
   zoom: var(--ui-scale);
+<<<<<<< ours
   /* Chromium resolves vh/vw inside a zoomed box to the real viewport and zooms the result again;
      size viewport shares in these units (`calc(var(--ui-vh) * 62)` = 62vh of the visible window) */
   --ui-vh: calc(1vh / var(--ui-scale, 1));
   --ui-vw: calc(1vw / var(--ui-scale, 1));
+=======
+>>>>>>> theirs
 }
 
 /* AI panel on the left, spanning from the ribbon to the status bar (unified with docs);
@@ -1810,6 +1817,7 @@ button.check-item:hover {
   font-size: 14px;
 }
 
+<<<<<<< ours
 /* loading state of the web frame: spinner, the localised line, a sheet-shaped skeleton */
 .workbook-opening-card {
   display: grid;
@@ -1893,6 +1901,14 @@ button.check-item:hover {
 
 .workbook-opening-failed p {
   margin: 0;
+=======
+.workbook-opening-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 240px;
+>>>>>>> theirs
 }
 
 .workbook-opening-bar {
@@ -1916,6 +1932,7 @@ button.check-item:hover {
 
 .workbook-opening-cancel {
   margin-top: 4px;
+<<<<<<< ours
   min-height: 34px;
   padding: 7px 12px;
   border-radius: var(--radius-medium);
@@ -1926,6 +1943,8 @@ button.check-item:hover {
 
 .workbook-opening-cancel:hover {
   background: var(--surface-hover);
+=======
+>>>>>>> theirs
 }
 
 .csv-empty-notice {
@@ -2156,6 +2175,11 @@ button.check-item:hover {
 
 .app-shell.copilot-collapsed .sheet-body {
   grid-template-columns: 34px minmax(0, 1fr);
+}
+
+/* sidebar setting off: the rail is not mounted, so the sheet takes the whole row */
+.app-shell.copilot-off .sheet-body {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .sheet-main {
@@ -3770,6 +3794,61 @@ body:has(.dialog-backdrop, .modal-backdrop) .shape-delete-button {
   min-width: 0;
   gap: 14px;
   padding: 18px;
+<<<<<<< ours
+=======
+}
+
+.format-cells-dialog.encrypted-workbook-password-dialog header {
+  font-size: 15px;
+}
+
+.encrypted-workbook-password-dialog .dialog-body {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+}
+
+.encrypted-workbook-password-copy {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.encrypted-workbook-password-dialog label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.encrypted-workbook-password-dialog input[type='password'] {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-small);
+  color: var(--text);
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.encrypted-workbook-password-dialog input[type='password']:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sheets-focus-ring);
+}
+
+.encrypted-workbook-password-dialog .dialog-error {
+  margin: 0;
+}
+
+.format-cells-dialog header {
+  font-size: 14px;
+  font-weight: 600;
+>>>>>>> theirs
 }
 
 .format-cells-dialog.encrypted-workbook-password-dialog header {
@@ -4894,7 +4973,7 @@ body:has(.dialog-backdrop, .modal-backdrop) .shape-delete-button {
 .ai-msg {
   position: relative;
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -5501,7 +5580,7 @@ body:has(.dialog-backdrop, .modal-backdrop) .shape-delete-button {
    * with the content, so clipped lines would sit flush against chips/footer */
   padding: 0 14px;
   margin: 12px 0 4px;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 24px;
   outline: none;
   color: var(--color-text-primary);
@@ -6078,7 +6157,11 @@ body:has(.dialog-backdrop, .modal-backdrop) .shape-delete-button {
  * the two differ — a dark app with the document theme pinned light — the UA
  * system colors inside the popups resolve to their dark variants: the menu
  * item buttons only carry Univer's dark-mode text class, so their labels turn
+<<<<<<< ours
  * white on the light menu surface and vanish. Track Univer's
+=======
+ * white on the light menu surface and vanish (genoffice#2041). Track Univer's
+>>>>>>> theirs
  * own dark flag so its popups get the UA scheme matching what they render. */
 .univer-popup {
   color-scheme: light;
@@ -6177,6 +6260,10 @@ body:has(.dialog-backdrop, .modal-backdrop) .shape-delete-button {
 
 .app-toast.success .app-toast-icon {
   color: var(--sheets-toast-ok);
+}
+
+.app-toast.info .app-toast-icon {
+  color: var(--accent);
 }
 
 /* Shape gallery dropdown (slides/docs parity: grouped, outline-icon grid) */
@@ -6594,6 +6681,7 @@ body:has(.dialog-backdrop, .modal-backdrop) .shape-delete-button {
 }
 
 /* Spelling panel (F7 / Review ▸ Proofing) rides the find-replace panel chrome;
+<<<<<<< ours
    these only add its selected row and the suggestion chips. The panel is not
    draggable, so its header drops the move cursor; the root takes focus
    programmatically (Escape), which needs no ring. */
@@ -6625,6 +6713,13 @@ body:has(.dialog-backdrop, .modal-backdrop) .shape-delete-button {
 .find-replace-panel.spell-panel .fr-results tbody tr:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+=======
+   these only add its note line, selected row and the suggestion chips. */
+
+.find-replace-panel .spell-note {
+  font-size: 11px;
+  color: var(--text-muted);
+>>>>>>> theirs
 }
 
 .find-replace-panel .fr-results tbody tr.spell-selected {
@@ -7652,6 +7747,7 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   align-self: flex-start;
 }
 
+<<<<<<< ours
 /* ---- web frame: no workbook engine yet (UNI-1016, EngineUnavailableScreen.tsx) ---- */
 .engine-unavailable {
   display: grid;
@@ -8261,6 +8357,8 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   color: var(--color-text-tertiary);
 }
 
+=======
+>>>>>>> theirs
 /* ── Withholding cells from the model ─────────────────────────────────────
  * The dialog itself wears the app's .modal-backdrop / .modal chrome; only
  * the three pieces unique to a redaction are added here. The placeholder
@@ -8272,11 +8370,14 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   line-height: 1.5;
 }
 
+<<<<<<< ours
 .redact-dialog-scope {
   display: block;
   margin-top: 6px;
 }
 
+=======
+>>>>>>> theirs
 .redact-dialog-range {
   margin: 0 0 12px;
   font-size: 12px;
@@ -8301,7 +8402,11 @@ body > div:has([data-u-comp='find-replace-dialog']) {
    the other is open rather than covering it. */
 .note-pictures-pane {
   position: fixed;
+<<<<<<< ours
   top: calc(96px + var(--uw-disc-bar-h, 0px));
+=======
+  top: 96px;
+>>>>>>> theirs
   right: 24px;
   bottom: 48px;
   z-index: 121;
@@ -8315,8 +8420,12 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   overflow: hidden;
 }
 
+<<<<<<< ours
 body:has(.note-pictures-pane) .threaded-comments-pane,
 body:has(.note-pictures-pane) .sheets-server-comments {
+=======
+body:has(.note-pictures-pane) .threaded-comments-pane {
+>>>>>>> theirs
   right: 380px;
 }
 

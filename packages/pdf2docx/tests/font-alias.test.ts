@@ -53,11 +53,19 @@ describe('PDF font aliases in DOCX', () => {
     const spans = ir.irPages.flatMap((p) =>
       p.blocks.flatMap((b) => (b.kind === 'text' ? b.lines.flatMap((l) => l.spans) : [])),
     )
+<<<<<<< ours
     expect(spans.map((s) => s.text).join('')).toBe('審查意見')
     const result = await convertPdfToDocx(pdf, { pdfium })
     const zip = await JSZip.loadAsync(result.docx)
     const xml = await zip.file('word/document.xml')!.async('string')
     expect(xml).toContain('審查意見')
+=======
+    expect(spans.map((s) => s.text).join('')).toBe('\u5be9\u67e5\u610f\u898b')
+    const result = await convertPdfToDocx(pdf, { pdfium })
+    const zip = await JSZip.loadAsync(result.docx)
+    const xml = await zip.file('word/document.xml')!.async('string')
+    expect(xml).toContain('\u5be9\u67e5\u610f\u898b')
+>>>>>>> theirs
     expect(xml).toContain(`w:eastAsia="${family}"`)
     expect(xml).not.toContain('DFKai Shu SB Estd BF')
     expect(spans.map((s) => s.fontFamily)).toEqual([family])

@@ -30,6 +30,17 @@ export const pl = {
   appExportPdfProgress: 'Eksportowanie pliku PDF…',
   appExportPdfDone: 'Wyeksportowano plik PDF: {path}',
   appExportPdfFailed: 'Eksport pliku PDF nie powiódł się: {error}',
+  appExportVideoTitle: 'Eksportuj jako wideo',
+  appExportVideoResolution: 'Rozdzielczość',
+  appExportVideoSeconds: 'Sekund na każdy slajd',
+  appExportVideoUseTimings: 'Użyj nagranych czasów i narracji, jeśli istnieją',
+  appExportVideoCreate: 'Utwórz wideo',
+  appExportVideoCancel: 'Anuluj',
+  appExportVideoProgress: 'Kodowanie wideo… {percent}%',
+  appExportVideoDone: 'Wideo wyeksportowano: {path}',
+  appExportVideoFailed: 'Eksport wideo nie powiódł się: {error}',
+  appExportVideoUnsupported:
+    'W tym systemie nie ma kodera wideo H.264, eksport MP4 jest niemożliwy',
   appStatusBgAppliedAll: 'Zastosowano kolor tła do wszystkich slajdów',
   appStatusThemeApplied: 'Zastosowano motyw „{name}”',
   appStatusThemeApplyFailed: 'Nie udało się zastosować motywu: {error}',
@@ -68,6 +79,10 @@ export const pl = {
   appStatusAudioInserted: 'Wstawiono dźwięk (osadzony w pliku .pptx)',
   appStatusModel3dInserted:
     'Wstawiono model 3D: zaznacz go, aby go obrócić (PowerPoint także pokazuje go w 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'Nie można tutaj narysować modelu 3D; jego obraz pozostaje bez zmian',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'Nagranie jest puste; niczego nie wstawiono',
   appStatusRecordingInserted: 'Wstawiono nagranie ekranu na bieżący slajd (osadzony plik webm)',
   appStatusRecording:
@@ -203,6 +218,7 @@ export const pl = {
   appCtxSendToBack: 'Przesuń na spód',
   appCtxBringForward: 'Przesuń do przodu',
   appCtxSendBackward: 'Przesuń do tyłu',
+  appCtxRotate: 'Obróć',
   appCtxRotateLeft90: 'Obróć o 90° w lewo',
   appCtxRotateRight90: 'Obróć o 90° w prawo',
   appCtxFlipH: 'Przerzuć w poziomie',
@@ -273,6 +289,25 @@ export const pl = {
     'Łączny czas pokazu wyniósł {duration}. Czy zapisać czasy wyświetlania slajdów do automatycznego przełączania?',
   appRehearseDiscard: 'Nie zapisuj',
   appRehearseSave: 'Zapisz',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Nagraj narrację',
+  appRecordSummary: 'Czas nagrania: {duration}. Zapisać narrację i czas każdego slajdu?',
+  appRecordDiscard: 'Nie zapisuj',
+  appRecordSave: 'Zapisz',
+  appStatusRecordSaved: 'Zapisano narrację na slajdach: {count} (odtwarza ją także PowerPoint)',
+  appStatusRecordFailed: 'Nie udało się zapisać nagrania',
+  appStatusNarrationCleared: 'Wyczyszczono narrację',
+  appSettingsTitle: 'Ustawienia AI',
+  appSettingsAccount: 'Konto Genspark',
+  appSettingsChecking: 'Sprawdzanie…',
+  appSettingsLoggedIn: 'Zalogowano',
+  appSettingsLoggedInEmail: 'Zalogowano: {email}',
+  appSettingsLoggedOut: 'Nie zalogowano (funkcje AI wymagają konta Genspark)',
+  appSettingsLoginPending: 'Oczekiwanie na logowanie w przeglądarce…',
+  appSettingsLogin: 'Zaloguj się do Genspark',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Anuluj',
   appCropHint: 'Enter — potwierdź · Esc — anuluj · Kliknij poza obszarem, aby potwierdzić',
   appStatusZoomsInserted:

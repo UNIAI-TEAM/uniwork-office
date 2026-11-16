@@ -92,7 +92,11 @@ export function registerIntegrationsIpc(
       skillVersion: skill.version,
       skillNeedsCli: /^\s+cli:\s*['"]?>=\s*(\d+\.\d+\.\d+)/m.exec(skill.text)?.[1] ?? '',
       agents: detectAgents().map((a) => ({ ...a, state: readInstallState(a.skillsDir, skill, l) })),
+<<<<<<< ours
       legacy,
+=======
+      legacy: findLegacySkillCopies(l),
+>>>>>>> theirs
     }
   })
 
@@ -114,14 +118,20 @@ export function registerIntegrationsIpc(
     },
   )
 
+<<<<<<< ours
   ipc.handle(INTEGRATIONS_CHANNELS.sweepLegacySkillCopies, (): LegacySweepResult => {
     const l = ledger()
     const beforeKeys = Object.keys(l).length
+=======
+  ipcMain.handle(INTEGRATIONS_CHANNELS.sweepLegacySkillCopies, (): LegacySweepResult => {
+    const l = ledger()
+>>>>>>> theirs
     // without the current copy the legacy ones are all the user has
     if (!currentSkillInstalled(l)) {
       throw new Error('the shared .agents copy is not installed yet')
     }
     const sweep = sweepLegacySkillCopies(l)
+<<<<<<< ours
     if (sweep.removed.length || Object.keys(l).length !== beforeKeys) saveLedger(l)
     return sweep
   })
@@ -133,6 +143,22 @@ export function registerIntegrationsIpc(
     if (uninstallSkill(target.skillsDir, l)) saveLedger(l)
     return stateOf(target.skillsDir)
   })
+=======
+    if (sweep.removed.length) saveLedger(l)
+    return sweep
+  })
+
+  ipcMain.handle(
+    INTEGRATIONS_CHANNELS.uninstallSkill,
+    (_e, agentId: AgentId): SkillInstallState => {
+      const target = agentTarget(agentId)
+      if (!target) throw new Error('unknown skill target')
+      const l = ledger()
+      if (uninstallSkill(target.skillsDir, l)) saveLedger(l)
+      return stateOf(target.skillsDir)
+    },
+  )
+>>>>>>> theirs
 
   // dialog titles come from the renderer, which owns the UI language
   ipc.handle(
@@ -171,6 +197,7 @@ export function registerIntegrationsIpc(
     if (typeof text === 'string') clipboard.writeText(text)
   })
 
+<<<<<<< ours
   ipc.handle(INTEGRATIONS_CHANNELS.listSkills, async (): Promise<FoundSkill[]> =>
     usableSkills(app.getPath('userData')),
   )
@@ -193,6 +220,32 @@ export function registerIntegrationsIpc(
     const roots = [skillsRoot(app.getPath('userData')), deps.recommendedSkillsDir]
     if (!roots.some((root) => isKnownSkillPath(path, root))) {
       throw new Error('skill-import:unknown-skill')
+=======
+  ipcMain.handle(INTEGRATIONS_CHANNELS.listSkills, async (): Promise<FoundSkill[]> =>
+    usableSkills(app.getPath('userData')),
+  )
+
+  ipcMain.handle(INTEGRATIONS_CHANNELS.removeSkill, (_e, name: string): void => {
+    removeSkill(name, app.getPath('userData'))
+  })
+
+  ipcMain.handle(
+    INTEGRATIONS_CHANNELS.listRecommendedSkills,
+    async (): Promise<RecommendedSkill[]> =>
+      recommendedSkills(deps.recommendedSkillsDir, app.getPath('userData')),
+  )
+
+  ipcMain.handle(INTEGRATIONS_CHANNELS.installRecommendedSkill, (_e, name: unknown): FoundSkill => {
+    if (typeof name !== 'string') throw new Error('unknown skill')
+    return installRecommendedSkill(name, deps.recommendedSkillsDir, app.getPath('userData'))
+  })
+
+  ipcMain.handle(INTEGRATIONS_CHANNELS.skillBody, (_e, path: string): string => {
+    // the path came from the renderer, so it is only a file we just listed
+    const roots = [skillsRoot(app.getPath('userData')), deps.recommendedSkillsDir]
+    if (!roots.some((root) => isKnownSkillPath(path, root))) {
+      throw new Error('unknown skill')
+>>>>>>> theirs
     }
     return readSkillBody(path)
   })
@@ -205,7 +258,11 @@ export function registerIntegrationsIpc(
     return r.canceled ? null : (r.filePaths[0] ?? null)
   }
 
+<<<<<<< ours
   ipc.handle(
+=======
+  ipcMain.handle(
+>>>>>>> theirs
     INTEGRATIONS_CHANNELS.importSkillFolder,
     async (_e, title: string): Promise<FoundSkill | null> => {
       const dir = await pick({ title: String(title ?? ''), properties: ['openDirectory'] })
@@ -213,7 +270,11 @@ export function registerIntegrationsIpc(
     },
   )
 
+<<<<<<< ours
   ipc.handle(
+=======
+  ipcMain.handle(
+>>>>>>> theirs
     INTEGRATIONS_CHANNELS.importSkillZip,
     async (_e, title: string): Promise<FoundSkill | null> => {
       const file = await pick({

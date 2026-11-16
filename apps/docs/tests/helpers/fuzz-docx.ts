@@ -374,6 +374,10 @@ function commentsExtendedPartXml(comments: FuzzComment[]): string {
 }
 
 const COMMENT_AUTHORS = ['Fuzz', 'Reviewer', 'Editor']
+<<<<<<< ours
+=======
+
+>>>>>>> theirs
 export async function buildFuzzDocx(seed: number): Promise<Uint8Array> {
   const r = rng(seed * 7919 + 17)
   const blocks: string[] = [`<w:p><w:r><w:t>Anchor seed ${seed}</w:t></w:r></w:p>`]

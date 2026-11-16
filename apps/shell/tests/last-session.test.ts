@@ -1,3 +1,4 @@
+<<<<<<< ours
 import { accessSync, constants, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -20,6 +21,10 @@ vi.mock('node:fs', async (importOriginal) => {
     accessSync: vi.fn(actual.accessSync),
   }
 })
+=======
+import { describe, expect, it } from 'vitest'
+import { launchPathsWithLastSession, readLastSessionDocuments } from '../src/main/last-session'
+>>>>>>> theirs
 
 const all = () => true
 
@@ -41,6 +46,7 @@ describe('readLastSessionDocuments', () => {
     const many = Array.from({ length: 500 }, (_, i) => `/doc-${i}.md`)
     expect(readLastSessionDocuments({ lastSessionDocuments: many })).toHaveLength(50)
   })
+<<<<<<< ours
 
   it('skips paths inside the UniWork store and under unreachable folder roots', () => {
     const list = [
@@ -59,17 +65,29 @@ describe('readLastSessionDocuments', () => {
       '/local/c.pptx',
     ])
   })
+=======
+>>>>>>> theirs
 })
 
 describe('launchPathsWithLastSession', () => {
   const saved = { lastSessionDocuments: ['/a.docx', '/gone.pptx', '/b.xlsx'] }
 
+<<<<<<< ours
   it('opens only the launch paths while the setting is off', () => {
     expect(launchPathsWithLastSession(saved, ['/c.pdf'], all)).toEqual(['/c.pdf'])
   })
 
   it('restores existing documents first, then the launch paths, without duplicates', () => {
     const settings = { ...saved, restoreLastSession: true }
+=======
+  it('opens only the launch paths once switched off', () => {
+    const settings = { ...saved, restoreLastSession: false }
+    expect(launchPathsWithLastSession(settings, ['/c.pdf'], all)).toEqual(['/c.pdf'])
+  })
+
+  it('restores by default: existing documents first, then the launch paths, without duplicates', () => {
+    const settings = saved
+>>>>>>> theirs
     const exists = (p: string) => p !== '/gone.pptx'
     expect(launchPathsWithLastSession(settings, ['/b.xlsx', '/c.pdf'], exists)).toEqual([
       '/a.docx',
@@ -77,6 +95,7 @@ describe('launchPathsWithLastSession', () => {
       '/c.pdf',
     ])
   })
+<<<<<<< ours
 
   it('drops stored paths that fall inside the UniWork store or an unreachable root at launch', () => {
     const settings = {
@@ -359,4 +378,6 @@ describe('createSessionSnapshotRecorder', () => {
 
     expect(writes).toEqual([['/shell/s.docx', '/detached/d.xlsx'], ['/shell/fresh.docx']])
   })
+=======
+>>>>>>> theirs
 })

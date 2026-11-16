@@ -30,6 +30,16 @@ export const ko = {
   appExportPdfProgress: 'PDF 내보내는 중…',
   appExportPdfDone: 'PDF 내보내기 완료: {path}',
   appExportPdfFailed: 'PDF 내보내기 실패: {error}',
+  appExportVideoTitle: '비디오로 내보내기',
+  appExportVideoResolution: '해상도',
+  appExportVideoSeconds: '각 슬라이드 표시 시간(초)',
+  appExportVideoUseTimings: '녹음된 시간 및 설명이 있으면 사용',
+  appExportVideoCreate: '비디오 만들기',
+  appExportVideoCancel: '취소',
+  appExportVideoProgress: '비디오 인코딩 중… {percent}%',
+  appExportVideoDone: '비디오를 내보냈습니다: {path}',
+  appExportVideoFailed: '비디오 내보내기 실패: {error}',
+  appExportVideoUnsupported: '이 시스템에는 H.264 비디오 인코더가 없어 MP4를 내보낼 수 없습니다',
   appStatusBgAppliedAll: '배경색을 모든 슬라이드에 적용했습니다',
   appStatusThemeApplied: '테마 "{name}"을(를) 적용했습니다',
   appStatusThemeApplyFailed: '테마 적용 실패: {error}',
@@ -63,6 +73,10 @@ export const ko = {
   appStatusAudioInserted: '오디오를 삽입했습니다(pptx에 포함됨)',
   appStatusModel3dInserted:
     '3D 모델을 삽입했습니다: 선택하면 회전할 수 있습니다(PowerPoint에서도 3D로 표시됨)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: '여기서 3D 모델을 그릴 수 없습니다. 그림은 바뀌지 않았습니다',
+>>>>>>> theirs
   appStatusRecordingEmpty: '녹화 내용이 비어 있어 삽입하지 않았습니다',
   appStatusRecordingInserted: '화면 녹화를 현재 슬라이드에 삽입했습니다(webm 포함)',
   appStatusRecording: '화면 녹화 중… "화면 녹화"를 다시 클릭하면 중지하고 삽입합니다',
@@ -192,6 +206,7 @@ export const ko = {
   appCtxSendToBack: '맨 뒤로 보내기',
   appCtxBringForward: '앞으로 가져오기',
   appCtxSendBackward: '뒤로 보내기',
+  appCtxRotate: '회전',
   appCtxRotateLeft90: '왼쪽으로 90° 회전',
   appCtxRotateRight90: '오른쪽으로 90° 회전',
   appCtxFlipH: '좌우 대칭',
@@ -259,6 +274,25 @@ export const ko = {
     '슬라이드 쇼에 걸린 시간은 {duration}입니다. 각 슬라이드의 표시 시간을 자동 전환 시간으로 저장하시겠습니까?',
   appRehearseDiscard: '저장 안 함',
   appRehearseSave: '저장',
+<<<<<<< ours
+=======
+  appRecordTitle: '내레이션 녹음',
+  appRecordSummary: '녹음 길이 {duration}. 각 슬라이드의 내레이션과 표시 시간을 저장하시겠습니까?',
+  appRecordDiscard: '저장 안 함',
+  appRecordSave: '저장',
+  appStatusRecordSaved: '슬라이드 {count}개에 내레이션을 저장했습니다(PowerPoint에서도 재생됨)',
+  appStatusRecordFailed: '녹음을 저장할 수 없습니다',
+  appStatusNarrationCleared: '내레이션을 지웠습니다',
+  appSettingsTitle: 'AI 설정',
+  appSettingsAccount: 'Genspark 계정',
+  appSettingsChecking: '확인 중…',
+  appSettingsLoggedIn: '로그인됨',
+  appSettingsLoggedInEmail: '로그인됨: {email}',
+  appSettingsLoggedOut: '로그인되지 않음(AI 기능을 사용하려면 Genspark 계정으로 로그인해야 합니다)',
+  appSettingsLoginPending: '브라우저 로그인을 기다리는 중…',
+  appSettingsLogin: 'Genspark 로그인',
+  appSettingsModel: '모델',
+>>>>>>> theirs
   appSettingsCancel: '취소',
   appCropHint: 'Enter 확인 · Esc 취소 · 바깥쪽 클릭으로 확인',
   appStatusZoomsInserted:

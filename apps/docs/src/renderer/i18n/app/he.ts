@@ -383,6 +383,8 @@ export const he = {
   appLangHindi: 'הינדית',
   appLangTraditionalChinese: 'סינית מסורתית',
   appLangVietnamese: 'וייטנאמית',
+  appLangTurkish: 'טורקית',
+  appLangHungarian: 'הונגרית',
   appWrapTextMenu: 'גלישת טקסט',
   appViewImage: 'הצג תמונה',
   appSaveImageAs: 'שמור תמונה בשם…',
@@ -536,6 +538,7 @@ export const he = {
   appUpdateStyleTip: 'עדכון סגנון זה לפי הקטע המסומן הנוכחי (נכתב חזרה אל styles.xml)',
   appNewStyleFromSelection: 'סגנון חדש מהקטע המסומן הנוכחי',
   appStyleNamePlaceholder: 'שם הסגנון',
+<<<<<<< ours
   appWebConflictTitle: 'מסמך זה שונה במקום אחר',
   appWebConflictBody: 'השינויים שלך עדיין לא ב-UniWork והם נשמרים בדפדפן הזה עד שתתנתק.',
   appWebConflictOverwrite: 'דריסה…',
@@ -576,6 +579,11 @@ export const he = {
     'המסמך הזה מוגן בסיסמה. המסמכים הממוזגים נשמרים כקבצים רגילים ללא סיסמה, ולכן כל מי שיפתח אותם יוכל לקרוא את התוכן. למזג בכל זאת?',
   appMergeWarnUniwork:
     'המסמך הזה שייך ל-UniWork. המסמכים הממוזגים נשמרים במחשב שלך כקבצים מקומיים רגילים מחוץ ל-UniWork. למזג בכל זאת?',
+=======
+  appMergeSourceLoaded: '{name} נטען ({n} רשומות)',
+  appMergeWritten: 'נכתבו {n} מסמכים',
+  appMergeNothingToWrite: 'אין מה לכתוב',
+>>>>>>> theirs
   appReviewPaneTitle: 'שינויים',
   appReviewPaneCount: '{n} שינויים',
   appReviewPaneHidden: '{n} מוסתרים על ידי מסננים',

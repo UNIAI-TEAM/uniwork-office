@@ -1,3 +1,4 @@
+<<<<<<< ours
 import { existsSync, writeFileSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -13,6 +14,14 @@ vi.mock('node:fs', async (importOriginal) => {
   }
 })
 
+=======
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { duplicateDocumentFile } from '../src/main/tab-duplicate'
+
+>>>>>>> theirs
 let directory: string
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'tab-duplicate-'))
@@ -53,6 +62,7 @@ describe('shared document duplication', () => {
     expect(deps.onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'ENOENT' }))
     expect(deps.recordRecentFile).not.toHaveBeenCalled()
   })
+<<<<<<< ours
 
   it('does not overwrite a target created between candidate selection and publication, and uses the next suffix', async () => {
     const source = join(directory, 'report.docx')
@@ -91,4 +101,6 @@ describe('shared document duplication', () => {
     expect(await readFile(racedTarget, 'utf8')).toBe('competing writer bytes')
     expect(await readFile(target!, 'utf8')).toBe('duplicated bytes')
   })
+=======
+>>>>>>> theirs
 })

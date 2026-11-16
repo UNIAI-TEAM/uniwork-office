@@ -157,6 +157,7 @@ export function compareDocuments(left: PageText[], right: PageText[]): CompareRe
     equal: pages.every((p) => p.addedCount === 0 && p.removedCount === 0),
   }
 }
+<<<<<<< ours
 
 /** The fixed reasons the main process gives for a document it cannot read for Compare. The
     renderer shows a translated sentence instead of the internal English string. */
@@ -166,3 +167,5 @@ const UNREADABLE_REASONS = new Set([
 ])
 
 export const isCompareUnreadable = (reason: string): boolean => UNREADABLE_REASONS.has(reason)
+=======
+>>>>>>> theirs

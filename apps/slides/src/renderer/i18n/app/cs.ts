@@ -30,6 +30,17 @@ export const cs = {
   appExportPdfProgress: 'Exportuje se PDF…',
   appExportPdfDone: 'Exportováno PDF: {path}',
   appExportPdfFailed: 'Export PDF se nezdařil: {error}',
+  appExportVideoTitle: 'Exportovat jako video',
+  appExportVideoResolution: 'Rozlišení',
+  appExportVideoSeconds: 'Sekund na každém snímku',
+  appExportVideoUseTimings: 'Použít nahrané časování a komentáře, pokud existují',
+  appExportVideoCreate: 'Vytvořit video',
+  appExportVideoCancel: 'Zrušit',
+  appExportVideoProgress: 'Kódování videa… {percent} %',
+  appExportVideoDone: 'Video exportováno: {path}',
+  appExportVideoFailed: 'Export videa se nezdařil: {error}',
+  appExportVideoUnsupported:
+    'V tomto systému není k dispozici kodér videa H.264, export MP4 není možný',
   appStatusBgAppliedAll: 'Barva pozadí použita na všechny snímky',
   appStatusThemeApplied: 'Použit motiv „{name}“',
   appStatusThemeApplyFailed: 'Použití motivu se nezdařilo: {error}',
@@ -64,6 +75,10 @@ export const cs = {
   appStatusAudioInserted: 'Zvuk vložen (vložený v .pptx)',
   appStatusModel3dInserted:
     '3D model vložen: po výběru ho můžete otáčet (PowerPoint ho také zobrazí ve 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: '3D model tu nelze vykreslit; jeho obrázek zůstává beze změny',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'Nahrávka je prázdná; nic nebylo vloženo',
   appStatusRecordingInserted: 'Nahrávka obrazovky vložena na aktuální snímek (vložené webm)',
   appStatusRecording: 'Nahrává se… dalším kliknutím na „Nahrávání obrazovky“ zastavíte a vložíte',
@@ -196,6 +211,7 @@ export const cs = {
   appCtxSendToBack: 'Přenést do pozadí',
   appCtxBringForward: 'Přenést blíž',
   appCtxSendBackward: 'Přenést dál',
+  appCtxRotate: 'Otočit',
   appCtxRotateLeft90: 'Otočit vlevo o 90°',
   appCtxRotateRight90: 'Otočit vpravo o 90°',
   appCtxFlipH: 'Překlopit vodorovně',
@@ -265,6 +281,25 @@ export const cs = {
     'Celková doba prezentace byla {duration}. Chcete uložit časování snímků pro automatické přepínání?',
   appRehearseDiscard: 'Neukládat',
   appRehearseSave: 'Uložit',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Nahrát komentář',
+  appRecordSummary: 'Délka nahrávky: {duration}. Uložit komentář a čas každého snímku?',
+  appRecordDiscard: 'Neukládat',
+  appRecordSave: 'Uložit',
+  appStatusRecordSaved: 'Komentář uložen na snímcích: {count} (přehraje ho i PowerPoint)',
+  appStatusRecordFailed: 'Nahrávku se nepodařilo uložit',
+  appStatusNarrationCleared: 'Komentář byl vymazán',
+  appSettingsTitle: 'Nastavení AI',
+  appSettingsAccount: 'Účet Genspark',
+  appSettingsChecking: 'Kontroluje se…',
+  appSettingsLoggedIn: 'Přihlášeno',
+  appSettingsLoggedInEmail: 'Přihlášeno: {email}',
+  appSettingsLoggedOut: 'Nepřihlášeno (funkce AI vyžadují účet Genspark)',
+  appSettingsLoginPending: 'Čeká se na přihlášení v prohlížeči…',
+  appSettingsLogin: 'Přihlásit se ke Gensparku',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Zrušit',
   appCropHint: 'Enter — potvrdit · Esc — zrušit · Kliknutím mimo potvrdíte',
   appStatusZoomsInserted: 'Vloženo zoomů: {count} – klepnutím během prezentace přejdete na snímky',

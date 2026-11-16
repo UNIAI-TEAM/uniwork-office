@@ -9,6 +9,14 @@ export const ms = {
   redactDialogPlaceholder: 'Nama placeholder, cth. telefon pelanggan',
   redactCancel: 'Batal',
   redactInsert: 'Sembunyikan',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'Fail ini telah diubah oleh program lain.',
+  diskConflictMsg: 'Fail ini berubah pada cakera; menyimpan akan menulis ganti perubahan itu.',
+  diskReload: 'Muat semula',
+  diskKeepMine: 'Kekalkan milik saya',
+  diskOverwrite: 'Tulis ganti juga',
+>>>>>>> theirs
 
   loading: 'Memuatkan…',
   loadFailed: 'Tidak dapat membuka fail',
@@ -76,6 +84,7 @@ export const ms = {
   linkNeedsSelection: 'Pilih teks dalam pratonton dahulu',
   save: 'Simpan (⌘S)',
   saveAs: 'Simpan Sebagai…',
+  aiNameFile: 'Namakan dengan AI…',
   ribbonCollapse: 'Runtuhkan Reben',
   ribbonExpand: 'Kembangkan Reben',
   ribbonGroupInsert: 'Sisip',

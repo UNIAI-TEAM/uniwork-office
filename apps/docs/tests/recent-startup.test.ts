@@ -26,7 +26,10 @@ function fixture() {
     process: { platform: 'linux' },
     docsMenuGate: null,
     isDev: false,
+<<<<<<< ours
     docsMenuAccelerator: () => undefined,
+=======
+>>>>>>> theirs
     readJson: () => paths,
     RECENT_PATH: () => '/synthetic/recent.json',
     existsSync,
@@ -40,7 +43,10 @@ function fixture() {
     checkUpdatesMenuItem: () => ({}),
     aboutMenuItem: () => ({}),
     app: { name: 'Synthetic' },
+<<<<<<< ours
 
+=======
+>>>>>>> theirs
     extraFileMenuItems: [],
     shellHooks: null,
     activeViewMenuState: () => ({}),

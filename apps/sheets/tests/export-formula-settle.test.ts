@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+<<<<<<< ours
+=======
+import { createAiDocument } from '../src/renderer/ai/create-document'
+>>>>>>> theirs
 import { handleExportCsv } from '../src/renderer/csv-export'
 import { createEditJournal } from '../src/renderer/edit-journal'
 import { FORMULA_SETTLE_TIMEOUT_MS } from '../src/renderer/formula-settle'
@@ -113,12 +117,21 @@ function harness(pendingFormula = true) {
 describe('exports right after the load wait for the formula results', () => {
   let exportCsv: ReturnType<typeof vi.fn>
   let exportPdf: ReturnType<typeof vi.fn>
+<<<<<<< ours
+=======
+  let createDocument: ReturnType<typeof vi.fn>
+>>>>>>> theirs
 
   beforeEach(() => {
     setModuleLang('en')
     exportCsv = vi.fn().mockResolvedValue({ canceled: false, path: 'D:/book.csv' })
     exportPdf = vi.fn().mockResolvedValue({ canceled: false, path: 'D:/book.pdf' })
+<<<<<<< ours
     vi.stubGlobal('window', { desktopApi: { exportCsv, exportPdf } })
+=======
+    createDocument = vi.fn().mockResolvedValue({ ok: true, path: 'D:/book.csv' })
+    vi.stubGlobal('window', { desktopApi: { exportCsv, exportPdf, createDocument } })
+>>>>>>> theirs
   })
 
   afterEach(() => {
@@ -156,6 +169,31 @@ describe('exports right after the load wait for the formula results', () => {
     expect(exportCsv).not.toHaveBeenCalled()
   })
 
+<<<<<<< ours
+=======
+  it('the AI create_document CSV path waits for the pass', async () => {
+    const h = harness()
+    const created = createAiDocument(h.csvContext, { type: 'csv', title: 'book' })
+    await tick()
+    expect(h.calculate).toHaveBeenCalledTimes(1)
+    expect(createDocument).not.toHaveBeenCalled()
+
+    h.finishCalculation()
+    expect((await created).ok).toBe(true)
+    expect(createDocument.mock.calls[0]?.[0].content).toBe('2,3,6\r\n')
+  })
+
+  it('the AI create_document path of a workbook replaced during the pass fails', async () => {
+    const h = harness()
+    const created = createAiDocument(h.csvContext, { type: 'csv', title: 'book' })
+    await tick()
+    h.csvContext.lazyWorkbookRef.current = null
+    h.finishCalculation()
+    expect((await created).ok).toBe(false)
+    expect(createDocument).not.toHaveBeenCalled()
+  })
+
+>>>>>>> theirs
   it('the ribbon PDF export waits for the pass', async () => {
     const h = harness()
     const exported = handleExportPdf(h.pageLayoutContext)

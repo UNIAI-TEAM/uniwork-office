@@ -30,6 +30,18 @@ export const de = {
   appExportPdfProgress: 'PDF wird exportiert…',
   appExportPdfDone: 'PDF exportiert: {path}',
   appExportPdfFailed: 'PDF-Export fehlgeschlagen: {error}',
+  appExportVideoTitle: 'Als Video exportieren',
+  appExportVideoResolution: 'Auflösung',
+  appExportVideoSeconds: 'Anzeigedauer pro Folie (Sekunden)',
+  appExportVideoUseTimings:
+    'Aufgezeichnete Anzeigedauern und Kommentare verwenden, falls vorhanden',
+  appExportVideoCreate: 'Video erstellen',
+  appExportVideoCancel: 'Abbrechen',
+  appExportVideoProgress: 'Video wird kodiert… {percent} %',
+  appExportVideoDone: 'Video exportiert: {path}',
+  appExportVideoFailed: 'Videoexport fehlgeschlagen: {error}',
+  appExportVideoUnsupported:
+    'Auf diesem System ist kein H.264-Videoencoder verfügbar, MP4-Export ist nicht möglich',
   appStatusBgAppliedAll: 'Hintergrundfarbe auf alle Folien angewendet',
   appStatusThemeApplied: 'Design „{name}“ angewendet',
   appStatusThemeApplyFailed: 'Design konnte nicht angewendet werden: {error}',
@@ -68,6 +80,11 @@ export const de = {
   appStatusAudioInserted: 'Audio eingefügt (in die .pptx-Datei eingebettet)',
   appStatusModel3dInserted:
     '3D-Modell eingefügt: zum Drehen auswählen (PowerPoint zeigt es ebenfalls in 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview:
+    'Das 3D-Modell konnte hier nicht gezeichnet werden; sein Bild bleibt unverändert',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'Die Aufzeichnung ist leer; nichts wurde eingefügt',
   appStatusRecordingInserted:
     'Bildschirmaufzeichnung auf der aktuellen Folie eingefügt (eingebettetes WebM)',
@@ -208,6 +225,7 @@ export const de = {
   appCtxSendToBack: 'In den Hintergrund',
   appCtxBringForward: 'Eine Ebene nach vorne',
   appCtxSendBackward: 'Eine Ebene nach hinten',
+  appCtxRotate: 'Drehen',
   appCtxRotateLeft90: 'Um 90° nach links drehen',
   appCtxRotateRight90: 'Um 90° nach rechts drehen',
   appCtxFlipH: 'Horizontal spiegeln',
@@ -278,6 +296,26 @@ export const de = {
     'Die Gesamtdauer der Bildschirmpräsentation betrug {duration}. Möchten Sie die Anzeigedauer der einzelnen Folien für den automatischen Folienwechsel speichern?',
   appRehearseDiscard: 'Nicht speichern',
   appRehearseSave: 'Speichern',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Kommentar aufzeichnen',
+  appRecordSummary: 'Aufnahmedauer {duration}. Kommentar und Anzeigedauer jeder Folie speichern?',
+  appRecordDiscard: 'Nicht speichern',
+  appRecordSave: 'Speichern',
+  appStatusRecordSaved:
+    'Kommentar auf {count} Folien gespeichert (PowerPoint spielt ihn ebenfalls ab)',
+  appStatusRecordFailed: 'Die Aufnahme konnte nicht gespeichert werden',
+  appStatusNarrationCleared: 'Kommentar gelöscht',
+  appSettingsTitle: 'KI-Einstellungen',
+  appSettingsAccount: 'Genspark-Konto',
+  appSettingsChecking: 'Wird überprüft…',
+  appSettingsLoggedIn: 'Angemeldet',
+  appSettingsLoggedInEmail: 'Angemeldet: {email}',
+  appSettingsLoggedOut: 'Nicht angemeldet (KI-Funktionen erfordern ein Genspark-Konto)',
+  appSettingsLoginPending: 'Warten auf Anmeldung im Browser…',
+  appSettingsLogin: 'Bei Genspark anmelden',
+  appSettingsModel: 'Modell',
+>>>>>>> theirs
   appSettingsCancel: 'Abbrechen',
   appCropHint: 'Eingabetaste zum Bestätigen · Esc zum Abbrechen · Klick außerhalb zum Bestätigen',
   appStatusZoomsInserted:

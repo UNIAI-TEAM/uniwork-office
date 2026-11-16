@@ -6,8 +6,16 @@ import { existsSync } from 'node:fs'
 export const LAUNCHABLE_EXTS = [
   'docx',
   'doc',
+<<<<<<< ours
   'odt',
   'ott',
+=======
+  'dot',
+  'odt',
+  'ott',
+  'hwpx',
+  'hwp',
+>>>>>>> theirs
   'xlsx',
   'xlsm',
   'xls',

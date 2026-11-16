@@ -1,4 +1,7 @@
+<<<<<<< ours
 import { useModalDialog } from '../components/modal-dialog'
+=======
+>>>>>>> theirs
 import { useI18n } from '../i18n/locale'
 import { formatClock } from '../slideshow-utils'
 import type { RecordingPhase } from './use-recording'
@@ -40,6 +43,7 @@ export function RecordingBar({
     </div>
   )
 }
+<<<<<<< ours
 
 const keepTake = (): void => {}
 
@@ -74,3 +78,5 @@ export function RecordNarrationDialog({
     </div>
   )
 }
+=======
+>>>>>>> theirs

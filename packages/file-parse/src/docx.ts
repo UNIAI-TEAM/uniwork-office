@@ -1,4 +1,8 @@
 import JSZip from 'jszip'
+<<<<<<< ours
+=======
+import { XMLParser } from 'fast-xml-parser'
+>>>>>>> theirs
 import { assertZipInflatesWithinLimits, assertZipWithinLimits } from '@genoffice/docx-engine'
 import { resolveTarget } from './opc'
 
@@ -17,6 +21,10 @@ export interface DocxTextOptions {
  * 19 MB report cost a gigabyte of RSS to index six thousand characters.
  */
 export async function docxToText(bytes: Uint8Array, opts: DocxTextOptions = {}): Promise<string> {
+<<<<<<< ours
+=======
+  if (opts.maxChars !== undefined && opts.maxChars <= 0) return ''
+>>>>>>> theirs
   await assertZipInflatesWithinLimits(bytes)
   const zip = await JSZip.loadAsync(bytes)
   assertZipWithinLimits(zip)
@@ -24,6 +32,7 @@ export async function docxToText(bytes: Uint8Array, opts: DocxTextOptions = {}):
   const documentXml = docPath ? await zip.file(docPath)?.async('string') : undefined
   if (!documentXml) throw new Error('docx: main document part not found')
   const dir = docPath!.slice(0, docPath!.lastIndexOf('/') + 1)
+<<<<<<< ours
   const styleFacts = paragraphStyleFacts(await zip.file(`${dir}styles.xml`)?.async('string'))
   const out = new TextSink(opts.maxChars ?? Infinity)
   scanBody(documentXml, styleFacts, out)
@@ -33,6 +42,39 @@ export async function docxToText(bytes: Uint8Array, opts: DocxTextOptions = {}):
   ] as const) {
     if (out.full) break
     const xml = await zip.file(`${dir}${part}`)?.async('string')
+=======
+  const parts = new Map<string, string>([
+    ['styles', `${dir}styles.xml`],
+    ['footnotes', `${dir}footnotes.xml`],
+    ['endnotes', `${dir}endnotes.xml`],
+  ])
+  const relsPath = `${dir}_rels/${docPath!.slice(dir.length)}.rels`
+  const relsXml = await zip.file(relsPath)?.async('string')
+  if (relsXml) {
+    const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true })
+    const rels = parser.parse(relsXml).Relationships?.Relationship ?? []
+    for (const rel of Array.isArray(rels) ? rels : [rels]) {
+      const kind = String(rel['@_Type'] ?? '')
+        .split('/')
+        .at(-1)!
+      if (!parts.has(kind) || String(rel['@_TargetMode'] ?? '').toLowerCase() === 'external')
+        continue
+      const target = String(rel['@_Target'] ?? '').trim()
+      if (!target) continue
+      const path = resolveTarget(docPath!, target)
+      if (path) parts.set(kind, path)
+    }
+  }
+  const styleFacts = paragraphStyleFacts(await zip.file(parts.get('styles')!)?.async('string'))
+  const out = new TextSink(opts.maxChars ?? Infinity)
+  scanBody(documentXml, styleFacts, out)
+  for (const [part, title] of [
+    ['footnotes', 'Footnotes'],
+    ['endnotes', 'Endnotes'],
+  ] as const) {
+    if (out.full) break
+    const xml = await zip.file(parts.get(part)!)?.async('string')
+>>>>>>> theirs
     if (!xml) continue
     const notes = new TextSink(Infinity)
     scanBody(xml, styleFacts, notes, { notes: true })
@@ -45,6 +87,7 @@ export async function docxToText(bytes: Uint8Array, opts: DocxTextOptions = {}):
 }
 
 async function mainDocumentPath(zip: JSZip): Promise<string | null> {
+<<<<<<< ours
   if (zip.file('word/document.xml')) return 'word/document.xml'
   const rels = await zip.file('_rels/.rels')?.async('string')
   if (!rels) return null
@@ -52,6 +95,20 @@ async function mainDocumentPath(zip: JSZip): Promise<string | null> {
     const tag = m[0]
     if (!/Type="[^"]*\/officeDocument"/.test(tag) || /TargetMode="External"/.test(tag)) continue
     const target = /Target="([^"]+)"/.exec(tag)?.[1]
+=======
+  const conventional = zip.file('word/document.xml') ? 'word/document.xml' : null
+  const rels = await zip.file('_rels/.rels')?.async('string')
+  if (!rels) return conventional
+  const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true })
+  const relationships = parser.parse(rels).Relationships?.Relationship ?? []
+  for (const rel of Array.isArray(relationships) ? relationships : [relationships]) {
+    if (
+      !String(rel['@_Type'] ?? '').endsWith('/officeDocument') ||
+      String(rel['@_TargetMode'] ?? '').toLowerCase() === 'external'
+    )
+      continue
+    const target = String(rel['@_Target'] ?? '').trim()
+>>>>>>> theirs
     if (!target) continue
     // OPC targets are percent-encoded; the zip entry name is the decoded path.
     const resolved = resolveTarget('', target)
@@ -60,7 +117,11 @@ async function mainDocumentPath(zip: JSZip): Promise<string | null> {
     const path = target.replace(/^\//, '')
     if (zip.file(path)) return path
   }
+<<<<<<< ours
   return null
+=======
+  return conventional
+>>>>>>> theirs
 }
 
 interface StyleFacts {
@@ -86,6 +147,7 @@ function paragraphStyleFacts(stylesXml: string | undefined): Map<string, StyleFa
     const name = /<w:name\b[^>]*w:val="([^"]*)"/.exec(body)?.[1] ?? ''
     const byName = /^heading\s*(\d)$/i.exec(name)
     const outline = /<w:outlineLvl\b[^>]*w:val="(\d)"/.exec(body)
+<<<<<<< ours
     const heading = byName
       ? Number(byName[1])
       : /^title$/i.test(name)
@@ -94,6 +156,16 @@ function paragraphStyleFacts(stylesXml: string | undefined): Map<string, StyleFa
           ? Number(outline[1]) === 9
             ? 0
             : Number(outline[1]) + 1
+=======
+    const heading = outline
+      ? Number(outline[1]) === 9
+        ? 0
+        : Number(outline[1]) + 1
+      : byName
+        ? Number(byName[1])
+        : /^title$/i.test(name)
+          ? 1
+>>>>>>> theirs
           : undefined
     const numId = /<w:numId\b[^>]*w:val="([^"]+)"/.exec(body)?.[1]
     raw.set(id, {
@@ -254,6 +326,7 @@ function scanBody(
           const p = paras.pop()
           if (p && !noteSeparator) emitPara(p)
         }
+<<<<<<< ours
         break
       case 'w:pStyle':
         if (opening) {
@@ -291,6 +364,81 @@ function scanBody(
         break
       case 'w:vanish':
         if (opening && !/w:val="(0|false)"/.test(attrs!)) runHidden = true
+        break
+      case 'w:t':
+        inText = opening && !selfClose
+        break
+      case 'w:tab':
+      case 'w:ptab':
+        if (opening && !runHidden) appendText('\t')
+        break
+      case 'w:br':
+      case 'w:cr':
+        // page and column breaks are layout, not text (a heading that opens a column must stay one line)
+        if (opening && !runHidden && !/w:type="(page|column)"/.test(attrs!)) appendText('\n')
+        break
+      case 'w:noBreakHyphen':
+        if (opening && !runHidden) appendText('-')
+        break
+      case 'w:sym':
+        if (opening && !runHidden) {
+          const code = /w:char="([0-9A-Fa-f]{4})"/.exec(attrs!)?.[1]
+          if (code) appendText(String.fromCharCode(parseInt(code, 16)))
+        }
+        break
+      case 'w:tbl':
+        if (opening) tables.push({ rows: [], cell: null, row: null })
+        if (ending) {
+          const table = tables.pop()
+          if (table) emitRows(table)
+        }
+        break
+      case 'w:tr': {
+        const table = tables.at(-1)
+        if (!table) break
+        if (opening) {
+          table.row = []
+          table.rows.push(table.row)
+=======
+        break
+      case 'w:pStyle':
+        if (opening) {
+          const val = /w:val="([^"]*)"/.exec(attrs!)?.[1]
+          const p = paras.at(-1)
+          if (p && val) {
+            const facts = styleFacts.get(val)
+            const level = facts?.heading ?? Number(/^Heading(\d)$/.exec(val)?.[1] ?? 0)
+            if (level) p.heading = level
+            if (facts?.list) p.list = true
+          }
+        }
+        break
+      case 'w:numPr':
+        if (opening) {
+          const p = paras.at(-1)
+          if (p) p.list = true
+        }
+        break
+      case 'w:numId': {
+        // inside the paragraph's own numPr: numId 0 switches inherited numbering off
+        const p = paras.at(-1)
+        if (opening && p) p.list = !/w:val="0"/.test(attrs!)
+        break
+      }
+      case 'w:outlineLvl':
+        if (opening) {
+          const p = paras.at(-1)
+          const val = /w:val="(\d)"/.exec(attrs!)?.[1]
+          if (p && val) p.heading = Number(val) === 9 ? 0 : Number(val) + 1
+>>>>>>> theirs
+        }
+        if (ending) table.row = null
+        break
+      case 'w:r':
+        if (opening) runHidden = false
+        break
+      case 'w:vanish':
+        if (opening && !/w:val="(0|false|off)"/.test(attrs!)) runHidden = true
         break
       case 'w:t':
         inText = opening && !selfClose

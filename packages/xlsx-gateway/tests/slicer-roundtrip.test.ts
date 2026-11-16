@@ -937,6 +937,10 @@ describe('slicer state through the save planner', () => {
       [], // tabColorStates
       [], // tableEdits
       [], // cellImageAdditions
+<<<<<<< ours
+=======
+      null, // externalLinkOps
+>>>>>>> theirs
       null, // redactionStates
       state,
     )
@@ -1030,6 +1034,10 @@ describe('slicer state through the save planner', () => {
       [],
       [],
       null,
+<<<<<<< ours
+=======
+      null,
+>>>>>>> theirs
       { slicers: [{ sheetName: 'Data', ...SLICER_INPUT }], removals: [] },
     )
     const sample = await assembleWithJsZip(buffer, firstPlan)
@@ -1071,6 +1079,10 @@ describe('slicer state through the save planner', () => {
       [],
       [],
       null,
+<<<<<<< ours
+=======
+      null,
+>>>>>>> theirs
       {
         slicers: [{ sheetName: 'Data', ...SLICER_INPUT }],
         removals: [
@@ -1127,6 +1139,10 @@ describe('slicer state through the save planner', () => {
       [],
       [],
       null,
+<<<<<<< ours
+=======
+      null,
+>>>>>>> theirs
       {
         slicers: [
           {
@@ -1150,6 +1166,7 @@ describe('slicer state through the save planner', () => {
     const followWorkbook = await followed.file('xl/workbook.xml')!.async('string')
     expect(followWorkbook.match(/<definedName\b/g) ?? []).toHaveLength(1)
   })
+<<<<<<< ours
 
   it('round-trips a workbook with a slicer and a timeline (open -> save -> reopen keeps both)', async () => {
     const timelineXml =
@@ -1274,6 +1291,8 @@ describe('slicer state through the save planner', () => {
       timelineCacheXml,
     )
   })
+=======
+>>>>>>> theirs
 })
 
 // ─── Shared slicers parts: Excel keeps every slicer of a worksheet in one part

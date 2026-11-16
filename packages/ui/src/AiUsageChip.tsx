@@ -1,6 +1,10 @@
 import React from 'react'
 import type { Lang } from '@genoffice/i18n'
+<<<<<<< ours
 import type { AgentTokenUsage } from '@genoffice/agent-core'
+=======
+import { addTokenUsage, type AgentTokenUsage } from '@genoffice/agent-core'
+>>>>>>> theirs
 import { AI_USAGE_LABELS } from './strings-ai-usage'
 import './ai-usage.css'
 
@@ -14,6 +18,7 @@ export function formatTokenCount(n: number): string {
   return String(n)
 }
 
+<<<<<<< ours
 /** Add one turn's reported usage into an accumulator; sides the provider never
  * reported stay absent instead of turning into fake zeros. */
 export function addTokenUsage(
@@ -25,6 +30,14 @@ export function addTokenUsage(
   if (delta.outputTokens !== undefined)
     out.outputTokens = (out.outputTokens ?? 0) + delta.outputTokens
   return out
+=======
+export { addTokenUsage }
+
+/** whole percent of the input served from the prompt cache; null when the provider reports no cache figures */
+export function cacheHitPercent(usage: AgentTokenUsage): number | null {
+  if (usage.cacheReadTokens === undefined || !usage.inputTokens) return null
+  return Math.round((usage.cacheReadTokens / usage.inputTokens) * 100)
+>>>>>>> theirs
 }
 
 function usageText(usage: AgentTokenUsage): string {
@@ -34,6 +47,7 @@ function usageText(usage: AgentTokenUsage): string {
   return parts.join(' ')
 }
 
+<<<<<<< ours
 /** What a screen reader says for the chip: "Token usage for this reply: 1.2k input tokens, 300 output tokens". */
 export function usageAriaLabel(
   usage: AgentTokenUsage,
@@ -49,6 +63,8 @@ export function usageAriaLabel(
   return `${session ? labels.sessionTitle : labels.runTitle}: ${parts.join(', ')}`
 }
 
+=======
+>>>>>>> theirs
 /**
  * Small numeric chip showing tokens billed for a reply (or a session total).
  * Renders nothing when the provider reported nothing — usage is optional data,
@@ -66,6 +82,7 @@ export function AiUsageChip({
 }): React.JSX.Element | null {
   const text = usageText(usage)
   if (!text) return null
+<<<<<<< ours
   const title = session ? AI_USAGE_LABELS[lang].sessionTitle : AI_USAGE_LABELS[lang].runTitle
   return (
     <span
@@ -74,6 +91,15 @@ export function AiUsageChip({
       role="img"
       aria-label={usageAriaLabel(usage, lang, session)}
     >
+=======
+  const labels = AI_USAGE_LABELS[lang]
+  const hit = cacheHitPercent(usage)
+  const title =
+    (session ? labels.sessionTitle : labels.runTitle) +
+    (hit === null ? '' : ` · ${labels.cacheHit.replace('{pct}', String(hit))}`)
+  return (
+    <span className="ai-usage-chip" title={title}>
+>>>>>>> theirs
       {session ? 'Σ ' : ''}
       {text}
     </span>

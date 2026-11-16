@@ -380,6 +380,8 @@ export const zhTW = {
   appLangHindi: '印地文',
   appLangTraditionalChinese: '繁體中文',
   appLangVietnamese: '越南文',
+  appLangTurkish: '土耳其文',
+  appLangHungarian: '匈牙利文',
   appWrapTextMenu: '文繞圖',
   appViewImage: '檢視圖片',
   appSaveImageAs: '另存圖片為…',
@@ -532,6 +534,7 @@ export const zhTW = {
   appUpdateStyleTip: '用目前選取範圍的格式更新此樣式(寫回 styles.xml)',
   appNewStyleFromSelection: '從目前選取範圍建立新樣式',
   appStyleNamePlaceholder: '樣式名稱',
+<<<<<<< ours
   appWebConflictTitle: '此文件已在其他地方被修改',
   appWebConflictBody: '你的變更尚未存到 UniWork，會保留在此瀏覽器中，直到你登出。',
   appWebConflictOverwrite: '覆寫…',
@@ -572,6 +575,11 @@ export const zhTW = {
     '此文件設有開啟密碼。合併產生的文件會以不帶密碼的一般檔案儲存，任何打開它們的人都能讀取內容。仍要合併嗎？',
   appMergeWarnUniwork:
     '此文件屬於 UniWork。合併產生的文件會以一般本機檔案儲存到你的電腦，不再受 UniWork 管理。仍要合併嗎？',
+=======
+  appMergeSourceLoaded: '已載入資料來源 {name}（{n} 筆記錄）',
+  appMergeWritten: '已寫出 {n} 個文件',
+  appMergeNothingToWrite: '沒有可寫出的文件',
+>>>>>>> theirs
   appReviewPaneTitle: '修訂',
   appReviewPaneCount: '{n} 處變更',
   appReviewPaneHidden: '{n} 處被篩選隱藏',

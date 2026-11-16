@@ -81,8 +81,11 @@ export interface BuildOptions {
    * If omitted, the cached text in <a:fld> is used (which may be stale from before slides were moved).
    */
   slideNo?: number
+<<<<<<< ours
   /** The slide's p:sldId/@id (the caller reads presentation.xml); copied to RenderSlide.sldId. */
   sldId?: string
+=======
+>>>>>>> theirs
   /** Line-breaking language for text with no language tag anywhere (unset = no East Asian
    *  rules; see TextLayoutInput.defaultEaLang). */
   defaultEaLang?: DefaultEaLang
@@ -186,6 +189,14 @@ export function buildRenderSlide(
     if (node) {
       if (i < bgLeading) node.background = true
       nodes.push(node)
+    }
+    // chartUserShapes overlays ride on top of their chart, read-only like decorations
+    for (const us of el.type === 'chart' ? ((el as ChartElement).userShapes ?? []) : []) {
+      const n = buildNode(us, vp, metrics, opts.media, opts.defaultEaLang, { x: 0, y: 0 })
+      if (n && n.type !== 'placeholder-chip') {
+        n.decoration = true
+        nodes.push(n)
+      }
     }
   }
   // Hidden-slide flag (<p:sld show="0">). Same logic as the engine's readSlideHiddenXml,
@@ -330,10 +341,14 @@ function buildNodeInner(
         return buildGroup(pseudo, box, vp, metrics, media, defaultEaLang)
       }
       // OLE read-only preview: the embedded preview image stretches to fill the frame (ignoring the
-      // pic's own xfrm) over an opaque white canvas (metafile previews are often transparent)
+      // pic's own xfrm) over an opaque white canvas (metafile previews are often transparent);
+      // the pic's own spPr fill, when authored, is that canvas (PowerPoint paints it behind the preview)
       if (pt.previewPicture) {
         const pic = buildPicture({ ...pt.previewPicture, id: pt.id }, box, vp, media)
-        if (pic?.type === 'picture') pic.bgColor = '#FFFFFF'
+        if (pic?.type === 'picture') {
+          pic.ole = true
+          if (!pic.fill) pic.bgColor = '#FFFFFF'
+        }
         return pic
       }
       if (pt.noChip) return null
@@ -595,12 +610,18 @@ function buildPicture(
         rotationDeg: box.rotationDeg + m.rotationDeg,
       }
   }
-  // GDI metafiles play back on an opaque white DC: PowerPoint shows a white panel for
-  // an EMF/WMF that never paints its background (PlanS academy banner, measured)
+  // An EMF plays back on an opaque white DC: PowerPoint shows a white panel for one
+  // that never paints its background (PlanS academy banner, measured). A WMF is
+  // transparent: a legacy-deck table metafile over a tinted rectangle shows the tint.
   const isMetafile =
     typeof dataUrl === 'string' &&
+<<<<<<< ours
     (/^data:image\/(x-)?(emf|wmf|emz|wmz)[;,]/.test(dataUrl) ||
       /^genoffice-slide-media:.*[?&]mime=image%2F(?:x-)?(emf|wmf)(?:&|$)/i.test(dataUrl))
+=======
+    (/^data:image\/(x-)?(emf|emz)[;,]/.test(dataUrl) ||
+      /^genoffice-slide-media:.*[?&]mime=image%2F(?:x-)?emf(?:&|$)/i.test(dataUrl))
+>>>>>>> theirs
   const node: PictureRenderNode = {
     id: `r_${el.id}`,
     type: 'picture',
@@ -620,7 +641,10 @@ function buildPicture(
     // clrChange applies to the metafile playback result including that white DC:
     // a clrChange keyed to white recolors the backing (an alpha-0 target drops it —
     // tdf113163's black master bg shows through); other keys leave the DC white
-    ...(metafileDcColor(isMetafile, el.clrChange) ?? {}),
+    // an authored spPr fill is that DC background and is drawn behind the image instead
+    ...(el.fill && el.fill.type !== 'none'
+      ? {}
+      : (metafileDcColor(isMetafile, el.clrChange) ?? {})),
     ...(el.duotone ? { duotone: el.duotone } : {}),
     ...(el.lum ? { lum: el.lum } : {}),
     ...(el.clrChange ? { clrChange: el.clrChange } : {}),

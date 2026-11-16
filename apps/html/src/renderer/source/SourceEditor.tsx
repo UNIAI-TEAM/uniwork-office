@@ -6,7 +6,11 @@ import {
   useRef,
   useState,
 } from 'react'
+<<<<<<< ours
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
+=======
+import { EditorState } from '@codemirror/state'
+>>>>>>> theirs
 import { EditorView } from '@codemirror/view'
 import { redo, redoDepth, undo, undoDepth } from '@codemirror/commands'
 import type { RunHistoryGroup } from '@genoffice/agent-core'
@@ -65,8 +69,11 @@ interface Props {
   onBeforeReplace?: () => void
   /** only the editor's own transactions report changes; External-annotated ones are already known to the caller */
   className?: string
+<<<<<<< ours
   /** a view-only document: typing is refused, programmatic replacements still apply */
   readOnly?: boolean
+=======
+>>>>>>> theirs
   /**
    * Right-click a selection to withhold it from the model.
    *
@@ -85,7 +92,11 @@ interface MenuState extends SourceRange {
 }
 
 export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function SourceEditor(
+<<<<<<< ours
   { initialText, onChange, onCursor, onBeforeReplace, className, readOnly = false, onRedact },
+=======
+  { initialText, onChange, onCursor, onBeforeReplace, className, onRedact },
+>>>>>>> theirs
   ref,
 ) {
   const { t } = useI18n()
@@ -148,12 +159,15 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+<<<<<<< ours
   useEffect(() => {
     viewRef.current?.dispatch({
       effects: readOnlyCompartment.current.reconfigure(readOnlyExtensions(readOnly)),
     })
   }, [readOnly])
 
+=======
+>>>>>>> theirs
   /**
    * A bare caret has nothing to withhold, and the source pane keeps Chromium's own
    * menu in that case — copy, paste and the spellchecker are still worth having on

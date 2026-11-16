@@ -63,11 +63,21 @@ export class ImportRegistry {
 
   /**
    * Forget an import that has finished. The owner check keeps a slow import
+<<<<<<< ours
    * from clearing the entry of the next one that started meanwhile.
    */
   finish(owner: ImportOwner, controller: AbortController): void {
     if (this.running.get(owner) === controller) {
       this.running.delete(owner)
     }
+=======
+   * from clearing the entry of the next one that started meanwhile; returns
+   * whether this import was still the owner's current one.
+   */
+  finish(owner: ImportOwner, controller: AbortController): boolean {
+    if (this.running.get(owner) !== controller) return false
+    this.running.delete(owner)
+    return true
+>>>>>>> theirs
   }
 }

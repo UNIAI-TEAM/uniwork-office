@@ -39,6 +39,7 @@ import type { EditParagraph } from '../types'
 import {
   applyEditParagraphs,
   collectParagraphFormatPatches,
+  fontSizeDriftNote,
   levelsChanged,
   type EditParagraphFormatPatch,
 } from '../edit-text'
@@ -195,8 +196,17 @@ register({
       const childBody = textChild.text!
       const previousXml = patchSlideXml(slide)
       const before = plainText(childBody.paragraphs)
+<<<<<<< ours
       childBody.paragraphs = applyEditParagraphs(childBody.paragraphs, paragraphs)
       if (textMovedInPlace(paragraphs)) textChild.textMoved = true
+=======
+      const oldParas = childBody.paragraphs
+      childBody.paragraphs = applyEditParagraphs(oldParas, paragraphs)
+      if (textMovedInPlace(paragraphs)) textChild.textMoved = true
+      const note = freshBody
+        ? undefined
+        : fontSizeDriftNote(oldParas, paragraphs, childBody.paragraphs)
+>>>>>>> theirs
       if (autoShape) centerParagraphs(childBody.paragraphs)
       ensureRunLinkRels(ctx.opened, index, childBody.paragraphs)
       if (!patchGroupChildText(slide, groupId, textChild)) {
@@ -211,7 +221,7 @@ register({
         setGroupChildParagraphFormat(slide, groupId, id, fmt, [pi])
       }
       cleanupSupersededSlideResources(ctx.opened, slide, previousXml, patchSlideXml(slide))
-      return { op, before, after: { levelDirty: false } }
+      return { op, before, after: { levelDirty: false, note } }
     }
     const { el } = resolveElement(ctx, op, { types: ['text', 'shape'], allowPart: true })
     const te = el as TextElement
@@ -226,8 +236,15 @@ register({
     const previousXml = patchSlideXml(slide)
     const before = plainText(body.paragraphs)
     const levelDirty = levelsChanged(body.paragraphs, paragraphs)
+<<<<<<< ours
     body.paragraphs = applyEditParagraphs(body.paragraphs, paragraphs)
     if (textMovedInPlace(paragraphs)) te.textMoved = true
+=======
+    const oldParas = body.paragraphs
+    body.paragraphs = applyEditParagraphs(oldParas, paragraphs)
+    if (textMovedInPlace(paragraphs)) te.textMoved = true
+    const note = freshBody ? undefined : fontSizeDriftNote(oldParas, paragraphs, body.paragraphs)
+>>>>>>> theirs
     if (autoShape) centerParagraphs(body.paragraphs)
     // Link rels and level rematerialization are deck-slide concerns (rels live on
     // the slide part; levels resolve against the chrome being edited) — skip on parts
@@ -244,7 +261,7 @@ register({
       te.dirtyPPr = { ...te.dirtyPPr, level: true, indents: true }
       materializeSlide(ctx.opened, index)
     }
-    return { op, before, after: { levelDirty } }
+    return { op, before, after: { levelDirty, note } }
   },
 })
 

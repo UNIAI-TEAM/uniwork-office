@@ -97,8 +97,15 @@ export function handleImportCsv(ctx: DataToolsContext): void {
     void (async () => {
       // the same ceiling the open path uses (the user's setting): one limit
       // for every way a delimited file comes in
+<<<<<<< ours
       // a failed or missing settings IPC falls back to the default, never to no limit
       const limitMb = await resolveCsvImportLimitMb(() => window.desktopApi?.getCsvImportLimit?.())
+=======
+      // a failed settings IPC falls back to the default, never to no limit
+      const limitMb = await window.desktopApi
+        .getCsvImportLimit()
+        .catch(() => CSV_IMPORT_DEFAULT_LIMIT_MB)
+>>>>>>> theirs
       if (file.size > limitMb * 1024 * 1024) {
         ctx.setMessage(t('appCsvTooLarge'))
         return

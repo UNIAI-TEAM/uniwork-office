@@ -407,6 +407,8 @@ export const de = {
   appLangHindi: 'Hindi',
   appLangTraditionalChinese: 'Traditionelles Chinesisch',
   appLangVietnamese: 'Vietnamesisch',
+  appLangTurkish: 'Türkisch',
+  appLangHungarian: 'Ungarisch',
   appWrapTextMenu: 'Textumbruch',
   appViewImage: 'Bild anzeigen',
   appSaveImageAs: 'Bild speichern unter…',
@@ -562,6 +564,7 @@ export const de = {
     'Diese Formatvorlage mit der Formatierung der aktuellen Auswahl aktualisieren (wird in styles.xml zurückgeschrieben)',
   appNewStyleFromSelection: 'Neue Formatvorlage aus der aktuellen Auswahl',
   appStyleNamePlaceholder: 'Name der Formatvorlage',
+<<<<<<< ours
   appWebConflictTitle: 'Dieses Dokument wurde an anderer Stelle geändert',
   appWebConflictBody:
     'Ihre Änderungen sind noch nicht in UniWork und bleiben in diesem Browser, bis Sie sich abmelden.',
@@ -610,6 +613,11 @@ export const de = {
     'Dieses Dokument ist passwortgeschützt. Die zusammengeführten Dokumente werden als normale Dateien ohne Passwort gespeichert; jeder, der sie öffnet, kann den Inhalt lesen. Trotzdem zusammenführen?',
   appMergeWarnUniwork:
     'Dieses Dokument gehört zu UniWork. Die zusammengeführten Dokumente werden als normale lokale Dateien außerhalb von UniWork auf Ihrem Computer gespeichert. Trotzdem zusammenführen?',
+=======
+  appMergeSourceLoaded: '{name} geladen ({n} Datensätze)',
+  appMergeWritten: '{n} Dokumente geschrieben',
+  appMergeNothingToWrite: 'Es gibt nichts zu schreiben',
+>>>>>>> theirs
   appReviewPaneTitle: 'Überarbeitungen',
   appReviewPaneCount: '{n} Änderungen',
   appReviewPaneHidden: '{n} durch Filter ausgeblendet',

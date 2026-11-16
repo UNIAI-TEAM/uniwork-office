@@ -12,8 +12,11 @@ import {
 import { Dropdown } from '@genoffice/ui'
 import { AppOnlyNote } from './AppOnlyNote'
 import { PromptModal } from './PromptModal'
+<<<<<<< ours
 import { cap } from '../capabilities'
 import { shortcutAria } from '../shortcuts'
+=======
+>>>>>>> theirs
 import {
   collectTocEntriesWithPages,
   tocFieldNodes,

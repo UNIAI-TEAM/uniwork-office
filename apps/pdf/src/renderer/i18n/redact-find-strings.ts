@@ -10,8 +10,11 @@ const redactFindStrings = {
   redactPatternEmail: 'Email addresses',
   redactPatternCreditCard: 'Credit card numbers',
   redactPatternSsn: 'US Social Security numbers',
+<<<<<<< ours
   redactPatternCccd: 'Vietnamese Citizen IDs (CCCD)',
   redactPatternMst: 'Vietnamese tax IDs (MST)',
+=======
+>>>>>>> theirs
   redactPatternDate: 'Dates',
   redactPatternIban: 'IBANs',
   redactFound: 'Marked {count} item(s) for redaction. Review them, then click Apply redactions.',
@@ -30,8 +33,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: '电子邮箱',
     redactPatternCreditCard: '信用卡号',
     redactPatternSsn: '美国社会安全号码',
+<<<<<<< ours
     redactPatternCccd: '越南公民身份证号 (CCCD)',
     redactPatternMst: '越南税号 (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: '日期',
     redactPatternIban: 'IBAN 账号',
     redactFound: '已标记 {count} 处待涂黑，请核对后点击“应用涂黑”。',
@@ -48,8 +54,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: '電子郵件地址',
     redactPatternCreditCard: '信用卡號',
     redactPatternSsn: '美國社會安全號碼',
+<<<<<<< ours
     redactPatternCccd: '越南公民身分證號 (CCCD)',
     redactPatternMst: '越南稅號 (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: '日期',
     redactPatternIban: 'IBAN 帳號',
     redactFound: '已標記 {count} 處待塗黑，請核對後按一下「套用塗黑」。',
@@ -66,8 +75,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'Địa chỉ email',
     redactPatternCreditCard: 'Số thẻ tín dụng',
     redactPatternSsn: 'Số an sinh xã hội Mỹ',
+<<<<<<< ours
     redactPatternCccd: 'Căn cước công dân (CCCD)',
     redactPatternMst: 'Mã số thuế',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Ngày tháng',
     redactPatternIban: 'Số IBAN',
     redactFound: 'Đã đánh dấu {count} mục để che. Hãy kiểm tra rồi bấm Áp dụng che nội dung.',
@@ -84,8 +96,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'メールアドレス',
     redactPatternCreditCard: 'クレジットカード番号',
     redactPatternSsn: '米国社会保障番号',
+<<<<<<< ours
     redactPatternCccd: 'ベトナム国民ID (CCCD)',
     redactPatternMst: 'ベトナム税番号 (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: '日付',
     redactPatternIban: 'IBAN',
     redactFound:
@@ -104,8 +119,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: '이메일 주소',
     redactPatternCreditCard: '신용카드 번호',
     redactPatternSsn: '미국 사회보장번호',
+<<<<<<< ours
     redactPatternCccd: '베트남 시민 신분증 번호 (CCCD)',
     redactPatternMst: '베트남 납세자 번호 (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: '날짜',
     redactPatternIban: 'IBAN',
     redactFound: '{count}개 항목을 가리기 대상으로 표시했습니다. 확인 후 마스킹 적용을 클릭하세요.',
@@ -122,8 +140,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'Adresses e-mail',
     redactPatternCreditCard: 'Numéros de carte bancaire',
     redactPatternSsn: 'Numéros de sécurité sociale (US)',
+<<<<<<< ours
     redactPatternCccd: 'Carte d’identité citoyenne vietnamienne (CCCD)',
     redactPatternMst: 'Numéro fiscal vietnamien (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Dates',
     redactPatternIban: 'IBAN',
     redactFound:
@@ -142,8 +163,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'E-Mail-Adressen',
     redactPatternCreditCard: 'Kreditkartennummern',
     redactPatternSsn: 'US-Sozialversicherungsnummern',
+<<<<<<< ours
     redactPatternCccd: 'Vietnamesische Bürger-IDs (CCCD)',
     redactPatternMst: 'Vietnamesische Steuernummern (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Datumsangaben',
     redactPatternIban: 'IBANs',
     redactFound:
@@ -161,8 +185,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'Correos electrónicos',
     redactPatternCreditCard: 'Números de tarjeta de crédito',
     redactPatternSsn: 'Números de Seguro Social (EE. UU.)',
+<<<<<<< ours
     redactPatternCccd: 'Cédulas de ciudadanía vietnamitas (CCCD)',
     redactPatternMst: 'Números de identificación fiscal vietnamitas (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Fechas',
     redactPatternIban: 'IBAN',
     redactFound:
@@ -180,8 +207,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'ที่อยู่อีเมล',
     redactPatternCreditCard: 'หมายเลขบัตรเครดิต',
     redactPatternSsn: 'หมายเลขประกันสังคมสหรัฐฯ',
+<<<<<<< ours
     redactPatternCccd: 'เลขบัตรประชาชนเวียดนาม (CCCD)',
     redactPatternMst: 'เลขประจำตัวผู้เสียภาษีเวียดนาม (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'วันที่',
     redactPatternIban: 'IBAN',
     redactFound: 'ทำเครื่องหมาย {count} รายการเพื่อปิดทับแล้ว ตรวจสอบแล้วคลิกใช้การปิดทับ',
@@ -198,8 +228,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'Alamat email',
     redactPatternCreditCard: 'Nomor kartu kredit',
     redactPatternSsn: 'Nomor Jaminan Sosial AS',
+<<<<<<< ours
     redactPatternCccd: 'ID Warga Negara Vietnam (CCCD)',
     redactPatternMst: 'Nomor Pokok Wajib Pajak Vietnam (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Tanggal',
     redactPatternIban: 'IBAN',
     redactFound: '{count} item ditandai untuk disensor. Periksa, lalu klik Terapkan redaksi.',
@@ -216,8 +249,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'Адреса e-mail',
     redactPatternCreditCard: 'Номера банковских карт',
     redactPatternSsn: 'Номера социального страхования США',
+<<<<<<< ours
     redactPatternCccd: 'Гражданские ID Вьетнама (CCCD)',
     redactPatternMst: 'Налоговые номера Вьетнама (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Даты',
     redactPatternIban: 'IBAN',
     redactFound: 'Отмечено для закрашивания: {count}. Проверьте и нажмите «Применить затемнение».',
@@ -234,8 +270,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'عناوين البريد الإلكتروني',
     redactPatternCreditCard: 'أرقام بطاقات الائتمان',
     redactPatternSsn: 'أرقام الضمان الاجتماعي الأمريكية',
+<<<<<<< ours
     redactPatternCccd: 'بطاقات الهوية الوطنية الفيتنامية (CCCD)',
     redactPatternMst: 'الأرقام الضريبية الفيتنامية (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'التواريخ',
     redactPatternIban: 'أرقام IBAN',
     redactFound: 'تم تحديد {count} عنصر للتنقيح. راجعها ثم انقر على تطبيق التنقيح.',
@@ -252,8 +291,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'Endereços de e-mail',
     redactPatternCreditCard: 'Números de cartão de crédito',
     redactPatternSsn: 'Números de Seguro Social (EUA)',
+<<<<<<< ours
     redactPatternCccd: 'Identidades de cidadão vietnamita (CCCD)',
     redactPatternMst: 'Números de identificação fiscal vietnamitas (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Datas',
     redactPatternIban: 'IBAN',
     redactFound: '{count} item(ns) marcado(s) para ocultar. Revise e clique em Aplicar censura.',
@@ -270,8 +312,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'Indirizzi e-mail',
     redactPatternCreditCard: 'Numeri di carta di credito',
     redactPatternSsn: 'Numeri di previdenza sociale USA',
+<<<<<<< ours
     redactPatternCccd: 'Carte d’identità vietnamite (CCCD)',
     redactPatternMst: 'Codici fiscali vietnamiti (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Date',
     redactPatternIban: 'IBAN',
     redactFound:
@@ -289,8 +334,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'Adresy e-mail',
     redactPatternCreditCard: 'Numery kart kredytowych',
     redactPatternSsn: 'Numery ubezpieczenia społecznego USA',
+<<<<<<< ours
     redactPatternCccd: 'Wietnamskie dowody osobiste (CCCD)',
     redactPatternMst: 'Wietnamskie numery podatkowe (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Daty',
     redactPatternIban: 'Numery IBAN',
     redactFound:
@@ -308,8 +356,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'E-mailové adresy',
     redactPatternCreditCard: 'Čísla platebních karet',
     redactPatternSsn: 'Americká čísla sociálního zabezpečení',
+<<<<<<< ours
     redactPatternCccd: 'Vietnamské občanské průkazy (CCCD)',
     redactPatternMst: 'Vietnamská daňová čísla (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Data',
     redactPatternIban: 'Čísla IBAN',
     redactFound: 'Označeno k začernění: {count}. Zkontrolujte je a klikněte na Použít začernění.',
@@ -326,8 +377,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'E-mailadressen',
     redactPatternCreditCard: 'Creditcardnummers',
     redactPatternSsn: 'Amerikaanse burgerservicenummers (SSN)',
+<<<<<<< ours
     redactPatternCccd: 'Vietnamese burger-ID’s (CCCD)',
     redactPatternMst: 'Vietnamese belastingnummers (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Datums',
     redactPatternIban: 'IBAN-nummers',
     redactFound:
@@ -345,8 +399,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'Alamat e-mel',
     redactPatternCreditCard: 'Nombor kad kredit',
     redactPatternSsn: 'Nombor Keselamatan Sosial AS',
+<<<<<<< ours
     redactPatternCccd: 'ID Warganegara Vietnam (CCCD)',
     redactPatternMst: 'Nombor Cukai Vietnam (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Tarikh',
     redactPatternIban: 'IBAN',
     redactFound: '{count} item ditandakan untuk dihitamkan. Semak, kemudian klik Gunakan redaksi.',
@@ -363,8 +420,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'E-posta adresleri',
     redactPatternCreditCard: 'Kredi kartı numaraları',
     redactPatternSsn: 'ABD Sosyal Güvenlik numaraları',
+<<<<<<< ours
     redactPatternCccd: 'Vietnam Vatandaşlık Kimlik Numaraları (CCCD)',
     redactPatternMst: 'Vietnam Vergi Numaraları (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'Tarihler',
     redactPatternIban: 'IBAN numaraları',
     redactFound:
@@ -374,6 +434,27 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactFoundRotated: 'Döndürülmüş metindeki {count} eşleşme atlandı; elle işaretleyin',
     aiToolFindSensitive: 'Hassas bilgileri bul ({count} sonuç)',
   },
+<<<<<<< ours
+=======
+  hu: {
+    redactFind: 'Bizalmas adatok keresése',
+    redactFindHint:
+      'Telefonszámok, e-mail-címek, kártyaszámok és más bizalmas adatok megjelölése kitakarásra',
+    redactFindAll: 'Az összes fenti',
+    redactPatternPhone: 'Telefonszámok',
+    redactPatternEmail: 'E-mail-címek',
+    redactPatternCreditCard: 'Bankkártyaszámok',
+    redactPatternSsn: 'Amerikai társadalombiztosítási számok (SSN)',
+    redactPatternDate: 'Dátumok',
+    redactPatternIban: 'IBAN-számok',
+    redactFound:
+      '{count} elem megjelölve kitakarásra. Nézd át őket, majd kattints a „Kitakarások alkalmazása” gombra.',
+    redactFoundNone: 'Nem található egyező bizalmas információ',
+    redactFoundCapped: 'Csak az első {count} terület lett megjelölve (a kitakarási korlát elérve)',
+    redactFoundRotated: '{count} egyezés az elforgatott szövegen kimaradt; jelöld meg őket kézzel',
+    aiToolFindSensitive: 'Bizalmas adatok keresése ({count} találat)',
+  },
+>>>>>>> theirs
   he: {
     redactFind: 'איתור מידע רגיש',
     redactFindHint: 'סימון מספרי טלפון, דוא״ל, מספרי כרטיס ועוד להשחרה',
@@ -382,8 +463,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'כתובות דוא״ל',
     redactPatternCreditCard: 'מספרי כרטיסי אשראי',
     redactPatternSsn: 'מספרי ביטוח לאומי (ארה״ב)',
+<<<<<<< ours
     redactPatternCccd: 'תעודות זהות וייטנאמיות (CCCD)',
     redactPatternMst: 'מספרי מס וייטנאמיים (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'תאריכים',
     redactPatternIban: 'מספרי IBAN',
     redactFound: 'סומנו {count} פריטים להשחרה. בדקו אותם ולחצו על החלת השחרות.',
@@ -400,8 +484,11 @@ const localizedRedactFindStrings: Record<string, Partial<typeof redactFindString
     redactPatternEmail: 'ईमेल पते',
     redactPatternCreditCard: 'क्रेडिट कार्ड नंबर',
     redactPatternSsn: 'अमेरिकी सोशल सिक्योरिटी नंबर',
+<<<<<<< ours
     redactPatternCccd: 'वियतनामी नागरिक पहचान संख्या (CCCD)',
     redactPatternMst: 'वियतनामी कर पहचान संख्या (MST)',
+=======
+>>>>>>> theirs
     redactPatternDate: 'तिथियाँ',
     redactPatternIban: 'IBAN नंबर',
     redactFound:

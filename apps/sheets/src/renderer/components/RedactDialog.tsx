@@ -1,7 +1,10 @@
 import { useRedactLabelField } from '@genoffice/ui'
 
 import { useI18n } from '../i18n/locale'
+<<<<<<< ours
 import { useModalDialog } from '../modal-dialog'
+=======
+>>>>>>> theirs
 
 interface Props {
   /**
@@ -35,7 +38,10 @@ interface Props {
 export function RedactDialog({ seed, rangeLabel, onSubmit, onCancel }: Props) {
   const { t } = useI18n()
   const field = useRedactLabelField(seed, onSubmit, onCancel)
+<<<<<<< ours
   const modal = useModalDialog(onCancel)
+=======
+>>>>>>> theirs
 
   return (
     <div
@@ -44,12 +50,20 @@ export function RedactDialog({ seed, rangeLabel, onSubmit, onCancel }: Props) {
         if (e.target === e.currentTarget) onCancel()
       }}
     >
+<<<<<<< ours
       <div className="modal" role="dialog" {...modal} aria-label={t('redactMenuLabel')}>
+=======
+      <div className="modal" role="dialog" aria-modal="true" aria-label={t('redactMenuLabel')}>
+>>>>>>> theirs
         <h2>{t('redactMenuLabel')}</h2>
         <label className="redact-dialog-desc" htmlFor="gx-redact-label">
           {t('redactDialogDesc')}
           {/* the claim above is about this app's AI; the file still has the words */}
+<<<<<<< ours
           <span className="redact-dialog-scope">{t('redactDialogScope')}</span>
+=======
+          <p className="redact-dialog-scope">{t('redactDialogScope')}</p>
+>>>>>>> theirs
         </label>
         <p className="redact-dialog-range">{rangeLabel}</p>
         <div className="redact-dialog-preview" aria-live="polite">
@@ -63,7 +77,17 @@ export function RedactDialog({ seed, rangeLabel, onSubmit, onCancel }: Props) {
           placeholder={t('redactDialogPlaceholder')}
           onChange={(e) => field.setValue(e.target.value)}
           onKeyDown={(e) => {
+<<<<<<< ours
             if (e.key !== 'Escape') field.onKeyDown(e)
+=======
+            if (e.key === 'Enter' && field.label) {
+              e.preventDefault()
+              onSubmit(field.label)
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              onCancel()
+            }
+>>>>>>> theirs
           }}
         />
         <div className="modal-actions">

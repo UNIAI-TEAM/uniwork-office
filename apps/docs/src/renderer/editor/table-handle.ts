@@ -449,9 +449,13 @@ function tableHandlePlugin(): Plugin {
       resizer.addEventListener('mouseenter', cancelHide)
       resizer.addEventListener('mouseleave', scheduleHide)
       resizer.addEventListener('mousedown', onResizeDown)
+<<<<<<< ours
       // keep the document from setup: a deferred destroy can run after the global is gone
       const doc = document
       doc.addEventListener('scroll', onScroll, true)
+=======
+      document.addEventListener('scroll', onScroll, true)
+>>>>>>> theirs
 
       return {
         update(_view, prevState) {

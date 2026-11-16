@@ -555,12 +555,21 @@ class TabLayoutView {
     private storage: TabStopStorage,
   ) {
     this.measure()
+<<<<<<< ours
     this.doc.fonts?.addEventListener('loadingdone', this.onFontsLoaded)
     this.doc.addEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
     // section wrap widths / document CSS land after the first measure and
     // re-wrap TOC titles without touching the editor root's width
     this.doc.addEventListener(DOC_CSS_COMMITTED_EVENT, this.onPhasedSettled)
     this.doc.addEventListener(WRAP_WIDTHS_COMMITTED_EVENT, this.onPhasedSettled)
+=======
+    document.fonts?.addEventListener('loadingdone', this.onFontsLoaded)
+    document.addEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
+    // section wrap widths / document CSS land after the first measure and
+    // re-wrap TOC titles without touching the editor root's width
+    document.addEventListener(DOC_CSS_COMMITTED_EVENT, this.onPhasedSettled)
+    document.addEventListener(WRAP_WIDTHS_COMMITTED_EVENT, this.onPhasedSettled)
+>>>>>>> theirs
     if (typeof ResizeObserver !== 'undefined') {
       // width-only trigger: height changes on every keystroke
       this.resizeObserver = new ResizeObserver(() => {
@@ -609,10 +618,17 @@ class TabLayoutView {
   }
 
   destroy() {
+<<<<<<< ours
     this.doc.fonts?.removeEventListener('loadingdone', this.onFontsLoaded)
     this.doc.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
     this.doc.removeEventListener(DOC_CSS_COMMITTED_EVENT, this.onPhasedSettled)
     this.doc.removeEventListener(WRAP_WIDTHS_COMMITTED_EVENT, this.onPhasedSettled)
+=======
+    document.fonts?.removeEventListener('loadingdone', this.onFontsLoaded)
+    document.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
+    document.removeEventListener(DOC_CSS_COMMITTED_EVENT, this.onPhasedSettled)
+    document.removeEventListener(WRAP_WIDTHS_COMMITTED_EVENT, this.onPhasedSettled)
+>>>>>>> theirs
     this.resizeObserver?.disconnect()
     if (this.retryRaf) cancelAnimationFrame(this.retryRaf)
   }

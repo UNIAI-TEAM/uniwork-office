@@ -399,6 +399,8 @@ export const zh = {
   appLangHindi: '印地文',
   appLangTraditionalChinese: '繁体中文',
   appLangVietnamese: '越南文',
+  appLangTurkish: '土耳其文',
+  appLangHungarian: '匈牙利文',
   appWrapTextMenu: '环绕文字',
   appViewImage: '查看图片',
   appSaveImageAs: '图片另存为…',
@@ -557,6 +559,7 @@ export const zh = {
   appUpdateStyleTip: '用当前选区的格式更新此样式(写回 styles.xml)',
   appNewStyleFromSelection: '从当前选区新建样式',
   appStyleNamePlaceholder: '样式名称',
+<<<<<<< ours
   appWebConflictTitle: '此文档已在其他地方被修改',
   appWebConflictBody: '你的更改尚未存到 UniWork，会保留在此浏览器中，直到你退出登录。',
   appWebConflictOverwrite: '覆盖…',
@@ -599,6 +602,11 @@ export const zh = {
     '此文档设有打开密码。合并生成的文档将不带密码保存为普通文件，任何打开它们的人都能读取内容。仍要合并吗？',
   appMergeWarnUniwork:
     '此文档属于 UniWork。合并生成的文档将作为普通本地文件保存到你的电脑，不再受 UniWork 管理。仍要合并吗？',
+=======
+  appMergeSourceLoaded: '已加载数据源 {name}（{n} 条记录）',
+  appMergeWritten: '已写出 {n} 个文档',
+  appMergeNothingToWrite: '没有可写出的文档',
+>>>>>>> theirs
   appReviewPaneTitle: '修订',
   appReviewPaneCount: '{n} 处修订',
   appReviewPaneHidden: '{n} 处被筛选隐藏',

@@ -62,6 +62,7 @@ fn children(data: &[u8]) -> Vec<Node<'_>> {
     while pos + 8 <= data.len() {
         let ver_inst = u16le(data, pos);
         let kind = u16le(data, pos + 2);
+<<<<<<< ours
         let len = u32le(data, pos + 4);
         if kind == 0 {
             break;
@@ -74,10 +75,24 @@ fn children(data: &[u8]) -> Vec<Node<'_>> {
             data: &data[start..end],
         });
         pos = end;
+=======
+        let len = u32le(data, pos + 4) as usize;
+        if kind == 0 {
+            break;
+        }
+        let end = (pos + 8 + len).min(data.len());
+        out.push(Node {
+            ver_inst,
+            kind,
+            data: &data[pos + 8..end],
+        });
+        pos += 8 + len;
+>>>>>>> theirs
     }
     out
 }
 
+<<<<<<< ours
 /// End of a record's body, clamped to the stream. The sum is done in u64 so a
 /// declared length near `u32::MAX` cannot wrap a 32-bit `usize` (wasm32) into
 /// a small value and panic on the slice; the wasm reactor aborts on panic.
@@ -89,6 +104,8 @@ fn record_end(start: usize, len: u32, limit: usize) -> usize {
 /// hostile file, and each level costs only eight bytes of input.
 const MAX_DEPTH: usize = 16;
 
+=======
+>>>>>>> theirs
 fn is_container(ver_inst: u16) -> bool {
     ver_inst & 0xF == 0xF
 }
@@ -108,7 +125,11 @@ const PROP_BLIP_PIB: u16 = 0x0104;
 /// each carrying one image after a fixed header and an optional name.
 pub(crate) fn parse_blips(dgg: &[u8]) -> Vec<Blip> {
     let mut out = Vec::new();
+<<<<<<< ours
     for store in containers_of(dgg, BSTORE_CONTAINER, 0) {
+=======
+    for store in containers_of(dgg, BSTORE_CONTAINER) {
+>>>>>>> theirs
         for entry in children(store.data) {
             if entry.kind != BSE || entry.data.len() < 36 {
                 continue;
@@ -141,15 +162,24 @@ pub(crate) fn parse_blips(dgg: &[u8]) -> Vec<Blip> {
 }
 
 /// Every container of `kind` anywhere in the tree, outermost first.
+<<<<<<< ours
 fn containers_of<'a>(data: &'a [u8], kind: u16, depth: usize) -> Vec<Node<'a>> {
+=======
+fn containers_of<'a>(data: &'a [u8], kind: u16) -> Vec<Node<'a>> {
+>>>>>>> theirs
     let mut out = Vec::new();
     for node in children(data) {
         if node.kind == kind {
             out.push(node);
             continue;
         }
+<<<<<<< ours
         if is_container(node.ver_inst) && depth < MAX_DEPTH {
             out.extend(containers_of(node.data, kind, depth + 1));
+=======
+        if is_container(node.ver_inst) {
+            out.extend(containers_of(node.data, kind));
+>>>>>>> theirs
         }
     }
     out
@@ -160,12 +190,20 @@ fn containers_of<'a>(data: &'a [u8], kind: u16, depth: usize) -> Vec<Node<'a>> {
 pub(crate) fn parse_pictures(drawing: &[u8]) -> Vec<Picture> {
     let mut out = Vec::new();
     for node in children(drawing) {
+<<<<<<< ours
         visit(&node, 0, &mut out);
+=======
+        visit(&node, &mut out);
+>>>>>>> theirs
     }
     out
 }
 
+<<<<<<< ours
 fn visit(node: &Node<'_>, depth: usize, out: &mut Vec<Picture>) {
+=======
+fn visit(node: &Node<'_>, out: &mut Vec<Picture>) {
+>>>>>>> theirs
     if node.kind == SP_CONTAINER {
         let mut anchor: Option<[u16; 8]> = None;
         let mut blip: Option<u32> = None;
@@ -194,9 +232,15 @@ fn visit(node: &Node<'_>, depth: usize, out: &mut Vec<Picture>) {
         }
         return;
     }
+<<<<<<< ours
     if is_container(node.ver_inst) && depth < MAX_DEPTH {
         for child in children(node.data) {
             visit(&child, depth + 1, out);
+=======
+    if is_container(node.ver_inst) {
+        for child in children(node.data) {
+            visit(&child, out);
+>>>>>>> theirs
         }
     }
 }
@@ -221,6 +265,7 @@ fn blip_pib(data: &[u8]) -> Option<u32> {
     }
     None
 }
+<<<<<<< ours
 
 #[cfg(test)]
 mod tests {
@@ -281,3 +326,5 @@ mod tests {
         assert_eq!(containers_of(&data, BSTORE_CONTAINER, 0).len(), 1);
     }
 }
+=======
+>>>>>>> theirs

@@ -394,6 +394,8 @@ export const cs = {
   appLangHindi: 'hindi',
   appLangTraditionalChinese: 'tradiční čínština',
   appLangVietnamese: 'vietnamština',
+  appLangTurkish: 'turečtina',
+  appLangHungarian: 'maďarština',
   appWrapTextMenu: 'Obtékání textu',
   appViewImage: 'Zobrazit obrázek',
   appSaveImageAs: 'Uložit obrázek jako…',
@@ -547,6 +549,7 @@ export const cs = {
   appUpdateStyleTip: 'Aktualizovat tento styl podle aktuálního výběru (zapíše se do styles.xml)',
   appNewStyleFromSelection: 'Nový styl z aktuálního výběru',
   appStyleNamePlaceholder: 'Název stylu',
+<<<<<<< ours
   appWebConflictTitle: 'Tento dokument byl změněn jinde',
   appWebConflictBody:
     'Vaše změny zatím nejsou v UniWork a zůstanou v tomto prohlížeči, dokud se neodhlásíte.',
@@ -592,6 +595,11 @@ export const cs = {
     'Tento dokument je chráněn heslem. Sloučené dokumenty se uloží jako běžné soubory bez hesla, takže jejich obsah přečte každý, kdo je otevře. Přesto sloučit?',
   appMergeWarnUniwork:
     'Tento dokument patří do UniWork. Sloučené dokumenty se uloží do vašeho počítače jako běžné místní soubory mimo UniWork. Přesto sloučit?',
+=======
+  appMergeSourceLoaded: 'Načteno {name} ({n} záznamů)',
+  appMergeWritten: 'Zapsáno dokumentů: {n}',
+  appMergeNothingToWrite: 'Není co zapsat',
+>>>>>>> theirs
   appReviewPaneTitle: 'Revize',
   appReviewPaneCount: 'Změny: {n}',
   appReviewPaneHidden: 'Skryto filtry: {n}',

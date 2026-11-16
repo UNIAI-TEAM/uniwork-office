@@ -362,6 +362,7 @@ export function csvGridShape(
 }
 
 /**
+<<<<<<< ours
  * csvGridShape for the desktop import: the same single pass, but it awaits
  * `pause` every few thousand rows so the caller can hand the event loop back
  * (the scan of a 50 MB file is seconds of synchronous work otherwise, and a
@@ -391,6 +392,8 @@ export async function csvGridShapeYielding(
 }
 
 /**
+=======
+>>>>>>> theirs
  * The worksheet XML, chunk by chunk. A 40 MB CSV becomes a worksheet several
  * times its size, and building that as one string is what made the import
  * need a gigabyte of memory; the chunks go into the archive as they come.

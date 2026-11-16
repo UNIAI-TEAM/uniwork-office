@@ -39,6 +39,7 @@ describe('the delimited import progress', () => {
     }
   })
 
+<<<<<<< ours
   it('a large delimited import emits progress events in order through to completion', async () => {
     // > 512 KiB so csvRows crosses the 256 KiB PROGRESS_INTERVAL checkpoint
     // multiple times during the read phase before streaming rows in the write phase
@@ -80,6 +81,8 @@ describe('the delimited import progress', () => {
     expect(writeEvents[writeEvents.length - 1]).toEqual({ phase: 'write', fraction: 1 })
   })
 
+=======
+>>>>>>> theirs
   it('stops when the import is aborted', async () => {
     const controller = new AbortController()
     const promise = csvToXlsxBufferForOpen(CSV, 'Sheet1', ',', {
@@ -109,6 +112,7 @@ describe('the delimited import progress', () => {
     controller.abort()
     expect(() => csvGridShape(CSV, ',', { signal: controller.signal })).toThrow(/abort/i)
   })
+<<<<<<< ours
 
   describe('keeps the event loop responsive (UNI-2527)', () => {
     // The desktop import runs in the main process. A Cancel click is an IPC
@@ -169,4 +173,6 @@ describe('the delimited import progress', () => {
       expect(doneRows).toBeLessThan(30_000)
     })
   })
+=======
+>>>>>>> theirs
 })

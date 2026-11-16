@@ -86,6 +86,7 @@ function asInt(value: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
+<<<<<<< ours
 // A hostile stream can inflate to gigabytes in the shell main process; past the
 // cap the stream is left untouched (the throw lands in the catch below).
 const DEFAULT_MAX_INFLATE = 256 * 1024 * 1024
@@ -95,6 +96,13 @@ function decodeFlate(contents: Uint8Array, dict: PDFDict, maxInflate: number): U
   if (dict.get(PDFName.of('DecodeParms')) !== undefined) return null
   try {
     return new Uint8Array(inflateSync(Buffer.from(contents), { maxOutputLength: maxInflate }))
+=======
+function decodeFlate(contents: Uint8Array, dict: PDFDict): Uint8Array | null {
+  // /DecodeParms (predictors) change byte semantics — those streams stay as they are
+  if (dict.get(PDFName.of('DecodeParms')) !== undefined) return null
+  try {
+    return new Uint8Array(inflateSync(Buffer.from(contents)))
+>>>>>>> theirs
   } catch {
     return null
   }
@@ -123,7 +131,10 @@ function channelCount(name: PDFName | undefined): 1 | 3 | 4 | 0 {
 export function shrinkDocument(
   doc: PDFDocument,
   maxDimension = DEFAULT_MAX_DIMENSION,
+<<<<<<< ours
   maxInflate = DEFAULT_MAX_INFLATE,
+=======
+>>>>>>> theirs
 ): ShrinkResult {
   let streamsRecompressed = 0
   let imagesDownsampled = 0
@@ -166,7 +177,11 @@ export function shrinkDocument(
       }
       const base = baseOfMask.get(refKey(ref))
       if (base && !pairShrinksToo(base, cand)) continue
+<<<<<<< ours
       const decoded = decodeFlate(obj.contents, dict, maxInflate)
+=======
+      const decoded = decodeFlate(obj.contents, dict)
+>>>>>>> theirs
       if (!decoded || decoded.length < cand.width * cand.height * cand.channels) continue
       const scale = maxDimension / Math.max(cand.width, cand.height)
       const newWidth = Math.max(1, Math.floor(cand.width * scale))
@@ -195,7 +210,11 @@ export function shrinkDocument(
     }
 
     if (filter === '/FlateDecode') {
+<<<<<<< ours
       const decoded = decodeFlate(obj.contents, dict, maxInflate)
+=======
+      const decoded = decodeFlate(obj.contents, dict)
+>>>>>>> theirs
       if (!decoded) continue
       const packed = deflateSync(decoded, { level: 9 })
       if (packed.length >= obj.contents.length) continue

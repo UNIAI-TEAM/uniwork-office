@@ -10,6 +10,10 @@ import '@genoffice/ui/screentip.css'
 import '@genoffice/ui/ai-model-picker.css'
 import '@genoffice/ui/ai-queue-strip.css'
 import '@genoffice/ui/ai-usage.css'
+<<<<<<< ours
+=======
+import '@genoffice/ui/ai-skills.css'
+>>>>>>> theirs
 import '@genoffice/ui/color-picker.css'
 import '@genoffice/ui/dropdown.css'
 import '@genoffice/ui/ribbon-collapse.css'
@@ -75,9 +79,13 @@ async function bootstrap(): Promise<void> {
   window.desktop?.onAiPanelPrefsChanged?.(applyAiPanelPrefs)
   await window.desktop
     ?.getAuthorName?.()
+<<<<<<< ours
     .then((name) => {
       if (typeof name === 'string') setAuthorName(name)
     })
+=======
+    .then(setAuthorName)
+>>>>>>> theirs
     .catch(() => {})
   window.desktop?.onAuthorNameChanged?.(setAuthorName)
   const root = createRoot(document.getElementById('root')!)

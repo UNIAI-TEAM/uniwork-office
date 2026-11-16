@@ -7,7 +7,11 @@ import {
 } from '../src/console-output'
 
 // GBK bytes for U+5DE5 U+4F5C U+8868 ("worksheet"), as emitted by reg.exe on a
+<<<<<<< ours
 // Chinese Windows install.
+=======
+// zh-CN Windows install.
+>>>>>>> theirs
 const gbkName = Buffer.concat([
   Buffer.from('Microsoft Excel ', 'ascii'),
   Buffer.from([0xb9, 0xa4, 0xd7, 0xf7, 0xb1, 0xed]),
@@ -39,6 +43,14 @@ describe('decodeCommandOutput', () => {
     expect(out).toContain('\uFFFD')
   })
 
+<<<<<<< ours
+=======
+  it('does not guess at an OEM page that has no decoder', () => {
+    const out = decodeCommandOutput(Buffer.from([0x66, 0x81, 0x72]), 'win32', { codePage: 850 })
+    expect(out).toContain('\uFFFD')
+  })
+
+>>>>>>> theirs
   it('leaves ASCII output untouched on Windows', () => {
     const ascii = Buffer.from('    (Default)    REG_SZ    Word.Document.12\r\n', 'ascii')
     expect(decodeCommandOutput(ascii, 'win32', { codePage: 936 })).toBe(ascii.toString('utf8'))

@@ -1,10 +1,17 @@
 import type { Editor } from '@tiptap/core'
 import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { ChartDisplay, CommentInfo, NewChart, NoteInfo } from '@genoffice/docx-engine'
+<<<<<<< ours
 import type { ImageUrlRegistry, ToolDisplay } from '@genoffice/agent-core'
 import type { AgentToolCall, AgentToolDef, CreateDocumentType } from '../../shared/ipc'
 import { t } from '../i18n/locale'
 import { MIND_MAP_LIMITS, MIND_MAP_TOOL, parseMindMapTree } from './mind-map'
+=======
+import type { ToolDisplay } from '@genoffice/agent-core'
+import type { AgentToolCall, AgentToolDef, CreateDocumentType } from '../../shared/ipc'
+import { t } from '../i18n/locale'
+import { MIND_MAP_LIMITS, MIND_MAP_TOOL, parseMindMapTree } from '@genoffice/agent-core/mind-map'
+>>>>>>> theirs
 import { executeOps, opNames } from './ops'
 import { clipExcerpt, repliesOf, resolveCommentAnchor } from './comment-ops'
 import { redactTextBetween } from './redact-view'

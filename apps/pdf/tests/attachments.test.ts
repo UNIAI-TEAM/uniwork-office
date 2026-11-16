@@ -1,15 +1,21 @@
+<<<<<<< ours
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+=======
+>>>>>>> theirs
 import { describe, expect, it } from 'vitest'
 import { PDFDocument, PDFName, PDFRawStream, PDFString } from 'pdf-lib'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { applyAttachments, attachmentLabels, AttachmentsError } from '../src/main/pdf-attachments'
 import { applySaveRequest } from '../src/main/save-pdf'
 import type { SavePdfRequest } from '../src/shared/ipc'
+<<<<<<< ours
 import { AttachmentsPanel } from '../src/renderer/AttachmentsPanel'
 import type { TFunc } from '../src/renderer/i18n/locale'
+=======
+>>>>>>> theirs
 
 const b64 = (text: string): string => Buffer.from(text, 'utf8').toString('base64')
 
@@ -133,6 +139,7 @@ describe('the embedded-files tree helper', () => {
     ).toThrow(AttachmentsError)
   })
 })
+<<<<<<< ours
 
 describe('AttachmentsPanel narrow sidebar layout', () => {
   it('renders the file name on its own full-width row and badges as sibling items on the wrapped second row', () => {
@@ -165,3 +172,5 @@ describe('AttachmentsPanel narrow sidebar layout', () => {
     expect(css.slice(nameStart, css.indexOf('}', nameStart))).toContain('flex: 1 0 100%')
   })
 })
+=======
+>>>>>>> theirs

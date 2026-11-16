@@ -46,13 +46,25 @@ describe('formula view indicator', () => {
 
   it('the app tells the shell which sheet is in formula view', () => {
     expect(appSrc).toMatch(/showFormulas=\{activeShowFormulas\}/)
+<<<<<<< ours
     expect(appSrc).toMatch(/formulaViewSheets\(state\)\.has\(worksheet\.getSheetId\(\)\)/)
+=======
+    expect(appSrc).toMatch(/formulaViewSheets\(state\)\.has\(sheetId\)/)
+    // a sheet switch must re-render the flag even when nothing else changed
+    expect(appSrc).toMatch(
+      /ActiveSheetChanged,[\s\S]{0,200}?setActiveSheetId\(activeSheet\.getSheetId\(\)\)/,
+    )
+>>>>>>> theirs
   })
 
   it('every language carries the wording', () => {
     const dir = join(here, '..', 'src/renderer/i18n/app')
     const files = readdirSync(dir).filter((f) => f.endsWith('.ts'))
+<<<<<<< ours
     expect(files.length).toBeGreaterThanOrEqual(21)
+=======
+    expect(files.length).toBeGreaterThanOrEqual(22)
+>>>>>>> theirs
     for (const file of files) {
       expect(readFileSync(join(dir, file), 'utf8'), file).toContain('appShowingFormulasActive')
     }

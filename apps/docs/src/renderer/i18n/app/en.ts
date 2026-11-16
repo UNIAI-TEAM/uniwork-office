@@ -390,6 +390,8 @@ export const en = {
   appLangHindi: 'Hindi',
   appLangTraditionalChinese: 'Traditional Chinese',
   appLangVietnamese: 'Vietnamese',
+  appLangTurkish: 'Turkish',
+  appLangHungarian: 'Hungarian',
   appWrapTextMenu: 'Wrap Text',
   appViewImage: 'View Image',
   appSaveImageAs: 'Save Image As…',
@@ -543,6 +545,7 @@ export const en = {
   appUpdateStyleTip: 'Update this style from the current selection (written back to styles.xml)',
   appNewStyleFromSelection: 'New style from the current selection',
   appStyleNamePlaceholder: 'Style name',
+<<<<<<< ours
   appWebConflictTitle: 'This document was changed elsewhere',
   appWebConflictBody:
     'Your changes aren’t on UniWork yet and are kept in this browser until you sign out.',
@@ -589,6 +592,11 @@ export const en = {
     'This document is password-protected. The merged documents are saved as ordinary files without the password, so anyone who opens them can read the content. Merge anyway?',
   appMergeWarnUniwork:
     'This document belongs to UniWork. The merged documents are saved to your computer as ordinary local files outside UniWork. Merge anyway?',
+=======
+  appMergeSourceLoaded: 'Loaded {name} ({n} records)',
+  appMergeWritten: '{n} documents written',
+  appMergeNothingToWrite: 'There is nothing to write',
+>>>>>>> theirs
   appReviewPaneTitle: 'Revisions',
   appReviewPaneCount: '{n} changes',
   appReviewPaneHidden: '{n} hidden by filters',

@@ -140,6 +140,11 @@ describe('formatSerial', () => {
     expect(formatSerial(2958465, date, false)).toBe('9999-12-31')
     expect(formatSerial(2958466, date, false)).toBeNull()
     expect(formatSerial(1e9, date, false)).toBeNull()
+<<<<<<< ours
+=======
+    expect(formatSerial(2957003, date, true)).toBe('9999-12-31')
+    expect(formatSerial(2957004, date, true)).toBeNull()
+>>>>>>> theirs
     expect(formatSerial(1e9, date, true)).toBeNull()
   })
 

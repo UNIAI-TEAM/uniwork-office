@@ -42,7 +42,11 @@ export function ImportProgressCard({
             <div className="workbook-opening-bar-fill" style={{ width: `${percent}%` }} />
           </div>
           <div className="workbook-opening-percent">{`${percent}%`}</div>
+<<<<<<< ours
           <button type="button" className="secondary workbook-opening-cancel" onClick={onCancel}>
+=======
+          <button type="button" className="workbook-opening-cancel" onClick={onCancel}>
+>>>>>>> theirs
             {cancelLabel}
           </button>
         </>

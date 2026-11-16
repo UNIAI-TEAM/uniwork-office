@@ -13,6 +13,8 @@ import {
 } from './preview-canvas-snapshot'
 import type { Editor } from '@tiptap/core'
 import { history } from '@tiptap/pm/history'
+import { suggestFileName } from '@genoffice/ui'
+import { modelTextOf, type RedactableNode } from './ai/redact-view'
 import {
   applyPageNumType,
   applySectionSettings,
@@ -63,10 +65,15 @@ import { hfSaveOptions } from './hf-sections'
 import { fetchDocBytes } from './doc-bytes'
 import { parseDocxOffThread } from './parse-off-thread'
 import { PHASED_APPEND } from './editor/streaming-tail-guard'
+<<<<<<< ours
 import { docTextLength, docWeight, openTierFor, refusalMeasureFor } from './large-document'
 import { documentToMarkdown } from './export-markdown'
 import { collectPdfInternalLinks } from './pdf-internal-links'
 import type { PdfInternalLink } from '../shared/ipc'
+=======
+import { docTextLength, docWeight, openTierFor } from './large-document'
+import { documentToMarkdown } from './export-markdown'
+>>>>>>> theirs
 import { docStyleCss } from './doc-style-css'
 import { documentTextContext } from './text-layout/document-context'
 import { setOpenDocumentText } from './text-layout/open-document'
@@ -105,10 +112,17 @@ import { adoptEmbeddedFonts } from './embedded-fonts'
 import { prefetchFaces } from './font-resolve'
 import { defaultEastAsiaFontFor } from './font-list'
 import { clearPrintZoom, setPrintZoom } from './print-zoom'
+<<<<<<< ours
 import type { SaveAsExportFormat } from '../shared/save-as-format'
 import { isNarrowStatusFrame, showToast } from './components/toast-bus'
 import { cap } from './capabilities'
 import { isEncryptedPackage } from './encrypted-package'
+=======
+import { collectPdfInternalLinks } from './pdf-internal-links'
+import type { PdfInternalLink } from '../shared/ipc'
+import type { SaveAsExportFormat } from '../shared/save-as-format'
+import { showToast } from './components/toast-bus'
+>>>>>>> theirs
 import { buildStandaloneHtml } from './html-export'
 import { carryAiMarks, sameDocIgnoringAiMarks } from './editor/ai-marker'
 import { aiPanelInitiallyOpen } from '@genoffice/ui'
@@ -699,7 +713,11 @@ export async function loadFile(
     ctx.setMirrorMargins(parsed.mirrorMargins ?? false)
     ctx.setMirrorMarginsDirty(false)
     ctx.setShowComments(true)
+<<<<<<< ours
     ctx.setCommentPanelOpen(commentsPaneOpensOnLoad(parsed.comments, parsed.blocks))
+=======
+    ctx.setCommentPanelOpen(hasUnanchoredComments(parsed.comments, parsed.blocks))
+>>>>>>> theirs
     ctx.setCommentPopup(null)
     ctx.setReadMode(tier === 'readOnly')
     ctx.setLargeDocSpellOff(tier !== 'normal')
@@ -952,6 +970,48 @@ function deriveAutoFileName(editor: Editor): string | null {
   return null
 }
 
+/** The document's own text, as the model may read it. Never the raw document. */
+function modelTextOfDocument(editor: Editor): string {
+  // A name is read off the opening of a document; 8k characters is far past
+  // anything a stem could name, and bounds the walk on the UI thread.
+  return modelTextOf(editor.getJSON() as RedactableNode, { maxChars: 8000 })
+}
+
+/**
+ * A file name from a bare stem, in the shape the save path expects.
+ *
+ * The stem is an untrusted string — a model's answer, or nothing at all — so it
+ * goes through the same sanitizer as a heading: a name carrying a separator, a
+ * control character or a reserved Windows device word would otherwise become a
+ * path the save silently refuses, or worse, writes somewhere else.
+ */
+function docxNameFromStem(stem: string): string | null {
+  const base = sanitizeFileBaseName(stem)
+  return base ? `${base}.docx` : null
+}
+
+/**
+ * Ask the model to name this document, on request.
+ *
+ * The result is the file name offered in the Save As dialog rather than a
+ * rename: moving a file that may be open elsewhere, referenced from a note, or
+ * synced is not something to do behind the reader's back. The dialog is the
+ * confirmation. Returns '' when there is nothing usable, which leaves the
+ * dialog on the name the document already has.
+ *
+ * The text handed over is `modelTextOf`, never the editor's document. A selection
+ * the reader hid from the model stays hidden from this call too — the file name
+ * is the one thing that reaches them after the model has seen the rest of the
+ * document, so a leak here would survive the redaction it was meant to outlive.
+ */
+export async function suggestedSaveAsName(ctx: FileActionContext): Promise<string> {
+  const { editor } = ctx
+  if (!editor) return ''
+  const stem = await suggestFileName({ content: modelTextOfDocument(editor) })
+  // a full file name, extension and all, because this is what the save dialog takes
+  return docxNameFromStem(stem) ?? ''
+}
+
 /**
  * The name a never-saved document's first save writes under (the first heading while it is
  * still "Untitled", else its current name); null once the document has a file. The AI panel's
@@ -1172,6 +1232,7 @@ export function currentDocGeneration(): number {
 }
 
 /**
+<<<<<<< ours
  * A converted legacy .doc is held as a temp .docx: an explicit Save of it is a
  * Save As next to the original, never a write into the temp copy. The shell's own
  * flush for the UniWork first save (`inPlace`) does write the temp copy; an MCP
@@ -1243,10 +1304,19 @@ export function canReuseSavePass(p: {
 }
 
 /**
+=======
+>>>>>>> theirs
  * The name a Save As dialog opens on.
  *
  * A name the caller proposed for this pass leads, then the name derived from
  * the document's own first heading, then the name the document already has.
+<<<<<<< ours
+=======
+ *
+ * Named rather than inlined so the precedence is stated once and testable: a
+ * proposal that never reaches the dialog is a manual trigger that does nothing
+ * silently, which is exactly how this shipped before it had a call site.
+>>>>>>> theirs
  */
 export function dialogNameFor(
   proposed: string | undefined,
@@ -1278,6 +1348,7 @@ export function save(
     async () => {
       const settled = ctx.settleFontSettings ? await ctx.settleFontSettings() : ctx
       if (docGeneration !== generation) return false
+<<<<<<< ours
       return saveOnce(settled, saveAs, auto, newDocName, explicitTarget, inPlace, exportRequest)
     },
     () =>
@@ -1289,6 +1360,12 @@ export function save(
         incomplete: ctx.saveIncompleteRef.current,
         dirty: isDocDirty(ctx),
       }),
+=======
+      return saveOnce(settled, saveAs, auto, newDocName, explicitTarget, exportRequest)
+    },
+    // an explicit MCP target must always write, never reuse an earlier pass
+    () => !saveAs && !explicitTarget && !ctx.saveIncompleteRef.current && !isDocDirty(ctx),
+>>>>>>> theirs
   ).then(async (saved) => {
     const { target } = exportRequest
     if (!target || docGeneration !== generation) return saved
@@ -1384,7 +1461,10 @@ async function saveOnce(
   auto: boolean,
   newDocName?: string,
   explicitTarget?: ExplicitSaveTarget,
+<<<<<<< ours
   inPlace = false,
+=======
+>>>>>>> theirs
   exportRequest?: SaveAsExportRequest,
 ): Promise<boolean> {
   const { doc, editor } = ctx
@@ -1575,7 +1655,11 @@ async function saveOnce(
       editor
         .chain()
         .setMeta(TRACK_IGNORE, true)
+<<<<<<< ours
         .setContent(carryAiMarks(editor.state.doc, rebasedPm) as never)
+=======
+        .setContent(rebasedPm as never)
+>>>>>>> theirs
         .run()
       resetEditorHistory(editor)
       const chain = editor
@@ -1811,7 +1895,11 @@ export async function exportPdf(ctx: FileActionContext, outPath?: string): Promi
   if (!doc) return false
   await waitForFullContent()
   if (printJobActive || ctx.pendingMixedExportRef.current) {
+<<<<<<< ours
     ctx.setStatus({ key: 'appExportingPdf' })
+=======
+    ctx.setStatus(t('appExportingPdf'))
+>>>>>>> theirs
     return false
   }
   printJobActive = true
@@ -1886,7 +1974,11 @@ export async function exportPdf(ctx: FileActionContext, outPath?: string): Promi
           : []
       ).map((st) => `${st.pageWidth}x${st.pageHeight}`),
     )
+<<<<<<< ours
     if (sizes.size > 1) ctx.setStatus({ key: 'appMixedExportOpening' })
+=======
+    if (sizes.size > 1) ctx.setStatus(t('appMixedExportOpening'))
+>>>>>>> theirs
     return deferExportToPreview(ctx, outPath)
   } finally {
     clearPrintZoom()

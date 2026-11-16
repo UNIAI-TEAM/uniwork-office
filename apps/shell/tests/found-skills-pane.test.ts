@@ -7,12 +7,21 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IntegrationsApi } from '../src/shared/integrations-api'
 import type { FoundSkill, RecommendedSkill } from '../src/shared/found-skill'
+<<<<<<< ours
 import { FoundSkills } from '../src/renderer/src/FoundSkills'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { skillsStrings } from '../src/renderer/src/i18n/strings-skills'
 
 /** the real English text, so assertions read like what a user sees */
 const en = skillsStrings.en as Record<string, string>
+=======
+import { FoundSkills, skillInstructions } from '../src/renderer/src/FoundSkills'
+import { LocaleProvider } from '../src/renderer/src/locale'
+import { strings } from '../src/renderer/src/strings'
+
+/** the real English text, so assertions read like what a user sees */
+const en = strings.en as Record<string, string>
+>>>>>>> theirs
 const t = ((key: string, params?: Record<string, string>) =>
   (en[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => params?.[name] ?? `{${name}}`)) as never
 
@@ -33,7 +42,11 @@ const skill = (over: Partial<FoundSkill>): FoundSkill => ({
   name: 'pptx-builder',
   description: 'Build a pptx',
   path: '/app/skills/pptx-builder/SKILL.md',
+<<<<<<< ours
   relevance: { relevant: true, matched: ['pptx'] },
+=======
+  relevance: { relevant: true, formats: ['pptx'] },
+>>>>>>> theirs
   ...over,
 })
 
@@ -78,7 +91,11 @@ function mountApi(
 
 async function render(): Promise<void> {
   await act(async () => {
+<<<<<<< ours
     root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(FoundSkills, { t })))
+=======
+    root.render(createElement(LocaleProvider, { lang: 'en' }, createElement(FoundSkills, { t })))
+>>>>>>> theirs
   })
   await act(async () => {
     await Promise.resolve()
@@ -101,12 +118,39 @@ async function click(el: Element | null | undefined): Promise<void> {
 const buttonWithText = (text: string): HTMLButtonElement | undefined =>
   [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)
 
+<<<<<<< ours
 /** the Read disclosure inside the row that names this skill */
 const disclosureFor = (name: string): HTMLDetailsElement | undefined => {
   const row = [...host.querySelectorAll('.set-intg-row')].find((r) =>
     r.querySelector('.set-field-label')?.textContent?.includes(name),
   )
   return row?.querySelector('details') ?? undefined
+=======
+/** the Details button inside the row that names this skill */
+const detailsFor = (name: string): HTMLButtonElement | undefined => {
+  const row = [...host.querySelectorAll('.set-skill-card')].find((r) =>
+    r.querySelector('.set-skill-name')?.textContent?.includes(name),
+  )
+  return row?.querySelector<HTMLButtonElement>('.set-skill-details') ?? undefined
+}
+
+/** the skill page, portaled to body */
+const detailPage = (): HTMLElement | null => document.body.querySelector('.skill-detail')
+
+function pressKey(key: string, shiftKey = false): void {
+  act(() => {
+    ;(document.activeElement ?? document.body).dispatchEvent(
+      new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }),
+    )
+  })
+}
+
+function withBody(text: string): void {
+  window.aiOfficeIntegrations = {
+    ...(window.aiOfficeIntegrations as IntegrationsApi),
+    skillBody: async () => text,
+  } as unknown as IntegrationsApi
+>>>>>>> theirs
 }
 
 describe('FoundSkills', () => {
@@ -152,6 +196,7 @@ describe('FoundSkills', () => {
     expect(host.textContent).not.toContain('Import failed')
   })
 
+<<<<<<< ours
   it('maps a skill-import error code to its localized string', async () => {
     mountApi([])
     ;(window.aiOfficeIntegrations as IntegrationsApi).importSkillZip = async () => {
@@ -216,13 +261,27 @@ describe('FoundSkills', () => {
     await click(buttonWithText('Import skill package (zip / .md)…'))
     expect(host.textContent).toContain('Import failed: too big')
     expect(host.textContent).not.toContain('remote method')
+=======
+  it('shows the reason when an import is refused', async () => {
+    mountApi([])
+    ;(window.aiOfficeIntegrations as IntegrationsApi).importSkillZip = async () => {
+      throw new Error('the archive contains a symlink, and imports refuse those')
+    }
+    await render()
+    await click(buttonWithText('Import skill package (zip / .md)…'))
+    expect(host.textContent).toContain('Import failed: the archive contains a symlink')
+>>>>>>> theirs
   })
 
   it('shows a skill about another format like any other', async () => {
     mountApi([
       skill({
         description: 'Roll back a Kubernetes release',
+<<<<<<< ours
         relevance: { relevant: false, matched: [] },
+=======
+        relevance: { relevant: false, formats: [] },
+>>>>>>> theirs
       }),
     ])
     await render()
@@ -237,7 +296,11 @@ describe('FoundSkills', () => {
     expect(buttonWithText('Import folder…')).toBeTruthy()
   })
 
+<<<<<<< ours
   it('fetches a body only when its disclosure is opened', async () => {
+=======
+  it('fetches a body only when its detail page is opened', async () => {
+>>>>>>> theirs
     mountApi([skill({})])
     const body = vi.fn(async () => 'Do the thing.\n')
     window.aiOfficeIntegrations = {
@@ -246,6 +309,7 @@ describe('FoundSkills', () => {
     } as unknown as IntegrationsApi
     await render()
     expect(body).not.toHaveBeenCalled()
+<<<<<<< ours
 
     const details = disclosureFor('pptx-builder')
     expect(details).toBeTruthy()
@@ -257,6 +321,85 @@ describe('FoundSkills', () => {
     })
     expect(body).toHaveBeenCalledWith('/app/skills/pptx-builder/SKILL.md')
     expect(host.textContent).toContain('Do the thing.')
+=======
+    expect(detailPage()).toBeNull()
+
+    await click(detailsFor('pptx-builder'))
+    expect(body).toHaveBeenCalledWith('/app/skills/pptx-builder/SKILL.md')
+    const page = detailPage()!
+    expect(page.getAttribute('role')).toBe('dialog')
+    expect(page.getAttribute('aria-modal')).toBe('true')
+    expect(document.getElementById(page.getAttribute('aria-labelledby')!)?.textContent).toBe(
+      'pptx-builder',
+    )
+    expect(page.textContent).toContain('Build a pptx')
+    expect(page.textContent).toContain('Do the thing.')
+
+    // a second open reuses the body it already read
+    await click(page.querySelector('.skill-detail-close'))
+    expect(detailPage()).toBeNull()
+    await click(detailsFor('pptx-builder'))
+    expect(body).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders the instructions without the front matter', async () => {
+    mountApi([skill({})])
+    withBody('---\nname: pptx-builder\ndescription: x\n---\n\n# Steps\n\n1. Open a deck\n')
+    await render()
+    await click(detailsFor('pptx-builder'))
+    const body = detailPage()!.querySelector('.skill-detail-body')!
+    expect(body.textContent).toContain('Steps')
+    expect(body.textContent).toContain('Open a deck')
+    expect(body.textContent).not.toContain('description: x')
+  })
+
+  it('says so when a skill has no instructions, and disables Copy', async () => {
+    mountApi([skill({})])
+    withBody('---\nname: pptx-builder\n---\n')
+    await render()
+    await click(detailsFor('pptx-builder'))
+    expect(detailPage()!.textContent).toContain('This skill has no instructions.')
+    const copy = [...detailPage()!.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Copy instructions',
+    )
+    expect(copy?.disabled).toBe(true)
+  })
+
+  it('keeps focus inside the page, closes on Escape only, and gives focus back', async () => {
+    mountApi([skill({})])
+    await render()
+    const opener = detailsFor('pptx-builder')!
+    opener.focus()
+    await click(opener)
+    const page = detailPage()!
+    const close = page.querySelector<HTMLButtonElement>('.skill-detail-close')!
+    expect(document.activeElement).toBe(close)
+
+    // Shift+Tab from the first control wraps to the last one inside the page
+    pressKey('Tab', true)
+    expect(page.contains(document.activeElement)).toBe(true)
+    expect(document.activeElement).not.toBe(close)
+
+    const underneath = vi.fn()
+    window.addEventListener('keydown', underneath)
+    try {
+      pressKey('Escape')
+    } finally {
+      window.removeEventListener('keydown', underneath)
+    }
+    expect(underneath).not.toHaveBeenCalled()
+    expect(detailPage()).toBeNull()
+    expect(document.activeElement).toBe(opener)
+  })
+
+  it('strips only a leading front matter block', () => {
+    expect(skillInstructions('---\nname: a\n---\nBody')).toBe('Body')
+    expect(skillInstructions('﻿---\r\nname: a\r\n---\r\nBody')).toBe('Body')
+    expect(skillInstructions('Intro\n---\nnot front matter\n---\n')).toBe(
+      'Intro\n---\nnot front matter\n---',
+    )
+    expect(skillInstructions('---\nname: a\n---\n')).toBe('')
+>>>>>>> theirs
   })
 
   it('offers shipped skills with Install, Update or an installed tag, and installs by name', async () => {
@@ -287,9 +430,12 @@ describe('FoundSkills', () => {
     const tabs = () => [...host.querySelectorAll<HTMLButtonElement>('.set-intg-tab')]
     expect(tabs().map((e) => e.textContent)).toEqual(['All', 'Office', 'Finance', 'Other'])
     // All opens first: every recommended skill shows, installed ones included
+<<<<<<< ours
     expect(
       [...host.querySelectorAll('.set-intg-skill .set-field-label')].map((e) => e.textContent),
     ).toEqual(['fresh', 'old', 'same'])
+=======
+>>>>>>> theirs
     expect(buttonWithText('Update')).toBeTruthy()
     expect(buttonWithText('Install')).toBeTruthy()
     await click(tabs()[3])

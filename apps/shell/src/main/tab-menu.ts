@@ -19,6 +19,11 @@ export type TabMenuStringKey =
   | 'menuTabCloseRight'
   | 'menuTabCloseAll'
   | 'menuTabReopen'
+<<<<<<< ours
+=======
+  | 'menuTabPin'
+  | 'menuTabUnpin'
+>>>>>>> theirs
   | 'menuOpenInNewWindow'
   | 'menuClose'
 
@@ -38,6 +43,11 @@ export interface TabMenuActions {
   /** close these tabs one after another (a save prompt that is cancelled stops the rest) */
   closeTabs(ids: string[]): void
   reopenClosed(): void
+<<<<<<< ours
+=======
+  /** keep the tab's renderer alive however long it sits in the background */
+  pin(id: string, pinned: boolean): void
+>>>>>>> theirs
 }
 
 export interface TabMenuInput {
@@ -49,11 +59,15 @@ export interface TabMenuInput {
   fileExists: boolean
   /** something was closed that can be opened again */
   canReopen: boolean
+<<<<<<< ours
   /** UniWork-bound tab: hides Rename, Duplicate, Reveal, Open with default app, and Copy path */
   uniworkBound?: boolean
   /** extra entries (e.g. UniWork offline pin/unpin) inserted before the Move/Close blocks */
   extraItems?: readonly MenuItemConstructorOptions[]
   /** Translate through the shell's 21-locale tab menu table. */
+=======
+  /** Translate through the shell's existing 21-locale main table. */
+>>>>>>> theirs
   tm(key: TabMenuStringKey): string
   actions: TabMenuActions
 }
@@ -137,13 +151,20 @@ export function tabMenuTemplate(input: TabMenuInput): MenuItemConstructorOptions
   const index = tabs.findIndex((other) => other.id === tab.id)
   const file = tab.filePath
   const onDisk = !!file && input.fileExists
+<<<<<<< ours
   const bound = input.uniworkBound === true
+=======
+>>>>>>> theirs
   const closable = (other: TabSummary): boolean => other.id !== 'home' && other.closable
   const others = tabs.filter((other) => other.id !== tab.id && closable(other))
   const right = tabs.slice(index + 1).filter(closable)
   const everything = tabs.filter(closable)
+<<<<<<< ours
   const kind: string = tab.kind
   const document = input.canDetach && kind !== 'home' && kind !== 'help'
+=======
+  const document = input.canDetach && tab.kind !== 'home' && tab.kind !== 'help'
+>>>>>>> theirs
 
   const template: MenuItemConstructorOptions[] = [
     // where the file is, at a glance (the menu is the place people look when they ask "which one is this?")
@@ -162,6 +183,7 @@ export function tabMenuTemplate(input: TabMenuInput): MenuItemConstructorOptions
       click: () => actions.print(tab.id),
     },
     { type: 'separator' },
+<<<<<<< ours
     ...(!bound
       ? ([
           {
@@ -179,6 +201,21 @@ export function tabMenuTemplate(input: TabMenuInput): MenuItemConstructorOptions
           { type: 'separator' },
         ] as MenuItemConstructorOptions[])
       : []),
+=======
+    {
+      id: 'rename',
+      label: tm('menuTabRename'),
+      enabled: !!file,
+      click: () => actions.rename(tab.id),
+    },
+    {
+      id: 'duplicate',
+      label: tm('menuTabDuplicate'),
+      enabled: onDisk,
+      click: () => actions.duplicate(file!),
+    },
+    { type: 'separator' },
+>>>>>>> theirs
     {
       id: 'splitBeside',
       label: tm('menuTabSplitBeside'),
@@ -192,6 +229,7 @@ export function tabMenuTemplate(input: TabMenuInput): MenuItemConstructorOptions
       click: () => actions.openInNewWindow(tab.id),
     },
     { type: 'separator' },
+<<<<<<< ours
     ...(!bound
       ? ([
           {
@@ -202,12 +240,21 @@ export function tabMenuTemplate(input: TabMenuInput): MenuItemConstructorOptions
           },
         ] as MenuItemConstructorOptions[])
       : []),
+=======
+    {
+      id: 'copyPath',
+      label: tm('menuTabCopyPath'),
+      enabled: !!file,
+      click: () => actions.copyText(file!),
+    },
+>>>>>>> theirs
     {
       id: 'copyName',
       label: tm('menuTabCopyName'),
       enabled: !!file,
       click: () => actions.copyText(baseName(file!)),
     },
+<<<<<<< ours
     ...(!bound
       ? ([
           {
@@ -228,6 +275,27 @@ export function tabMenuTemplate(input: TabMenuInput): MenuItemConstructorOptions
     ...(input.extraItems && input.extraItems.length > 0
       ? [...input.extraItems, { type: 'separator' as const }]
       : []),
+=======
+    {
+      id: 'reveal',
+      label: tm('menuTabReveal'),
+      enabled: onDisk,
+      click: () => actions.reveal(file!),
+    },
+    {
+      id: 'openDefault',
+      label: tm('menuTabOpenDefault'),
+      enabled: onDisk && !isProgramFile(file!),
+      click: () => actions.openDefault(file!),
+    },
+    { type: 'separator' },
+    {
+      id: 'pin',
+      label: tm(tab.pinned ? 'menuTabUnpin' : 'menuTabPin'),
+      enabled: tab.kind !== 'help',
+      click: () => actions.pin(tab.id, !tab.pinned),
+    },
+>>>>>>> theirs
     {
       id: 'moveLeft',
       label: tm('menuTabMoveLeft'),

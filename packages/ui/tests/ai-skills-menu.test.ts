@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import { act, createElement } from 'react'
+<<<<<<< ours
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AiSkillChips, AiSkillsMenu, MAX_ATTACHED_SKILLS } from '../src/AiSkillsMenu'
@@ -10,6 +11,16 @@ actEnv.IS_REACT_ACT_ENVIRONMENT = true
 
 let host: HTMLDivElement
 let root: Root
+=======
+import { createRoot } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { AiSkillChips, AiSkillsMenu } from '../src/AiSkillsMenu'
+
+;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+let host: HTMLDivElement
+let root: ReturnType<typeof createRoot>
+>>>>>>> theirs
 
 beforeEach(() => {
   host = document.createElement('div')
@@ -24,8 +35,11 @@ afterEach(() => {
 const SKILLS = [
   { name: 'tables', description: 'Header rows and totals' },
   { name: 'tone', description: 'Write plainly' },
+<<<<<<< ours
   { name: 'citations', description: 'Footnotes and sources' },
   { name: 'summary', description: 'Executive summary' },
+=======
+>>>>>>> theirs
 ]
 
 async function settle(): Promise<void> {
@@ -37,7 +51,11 @@ async function settle(): Promise<void> {
 
 const click = (el: Element | null | undefined) => {
   expect(el).toBeTruthy()
+<<<<<<< ours
   if (el instanceof HTMLElement) act(() => el.click())
+=======
+  act(() => (el as HTMLElement).click())
+>>>>>>> theirs
 }
 
 function mount(over: Partial<Parameters<typeof AiSkillsMenu>[0]> = {}) {
@@ -80,8 +98,11 @@ describe('AiSkillsMenu', () => {
     expect([...host.querySelectorAll('.ai-plus-skill-name')].map((n) => n.textContent)).toEqual([
       'tables',
       'tone',
+<<<<<<< ours
       'citations',
       'summary',
+=======
+>>>>>>> theirs
     ])
   })
 
@@ -103,6 +124,7 @@ describe('AiSkillsMenu', () => {
     expect(host.querySelector('.ai-plus-pop')).not.toBeNull()
   })
 
+<<<<<<< ours
   it('closes on Escape from a focused skill row and returns focus to the + button', async () => {
     mount()
     const btn = host.querySelector<HTMLButtonElement>('.ai-plus-btn')!
@@ -177,6 +199,8 @@ describe('AiSkillsMenu', () => {
     expect(host.querySelector('.ai-plus-pop')).toBeNull()
     expect(document.activeElement).toBe(btn)
   })
+=======
+>>>>>>> theirs
   it('marks selected skills and offers Manage only when a handler is given', async () => {
     const onManage = vi.fn()
     mount({ selected: ['tables'], onManage })
@@ -194,6 +218,7 @@ describe('AiSkillsMenu', () => {
     await settle()
     expect(host.querySelector('.ai-plus-empty')?.textContent).toBe('No skills installed yet')
   })
+<<<<<<< ours
 
   it('caps selection at 3 skills: disables unselected rows and shows a localized hint while keeping selected rows removable', async () => {
     expect(MAX_ATTACHED_SKILLS).toBe(3)
@@ -215,6 +240,8 @@ describe('AiSkillsMenu', () => {
     click(rows[0])
     expect(onToggle).toHaveBeenCalledWith('tables')
   })
+=======
+>>>>>>> theirs
 })
 
 describe('AiSkillChips', () => {
@@ -233,6 +260,7 @@ describe('AiSkillChips', () => {
     expect(host.querySelector('.ai-skill-chips-sent')).not.toBeNull()
   })
 })
+<<<<<<< ours
 
 describe('AI_SKILLS_LABELS', () => {
   it('covers all 21 UI locales with non-empty labels and no tr locale', () => {
@@ -246,3 +274,5 @@ describe('AI_SKILLS_LABELS', () => {
     }
   })
 })
+=======
+>>>>>>> theirs

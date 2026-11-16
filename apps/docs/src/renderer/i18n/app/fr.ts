@@ -406,6 +406,8 @@ export const fr = {
   appLangHindi: 'hindi',
   appLangTraditionalChinese: 'chinois traditionnel',
   appLangVietnamese: 'vietnamien',
+  appLangTurkish: 'turc',
+  appLangHungarian: 'hongrois',
   appWrapTextMenu: 'Habillage du texte',
   appViewImage: "Afficher l'image",
   appSaveImageAs: "Enregistrer l'image sous…",
@@ -560,6 +562,7 @@ export const fr = {
     'Mettre à jour ce style à partir de la sélection actuelle (réécrit dans styles.xml)',
   appNewStyleFromSelection: 'Nouveau style à partir de la sélection actuelle',
   appStyleNamePlaceholder: 'Nom du style',
+<<<<<<< ours
   appWebConflictTitle: 'Ce document a été modifié ailleurs',
   appWebConflictBody:
     'Vos modifications ne sont pas encore sur UniWork et sont conservées dans ce navigateur jusqu’à votre déconnexion.',
@@ -607,6 +610,11 @@ export const fr = {
     'Ce document est protégé par mot de passe. Les documents fusionnés sont enregistrés comme fichiers ordinaires, sans mot de passe : toute personne qui les ouvre peut en lire le contenu. Fusionner quand même ?',
   appMergeWarnUniwork:
     'Ce document appartient à UniWork. Les documents fusionnés sont enregistrés sur votre ordinateur comme fichiers locaux ordinaires, en dehors d’UniWork. Fusionner quand même ?',
+=======
+  appMergeSourceLoaded: '{name} chargé ({n} enregistrements)',
+  appMergeWritten: '{n} documents écrits',
+  appMergeNothingToWrite: "Il n'y a rien à écrire",
+>>>>>>> theirs
   appReviewPaneTitle: 'Révisions',
   appReviewPaneCount: '{n} modifications',
   appReviewPaneHidden: '{n} masquées par les filtres',

@@ -42,7 +42,11 @@ const cardOf = (over: Partial<NotePopupCard['picture']> = {}): NotePopupCard => 
     row: 3,
     column: 2,
     author: 'Alice',
+<<<<<<< ours
     text: '老照片扫描件',
+=======
+    text: '\u8001\u7167\u7247\u626b\u63cf\u4ef6',
+>>>>>>> theirs
     dataUrl: 'data:image/png;base64,AAA',
     ...over,
   },
@@ -62,13 +66,20 @@ describe('NotePictureHoverCard', () => {
     expect(card).not.toBeNull()
     expect(card!.querySelector('.np-author')?.textContent).toBe('Alice')
     expect(card!.querySelector('.np-image')?.getAttribute('src')).toBe('data:image/png;base64,AAA')
+<<<<<<< ours
     expect(card!.querySelector('.np-text')?.textContent).toBe('老照片扫描件')
+=======
+    expect(card!.querySelector('.np-text')?.textContent).toBe(
+      '\u8001\u7167\u7247\u626b\u63cf\u4ef6',
+    )
+>>>>>>> theirs
     await act(async () => {
       card!.querySelector<HTMLButtonElement>('.np-remove')!.click()
     })
     expect(onRemove).toHaveBeenCalledWith('sheet-1', 3, 2)
   })
 
+<<<<<<< ours
   it('hides the remove button when readOnly is true', async () => {
     await mount(
       createElement(NotePictureHoverCard, {
@@ -85,6 +96,8 @@ describe('NotePictureHoverCard', () => {
     expect(card!.querySelector('.np-remove')).toBeNull()
   })
 
+=======
+>>>>>>> theirs
   it('renders nothing without a card, and no picture without bytes', async () => {
     await mount(
       createElement(NotePictureHoverCard, { card: null, sessionId: undefined, onRemove: vi.fn() }),
@@ -103,7 +116,11 @@ describe('NotePictureHoverCard', () => {
             row: 3,
             column: 2,
             author: 'Alice',
+<<<<<<< ours
             text: '老照片扫描件',
+=======
+            text: '\u8001\u7167\u7247\u626b\u63cf\u4ef6',
+>>>>>>> theirs
           },
         },
         sessionId: undefined,
@@ -112,7 +129,13 @@ describe('NotePictureHoverCard', () => {
     )
     expect(document.querySelector('.note-hover-card .np-image')).toBeNull()
     // the text still shows: the popup itself carries only the note text
+<<<<<<< ours
     expect(document.querySelector('.note-hover-card .np-text')?.textContent).toBe('老照片扫描件')
+=======
+    expect(document.querySelector('.note-hover-card .np-text')?.textContent).toBe(
+      '\u8001\u7167\u7247\u626b\u63cf\u4ef6',
+    )
+>>>>>>> theirs
   })
 
   it('stays unpositioned when Univer has no popup box to anchor under', async () => {

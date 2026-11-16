@@ -12,6 +12,10 @@ import {
   mergeCells,
   splitCell,
 } from '@tiptap/pm/tables'
+<<<<<<< ours
+=======
+import { platformShortcuts } from '@genoffice/i18n'
+>>>>>>> theirs
 import { redactTextBetween, type RedactableNode } from '../ai/redact-view'
 import type { TextboxDisplay } from '@genoffice/docx-engine'
 
@@ -45,7 +49,10 @@ import {
 } from '../editor/table-ops'
 import type { TableDialogKind } from './TableDialogs'
 import { IconSparkle } from './icons'
+<<<<<<< ours
 import { cap } from '../capabilities'
+=======
+>>>>>>> theirs
 import { IconCellAlign } from './table-icons'
 import { spellcheckEnabled } from '../spellcheck-pref'
 import { applySpellingSuggestion } from '../editor/spell-replace'
@@ -118,8 +125,11 @@ interface EditorContextMenuProps {
   sectionContentWidthPx?: number
   /** re-mark existing text after the session dictionary or languages changed */
   onRespell?: () => void
+<<<<<<< ours
   /** whether adding comments is allowed when the document body is read-only */
   commentsAllowed?: boolean
+=======
+>>>>>>> theirs
   /** tracked changes under the pointer; null while protection disables accept/reject */
   revisions?: {
     at: RevisionRange[]
@@ -213,7 +223,10 @@ export function EditorContextMenu({
   onTableDialog,
   sectionContentWidthPx = 624,
   onRespell,
+<<<<<<< ours
   commentsAllowed = false,
+=======
+>>>>>>> theirs
   revisions,
   comment,
   trackChanges,
@@ -511,7 +524,10 @@ export function EditorContextMenu({
       })}
       {!onPicture &&
         item(t('appPastePlain'), {
+<<<<<<< ours
           shortcut: 'paste-plain',
+=======
+>>>>>>> theirs
           disabled: !canEdit,
           onClick: run(() => void pasteFromClipboard(editor, 'text')),
         })}
@@ -525,8 +541,13 @@ export function EditorContextMenu({
       {!onPicture && (
         <>
           <div className="ctx-sep" />
+<<<<<<< ours
           {item(t('appFontMenu'), { shortcut: 'font-dialog', onClick: run(onFontDialog) })}
           {item(t('appParagraphMenu'), { onClick: run(onParagraphDialog) })}
+=======
+          {item(t('appFontMenu'), { key: '⌘D', onClick: run(onFontDialog) })}
+          {item(t('appParagraphMenu'), { key: '⌥⌘M', onClick: run(onParagraphDialog) })}
+>>>>>>> theirs
           {menu.link?.toc && onUpdateToc && (
             <>
               <div className="ctx-sep" />
@@ -794,7 +815,11 @@ export function EditorContextMenu({
             </div>
           </>
         )}
+<<<<<<< ours
       {cap('ai') && !onPicture && (
+=======
+      {!onPicture && (
+>>>>>>> theirs
         <>
           <div className="ctx-sep" />
           {item(t('appSynonyms'), {
@@ -832,6 +857,7 @@ export function EditorContextMenu({
             )}
           </div>
           {/* Withholding a span. No AI badge: the item spends the words rather
+<<<<<<< ours
               than using the model, and the badge would read "Uses AI".
               Text only, deliberately. A picture alone in a paragraph is a *block*
               node (docProtected), which takes no marks at all, and a picture
@@ -839,16 +865,32 @@ export function EditorContextMenu({
               (convert.ts reads the run's node attrs, never the node's marks) — so
               offering it for a picture would hide it for one session and then lose
               the decision on the next save, with nothing to tell the reader. */}
+=======
+          than using the model, and the badge would read "Uses AI".
+          Text only, deliberately. A picture alone in a paragraph is a *block*
+          node (docProtected), which takes no marks at all, and a picture
+          beside text is an inline atom whose mark is dropped by the docx save
+          (convert.ts reads the run's node attrs, never the node's marks) — so
+          offering it for a picture would hide it for one session and then lose
+          the decision on the next save, with nothing to tell the reader. */}
+>>>>>>> theirs
           {onRedact &&
             item(t('redactMenuLabel'), {
               disabled: !canEdit || !hasSelection,
               onClick: run(onRedact),
             })}
           {/* The other half of the item above, and its mirror: offered only when the
+<<<<<<< ours
               selection really carries the mark. Without this the sole way to stop
               withholding a span was to delete the words, which loses the reader's
               own text to undo a decision they made in the editor. Same reason as
               the item beside it for no AI badge — this one only moves a mark. */}
+=======
+          selection really carries the mark. Without this the sole way to stop
+          withholding a span was to delete the words, which loses the reader's
+          own text to undo a decision they made in the editor. Same reason as
+          the item beside it for no AI badge — this one only moves a mark. */}
+>>>>>>> theirs
           {onUnredact &&
             isRedactedSelection &&
             item(t('redactShowLabel'), {
@@ -972,6 +1014,53 @@ export function EditorContextMenu({
             })}
         </>
       )}
+<<<<<<< ours
+=======
+      {item(t('appNewComment'), { disabled: !canComment, onClick: run(onNewComment) })}
+      {comment && !onPicture && (
+        <>
+          <div className="ctx-sep" />
+          {item(t('appCtxReplyComment'), {
+            disabled: !comment.id,
+            onClick: run(() => comment.id && comment.onReply(comment.id)),
+          })}
+          {item(t('appCtxDeleteComment'), {
+            disabled: !comment.id,
+            onClick: run(() => comment.id && comment.onDelete(comment.id)),
+          })}
+          {item(t('appCtxResolveComment'), {
+            disabled: !comment.id,
+            onClick: run(() => comment.id && comment.onResolve(comment.id)),
+          })}
+        </>
+      )}
+      {!onPicture && (revisions?.any || trackChanges) && (
+        <>
+          <div className="ctx-sep" />
+          {revisions && revisions.at.length > 0 && (
+            <>
+              {item(t('appCtxAcceptChange'), {
+                onClick: run(() => revisions.onRange('accept', revisions.at[0])),
+              })}
+              {item(t('appCtxRejectChange'), {
+                onClick: run(() => revisions.onRange('reject', revisions.at[0])),
+              })}
+            </>
+          )}
+          {revisions?.any && (
+            <>
+              {item(t('ribbonAcceptAll'), { onClick: run(() => revisions.onAll('accept')) })}
+              {item(t('ribbonRejectAll'), { onClick: run(() => revisions.onAll('reject')) })}
+            </>
+          )}
+          {trackChanges &&
+            item(`${trackChanges.on ? '✓ ' : ''}${t('ribbonTrackChanges')}`, {
+              key: '⇧⌘E',
+              onClick: run(trackChanges.onToggle),
+            })}
+        </>
+      )}
+>>>>>>> theirs
     </div>
   )
 }

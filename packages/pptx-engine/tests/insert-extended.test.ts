@@ -484,6 +484,7 @@ describe('addMedia / addModel3d', () => {
     expect(el.type).toBe('picture')
     expect(el.model3d?.target).toMatch(/^ppt\/media\/model3d\d+\.glb$/)
     expect(reopened.archive.readBytes(el.model3d!.target!)).toEqual(glb)
+<<<<<<< ours
   })
 
   it('addModel3d rejects malformed glb bytes without mutating the archive', async () => {
@@ -504,6 +505,8 @@ describe('addMedia / addModel3d', () => {
     }
     expect([...opened.archive.entries.keys()].sort()).toEqual(entriesBefore)
     expect(opened.deck.slides[0]!.elements).toHaveLength(countBefore)
+=======
+>>>>>>> theirs
   })
 
   it('solidPng produces a decodable png signature', () => {

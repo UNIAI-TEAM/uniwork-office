@@ -399,6 +399,8 @@ export const ms = {
   appLangHindi: 'Hindi',
   appLangTraditionalChinese: 'Cina Tradisional',
   appLangVietnamese: 'Vietnam',
+  appLangTurkish: 'Turki',
+  appLangHungarian: 'Hungary',
   appWrapTextMenu: 'Lilit Teks',
   appViewImage: 'Lihat Imej',
   appSaveImageAs: 'Simpan Imej Sebagai…',
@@ -552,6 +554,7 @@ export const ms = {
   appUpdateStyleTip: 'Kemas kini gaya ini dengan pilihan semasa (ditulis semula ke styles.xml)',
   appNewStyleFromSelection: 'Gaya baharu daripada pilihan semasa',
   appStyleNamePlaceholder: 'Nama gaya',
+<<<<<<< ours
   appWebConflictTitle: 'Dokumen ini telah diubah di tempat lain',
   appWebConflictBody:
     'Perubahan anda belum ada di UniWork dan disimpan dalam pelayar ini sehingga anda log keluar.',
@@ -598,6 +601,11 @@ export const ms = {
     'Dokumen ini dilindungi kata laluan. Dokumen yang digabungkan disimpan sebagai fail biasa tanpa kata laluan, jadi sesiapa yang membukanya boleh membaca kandungannya. Gabung juga?',
   appMergeWarnUniwork:
     'Dokumen ini milik UniWork. Dokumen yang digabungkan disimpan pada komputer anda sebagai fail setempat biasa di luar UniWork. Gabung juga?',
+=======
+  appMergeSourceLoaded: '{name} dimuatkan ({n} rekod)',
+  appMergeWritten: '{n} dokumen ditulis',
+  appMergeNothingToWrite: 'Tiada untuk ditulis',
+>>>>>>> theirs
   appReviewPaneTitle: 'Semakan',
   appReviewPaneCount: '{n} perubahan',
   appReviewPaneHidden: '{n} disembunyikan oleh penapis',

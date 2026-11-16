@@ -112,6 +112,7 @@ export const ScriptFonts = Extension.create({
         },
         props: {
           decorations: (state) => key.getState(state),
+<<<<<<< ours
           // returning false lets prosemirror-view run its own handler after us
           handleDOMEvents: {
             compositionstart: (view) => {
@@ -127,6 +128,17 @@ export const ScriptFonts = Extension.create({
               // edit. Rebuild once the composition is over — unless the next one
               // has already started by the time the timeout fires; its own
               // compositionend rebuilds then.
+=======
+          handleDOMEvents: {
+            // A Japanese or Korean IME (and a raw-pinyin Enter commit) already
+            // has the final text in the DOM before compositionend, so ProseMirror
+            // dispatches nothing and the mapped set stays: text appended at the
+            // end of a run would keep the Latin face until the next non-IME
+            // edit. Rebuild once the composition is over — unless the next one
+            // has already started by the time the timeout fires; its own
+            // compositionend rebuilds then.
+            compositionend: (view) => {
+>>>>>>> theirs
               window.setTimeout(() => {
                 if (!view.isDestroyed && !view.composing)
                   view.dispatch(view.state.tr.setMeta(key, true))
@@ -135,9 +147,12 @@ export const ScriptFonts = Extension.create({
             },
           },
         },
+<<<<<<< ours
         // an editor torn down mid-composition must not leave the class behind
         // (prosemirror-view calls destroy() with no arguments, so close over the view)
         view: (view) => ({ destroy: () => view.dom.classList.remove(COMPOSING) }),
+=======
+>>>>>>> theirs
       }),
     ]
   },

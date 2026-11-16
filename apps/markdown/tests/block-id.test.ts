@@ -209,6 +209,7 @@ describe('copy link to block', () => {
     expect(h.copied[0]).toBe(`[[#^${id}]]`)
   })
 
+<<<<<<< ours
   it('writes no id into a view-only document, but still copies the link of an id it carries', () => {
     const h = openDoc('Plain line.\n\nKnown line. ^known')
     h.editor.setEditable(false)
@@ -229,6 +230,8 @@ describe('copy link to block', () => {
     expect(blockLink?.config.addKeyboardShortcuts).toBeUndefined()
   })
 
+=======
+>>>>>>> theirs
   it('does nothing on an empty line and says so', () => {
     const h = openDoc('Text.\n\nMore.')
     // an empty paragraph between the two: nothing to address

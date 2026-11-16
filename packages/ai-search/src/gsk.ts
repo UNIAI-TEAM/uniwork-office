@@ -12,6 +12,7 @@
  * here is shown to users.
  */
 
+<<<<<<< ours
 import {
   getUniworkCloudStatus,
   uniworkCloudEnabled,
@@ -26,6 +27,30 @@ import {
 import { storeGeneratedImage } from '@genoffice/electron-utils/generated-images'
 import { loadMediaReferences, type MediaBudget } from './media-tools'
 import { safeHost, type ImageSearchResult, type WebSearchResult } from './shared'
+=======
+import { execFile } from 'node:child_process'
+import { existsSync, mkdirSync, unwatchFile, watchFile, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { createRequire } from 'node:module'
+import {
+  asRecord,
+  firstItem,
+  gskProxyUrl,
+  isCopyrightHost,
+  safeHost,
+  type ImageSearchResult,
+  type WebSearchResult,
+} from './shared'
+import {
+  genofficeApiKey,
+  genofficeAuthPath,
+  recoverFromRejectedGskKey,
+  reloadGenofficeAuth,
+  type GskRecoveryOutcome,
+} from './genoffice-auth'
+// deep import: the package root re-exports Electron-bound modules, and this file also runs in the genoffice CLI
+>>>>>>> theirs
 
 const MIB = 1024 * 1024
 
@@ -52,12 +77,123 @@ function requireTool(tool: UniworkCloudTool): void {
   if (!uniworkCloudToolAvailable(tool)) throw new UniworkCloudError('cloud_unavailable')
 }
 
+<<<<<<< ours
 function toBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64')
 }
 
 function fromBase64(data: string): Uint8Array {
   return new Uint8Array(Buffer.from(data, 'base64'))
+=======
+/**
+ * API key for Genspark LLM proxy / tool_cli auth; '' when not logged in.
+ * Priority: explicit GSK_API_KEY env → GenOffice's own login.
+ * Never borrow the shared CLI login: it can belong to another app or account,
+ * and must not silently undo GenOffice sign-out.
+ */
+export function gskApiKey(): string {
+  const env = process.env.GSK_API_KEY
+  if (env && !rejectedKeys.has(env)) return env
+  const own = genofficeApiKey()
+  return own && !rejectedKeys.has(own) ? own : ''
+}
+
+// ── Rejected keys (401) ─────────────────────────────────────────────
+
+/**
+ * Keys the server answered 401 for (expired / revoked). GenOffice's own key
+ * is also deleted from disk; env keys are only skipped for the rest of this
+ * process because GenOffice does not own their source.
+ */
+const rejectedKeys = new Set<string>()
+
+/** Thrown when a gsk-key call is refused with 401 and no fresh key could be minted. */
+export class GskAuthError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'GskAuthError'
+  }
+}
+
+/** Whether an error text reports an HTTP 401 (gsk CLI, tool_cli, LLM proxy shapes). */
+export function isGskUnauthorizedText(text: unknown): boolean {
+  return /\bHTTP 401\b|\b401 Unauthorized\b/i.test(String(text ?? ''))
+}
+
+/**
+ * Records that `key` was refused with 401: it stops being offered (so
+ * hasGskAuth() / ai:gsk-status report signed-out and the existing sign-in UI
+ * appears) and the re-mint / re-login recovery starts. The invalidation is
+ * synchronous, before the first await, so a caller can report the failure
+ * right after this returns.
+ */
+export function noteGskKeyRejected(
+  key: string,
+  options: { allowLogin?: boolean } = {},
+): Promise<GskRecoveryOutcome> {
+  if (key) rejectedKeys.add(key)
+  return recoverFromRejectedGskKey(key, options)
+}
+
+/**
+ * For callers that used the gsk key outside this module (the Genspark LLM
+ * proxy chat/stream): when `error` reports a 401, drop the key and start the
+ * recovery in the background. Returns whether it was an auth failure.
+ */
+export function noteGskCallFailure(key: string, error: unknown): boolean {
+  if (!key) return false
+  const text = error instanceof Error ? error.message : String(error ?? '')
+  if (!isGskUnauthorizedText(text)) return false
+  void noteGskKeyRejected(key).catch(() => {})
+  return true
+}
+
+/**
+ * Runs `call` with the current key; on a 401 drops the key and, when the
+ * stored session minted a replacement, retries exactly once with it.
+ */
+async function withKeyRecovery<T>(
+  call: (key: string) => Promise<T>,
+  options: { allowLogin?: boolean } = {},
+): Promise<T> {
+  const key = gskApiKey()
+  try {
+    return await call(key)
+  } catch (err) {
+    if (!(err instanceof GskAuthError)) throw err
+    const outcome = await noteGskKeyRejected(key, options)
+    const next = gskApiKey()
+    if (outcome !== 'reminted' || !next || next === key) throw err
+    return call(next)
+  }
+}
+
+/** Test hook: forget rejected keys. */
+export function resetGskRejectedKeys(): void {
+  rejectedKeys.clear()
+}
+
+/**
+ * Fires when the effective gsk key changes on disk — another GenOffice-family
+ * app re-logging in mints a new key and revokes the one this process holds.
+ * Polls by path (watchFile): auth.json is replaced whole, and fs.watch misses
+ * events for a moment after it is armed.
+ */
+export function watchGskApiKey(onChange: (key: string) => void, intervalMs = 2000): () => void {
+  let last = gskApiKey()
+  const check = (): void => {
+    reloadGenofficeAuth()
+    const key = gskApiKey()
+    if (key === last) return
+    last = key
+    onChange(key)
+  }
+  const files = [genofficeAuthPath()]
+  for (const f of files) watchFile(f, { persistent: false, interval: intervalMs }, check)
+  return () => {
+    for (const f of files) unwatchFile(f, check)
+  }
+>>>>>>> theirs
 }
 
 /** options every media entry point accepts: where bare local paths may be read from */
@@ -121,6 +257,83 @@ export async function gskLoginInfo(): Promise<GskLoginInfo | null> {
     plan: status.planName ?? '',
     ...(typeof remaining === 'number' ? { creditBalance: remaining } : {}),
   }
+<<<<<<< ours
+=======
+  throw new Error(`No JSON found in gsk output: ${summarizeGskFailure(stdout, '')}`)
+}
+
+/** `passive`: a status/background call — a rejected key is dropped but no browser login opens */
+function runGsk(
+  args: string[],
+  timeoutMs: number,
+  signal?: AbortSignal,
+  passive = false,
+): Promise<unknown> {
+  const entry = resolveGskEntry()
+  if (!entry) return Promise.reject(new Error('@genspark/cli is not installed'))
+  return withKeyRecovery((key) => runGskOnce(entry, key, args, timeoutMs, signal), {
+    allowLogin: !passive,
+  })
+}
+
+function runGskOnce(
+  entry: string,
+  key: string,
+  args: string[],
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  // With no injected key the CLI would independently load its shared login.
+  if (!key) return Promise.reject(new GskAuthError('Sign in to GenOffice to use Genspark'))
+  // inject the resolved key so the CLI bills the same identity as our direct HTTP calls
+  return new Promise((resolve, reject) => {
+    execFile(
+      process.execPath,
+      [...electronCompatArgs(), entry, ...args, '--output', 'json'],
+      {
+        timeout: timeoutMs,
+        maxBuffer: MAX_BUFFER,
+        env: {
+          ...gskChildEnv(),
+          GSK_API_KEY: key,
+        },
+        ...(signal ? { signal } : {}),
+      },
+      (err, stdout, stderr) => {
+        if (err) {
+          // stderr carries gsk's real reason ([ERROR] lines, or a whole HTML
+          // page); err.message only repeats the command line, so use it alone
+          // when stderr has nothing
+          const stderrText = summarizeGskFailure(stderr, '')
+          const message = stderrText
+            ? `gsk failed: ${stderrText}`
+            : summarizeGskFailure((err as Error).message, 'gsk failed')
+          // the CLI prints a refused call's {status:'error', message:'HTTP 401…'} on stdout
+          const unauthorized =
+            !!key && (isGskUnauthorizedText(stdout) || isGskUnauthorizedText(stderr))
+          reject(unauthorized ? new GskAuthError(message) : new Error(message))
+          return
+        }
+        try {
+          const result = parseGskOutput(String(stdout))
+          const rec = asRecord(result)
+          if (rec.status && rec.status !== 'ok') {
+            const message = `gsk returned an error: ${summarizeGskFailure(rec.message ?? rec.status)}`
+            reject(
+              key && isGskUnauthorizedText(rec.message)
+                ? new GskAuthError(message)
+                : new Error(message),
+            )
+            return
+          }
+          resolve(result)
+        } catch (parseErr) {
+          reject(parseErr)
+        }
+      },
+    )
+  })
+>>>>>>> theirs
 }
 
 // ── Search ──────────────────────────────────────────────────────────
@@ -238,6 +451,7 @@ export async function gskGenerateImage(
   return { url: storeGeneratedImage(fromBase64(first.dataBase64), first.mime), taskId: r.model }
 }
 
+<<<<<<< ours
 // ── Slide generation (not a UniWork cloud tool) ─────────────────────
 
 export interface GskSlideGenerateOptions {
@@ -264,6 +478,8 @@ export async function gskSlideGenerate(
   throw new Error(SLIDES_UNAVAILABLE)
 }
 
+=======
+>>>>>>> theirs
 // ── Media analysis / transcription ──────────────────────────────────
 
 export interface GskAnalyzeMediaOptions {
@@ -284,6 +500,7 @@ export async function gskAnalyzeMedia(
   signal?: AbortSignal,
   media: GskMediaOptions = {},
 ): Promise<string> {
+<<<<<<< ours
   requireTool('media_analyze')
   const requirements = clip(
     String(options.requirements ?? '').trim(),
@@ -301,4 +518,140 @@ export async function gskAnalyzeMedia(
     signal,
   )
   return r.text
+=======
+  const args = [
+    'media-analyze',
+    '--media_urls',
+    ...options.mediaUrls,
+    '--requirements',
+    options.requirements,
+  ]
+  const raw = await runGsk(args, GENERATE_TIMEOUT_MS, signal)
+  return extractGskText(raw)
+}
+
+export interface GskTranscribeOptions {
+  /** Audio URLs or local paths */
+  audioUrls: string[]
+  /** Prompt (context / proper nouns; can improve recognition quality) */
+  prompt?: string
+  /** whisper-1 (default, with timestamps) | gemini-3-flash-preview | elevenlabs_scribe_v2 */
+  model?: string
+}
+
+export async function gskTranscribe(
+  options: GskTranscribeOptions,
+  signal?: AbortSignal,
+): Promise<string> {
+  const args = ['transcribe', '--audio_urls', ...options.audioUrls]
+  if (options.prompt) args.push('--prompt', options.prompt)
+  if (options.model) args.push('-m', options.model)
+  const raw = await runGsk(args, GENERATE_TIMEOUT_MS, signal)
+  return extractGskText(raw)
+}
+
+// ── Past projects (Genspark web) ────────────────────────────────────
+
+export interface GskPastProject {
+  projectId: string
+  /** raw project type, e.g. 'slides_agent_git' */
+  type: string
+  title: string
+  /** creation time, ISO-like string from the API */
+  ctime: string
+  /** relative web URL, e.g. '/agents?id=...' — join with https://www.genspark.ai */
+  projectUrl: string
+}
+
+export interface GskPastProjectsPage {
+  projects: GskPastProject[]
+  total: number
+  hasMore: boolean
+}
+
+/**
+ * Parses `gsk projects`. data.projects lacks project_url — it only appears in
+ * session_state.past_projects — so take it from there, falling back to
+ * deriving it from the project id. (exported for tests)
+ */
+export function parseGskPastProjects(raw: unknown): GskPastProjectsPage {
+  const rec = asRecord(raw)
+  const data = asRecord(rec.data ?? raw)
+  const urlById = new Map<string, string>()
+  const sessionProjects = asRecord(asRecord(rec.session_state).past_projects).projects
+  if (Array.isArray(sessionProjects)) {
+    for (const item of sessionProjects) {
+      const p = asRecord(item)
+      if (p.project_id && typeof p.project_url === 'string' && p.project_url) {
+        urlById.set(String(p.project_id), p.project_url)
+      }
+    }
+  }
+  const listRaw: unknown[] = Array.isArray(data.projects) ? data.projects : []
+  const projects: GskPastProject[] = []
+  for (const item of listRaw) {
+    const p = asRecord(item)
+    const projectId = String(p.project_id ?? '')
+    if (!projectId) continue
+    projects.push({
+      projectId,
+      type: String(p.type ?? ''),
+      title: String(p.title ?? ''),
+      ctime: String(p.ctime ?? ''),
+      projectUrl: urlById.get(projectId) ?? `/agents?id=${projectId}`,
+    })
+  }
+  const total = Number(data.total)
+  return {
+    projects,
+    total: Number.isFinite(total) ? total : projects.length,
+    hasMore: data.has_more === true,
+  }
+}
+
+export interface GskListPastProjectsOptions {
+  /** 'slides' | 'docs' | 'sheets' | ...; omit for all kinds */
+  artifactTypes?: string[]
+  /** page size, CLI default 20, max 100 */
+  limit?: number
+  offset?: number
+  signal?: AbortSignal
+}
+
+/** Lists the user's own past Genspark web projects, newest first (`gsk projects`). */
+export async function gskListPastProjects(
+  options: GskListPastProjectsOptions = {},
+): Promise<GskPastProjectsPage> {
+  const args = ['projects']
+  if (options.artifactTypes?.length) args.push('--artifact_types', ...options.artifactTypes)
+  if (options.limit !== undefined) args.push('--limit', String(options.limit))
+  if (options.offset) args.push('--offset', String(options.offset))
+  // background sync: never the reason a browser window opens
+  const raw = await runGsk(args, SEARCH_TIMEOUT_MS, options.signal, true)
+  return parseGskPastProjects(raw)
+}
+
+export interface GskLoginInfo {
+  email: string
+  plan: string
+  creditBalance?: number
+}
+
+/** Current login info; null when not logged in */
+export async function gskLoginInfo(): Promise<GskLoginInfo | null> {
+  try {
+    const raw = await runGsk(['login-info'], SEARCH_TIMEOUT_MS, undefined, true)
+    const d = asRecord(asRecord(raw).data ?? raw)
+    if (!d.email) return null
+    const info: GskLoginInfo = {
+      email: String(d.email),
+      plan: String(d.plan ?? d.personal_plan ?? ''),
+    }
+    const balance = Number(d.credit_balance)
+    if (Number.isFinite(balance)) info.creditBalance = balance
+    return info
+  } catch {
+    return null
+  }
+>>>>>>> theirs
 }

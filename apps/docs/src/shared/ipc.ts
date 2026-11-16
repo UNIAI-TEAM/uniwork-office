@@ -207,6 +207,7 @@ export type MenuCommand =
   /** the shell's own flush of a converted document for the UniWork first save: write in place, no dialog */
   | 'save-in-place'
   | 'save-as'
+  | 'name-with-ai'
   | 'undo'
   | 'redo'
   | 'zoom-in'
@@ -423,8 +424,13 @@ export interface DesktopCapabilities {
  * MCP bridge: an editor command pushed from the shell main process into a docs
  * tab so an external agent drives the *visible* editor instead of writing a file
  * behind it. `insert_content` / `replace_blocks` / `apply_ops` / `insert_picture` /
+<<<<<<< ours
  * `read_document` reuse the built-in agent's tool executors; `save_document` writes
  * the live document to an explicit path.
+=======
+ * `read_document` / `read_blocks` reuse the built-in agent's tool executors;
+ * `save_document` writes the live document to an explicit path.
+>>>>>>> theirs
  */
 export type McpEditorCommand =
   | 'insert_content'
@@ -432,6 +438,10 @@ export type McpEditorCommand =
   | 'apply_ops'
   | 'insert_picture'
   | 'read_document'
+<<<<<<< ours
+=======
+  | 'read_blocks'
+>>>>>>> theirs
   | 'save_document'
 
 export interface McpCommandMessage {
@@ -478,6 +488,17 @@ export interface PrintJobOptions {
   duplex?: PrintDuplex
 }
 
+<<<<<<< ours
+=======
+/** the document's own paper size in twips, read off the pagination preview's
+ * first sheet: the CUPS print route bakes printToPDF pages at this size
+ * instead of Chromium's Letter default. Optional — absent falls back. */
+export interface PrintPaper {
+  widthTwips: number
+  heightTwips: number
+}
+
+>>>>>>> theirs
 export interface PrinterInfo {
   name: string
   displayName: string
@@ -691,18 +712,30 @@ export interface DesktopApi {
   onAiSettingsChanged(handler: () => void): () => void
   /** shell only: switch to Home and open Settings › Account, UniWork AI sign-in (rejects in standalone) */
   openAiModelSettings(): Promise<void>
+<<<<<<< ours
+=======
+  /** shell: switch to Home and open Settings › Integrations (the skills list) */
+  openSkillsSettings(): Promise<void>
+>>>>>>> theirs
   /** print the current window; ok=false without error = canceled.
    *  scale: print scale inverting the preview's print zoom (print-zoom.ts).
    *  job: printer/copies/duplex from the in-app dialog; a named printer ('' = OS
    *  default) prints silently, null or omitted opens the system dialog.
    *  paper: the document's own page size in twips (the preview's first sheet),
    *  used by the CUPS print route to size printToPDF's pages */
+<<<<<<< ours
   /** noPrinter: the machine has no printer, so nothing was sent (offer Save as PDF instead) */
+=======
+>>>>>>> theirs
   print(
     scale?: number,
     job?: PrintJobOptions,
     paper?: PrintPaper,
+<<<<<<< ours
   ): Promise<{ ok: boolean; error?: string; noPrinter?: boolean }>
+=======
+  ): Promise<{ ok: boolean; error?: string }>
+>>>>>>> theirs
   /** installed printers for the in-app print dialog */
   listPrinters(): Promise<PrinterInfo[]>
   /** render the document to PDF and ask where to save; size in twips.
@@ -714,7 +747,11 @@ export interface DesktopApi {
     outPath?: string,
     scale?: number,
     links?: PdfInternalLink[],
+<<<<<<< ours
   ): Promise<PdfExportResult>
+=======
+  ): Promise<{ ok: boolean; path?: string; error?: string }>
+>>>>>>> theirs
   exportHtml(
     defaultName: string,
     html: string,
@@ -739,7 +776,11 @@ export interface DesktopApi {
     base64Parts: string[],
     outPath?: string,
     links?: PdfInternalLink[],
+<<<<<<< ours
   ): Promise<PdfExportResult>
+=======
+  ): Promise<{ ok: boolean; path?: string; error?: string }>
+>>>>>>> theirs
   /** Export as images: the folder picker plus a pre-authorized temp PDF path the
    *  regular PDF export writes to silently (no reveal, no open) */
   pickExportImagesTarget(): Promise<{ dir: string; pdfPath: string } | null>
@@ -853,6 +894,7 @@ export interface DesktopApi {
   reportCloseSaveResult(ok: boolean): void
   /** keep the native View menu's checkbox items in sync with renderer state */
   reportViewMenuState(state: { aiSidebar: boolean; darkCanvas: boolean }): void
+<<<<<<< ours
   /** web frame only (SIZE-F1): notify the host that the document was refused on open */
   reportOpenRefused?(info: {
     path?: string | null
@@ -865,6 +907,40 @@ export interface DesktopApi {
     }
     message?: string
   }): void
+=======
+  /** the skills the user installed (userData/skills), for the AI panel's skills skill */
+  skillsList(): Promise<UserSkillEntry[]>
+  /** the body of one installed skill, by name — the main process resolves the path */
+  skillText(name: string): Promise<string>
+  /** run the bundled genoffice CLI; failures come back as ok:false, never a throw */
+  runCli(args: string[]): Promise<UserCliRun>
+}
+
+export interface UserSkillEntry {
+  name: string
+  description: string
+  relevant: boolean
+}
+
+export interface UserCliRun {
+  ok: boolean
+  /** process exit code, or -1 when the process never started */
+  code: number
+  json?: {
+    status: string
+    command: string | null
+    code?: number
+    summary?: string
+    output_path?: string
+    message?: string
+  }
+  stdout: string
+  stderr: string
+  /** where relative paths resolved; absent in a window with no document and no save folder */
+  cwd?: string
+  /** the folders the CLI may read and write */
+  allowedRoots?: string[]
+>>>>>>> theirs
 }
 
 /** mirrors VIEW_IMAGE_CHANNEL in @genoffice/electron-utils (kept literal so the preload stays free of main-only deps) */

@@ -573,10 +573,13 @@ export const deleteTableColumn: Command = (state, dispatch) => {
     widths ? widths.filter((_, col) => keep(col)) : null,
     pct.filter((_, col) => keep(col)),
   )
+<<<<<<< ours
   const table = tr.doc.nodeAt(tablePos)
   if (table && widths && table.attrs.tblAutoFit === 'fixed' && !table.attrs.tblAutoFitEdited) {
     tr.setNodeMarkup(tablePos, undefined, { ...table.attrs, tblAutoFitEdited: true })
   }
+=======
+>>>>>>> theirs
   dispatch?.(tr)
   return true
 }

@@ -15,7 +15,10 @@ import {
   type WorkbookReadContext,
 } from '../src/renderer/ai/workbook-readers'
 import type { SheetRedactionState } from '@genoffice/xlsx-gateway/gateway/xlsx-redaction'
+<<<<<<< ours
 import type * as UniverSync from '../src/renderer/univer-sync'
+=======
+>>>>>>> theirs
 
 const SHEETS = [
   { id: 'sh1', name: 'Customers' },
@@ -154,15 +157,26 @@ describe('read_cells projects every field of a withheld cell', () => {
       B3: { value: 'public' },
     })
     const result = readCells(ctx, ['B2', 'B3'])
+<<<<<<< ours
     expect(result.B2).toMatchObject({ value: '{{client phone}}' })
     expect(result.B2?.formula).toBeUndefined()
     expect(result.B2?.rawValue).toBeUndefined()
     expect(result.B3).toMatchObject({ value: 'public' })
+=======
+    expect(result.B2).toEqual({ value: '{{client phone}}' })
+    expect(result.B2?.formula).toBeUndefined()
+    expect(result.B2?.rawValue).toBeUndefined()
+    expect(result.B3).toEqual({ value: 'public' })
+>>>>>>> theirs
   })
 
   it('leaves a workbook with no marks exactly as it was', () => {
     const ctx = demoContext({ B2: { value: '13800138000' } }, NO_REDACTIONS)
+<<<<<<< ours
     expect(readCells(ctx, ['B2']).B2).toMatchObject({ value: '13800138000' })
+=======
+    expect(readCells(ctx, ['B2']).B2).toEqual({ value: '13800138000' })
+>>>>>>> theirs
   })
 })
 
@@ -249,8 +263,12 @@ describe('read_cells projects a withheld cell on the streaming path too', () => 
     // `value` here would hand over the number twice: once in `formula` and
     // once in `rawValue`.
     vi.resetModules()
+<<<<<<< ours
     vi.doMock('../src/renderer/univer-sync', async (importOriginal) => ({
       ...(await importOriginal<typeof UniverSync>()),
+=======
+    vi.doMock('../src/renderer/univer-sync', () => ({
+>>>>>>> theirs
       lazyCellReader: () => (address: string) => ({
         value: address === 'B2' ? '13800138000' : 'public',
         formula: address === 'B2' ? '=A1&""' : undefined,
@@ -263,7 +281,10 @@ describe('read_cells projects a withheld cell on the streaming path too', () => 
       getSheetId: () => 'sh1',
       getSheetName: () => 'Customers',
       getMergedRanges: () => [],
+<<<<<<< ours
       getRange: () => ({ getNumberFormat: () => 'General', getCellDatas: () => [[{}]] }),
+=======
+>>>>>>> theirs
     }
     const ctx: WorkbookReadContext = {
       univerRef: {
@@ -285,10 +306,17 @@ describe('read_cells projects a withheld cell on the streaming path too', () => 
     }
 
     const result = readCellsLazy(ctx, ['B2', 'B3'])
+<<<<<<< ours
     expect(result.B2).toMatchObject({ value: '{{client phone}}' })
     expect(result.B2?.formula).toBeUndefined()
     expect(result.B2?.rawValue).toBeUndefined()
     expect(result.B3).toMatchObject({ value: 'public', rawValue: 'public' })
+=======
+    expect(result.B2).toEqual({ value: '{{client phone}}' })
+    expect(result.B2?.formula).toBeUndefined()
+    expect(result.B2?.rawValue).toBeUndefined()
+    expect(result.B3).toEqual({ value: 'public', rawValue: 'public' })
+>>>>>>> theirs
     vi.doUnmock('../src/renderer/univer-sync')
     vi.resetModules()
   })

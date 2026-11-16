@@ -1,4 +1,8 @@
+<<<<<<< ours
 import { useEffect, useRef, useState } from 'react'
+=======
+import { useEffect, useState } from 'react'
+>>>>>>> theirs
 import type { Editor } from '@tiptap/core'
 import { mergeFieldInstruction } from '@genoffice/docx-engine'
 import type { MergeDataSource } from '../../shared/ipc'
@@ -45,6 +49,7 @@ export function MailingsTab({
   const { t } = useI18n()
   const [panelOpen, setPanelOpen] = useState(false)
   const [recordIndex, setRecordIndex] = useState(0)
+<<<<<<< ours
   const triggerRef = useRef<HTMLButtonElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   // a new list starts at its first record; the old index may be past its end
@@ -65,6 +70,11 @@ export function MailingsTab({
     return () => window.removeEventListener('keydown', onKey, true)
   }, [isOpen, setDropdown])
 
+=======
+  // a new list starts at its first record; the old index may be past its end
+  useEffect(() => setRecordIndex(0), [source?.path])
+
+>>>>>>> theirs
   const records = source?.records ?? []
   const hasRecords = records.length > 0
   const insertField = (name: string) => {
@@ -97,6 +107,7 @@ export function MailingsTab({
         <div className="ribbon-group-items">
           <div className="rb-split-wrap">
             <button
+<<<<<<< ours
               ref={triggerRef}
               className="rb-big"
               disabled={!hasDoc || !source || source.fields.length === 0}
@@ -110,6 +121,12 @@ export function MailingsTab({
                   setDropdown(() => 'mergefield')
                 }
               }}
+=======
+              className="rb-big"
+              disabled={!hasDoc || !source || source.fields.length === 0}
+              data-tip={t('ribbonMailingsInsertFieldTip')}
+              onClick={() => toggleDropdown(setDropdown, 'mergefield')}
+>>>>>>> theirs
             >
               <span className="rb-big-icon">
                 <IconMergeField size={BIG} />
@@ -117,6 +134,7 @@ export function MailingsTab({
               </span>
               <span>{t('ribbonMailingsInsertField')}</span>
             </button>
+<<<<<<< ours
             {isOpen && source && (
               <div
                 ref={listRef}
@@ -164,6 +182,13 @@ export function MailingsTab({
                     className="rb-field-item"
                     onClick={() => insertField(name)}
                   >
+=======
+            {dropdown === 'mergefield' && source && (
+              <div data-rb-panel="" className="rb-field-list">
+                <div className="rb-drop-title">{t('ribbonMailingsFields')}</div>
+                {source.fields.map((name) => (
+                  <button key={name} className="rb-field-item" onClick={() => insertField(name)}>
+>>>>>>> theirs
                     {name}
                   </button>
                 ))}

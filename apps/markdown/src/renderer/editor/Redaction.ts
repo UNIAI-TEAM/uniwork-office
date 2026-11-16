@@ -117,7 +117,12 @@ export const Redaction = Mark.create({
   /** writes the persisted span; see the class comment */
   renderMarkdown(node, helpers) {
     const label = String(node.attrs?.label ?? 'private')
+<<<<<<< ours
     const text = helpers.renderChildren(node)
+=======
+    // a literal "</span>" inside the hidden words must not close the marker early
+    const text = helpers.renderChildren(node).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+>>>>>>> theirs
     return `<span class="redact-span" data-redaction="" data-label="${label.replace(/"/g, '&quot;')}">${text}</span>`
   },
 })

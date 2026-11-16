@@ -266,6 +266,7 @@ describe('CertSignDialog', () => {
     expect(listSystemCertificates).toHaveBeenLastCalledWith('pw')
   })
 
+<<<<<<< ours
   it('ignores Escape while a signing run is in flight', async () => {
     let finish: (v: { ok: true; path: string }) => void = () => {}
     installApi({
@@ -318,6 +319,8 @@ describe('CertSignDialog', () => {
     expect(dialog.querySelector<HTMLInputElement>('input.pdf-cert-page')!.value).toBe('')
   })
 
+=======
+>>>>>>> theirs
   it('offers certification only for a document that has no signatures yet', async () => {
     installApi({})
     const dialog = await mount(

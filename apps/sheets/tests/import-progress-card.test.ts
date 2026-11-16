@@ -123,8 +123,11 @@ describe('the import progress card', () => {
     expect(rendered.cancelText).toBe('Cancel')
     const button = container?.querySelector<HTMLButtonElement>('.workbook-opening-cancel')
     expect(button).toBeTruthy()
+<<<<<<< ours
     expect(button?.classList.contains('secondary')).toBe(true)
     expect(button?.classList.contains('workbook-opening-cancel')).toBe(true)
+=======
+>>>>>>> theirs
     await act(async () => {
       button?.click()
     })

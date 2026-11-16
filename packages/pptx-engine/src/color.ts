@@ -4,7 +4,11 @@
  * placeholder (lstStyle defRPr default colors) to avoid a circular dependency.
  */
 import { type Theme, resolveSchemeColor, sysColorHex } from './theme'
+<<<<<<< ours
 import { asXmlNode, percentFraction, srgbHexValue, type XmlNode } from './xml-utils'
+=======
+import { asXmlNode, percentFraction, srgbHexValue, xmlArray, type XmlNode } from './xml-utils'
+>>>>>>> theirs
 
 /**
  * Resolve a color node + modifiers: srgbClr/schemeClr/sysClr, supporting alpha
@@ -245,18 +249,44 @@ const PRESET_COLORS_LOWER = new Map<string, string>(
 /** Apply lumMod/lumOff/tint/shade/satMod/alpha modifiers (ST_Percentage: 1/1000 % or "50%"). */
 export function applyColorMods(hex: string, mods: XmlNode | undefined): string {
   let { r, g, b } = hexToRgb(hex)
+<<<<<<< ours
   const pct = (k: string): number | undefined => {
     const v = asXmlNode(mods?.[k])['@_val']
     return v != null ? (percentFraction(v) ?? 0) : undefined
+=======
+  // Repeated modifiers apply in order: multipliers compound, offsets add, alpha is
+  // overridden (Google Slides exports two alpha children; PowerPoint keeps the last).
+  const vals = (k: string): number[] =>
+    xmlArray(mods?.[k])
+      .map((n) => n['@_val'])
+      .filter((v) => v != null)
+      .map((v) => percentFraction(v) ?? 0)
+  const last = (k: string): number | undefined => {
+    const v = vals(k)
+    return v.length ? v[v.length - 1] : undefined
   }
-  const lumMod = pct('a:lumMod')
-  const lumOff = pct('a:lumOff')
-  const shade = pct('a:shade')
-  const tint = pct('a:tint')
+  const product = (k: string): number | undefined => {
+    const v = vals(k)
+    return v.length ? v.reduce((a, b) => a * b, 1) : undefined
+  }
+  const sum = (k: string, rawDivisor?: number): number | undefined => {
+    const v = xmlArray(mods?.[k])
+      .map((n) => n['@_val'])
+      .filter((raw) => raw != null)
+      // hueOff is an angle in 1/60000 degree, everything else is a percentage
+      .map((raw) =>
+        rawDivisor ? (parseInt(String(raw), 10) || 0) / rawDivisor : (percentFraction(raw) ?? 0),
+      )
+    return v.length ? v.reduce((a, b) => a + b, 0) : undefined
+>>>>>>> theirs
+  }
+  const lumMod = product('a:lumMod')
+  const lumOff = sum('a:lumOff')
+  const shade = product('a:shade')
+  const tint = product('a:tint')
   // SmartArt colorful cycles rotate node colors via HSL offsets (hueOff 1/60000 deg, satOff 1/1000 %)
-  const hueOffV = asXmlNode(mods?.['a:hueOff'])['@_val']
-  const hueOff = hueOffV != null ? (parseInt(String(hueOffV), 10) || 0) / 60000 : undefined
-  const satOff = pct('a:satOff')
+  const hueOff = sum('a:hueOff', 60000)
+  const satOff = sum('a:satOff')
   if ((hueOff != null && hueOff !== 0) || (satOff != null && satOff !== 0)) {
     const { h, s, l } = rgbToHsl(r, g, b)
     const h2 = (((h + (hueOff ?? 0) / 360) % 1) + 1) % 1
@@ -267,7 +297,7 @@ export function applyColorMods(hex: string, mods: XmlNode | undefined): string {
     b = rgb2.b
   }
   // satMod (frequent in theme gradient templates): HSL saturation multiplier
-  const satMod = pct('a:satMod')
+  const satMod = product('a:satMod')
   if (satMod != null) {
     const { h, s, l } = rgbToHsl(r, g, b)
     const rgb2 = hslToRgb(h, Math.max(0, Math.min(1, s * satMod)), l)
@@ -307,7 +337,7 @@ export function applyColorMods(hex: string, mods: XmlNode | undefined): string {
       .map((v) => v.toString(16).padStart(2, '0'))
       .join('')
       .toUpperCase()
-  const alpha = pct('a:alpha')
+  const alpha = last('a:alpha')
   if (alpha != null && alpha < 1) {
     // Broken input can carry a negative (or non-finite) alpha; clamping keeps the
     // suffix two hex digits, where Math.round(-2.5 * 255) used to write "-27D".

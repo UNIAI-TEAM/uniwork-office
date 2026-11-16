@@ -11,7 +11,10 @@
 import {
   allocatePartPath,
   appendRelationship,
+<<<<<<< ours
   base64ToBytes,
+=======
+>>>>>>> theirs
   registerContentTypeDefault,
   registerContentTypeOverride,
   relativeTarget,
@@ -85,7 +88,11 @@ export async function applyCellImageAdditions(
   for (const addition of additions) {
     const extension = IMAGE_EXTENSIONS[addition.mediaType]
     const mediaPath = await allocatePartPath(pkg, 'xl/media/image', `.${extension}`)
+<<<<<<< ours
     pkg.addBinary(mediaPath, base64ToBytes(addition.base64))
+=======
+    pkg.addBinary(mediaPath, Uint8Array.from(Buffer.from(addition.base64, 'base64')))
+>>>>>>> theirs
     touchedEntries.add(mediaPath)
     mediaPaths.push(mediaPath)
     await registerContentTypeDefault(pkg, extension, addition.mediaType, touchedEntries)

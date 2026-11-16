@@ -83,14 +83,25 @@ export function normalizeRecentQuery(
 /** sidebar filter keys that stand for a family of extensions, not one exact ext */
 export const EXT_FAMILY: Record<string, readonly string[]> = {
   // mirrors Home's FILTER_FAMILY and SEARCH_EXT_FAMILY
+<<<<<<< ours
   docx: ['docx', 'doc', 'odt', 'ott'],
+=======
+  docx: ['docx', 'doc', 'dot', 'odt', 'ott', 'hwpx', 'hwp'],
+>>>>>>> theirs
   // delimited text belongs to the sheets family: Home's own FILTER_FAMILY and
   // the shell's open routing both treat .csv/.tsv as spreadsheets, so a
   // sidebar filtered on "xlsx" must page them in too (csv was missing here).
   xlsx: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv', 'ods', 'ots'],
   pptx: ['pptx', 'ppt', 'odp', 'otp'],
+<<<<<<< ours
   // exact-extension filter and .json is found under "all" only
   md: ['md', 'markdown'],
+=======
+  // the text app opens txt/json as source too, so the sidebar "md" filter has
+  // to page them in the same way Home's FILTER_FAMILY already does — otherwise
+  // the two views disagree about which files the filter means.
+  md: ['md', 'markdown', 'txt', 'json'],
+>>>>>>> theirs
   html: ['html', 'htm'],
 }
 
@@ -167,10 +178,15 @@ export async function pageRecentPaths(
   paths: readonly string[],
   raw: unknown,
   starredPaths: ReadonlySet<string>,
+<<<<<<< ours
   uniwork?: RecentUniworkLookup,
 ): Promise<RecentPage> {
   const { offset, limit, ext } = normalizeRecentQuery(raw)
   const visible = uniwork ? paths.filter((p) => uniwork(p) !== 'hidden') : paths
+=======
+): Promise<RecentPage> {
+  const { offset, limit, ext } = normalizeRecentQuery(raw)
+>>>>>>> theirs
   // Probe only the returned page, without blocking main on unavailable mounts.
   const filtered = ext
     ? visible.filter((p) => matchesExtFamily(extname(p).slice(1).toLowerCase(), ext))
@@ -184,7 +200,11 @@ export async function pageRecentPaths(
     }
   }
   return {
+<<<<<<< ours
     entries,
+=======
+    entries: await statPathEntriesAsync(page, starredPaths),
+>>>>>>> theirs
     total: filtered.length,
     totalAll: visible.length,
   }

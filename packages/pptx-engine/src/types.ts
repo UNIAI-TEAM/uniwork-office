@@ -340,7 +340,7 @@ export interface Paragraph {
   alignSrc?: string
   /** Paragraph base direction (a:pPr rtl): true = RTL base, false = explicit LTR base, absent = inferred from the first strong character */
   rtl?: boolean
-  /** <a:pPr hangingPunct="0"> switches off East Asian hanging punctuation (a trailing closing mark may overhang the margin); absent = PowerPoint's default, on */
+  /** Effective East Asian hanging-punctuation switch (own pPr, else lstStyle/master level); absent = PowerPoint default, on */
   hangingPunct?: boolean
   /** <a:pPr latinLnBrk="1"> ("allow Latin text to wrap in the middle of a word"): Hangul words then break per syllable like CJK; absent = word wrap */
   latinLnBrk?: boolean
@@ -414,6 +414,9 @@ export interface Paragraph {
     indent?: boolean
     tabLst?: boolean
     defTabSz?: boolean
+    hangingPunct?: boolean
+    latinLnBrk?: boolean
+    eaLnBrk?: boolean
   }
 }
 
@@ -603,7 +606,7 @@ export interface TextElement extends ElementBase {
   /** spPr carried neither a:prstGeom nor a:custGeom (non-placeholder): PowerPoint draws only the text */
   noGeometry?: true
   fill?: Fill
-  /** <p:sp useBgFill="1">: painted with the slide's effective background fill (fill is only a fallback) */
+  /** <p:sp useBgFill="1"> without an spPr fill of its own: painted with the slide's effective background fill */
   useBgFill?: boolean
   /** <a:effectLst><a:fillOverlay>: second fill composited over the base (PowerPoint blends
    *  with the record's blend mode; the renderer approximates every mode as multiply) */
@@ -745,6 +748,8 @@ export interface ChartElement extends ElementBase {
   type: 'chart'
   /** Parsed chart data model (see chart.ts) */
   chart: import('./chart').ChartModel
+  /** c:userShapes text/shape overlays, already in slide coordinates; render-only (never saved back) */
+  userShapes?: TextElement[]
 }
 
 export type SlideElement =

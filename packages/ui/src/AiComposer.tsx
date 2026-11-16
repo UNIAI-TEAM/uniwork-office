@@ -3,6 +3,7 @@ import type { Lang } from '@genoffice/i18n'
 import { IconEnter, IconSend, IconStop } from './icons'
 import { useAiPanelPrefs } from './ai-panel-prefs-store'
 import { useImeEnterGuard } from './ime-enter'
+<<<<<<< ours
 import { useAiModelNeedAction, useAiModelNeedHint } from './ai-model-need'
 import {
   UniworkComposerNote,
@@ -13,11 +14,49 @@ import {
   type AiComposerUniworkProps,
 } from './ai-uniwork-composer'
 import { aiUniworkText } from './strings-ai-uniwork'
+=======
+>>>>>>> theirs
 
 // Keep in sync with the CSS `max-height` on `.ai-input-box textarea` (7 lines à 24px)
 const MAX_TEXTAREA_HEIGHT = 168
 
+<<<<<<< ours
 export interface AiComposerProps {
+=======
+/**
+ * The AI panel input box shared by docs and sheets: auto-growing textarea
+ * (Enter sends, Shift+Enter newline, Esc stops) plus a footer with optional
+ * app-specific controls, a shortcut hint, and the send/stop button.
+ * Renders the `.ai-input-box` class family; each app themes it in its own CSS.
+ * While busy, Enter queues the draft instead (see useChatRunQueue).
+ */
+export function AiComposer({
+  value,
+  busy,
+  placeholder,
+  hintIdle,
+  hintBusy,
+  hintIdleTitle,
+  sendLabel,
+  stopLabel,
+  ariaLabel,
+  header,
+  queueStrip,
+  footerStart,
+  iconOnly = false,
+  sendIconEnabled,
+  sendIconDisabled,
+  stopIcon,
+  textareaRef,
+  onChange,
+  onSend,
+  onQueue,
+  queuePlaceholder,
+  onStop,
+  onPasteFiles,
+  onPasteText,
+}: {
+>>>>>>> theirs
   readonly value: string
   readonly busy: boolean
   readonly placeholder: string
@@ -104,6 +143,7 @@ export function AiComposer({
   const boxRef = useRef<HTMLDivElement | null>(null)
   const internalDisclosureRegionRef = useRef<HTMLElement | null>(null)
   const ref = textareaRef ?? innerRef
+<<<<<<< ours
   const autoId = useId()
   const autoSentenceId = `ai-uniwork-disclosure-sentence-${autoId}`
   const autoNeedsAckId = `ai-uniwork-send-needs-ack-${autoId}`
@@ -112,6 +152,10 @@ export function AiComposer({
   // UniWork AI is not on here: send stays off and the hint says why
   const needModelHint = useAiModelNeedHint()
   const needModelAction = useAiModelNeedAction()
+=======
+  const canSend = value.trim().length > 0 && !busy
+  const ime = useImeEnterGuard()
+>>>>>>> theirs
   const { spellcheck } = useAiPanelPrefs()
 
   const hasUniworkFeatures = uniwork !== undefined || viewOnly !== undefined
@@ -185,6 +229,7 @@ export function AiComposer({
     ta.style.height = `${Math.min(ta.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`
   }, [value, ref])
 
+<<<<<<< ours
   // the disclosure region owns its own ack hook; an ack that cannot be stored (empty account)
   // lives in this composer's hook, so it has to be recorded here too
   const disclosureOnAck = disclosureCfg?.onAck
@@ -220,6 +265,10 @@ export function AiComposer({
 
   const inputBox = (
     <div ref={boxRef} className="ai-input-box" data-esc-local={busy ? '' : undefined}>
+=======
+  return (
+    <div className="ai-input-box">
+>>>>>>> theirs
       {queueStrip}
       {header}
       <textarea
@@ -238,10 +287,13 @@ export function AiComposer({
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             if (ime.isImeConfirm(e.nativeEvent)) return
+<<<<<<< ours
             if (unacked) {
               handleBlockedByAck()
               return
             }
+=======
+>>>>>>> theirs
             if (canSend) onSend()
             else if (busy && onQueue) onQueue()
           } else if (e.key === 'Escape' && busy) {

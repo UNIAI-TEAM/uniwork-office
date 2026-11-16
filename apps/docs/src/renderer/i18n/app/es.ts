@@ -401,6 +401,8 @@ export const es = {
   appLangHindi: 'hindi',
   appLangTraditionalChinese: 'chino tradicional',
   appLangVietnamese: 'vietnamita',
+  appLangTurkish: 'turco',
+  appLangHungarian: 'húngaro',
   appWrapTextMenu: 'Ajustar texto',
   appViewImage: 'Ver imagen',
   appSaveImageAs: 'Guardar imagen como…',
@@ -555,6 +557,7 @@ export const es = {
     'Actualizar este estilo con el formato de la selección actual (se escribe en styles.xml)',
   appNewStyleFromSelection: 'Nuevo estilo a partir de la selección actual',
   appStyleNamePlaceholder: 'Nombre del estilo',
+<<<<<<< ours
   appWebConflictTitle: 'Este documento se modificó en otro lugar',
   appWebConflictBody:
     'Tus cambios aún no están en UniWork y se conservan en este navegador hasta que cierres sesión.',
@@ -601,6 +604,11 @@ export const es = {
     'Este documento está protegido con contraseña. Los documentos combinados se guardan como archivos normales, sin contraseña, así que cualquiera que los abra podrá leer el contenido. ¿Combinar de todos modos?',
   appMergeWarnUniwork:
     'Este documento pertenece a UniWork. Los documentos combinados se guardan en tu equipo como archivos locales normales, fuera de UniWork. ¿Combinar de todos modos?',
+=======
+  appMergeSourceLoaded: '{name} cargado ({n} registros)',
+  appMergeWritten: '{n} documentos escritos',
+  appMergeNothingToWrite: 'No hay nada que escribir',
+>>>>>>> theirs
   appReviewPaneTitle: 'Revisiones',
   appReviewPaneCount: '{n} cambios',
   appReviewPaneHidden: '{n} ocultos por los filtros',

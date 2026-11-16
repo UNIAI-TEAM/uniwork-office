@@ -392,6 +392,8 @@ export const th = {
   appLangHindi: 'ภาษาฮินดี',
   appLangTraditionalChinese: 'ภาษาจีนตัวเต็ม',
   appLangVietnamese: 'ภาษาเวียดนาม',
+  appLangTurkish: 'ภาษาตุรกี',
+  appLangHungarian: 'ภาษาฮังการี',
   appWrapTextMenu: 'ตัดข้อความ',
   appViewImage: 'ดูรูปภาพ',
   appSaveImageAs: 'บันทึกรูปภาพเป็น…',
@@ -544,6 +546,7 @@ export const th = {
   appUpdateStyleTip: 'อัปเดตสไตล์นี้ด้วยรูปแบบของส่วนที่เลือกปัจจุบัน (เขียนกลับไปยัง styles.xml)',
   appNewStyleFromSelection: 'สร้างสไตล์ใหม่จากส่วนที่เลือกปัจจุบัน',
   appStyleNamePlaceholder: 'ชื่อสไตล์',
+<<<<<<< ours
   appWebConflictTitle: 'เอกสารนี้ถูกแก้ไขจากที่อื่น',
   appWebConflictBody:
     'การเปลี่ยนแปลงของคุณยังไม่อยู่บน UniWork และจะเก็บไว้ในเบราว์เซอร์นี้จนกว่าคุณจะออกจากระบบ',
@@ -586,6 +589,11 @@ export const th = {
     'เอกสารนี้ป้องกันด้วยรหัสผ่าน เอกสารที่ผสานจะถูกบันทึกเป็นไฟล์ธรรมดาที่ไม่มีรหัสผ่าน ทุกคนที่เปิดไฟล์จึงอ่านเนื้อหาได้ ต้องการผสานต่อหรือไม่',
   appMergeWarnUniwork:
     'เอกสารนี้เป็นของ UniWork เอกสารที่ผสานจะถูกบันทึกลงคอมพิวเตอร์ของคุณเป็นไฟล์ในเครื่องธรรมดา นอก UniWork ต้องการผสานต่อหรือไม่',
+=======
+  appMergeSourceLoaded: 'โหลด {name} แล้ว ({n} ระเบียน)',
+  appMergeWritten: 'เขียนเอกสารแล้ว {n} ฉบับ',
+  appMergeNothingToWrite: 'ไม่มีเอกสารให้เขียน',
+>>>>>>> theirs
   appReviewPaneTitle: 'การแก้ไข',
   appReviewPaneCount: '{n} การเปลี่ยนแปลง',
   appReviewPaneHidden: 'ซ่อนโดยตัวกรอง {n} รายการ',

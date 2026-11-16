@@ -1038,7 +1038,11 @@ function injectShapeText(
       const body = entry.paras
         .map(
           (p) =>
+<<<<<<< ours
             `<w:p>${pPrWithJc(pPrWithIndLeft(pPrWithNumPr('', p.numPr ?? null), p.indentLeft ?? null), p.align)}${runsXml(p.runs, null)}</w:p>`,
+=======
+            `<w:p>${pPrWithJc(pPrWithIndLeft('', p.indentLeft ?? null), p.align)}${runsXml(p.runs, null)}</w:p>`,
+>>>>>>> theirs
         )
         .join('')
       const txbx = `<wps:txbx><w:txbxContent>${body}</w:txbxContent></wps:txbx>`

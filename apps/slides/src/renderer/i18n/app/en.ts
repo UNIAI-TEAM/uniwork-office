@@ -30,6 +30,17 @@ export const en = {
   appExportPdfProgress: 'Exporting PDF…',
   appExportPdfDone: 'Exported PDF: {path}',
   appExportPdfFailed: 'PDF export failed: {error}',
+  appExportVideoTitle: 'Export as Video',
+  appExportVideoResolution: 'Resolution',
+  appExportVideoSeconds: 'Seconds spent on each slide',
+  appExportVideoUseTimings: 'Use recorded timings and narrations when present',
+  appExportVideoCreate: 'Create Video',
+  appExportVideoCancel: 'Cancel',
+  appExportVideoProgress: 'Encoding video… {percent}%',
+  appExportVideoDone: 'Video exported: {path}',
+  appExportVideoFailed: 'Video export failed: {error}',
+  appExportVideoUnsupported:
+    'No H.264 video encoder is available on this system, so MP4 export is not possible',
   appStatusBgAppliedAll: 'Background color applied to all slides',
   appStatusThemeApplied: 'Applied theme "{name}"',
   appStatusThemeApplyFailed: 'Failed to apply theme: {error}',
@@ -62,6 +73,10 @@ export const en = {
   appStatusAudioInserted: 'Audio inserted (embedded in the .pptx)',
   appStatusModel3dInserted:
     '3D model inserted: select it to turn it (PowerPoint shows it in 3D too)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'The 3D model could not be drawn here; its picture is unchanged',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'Recording is empty; nothing was inserted',
   appStatusRecordingInserted: 'Screen recording inserted on the current slide (embedded webm)',
   appStatusRecording: 'Recording… click "Screen Recording" again to stop and insert',
@@ -194,6 +209,7 @@ export const en = {
   appCtxSendToBack: 'Send to Back',
   appCtxBringForward: 'Bring Forward',
   appCtxSendBackward: 'Send Backward',
+  appCtxRotate: 'Rotate',
   appCtxRotateLeft90: 'Rotate Left 90°',
   appCtxRotateRight90: 'Rotate Right 90°',
   appCtxFlipH: 'Flip Horizontal',
@@ -262,6 +278,25 @@ export const en = {
     'The total time for the slide show was {duration}. Do you want to save the slide timings for automatic slide advance?',
   appRehearseDiscard: "Don't Save",
   appRehearseSave: 'Save',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Record Narration',
+  appRecordSummary: "Recording length {duration}. Save each slide's narration and timing?",
+  appRecordDiscard: "Don't Save",
+  appRecordSave: 'Save',
+  appStatusRecordSaved: 'Narration saved on {count} slides (PowerPoint plays it too)',
+  appStatusRecordFailed: 'The recording could not be saved',
+  appStatusNarrationCleared: 'Narration cleared',
+  appSettingsTitle: 'AI Settings',
+  appSettingsAccount: 'Genspark Account',
+  appSettingsChecking: 'Checking…',
+  appSettingsLoggedIn: 'Signed in',
+  appSettingsLoggedInEmail: 'Signed in: {email}',
+  appSettingsLoggedOut: 'Not signed in (AI features require a Genspark account)',
+  appSettingsLoginPending: 'Waiting for browser sign-in…',
+  appSettingsLogin: 'Sign in to Genspark',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Cancel',
   appCropHint: 'Enter to confirm · Esc to cancel · Click outside to confirm',
   appStatusZoomsInserted:

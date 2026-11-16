@@ -25,7 +25,11 @@ const { FakeWindow, detachedWindows } = vi.hoisted(() => {
     title = ''
     position: [number, number] = [0, 0]
     contentView = { addChildView: vi.fn(), removeChildView: vi.fn() }
+<<<<<<< ours
     webContents = { on: vi.fn(), once: vi.fn(), focus: vi.fn(), send: vi.fn() }
+=======
+    webContents = { once: vi.fn(), focus: vi.fn(), send: vi.fn() }
+>>>>>>> theirs
 
     on(event: string, fn: (...args: unknown[]) => void): void {
       const list = this.handlers.get(event) ?? []

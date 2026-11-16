@@ -9,7 +9,11 @@ export const pt = {
   redactDialogPlaceholder: 'Nome do marcador, ex.: telefone do cliente',
   redactCancel: 'Cancelar',
   redactInsert: 'Ocultar',
+<<<<<<< ours
   redactEnable: 'Clique com o botão direito numa seleção para ocultá-la do modelo.',
+=======
+  redactEnable: 'Clique com o botão direito em uma seleção para ocultá-la do modelo.',
+>>>>>>> theirs
 
   appPhPromptTitle: 'Clique para adicionar um título',
   appPhPromptSubtitle: 'Clique para adicionar um subtítulo',
@@ -30,6 +34,17 @@ export const pt = {
   appExportPdfProgress: 'Exportando PDF…',
   appExportPdfDone: 'PDF exportado: {path}',
   appExportPdfFailed: 'Falha ao exportar PDF: {error}',
+  appExportVideoTitle: 'Exportar como vídeo',
+  appExportVideoResolution: 'Resolução',
+  appExportVideoSeconds: 'Segundos em cada slide',
+  appExportVideoUseTimings: 'Usar intervalos e narrações gravados quando existirem',
+  appExportVideoCreate: 'Criar vídeo',
+  appExportVideoCancel: 'Cancelar',
+  appExportVideoProgress: 'Codificando vídeo… {percent}%',
+  appExportVideoDone: 'Vídeo exportado: {path}',
+  appExportVideoFailed: 'Falha ao exportar o vídeo: {error}',
+  appExportVideoUnsupported:
+    'Este sistema não tem um codificador de vídeo H.264, não é possível exportar MP4',
   appStatusBgAppliedAll: 'Cor de fundo aplicada a todos os slides',
   appStatusThemeApplied: 'Tema "{name}" aplicado',
   appStatusThemeApplyFailed: 'Falha ao aplicar o tema: {error}',
@@ -67,6 +82,10 @@ export const pt = {
   appStatusAudioInserted: 'Áudio inserido (incorporado ao .pptx)',
   appStatusModel3dInserted:
     'Modelo 3D inserido: selecione-o para girá-lo (o PowerPoint também o mostra em 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'Não foi possível desenhar o modelo 3D aqui; a imagem dele não muda',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'A gravação está vazia; nada foi inserido',
   appStatusRecordingInserted: 'Gravação de tela inserida no slide atual (webm incorporado)',
   appStatusRecording:
@@ -204,6 +223,7 @@ export const pt = {
   appCtxSendToBack: 'Enviar para Trás',
   appCtxBringForward: 'Avançar',
   appCtxSendBackward: 'Recuar',
+  appCtxRotate: 'Girar',
   appCtxRotateLeft90: 'Girar 90° para a Esquerda',
   appCtxRotateRight90: 'Girar 90° para a Direita',
   appCtxFlipH: 'Inverter Horizontalmente',
@@ -274,6 +294,25 @@ export const pt = {
     'O tempo total da apresentação foi de {duration}. Deseja salvar os intervalos dos slides para o avanço automático?',
   appRehearseDiscard: 'Não Salvar',
   appRehearseSave: 'Salvar',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Gravar Narração',
+  appRecordSummary: 'Duração da gravação: {duration}. Salvar a narração e o tempo de cada slide?',
+  appRecordDiscard: 'Não Salvar',
+  appRecordSave: 'Salvar',
+  appStatusRecordSaved: 'Narração salva em {count} slides (o PowerPoint também a reproduz)',
+  appStatusRecordFailed: 'Não foi possível salvar a gravação',
+  appStatusNarrationCleared: 'Narração limpa',
+  appSettingsTitle: 'Configurações de IA',
+  appSettingsAccount: 'Conta Genspark',
+  appSettingsChecking: 'Verificando…',
+  appSettingsLoggedIn: 'Conectado',
+  appSettingsLoggedInEmail: 'Conectado: {email}',
+  appSettingsLoggedOut: 'Não conectado (os recursos de IA exigem uma conta Genspark)',
+  appSettingsLoginPending: 'Aguardando o login no navegador…',
+  appSettingsLogin: 'Entrar no Genspark',
+  appSettingsModel: 'Modelo',
+>>>>>>> theirs
   appSettingsCancel: 'Cancelar',
   appCropHint: 'Enter para confirmar · Esc para cancelar · Clique fora para confirmar',
   appStatusZoomsInserted:

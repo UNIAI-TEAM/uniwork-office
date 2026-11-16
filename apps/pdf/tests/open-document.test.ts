@@ -4,11 +4,18 @@ import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it, vi } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
 import { decryptDocument } from '../src/main/pdf-crypt'
+<<<<<<< ours
 import type { getDocument as getDocumentType } from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 const { getDocument } = vi.hoisted(() => ({ getDocument: vi.fn() }))
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({ getDocument }))
 import { loadPdfForView, withLoadedPdf } from '../src/renderer/open-document'
+=======
+
+const { getDocument } = vi.hoisted(() => ({ getDocument: vi.fn() }))
+vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({ getDocument }))
+import { loadPdfForView } from '../src/renderer/open-document'
+>>>>>>> theirs
 
 // A real transferable boundary, like PDF.js handing document data to its worker.
 // The reader itself is not needed to exercise the caller's retained bytes.
@@ -73,6 +80,7 @@ describe('document loading retains source bytes for the open pipeline', () => {
     getDocument.mockReset()
   })
 })
+<<<<<<< ours
 
 describe('withLoadedPdf (printDoc load path)', () => {
   it.each([
@@ -130,3 +138,5 @@ describe('withLoadedPdf (printDoc load path)', () => {
     }
   })
 })
+=======
+>>>>>>> theirs

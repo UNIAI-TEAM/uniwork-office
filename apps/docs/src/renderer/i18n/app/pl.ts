@@ -400,6 +400,8 @@ export const pl = {
   appLangHindi: 'hindi',
   appLangTraditionalChinese: 'tradycyjny chiński',
   appLangVietnamese: 'wietnamski',
+  appLangTurkish: 'turecki',
+  appLangHungarian: 'węgierski',
   appWrapTextMenu: 'Zawijaj tekst',
   appViewImage: 'Wyświetl obraz',
   appSaveImageAs: 'Zapisz obraz jako…',
@@ -554,6 +556,7 @@ export const pl = {
     'Zaktualizuj ten styl formatem bieżącego zaznaczenia (zapisywane z powrotem do styles.xml)',
   appNewStyleFromSelection: 'Nowy styl z bieżącego zaznaczenia',
   appStyleNamePlaceholder: 'Nazwa stylu',
+<<<<<<< ours
   appWebConflictTitle: 'Ten dokument został zmieniony w innym miejscu',
   appWebConflictBody:
     'Twoich zmian nie ma jeszcze w UniWork; są przechowywane w tej przeglądarce do czasu wylogowania.',
@@ -600,6 +603,11 @@ export const pl = {
     'Ten dokument jest chroniony hasłem. Scalone dokumenty zostaną zapisane jako zwykłe pliki bez hasła, więc każdy, kto je otworzy, przeczyta ich treść. Scalić mimo to?',
   appMergeWarnUniwork:
     'Ten dokument należy do UniWork. Scalone dokumenty zostaną zapisane na Twoim komputerze jako zwykłe pliki lokalne poza UniWork. Scalić mimo to?',
+=======
+  appMergeSourceLoaded: 'Wczytano {name} ({n} rekordów)',
+  appMergeWritten: 'Zapisano dokumentów: {n}',
+  appMergeNothingToWrite: 'Nie ma czego zapisać',
+>>>>>>> theirs
   appReviewPaneTitle: 'Zmiany',
   appReviewPaneCount: 'Zmiany: {n}',
   appReviewPaneHidden: 'Ukryte przez filtry: {n}',

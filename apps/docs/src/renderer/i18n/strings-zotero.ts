@@ -372,4 +372,42 @@ export const zoteroStrings = defineStrings({
       'Tài liệu này có trích dẫn Zotero trong chú thích cuối trang hoặc cuối tài liệu mà UniWork Office chưa cập nhật được. Các lệnh Zotero bị tắt ở đây để giữ thư mục tham khảo nguyên vẹn.',
     zoteroGroup: 'Zotero',
   },
+  tr: {
+    zoteroCitation: 'Zotero Alıntısı',
+    zoteroCitationTip:
+      'Zotero ile alıntı ekleyin; düzenlemek için imleci bir alıntının içine getirin',
+    zoteroBibliography: 'Zotero Kaynakçası',
+    zoteroBibliographyTip: 'Zotero ile kaynakça ekleyin veya düzenleyin',
+    zoteroRefresh: 'Yenile',
+    zoteroRefreshTip: 'Tüm Zotero alıntılarını ve kaynakçalarını yenile',
+    zoteroDocumentSettings: 'Belge Ayarları',
+    zoteroDocumentSettingsTip: 'Zotero belge ayarları',
+    zoteroDocumentPreferences: 'Belge Tercihleri',
+    zoteroRemoveCodes: 'Alan Kodlarını Kaldır',
+    zoteroConnectionError:
+      'Zotero ile bağlantı kurulamadı. Zotero uygulamasını başlatın ve açık tutun.',
+    zoteroOperationError: 'Zotero işlemi başarısız oldu.',
+    zoteroNoteFieldsUnsupported:
+      'Bu belgenin dipnotlarında veya son notlarında GenOffice tarafından henüz güncellenemeyen Zotero alıntıları var. Kaynakçanın bozulmaması için Zotero komutları burada kapatıldı.',
+    zoteroGroup: 'Zotero',
+  },
+  hu: {
+    zoteroCitation: 'Zotero-hivatkozás',
+    zoteroCitationTip:
+      'Hivatkozás beszúrása a Zoteróval; szerkesztéshez tedd a kurzort egy hivatkozásba',
+    zoteroBibliography: 'Zotero-irodalomjegyzék',
+    zoteroBibliographyTip: 'Irodalomjegyzék beszúrása vagy szerkesztése a Zoteróval',
+    zoteroRefresh: 'Frissítés',
+    zoteroRefreshTip: 'Az összes Zotero-hivatkozás és -irodalomjegyzék frissítése',
+    zoteroDocumentSettings: 'Dokumentum beállításai',
+    zoteroDocumentSettingsTip: 'Zotero dokumentumbeállítások',
+    zoteroDocumentPreferences: 'Dokumentumbeállítások',
+    zoteroRemoveCodes: 'Mezőkódok eltávolítása',
+    zoteroConnectionError:
+      'Nem sikerült csatlakozni a Zoterohoz. Indítsd el a Zoterót, és hagyd futni.',
+    zoteroOperationError: 'A Zotero-művelet nem sikerült.',
+    zoteroNoteFieldsUnsupported:
+      'Ez a dokumentum lábjegyzetekben vagy végjegyzetekben tartalmaz Zotero-hivatkozásokat, amelyeket a GenOffice egyelőre nem tud frissíteni. A Zotero-parancsok itt le vannak tiltva, hogy az irodalomjegyzék érintetlen maradjon.',
+    zoteroGroup: 'Zotero',
+  },
 })

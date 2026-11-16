@@ -260,7 +260,11 @@ function blankAppPropertiesXml(): string {
 }
 
 /** Application a new GenOffice document records in docProps/app.xml */
+<<<<<<< ours
 export const NEW_DOCUMENT_APPLICATION = 'UniWork Office'
+=======
+export const NEW_DOCUMENT_APPLICATION = 'GenOffice'
+>>>>>>> theirs
 /** Template a new GenOffice document records (Word's own default) */
 export const NEW_DOCUMENT_TEMPLATE = 'Normal.dotm'
 /**

@@ -413,6 +413,8 @@ export const ja = {
   appLangHindi: 'ヒンディー語',
   appLangTraditionalChinese: '繁体字中国語',
   appLangVietnamese: 'ベトナム語',
+  appLangTurkish: 'トルコ語',
+  appLangHungarian: 'ハンガリー語',
   appWrapTextMenu: '文字列の折り返し',
   appViewImage: '画像を表示',
   appSaveImageAs: '名前を付けて画像を保存…',
@@ -572,6 +574,7 @@ export const ja = {
   appUpdateStyleTip: '現在の選択範囲の書式でこのスタイルを更新します(styles.xml に書き戻し)',
   appNewStyleFromSelection: '選択範囲から新しいスタイルを作成',
   appStyleNamePlaceholder: 'スタイル名',
+<<<<<<< ours
   appWebConflictTitle: 'このドキュメントは別の場所で変更されました',
   appWebConflictBody: '変更はまだ UniWork になく、ログアウトするまでこのブラウザーに保持されます。',
   appWebConflictOverwrite: '上書き…',
@@ -619,6 +622,11 @@ export const ja = {
     'このドキュメントはパスワードで保護されています。差し込み印刷で作成されるドキュメントはパスワードなしの通常のファイルとして保存され、開いた人は誰でも内容を読めます。続行しますか？',
   appMergeWarnUniwork:
     'このドキュメントは UniWork のものです。差し込み印刷で作成されるドキュメントは、UniWork の管理外の通常のローカルファイルとしてこのコンピューターに保存されます。続行しますか？',
+=======
+  appMergeSourceLoaded: '{name}（{n} 件）を読み込みました',
+  appMergeWritten: '{n} 個のドキュメントを書き出しました',
+  appMergeNothingToWrite: '書き出すものがありません',
+>>>>>>> theirs
   appReviewPaneTitle: '変更履歴',
   appReviewPaneCount: '{n} 件の変更',
   appReviewPaneHidden: '{n} 件はフィルターで非表示',

@@ -39,7 +39,6 @@ import { TRANSLATE_LANGS, ribbonLangKey } from './translate-langs'
 import { shortcutAria } from '../shortcuts'
 import {
   IconAccept,
-  IconAiPanel,
   IconCaret,
   IconComment,
   IconCommentNext,
@@ -1307,6 +1306,20 @@ export function ReviewTab({
             disabled={!hasDoc}
             data-tip={t('ribbonReviewingPaneTip')}
             onClick={onToggleReviewPane}
+<<<<<<< ours
+=======
+          >
+            <span className="rb-big-icon">
+              <IconNavPane size={BIG} />
+            </span>
+            <span>{t('ribbonReviewingPane')}</span>
+          </button>
+          <button
+            className="rb-big"
+            disabled={!hasDoc || revisionCount === 0}
+            data-tip={`${t('ribbonAiRevisionsTip', { count: revisionCount })} — ${t('ribbonAiCreditNote')}`}
+            onClick={() => onAiPreset(t('ribbonAiRevisionsPrompt'))}
+>>>>>>> theirs
           >
             <span className="rb-big-icon">
               <IconNavPane size={BIG} />
@@ -1400,8 +1413,6 @@ interface ViewTabProps {
   onZoom: (zoom: number) => void
   onZoomFit: (mode: 'width' | 'page' | 'multi') => void
   onZoomDialog: () => void
-  showAi: boolean
-  onToggleAi: () => void
   darkPage: boolean
   onDarkPage: (v: boolean) => void
   showRuler: boolean
@@ -1426,8 +1437,6 @@ export function ViewTab({
   onZoom,
   onZoomFit,
   onZoomDialog,
-  showAi,
-  onToggleAi,
   darkPage,
   onDarkPage,
   showRuler,
@@ -1642,6 +1651,7 @@ export function ViewTab({
 
       <div className="ribbon-group">
         <div className="ribbon-group-items">
+<<<<<<< ours
           {cap('ai') && (
             <button
               className={`rb-big ${showAi ? 'active' : ''}`}
@@ -1654,6 +1664,8 @@ export function ViewTab({
               <span>{t('ribbonAiPanel')}</span>
             </button>
           )}
+=======
+>>>>>>> theirs
           <button
             className={`rb-big ${darkPage ? 'active' : ''}`}
             data-tip={t('ribbonDarkModeTip')}

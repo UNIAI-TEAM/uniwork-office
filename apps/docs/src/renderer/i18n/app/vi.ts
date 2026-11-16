@@ -391,6 +391,8 @@ export const vi = {
   appLangHindi: 'Tiếng Hindi',
   appLangTraditionalChinese: 'Tiếng Trung (Phồn thể)',
   appLangVietnamese: 'Tiếng Việt',
+  appLangTurkish: 'Tiếng Thổ Nhĩ Kỳ',
+  appLangHungarian: 'Tiếng Hungary',
   appWrapTextMenu: 'Ngắt dòng văn bản',
   appViewImage: 'Xem hình ảnh',
   appSaveImageAs: 'Lưu hình ảnh thành…',
@@ -544,6 +546,7 @@ export const vi = {
   appUpdateStyleTip: 'Cập nhật kiểu này từ vùng chọn hiện tại (ghi lại vào styles.xml)',
   appNewStyleFromSelection: 'Tạo kiểu mới từ vùng chọn hiện tại',
   appStyleNamePlaceholder: 'Tên kiểu',
+<<<<<<< ours
   appWebConflictTitle: 'Tài liệu này đã được thay đổi ở nơi khác',
   appWebConflictBody:
     'Thay đổi của bạn chưa lưu lên UniWork và vẫn được giữ trong trình duyệt này cho tới khi bạn đăng xuất.',
@@ -589,6 +592,11 @@ export const vi = {
     'Tài liệu này được bảo vệ bằng mật khẩu. Các tài liệu trộn được lưu thành tệp thường, không có mật khẩu, nên ai mở tệp cũng đọc được nội dung. Vẫn trộn?',
   appMergeWarnUniwork:
     'Tài liệu này thuộc UniWork. Các tài liệu trộn được lưu vào máy tính của bạn thành tệp cục bộ thông thường, nằm ngoài UniWork. Vẫn trộn?',
+=======
+  appMergeSourceLoaded: 'Đã tải {name} ({n} bản ghi)',
+  appMergeWritten: 'Đã ghi {n} tài liệu',
+  appMergeNothingToWrite: 'Không có gì để ghi',
+>>>>>>> theirs
   appReviewPaneTitle: 'Sửa đổi',
   appReviewPaneCount: '{n} thay đổi',
   appReviewPaneHidden: '{n} bị ẩn bởi bộ lọc',

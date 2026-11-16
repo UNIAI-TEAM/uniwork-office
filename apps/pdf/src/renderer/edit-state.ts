@@ -5,6 +5,12 @@ import type { SavedNoteAnnot } from './note-threads'
 import type { HeaderFooterConfig, WatermarkConfig } from './stamps'
 import type { LocalTextEdit, LocalTextInsert } from './text-edit-preview'
 import type {
+<<<<<<< ours
+=======
+  BlankPageInput,
+  FormFieldInput,
+  FormWidgetEditInput,
+>>>>>>> theirs
   FormValueInput,
   MarkupType,
   MetadataInput,
@@ -56,6 +62,18 @@ export interface LocalNoteEdit {
   contents: string
 }
 
+/** A form field authored in Form Design, pending until saved */
+export interface LocalFormField {
+  id: string
+  input: FormFieldInput
+}
+
+/** A blank page added in the session, pending until saved; `input.pageIndex` is its virtual original index */
+export interface LocalBlankPage {
+  id: string
+  input: BlankPageInput
+}
+
 export interface EditSnapshot {
   markups: LocalMarkup[]
   annotDeletes: LocalAnnotDelete[]
@@ -66,6 +84,10 @@ export interface EditSnapshot {
   imageEdits: LocalImageEdit[]
   stampCfg: StampConfig | null
   formEdits: Map<string, FormValueInput>
+  formFields: LocalFormField[]
+  /** widget id → pending design-time edit of an existing widget */
+  formWidgetEdits: Map<string, FormWidgetEditInput>
+  blankPages: LocalBlankPage[]
   rotations: Map<number, number>
   deleted: Set<number>
   order: number[] | null
@@ -95,6 +117,9 @@ export interface SavedSnapshot {
   imageEditIds: Set<string>
   stampCfg: StampConfig | null
   formEdits: Map<string, FormValueInput>
+  formFieldIds: Set<string>
+  formWidgetEdits: Map<string, FormWidgetEditInput>
+  blankPageIds: Set<string>
   rotations: Map<number, number>
   metadata: MetadataInput | null
   /** The edited bookmark tree this save wrote (same object the pending edit holds), or null */

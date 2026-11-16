@@ -436,10 +436,17 @@ class CjkPunctShrinkView {
     private storage: CjkPunctShrinkStorage,
   ) {
     this.measure()
+<<<<<<< ours
     this.doc.fonts?.addEventListener('loadingdone', this.onFontsLoaded)
     this.doc.addEventListener(DOC_CSS_COMMITTED_EVENT, this.onDocCss)
     this.doc.addEventListener(WRAP_WIDTHS_COMMITTED_EVENT, this.onDocCss)
     this.doc.addEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
+=======
+    document.fonts?.addEventListener('loadingdone', this.onFontsLoaded)
+    document.addEventListener(DOC_CSS_COMMITTED_EVENT, this.onDocCss)
+    document.addEventListener(WRAP_WIDTHS_COMMITTED_EVENT, this.onDocCss)
+    document.addEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
+>>>>>>> theirs
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(() => {
         const w = this.view.dom.offsetWidth
@@ -477,10 +484,17 @@ class CjkPunctShrinkView {
   }
 
   destroy() {
+<<<<<<< ours
     this.doc.fonts?.removeEventListener('loadingdone', this.onFontsLoaded)
     this.doc.removeEventListener(DOC_CSS_COMMITTED_EVENT, this.onDocCss)
     this.doc.removeEventListener(WRAP_WIDTHS_COMMITTED_EVENT, this.onDocCss)
     this.doc.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
+=======
+    document.fonts?.removeEventListener('loadingdone', this.onFontsLoaded)
+    document.removeEventListener(DOC_CSS_COMMITTED_EVENT, this.onDocCss)
+    document.removeEventListener(WRAP_WIDTHS_COMMITTED_EVENT, this.onDocCss)
+    document.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
+>>>>>>> theirs
     this.resizeObserver?.disconnect()
     if (this.retryRaf) cancelAnimationFrame(this.retryRaf)
   }

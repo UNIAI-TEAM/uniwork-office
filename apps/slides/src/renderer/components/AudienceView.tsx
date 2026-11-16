@@ -21,6 +21,7 @@ import { ShowMediaLayer } from './ShowMediaLayer'
 import { useI18n } from '../i18n/locale'
 import { MorphStage } from './MorphStage'
 import { InkLayer, type InkStroke } from './ShowInk'
+<<<<<<< ours
 import {
   createBroadcastRecovery,
   mergeBroadcastUpdate,
@@ -30,6 +31,10 @@ import { setImageSource } from '../image-loader'
 import { isWeb } from '../capabilities'
 import { showNavKey } from '../show-keys'
 import { shortcutPlatform, shortcutSurface } from '../shortcuts'
+=======
+import { mergeBroadcastUpdate } from '../../shared/slide-update'
+import { setImageSource } from '../image-loader'
+>>>>>>> theirs
 
 const ANIMATED = ['fade', 'push', 'wipe', 'split', 'circle'] as const
 
@@ -141,6 +146,7 @@ export function AudienceView() {
   // The sync cursor doesn't change on a content edit, so clear it: once the
   // reloaded animation lists land, the seek effect re-aligns the player against
   // the fresh deck instead of keeping stale animation state.
+<<<<<<< ours
   useEffect(() => {
     const recovery = createBroadcastRecovery(
       () => window.slidesApi.getRenderSlides(),
@@ -174,6 +180,28 @@ export function AudienceView() {
       off?.()
     }
   }, [])
+=======
+  useEffect(
+    () =>
+      window.slidesApi.onDeckChanged?.(({ slides: all, order }) => {
+        if ((order?.length ?? all.length) === 0) return
+        cursorRef.current = ''
+        setSlides((current) =>
+          order
+            ? mergeBroadcastUpdate(current, { slides: all, order }, () => {
+                void window.slidesApi
+                  .getRenderSlides()
+                  .then((slides) => {
+                    if (slides) setSlides(slides)
+                  })
+                  .catch((error) => console.error('Failed to refresh audience deck:', error))
+              })
+            : all,
+        )
+      }),
+    [],
+  )
+>>>>>>> theirs
 
   useEffect(() => {
     if (!slides) return

@@ -30,6 +30,18 @@ export const nl = {
   appExportPdfProgress: 'PDF exporteren…',
   appExportPdfDone: 'PDF geëxporteerd: {path}',
   appExportPdfFailed: 'Exporteren van PDF mislukt: {error}',
+  appExportVideoTitle: 'Exporteren als video',
+  appExportVideoResolution: 'Resolutie',
+  appExportVideoSeconds: 'Seconden per dia',
+  appExportVideoUseTimings:
+    'Opgenomen tijdsinstellingen en gesproken tekst gebruiken indien aanwezig',
+  appExportVideoCreate: 'Video maken',
+  appExportVideoCancel: 'Annuleren',
+  appExportVideoProgress: 'Video coderen… {percent}%',
+  appExportVideoDone: 'Video geëxporteerd: {path}',
+  appExportVideoFailed: 'Video-export mislukt: {error}',
+  appExportVideoUnsupported:
+    'Dit systeem heeft geen H.264-video-encoder, MP4-export is niet mogelijk',
   appStatusBgAppliedAll: "Achtergrondkleur toegepast op alle dia's",
   appStatusThemeApplied: 'Thema "{name}" toegepast',
   appStatusThemeApplyFailed: 'Thema toepassen mislukt: {error}',
@@ -69,6 +81,11 @@ export const nl = {
   appStatusAudioInserted: 'Audio ingevoegd (ingesloten in het .pptx-bestand)',
   appStatusModel3dInserted:
     '3D-model ingevoegd: selecteer het om het te draaien (PowerPoint toont het ook in 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview:
+    'Het 3D-model kan hier niet worden getekend; de afbeelding blijft ongewijzigd',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'De opname is leeg; er is niets ingevoegd',
   appStatusRecordingInserted: 'Schermopname ingevoegd op de huidige dia (ingesloten webm)',
   appStatusRecording:
@@ -207,6 +224,7 @@ export const nl = {
   appCtxSendToBack: 'Naar achtergrond',
   appCtxBringForward: 'Naar voren',
   appCtxSendBackward: 'Naar achteren',
+  appCtxRotate: 'Draaien',
   appCtxRotateLeft90: '90° naar links draaien',
   appCtxRotateRight90: '90° naar rechts draaien',
   appCtxFlipH: 'Horizontaal spiegelen',
@@ -277,6 +295,26 @@ export const nl = {
     'De totale duur van de voorstelling was {duration}. Wilt u de diatijden opslaan voor automatische diadoorloop?',
   appRehearseDiscard: 'Niet opslaan',
   appRehearseSave: 'Opslaan',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Gesproken tekst opnemen',
+  appRecordSummary: 'Opnameduur {duration}. De gesproken tekst en de tijd van elke dia opslaan?',
+  appRecordDiscard: 'Niet opslaan',
+  appRecordSave: 'Opslaan',
+  appStatusRecordSaved:
+    'Gesproken tekst opgeslagen op {count} dia’s (PowerPoint speelt die ook af)',
+  appStatusRecordFailed: 'De opname kan niet worden opgeslagen',
+  appStatusNarrationCleared: 'Gesproken tekst gewist',
+  appSettingsTitle: 'AI-instellingen',
+  appSettingsAccount: 'Genspark-account',
+  appSettingsChecking: 'Controleren…',
+  appSettingsLoggedIn: 'Aangemeld',
+  appSettingsLoggedInEmail: 'Aangemeld: {email}',
+  appSettingsLoggedOut: 'Niet aangemeld (AI-functies vereisen een Genspark-account)',
+  appSettingsLoginPending: 'Wachten op aanmelding in de browser…',
+  appSettingsLogin: 'Aanmelden bij Genspark',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Annuleren',
   appCropHint: 'Enter om te bevestigen · Esc om te annuleren · Klik erbuiten om te bevestigen',
   appStatusZoomsInserted:

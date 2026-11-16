@@ -566,6 +566,7 @@ export function readCells(
     const worksheet =
       sheetId === undefined ? workbook?.getActiveSheet() : workbook?.getSheetBySheetId(sheetId)
     if (!worksheet) return result
+    const targetId = sheetId ?? worksheet.getSheetId()
     const reader = lazyCellReader(worksheet)
     const targetSheetId = worksheet.getSheetId()
     for (const address of addresses) {
@@ -573,7 +574,11 @@ export function readCells(
       // own text and `rawValue` the model value behind it, so projecting only
       // `value` would hand over the very number the reader hid.
       const withheld = redactions.labelAt(
+<<<<<<< ours
         targetSheetId,
+=======
+        targetId,
+>>>>>>> theirs
         parseAddress(address).row,
         parseAddress(address).column,
       )

@@ -14,8 +14,12 @@ import {
   type NoteInfo,
 } from '@genoffice/docx-engine'
 import type { Dispatch, SetStateAction } from 'react'
+<<<<<<< ours
 import { NEUTRAL_COMMENT_AUTHOR } from './comment-author'
 import { setAuthorName } from './author-name'
+=======
+import { authorName } from './author-name'
+>>>>>>> theirs
 import { fetchDocBytes } from './doc-bytes'
 import type { DocState } from './doc-state'
 import {
@@ -127,11 +131,14 @@ export interface ReviewContext {
   setInkAnnotations: Dispatch<SetStateAction<InkAnnotation[]>>
   setInksDirty: (dirty: boolean) => void
   setCompareResult: (value: { otherName: string; entries: CompareEntry[] } | null) => void
+<<<<<<< ours
   /**
    * G8-12: set while the document is in server-comment mode. New Comment opens the server composer
    * and the comments stored in the file are read-only (lane decision D4): no local comment write.
    */
   server?: { startThread(): void } | null
+=======
+>>>>>>> theirs
   /** Show Markup filters: "shown" scopes and the current-change pick honour them */
   revisionFilter: RevisionFilter
   /** a change hidden by the Markup view needs All Markup before it can be shown */
@@ -243,7 +250,11 @@ export function startNewComment(ctx: ReviewContext): void {
 }
 
 export function submitNewComment(ctx: ReviewContext, text: string, image?: CommentImage): void {
+<<<<<<< ours
   if (!ctx.editor || ctx.server) return
+=======
+  if (!ctx.editor) return
+>>>>>>> theirs
   setPendingCommentRange(ctx, null)
   const id = nextCommentId(ctx.comments)
   if (!addCommentToSelection(ctx.editor, id)) {
@@ -254,7 +265,11 @@ export function submitNewComment(ctx: ReviewContext, text: string, image?: Comme
   const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
   ctx.setComments((prev) => [
     ...prev,
+<<<<<<< ours
     { id, author: commentAuthor, date: now, text, ...(image ? { image } : {}) },
+=======
+    { id, author: authorName(), date: now, text, ...(image ? { image } : {}) },
+>>>>>>> theirs
   ])
   ctx.setCommentsDirty(true)
   ctx.setCommentComposing(false)
@@ -289,7 +304,11 @@ export function replyToComment(
   ctx: ReviewContext,
   parentId: string,
   text: string,
+<<<<<<< ours
   author = commentAuthor,
+=======
+  author = authorName(),
+>>>>>>> theirs
 ): boolean {
   if (!ctx.editor || ctx.server) return false
   const id = nextCommentId(ctx.comments)
@@ -476,6 +495,7 @@ export function handleRevisionRange(
       ctx.setStatus(t('appNoRevisionsToHandle'))
     else ctx.dirtyRef.current = true
     return
+<<<<<<< ours
   }
   const live = collectRevisions(editor.state.doc).find(
     (r) =>
@@ -488,6 +508,20 @@ export function handleRevisionRange(
     ctx.setStatus(t('appNoRevisionsToHandle'))
     return
   }
+=======
+  }
+  const live = collectRevisions(editor.state.doc).find(
+    (r) =>
+      r.kind === target.kind &&
+      r.author === target.author &&
+      r.from < target.to &&
+      r.to > target.from,
+  )
+  if (!live) {
+    ctx.setStatus(t('appNoRevisionsToHandle'))
+    return
+  }
+>>>>>>> theirs
   applyRevisions(editor, [live], action)
   ctx.dirtyRef.current = true
 }

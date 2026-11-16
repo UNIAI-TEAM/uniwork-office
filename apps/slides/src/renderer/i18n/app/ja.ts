@@ -30,6 +30,17 @@ export const ja = {
   appExportPdfProgress: 'PDF をエクスポート中…',
   appExportPdfDone: 'PDF をエクスポートしました：{path}',
   appExportPdfFailed: 'PDF のエクスポートに失敗しました：{error}',
+  appExportVideoTitle: 'ビデオとしてエクスポート',
+  appExportVideoResolution: '解像度',
+  appExportVideoSeconds: '各スライドの表示秒数',
+  appExportVideoUseTimings: '記録されたタイミングとナレーションがあれば使用する',
+  appExportVideoCreate: 'ビデオを作成',
+  appExportVideoCancel: 'キャンセル',
+  appExportVideoProgress: 'ビデオをエンコード中… {percent}%',
+  appExportVideoDone: 'ビデオをエクスポートしました: {path}',
+  appExportVideoFailed: 'ビデオのエクスポートに失敗しました: {error}',
+  appExportVideoUnsupported:
+    'このシステムには H.264 ビデオエンコーダーがないため MP4 をエクスポートできません',
   appStatusBgAppliedAll: '背景色をすべてのスライドに適用しました',
   appStatusThemeApplied: 'テーマ「{name}」を適用しました',
   appStatusThemeApplyFailed: 'テーマの適用に失敗しました：{error}',
@@ -66,6 +77,10 @@ export const ja = {
   appStatusAudioInserted: 'オーディオを挿入しました（pptx に埋め込み済み）',
   appStatusModel3dInserted:
     '3D モデルを挿入しました：選択すると回転できます（PowerPoint でも 3D で表示されます）',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'ここでは 3D モデルを描画できませんでした。画像は変更されていません',
+>>>>>>> theirs
   appStatusRecordingEmpty: '録画内容が空のため、挿入しませんでした',
   appStatusRecordingInserted: '画面録画を現在のスライドに挿入しました（webm 埋め込み）',
   appStatusRecording: '画面録画中…もう一度「画面録画」をクリックすると停止して挿入',
@@ -195,6 +210,7 @@ export const ja = {
   appCtxSendToBack: '最背面へ移動',
   appCtxBringForward: '前面へ移動',
   appCtxSendBackward: '背面へ移動',
+  appCtxRotate: '回転',
   appCtxRotateLeft90: '左へ 90° 回転',
   appCtxRotateRight90: '右へ 90° 回転',
   appCtxFlipH: '左右反転',
@@ -263,6 +279,26 @@ export const ja = {
     'スライドショーの所要時間は {duration} でした。各スライドの表示時間を自動切り替えのタイミングとして保存しますか？',
   appRehearseDiscard: '保存しない',
   appRehearseSave: '保存',
+<<<<<<< ours
+=======
+  appRecordTitle: 'ナレーションの録音',
+  appRecordSummary: '録音時間 {duration}。各スライドのナレーションと表示時間を保存しますか？',
+  appRecordDiscard: '保存しない',
+  appRecordSave: '保存',
+  appStatusRecordSaved:
+    '{count} 枚のスライドにナレーションを保存しました（PowerPoint でも再生できます）',
+  appStatusRecordFailed: '録音を保存できませんでした',
+  appStatusNarrationCleared: 'ナレーションをクリアしました',
+  appSettingsTitle: 'AI 設定',
+  appSettingsAccount: 'Genspark アカウント',
+  appSettingsChecking: '確認中…',
+  appSettingsLoggedIn: 'サインイン済み',
+  appSettingsLoggedInEmail: 'サインイン済み：{email}',
+  appSettingsLoggedOut: '未サインイン（AI 機能には Genspark アカウントへのサインインが必要）',
+  appSettingsLoginPending: 'ブラウザーでのサインインを待機中…',
+  appSettingsLogin: 'Genspark にサインイン',
+  appSettingsModel: 'モデル',
+>>>>>>> theirs
   appSettingsCancel: 'キャンセル',
   appCropHint: 'Enter で確定 · Esc でキャンセル · 外側をクリックで確定',
   appStatusZoomsInserted:

@@ -323,6 +323,7 @@ export function proposeOperations(
                 write.startColumn <= bounds.endColumn &&
                 write.endColumn >= bounds.startColumn,
             )
+<<<<<<< ours
             if (rangeLoaded && !writtenThisBatch) {
               const maxRow = targetSheet.getMaxRows() - 1
               const maxCol = targetSheet.getMaxColumns() - 1
@@ -337,6 +338,12 @@ export function proposeOperations(
                       )
                       .getRawValues() as (string | number | boolean | null | undefined)[][])
                   : []
+=======
+            const values = targetSheet.getRange(operation.dataRange).getRawValues() as (
+              string | number | boolean | null | undefined
+            )[][]
+            if (rangeLoaded && !writtenThisBatch) {
+>>>>>>> theirs
               if (operation.columns) {
                 // The named-columns probe refuses a named column with no
                 // numbers outright. Geometry errors cannot fire here — the

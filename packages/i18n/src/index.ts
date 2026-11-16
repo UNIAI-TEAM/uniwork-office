@@ -20,6 +20,8 @@ export type Lang =
   | 'hi'
   | 'zh-TW'
   | 'vi'
+  | 'tr'
+  | 'hu'
 
 export const LANGS: readonly Lang[] = [
   'zh',
@@ -43,6 +45,8 @@ export const LANGS: readonly Lang[] = [
   'hi',
   'zh-TW',
   'vi',
+  'tr',
+  'hu',
 ]
 
 export function isLang(value: unknown): value is Lang {
@@ -88,6 +92,8 @@ const HTML_LANGS: Record<Lang, string> = {
   hi: 'hi-IN',
   'zh-TW': 'zh-TW',
   vi: 'vi-VN',
+  tr: 'tr-TR',
+  hu: 'hu-HU',
 }
 
 /** BCP-47 tag for document.documentElement.lang (drives CSS :lang() and Chromium's per-language font fallback) */
@@ -221,3 +227,4 @@ export function createI18n<D extends Record<string, string>>(dicts: LangDicts<D>
 }
 
 export * from './font-names'
+export * from './common-ribbon'

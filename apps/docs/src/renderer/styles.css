@@ -2825,6 +2825,61 @@ th[data-rev-fmt] {
    scrollIntoView can shift it) offset to that page's band of the flow. */
 .doc-zoom.multipage {
   position: relative;
+<<<<<<< ours
+=======
+}
+
+.doc-zoom.multipage .doc-live {
+  position: absolute;
+  overflow: clip;
+  background: var(--page-bg, var(--docs-paper));
+  box-shadow: var(--docs-page-shadow);
+}
+
+.doc-zoom.multipage .doc-live .doc-page {
+  box-shadow: none;
+}
+
+.mp-slot {
+  position: absolute;
+  overflow: clip;
+  user-select: none;
+  cursor: text;
+  background: var(--page-bg, var(--docs-paper));
+  box-shadow: var(--docs-page-shadow);
+}
+
+.mp-slot .mp-wrap {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+
+.mp-slot .mp-page {
+  position: absolute;
+  inset: 0;
+  width: auto !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  box-shadow: none !important;
+  column-count: auto !important;
+  pointer-events: none;
+}
+
+.mp-block {
+  position: absolute;
+}
+
+/* Format painter armed: Word-style I-beam + brush cursor, but only while
+   hovering the text flow (block children) — page margins and the blank area
+   below the content keep their normal cursor. Fixed black/white affordance,
+   identical in both themes (the page surface never follows the chrome theme). */
+.ProseMirror.doc-painter-cursor > * {
+  cursor:
+    url('data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%2728%27%20height=%2728%27%20viewBox=%270%200%2028%2028%27%3E%3Cg%20stroke=%27white%27%20stroke-width=%273.4%27%20paint-order=%27stroke%27%20stroke-linecap=%27round%27%20fill=%27none%27%3E%3Cpath%20d=%27M2%205h5M2%2023h5M4.5%205v18%27/%3E%3C/g%3E%3Cg%20stroke=%27black%27%20stroke-width=%271.5%27%20fill=%27none%27%20stroke-linecap=%27round%27%3E%3Cpath%20d=%27M2%205h5M2%2023h5M4.5%205v18%27/%3E%3C/g%3E%3Crect%20x=%2716.6%27%20y=%273.5%27%20width=%273%27%20height=%275.2%27%20rx=%271.4%27%20fill=%27black%27%20stroke=%27white%27%20stroke-width=%271.2%27%20paint-order=%27stroke%27/%3E%3Crect%20x=%2710.5%27%20y=%278.2%27%20width=%2715%27%20height=%2710.3%27%20rx=%271.6%27%20fill=%27black%27%20stroke=%27white%27%20stroke-width=%271.2%27%20paint-order=%27stroke%27/%3E%3Cpath%20d=%27M10.5%2012.4%20H25.5%27%20stroke=%27white%27%20stroke-width=%271.3%27/%3E%3Cpath%20d=%27M15%2014.9%20V16.9%20M21%2014.9%20V16.9%27%20stroke=%27white%27%20stroke-width=%271.3%27%20stroke-linecap=%27round%27/%3E%3C/svg%3E')
+      4 14,
+    text;
+>>>>>>> theirs
 }
 
 .doc-zoom.multipage .doc-live {
@@ -4463,6 +4518,44 @@ th[data-rev-fmt] {
   padding: 8px 14px;
   font-size: 12px;
   color: var(--text-dim);
+<<<<<<< ours
+=======
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-pane-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.review-pane-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text);
+}
+
+.review-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--docs-paper-rev-ink);
+  flex: none;
+}
+
+.layout-menu .rb-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+
+/* comment composer (new comment) */
+.comment-compose {
+>>>>>>> theirs
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -4545,6 +4638,7 @@ th[data-rev-fmt] {
   display: flex;
   align-items: center;
   gap: 6px;
+<<<<<<< ours
 }
 
 .review-pane-count {
@@ -4732,6 +4826,158 @@ th[data-rev-fmt] {
 .comment-pending {
   background: var(--rev-comment-bg, var(--docs-paper-comment-bg));
   border-bottom: 2px dashed var(--rev-comment-ink, var(--docs-paper-comment-line));
+=======
+}
+
+.review-pane-count {
+  padding: 0 7px;
+  border-radius: 9px;
+  background: var(--hover);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.review-pane-summary {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto max-content;
+  gap: 2px 12px;
+  justify-content: start;
+}
+
+.review-pane-sum-line {
+  display: contents;
+}
+
+.review-pane-summary dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+}
+
+.review-pane-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.review-row {
+  position: relative;
+  padding: 6px 10px 6px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.review-row:hover,
+.review-row:focus-within {
+  background: var(--hover);
+>>>>>>> theirs
+}
+
+.review-row.active {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.review-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.review-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.review-row-kind {
+  font-weight: 600;
+  color: var(--docs-paper-rev-ink);
+}
+
+.review-row-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-row-when {
+  margin-left: auto;
+  flex: none;
+  color: var(--text-dim);
+}
+
+.review-row-text {
+  margin-top: 2px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.review-del .review-row-text {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+
+.review-ins .review-row-text {
+  text-decoration: underline;
+}
+
+/* Accept / Reject overlay the date on hover, focus and the active row */
+.review-row-actions {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  padding-left: 8px;
+  /* covers the date underneath, in the row's own hover / active colour */
+  background: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.review-row:hover .review-row-actions,
+.review-row:focus-within .review-row-actions,
+.review-row.active .review-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.review-row-act {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+.review-row-act:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.review-row-act:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* comments: in-text highlight + right-side pane */
+.doc-comment {
+  background: var(--rev-comment-bg, var(--docs-paper-comment-bg));
+  border-bottom: 2px solid var(--rev-comment-ink, var(--docs-paper-comment-line));
+  cursor: pointer;
+}
+
+/* range picked for a comment that is still being composed */
+.comment-pending {
+  background: var(--rev-comment-bg, var(--docs-paper-comment-bg));
+  border-bottom: 2px dashed var(--rev-comment-ink, var(--docs-paper-comment-line));
 }
 
 /* Word: body shading of resolved threads is hidden (the jump flash animation can still briefly reveal the position) */
@@ -4854,11 +5100,110 @@ th[data-rev-fmt] {
   font-weight: 600;
   font-size: 12px;
   overflow-wrap: anywhere;
+<<<<<<< ours
+}
+
+.comment-when {
+  font-size: 10.5px;
+=======
 }
 
 .comment-when {
   font-size: 10.5px;
   color: var(--text-dim);
+}
+
+.comment-card-actions {
+  position: relative;
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  gap: 2px;
+}
+
+.comment-resolve,
+.comment-more {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  border-radius: 4px;
+>>>>>>> theirs
+  color: var(--text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.comment-resolve:hover,
+.comment-more:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.comment-resolve.on {
+  color: var(--docs-ok-ink);
+}
+
+.comment-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 5;
+  min-width: 170px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: var(--shadow-menu);
+}
+
+.comment-menu[hidden] {
+  display: none;
+}
+
+.comment-menu button {
+  white-space: nowrap;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.comment-menu button:hover {
+  background: var(--hover);
+}
+
+.comment-menu .comment-card-del:hover {
+  color: var(--danger);
+}
+
+.comment-reply-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.comment-reply-input:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .comment-card-actions {
@@ -4891,8 +5236,41 @@ th[data-rev-fmt] {
   color: var(--text);
 }
 
+<<<<<<< ours
 .comment-resolve.on {
   color: var(--docs-ok-ink);
+=======
+.comment-image {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-top: 6px;
+}
+
+.comment-image-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.comment-image-preview img {
+  max-width: 120px;
+  max-height: 90px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.comment-image-preview button {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.comments-empty {
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+>>>>>>> theirs
 }
 
 .comment-menu {
@@ -5306,6 +5684,7 @@ th[data-rev-fmt] {
 }
 .doc-autospace-pad-m.doc-autospace-pad-full {
   margin-inline-start: calc(var(--doc-autospace-pad, 0.125em) * var(--doc-autospace-pad-le, 2));
+<<<<<<< ours
 }
 
 /* static-DOM word-joiner (protected-render padSegments): generated content keeps
@@ -5320,6 +5699,22 @@ th[data-rev-fmt] {
   text-wrap-mode: nowrap;
 }
 
+=======
+}
+
+/* static-DOM word-joiner (protected-render padSegments): generated content keeps
+   the U+2060 out of innerText, so cell / textbox edits never commit it */
+.doc-kr-wj:empty::before {
+  content: '\2060';
+}
+
+/* spaces Word never breaks at (inline-segments middleDotNoBreaks); the wrap mode
+   alone, so the spaces collapse or stay as their context says */
+.doc-nobreak {
+  text-wrap-mode: nowrap;
+}
+
+>>>>>>> theirs
 /* under balanceSingleByteDoubleByteWidth a space beside an East Asian character
    or another space advances 0.5em in Word whatever the run font (line-metrics
    balancedSpaceOffsets); the half-width space face supplies that advance. Keep it a plain baseline inline: line-height:0 or vertical-align:top
@@ -6245,6 +6640,7 @@ th[data-rev-fmt] {
   :is(p, .doc-li, .doc-outline-only).ctx-sp:not([data-style]):has(
     + :is(p, .doc-li, .doc-outline-only):not([data-style])
   ) {
+<<<<<<< ours
   margin-bottom: 0 !important;
 }
 
@@ -6254,6 +6650,31 @@ th[data-rev-fmt] {
   margin-top: 0 !important;
 }
 
+/* twins of the two rules above across a pagination widget the canvas keeps
+   between blocks (doc-style-css.ts PAGE_WIDGET): a page gap must not break
+   the spacing the gapless print clones show */
+.doc-page
+  :is(p, .doc-li, .doc-outline-only).ctx-sp:not([data-style]):has(
+    + :is(.page-gap, .page-gap-cut, .page-float-host, .page-float-carry)
+      + :is(p, .doc-li, .doc-outline-only):not([data-style])
+  ) {
+=======
+>>>>>>> theirs
+  margin-bottom: 0 !important;
+}
+
+.doc-page
+  :is(p, .doc-li, .doc-outline-only):not([data-style])
+<<<<<<< ours
+  + :is(.page-gap, .page-gap-cut, .page-float-host, .page-float-carry)
+=======
+>>>>>>> theirs
+  + :is(p, .doc-li, .doc-outline-only).ctx-sp:not([data-style]) {
+  margin-top: 0 !important;
+}
+
+<<<<<<< ours
+=======
 /* twins of the two rules above across a pagination widget the canvas keeps
    between blocks (doc-style-css.ts PAGE_WIDGET): a page gap must not break
    the spacing the gapless print clones show */
@@ -6272,6 +6693,7 @@ th[data-rev-fmt] {
   margin-top: 0 !important;
 }
 
+>>>>>>> theirs
 /* ...and across table boundaries: Word compares with the next paragraph in
    cell-flow order (probe 2026-10-20) - the first cell's first paragraph after a
    paragraph before the table, the next cell's first paragraph after a cell's
@@ -11109,6 +11531,7 @@ body.docs-crop-active
   border: 1px solid var(--border);
   border-radius: var(--radius-12);
   background: var(--color-bg-subtle);
+<<<<<<< ours
 }
 
 .ai-revision-bar .ai-revision-count {
@@ -11282,6 +11705,163 @@ body.docs-crop-active
 .ai-track-btn:hover {
   background: var(--color-bg-subtle);
   color: var(--color-text-primary);
+}
+
+.ai-revision-reject:hover:not(:disabled),
+.ai-revision-accept:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--color-border-strong);
+}
+
+.ai-revision-reject:disabled,
+.ai-revision-accept:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ai-revision-bar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* attachment chips above the composer */
+.ai-attachments {
+  display: flex;
+  gap: 8px;
+  /* single row inside the prompt box, above the textarea (Genspark composer style):
+     extra images run past the box edge and scroll horizontally.
+     scroll (not auto) + zero bottom padding: the always-present 4px scrollbar lane
+     doubles as the bottom padding, so overflowing never grows the strip and
+     shifts its content up */
+  overflow-x: scroll;
+  /* side insets are transparent borders, not padding: overflow clips at the
+     padding edge, so side padding would let scrolled items slide flush against
+     the box edges — borders keep the 14px gaps while scrolling */
+  padding: 13px 0 0;
+  border-inline: 14px solid transparent;
+  margin-bottom: -6px;
+=======
+>>>>>>> theirs
+}
+
+.ai-revision-bar .ai-revision-count {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: start;
+  font: inherit;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.ai-revision-bar .ai-revision-count:disabled {
+  cursor: default;
+}
+
+.ai-revision-chevron {
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.ai-revision-count.open .ai-revision-chevron {
+  transform: translateY(1px) rotate(-135deg);
+}
+
+.ai-revision-list {
+  flex-basis: 100%;
+  margin: 0 -10px -8px;
+  border-top: 1px solid var(--border);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.ai-revision-row {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-caption);
+  cursor: pointer;
+}
+
+.ai-revision-row:last-child {
+  border-bottom: 0;
+}
+
+.ai-revision-row:hover,
+.ai-revision-row.active {
+  background: var(--hover);
+}
+
+.ai-revision-row-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-secondary);
+}
+
+.ai-revision-row-head b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ai-revision-dot {
+  width: 6px;
+  height: 6px;
+  margin-inline-end: 2px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+}
+
+.ai-revision-dot.ins {
+  background: var(--success);
+}
+
+.ai-revision-dot.del {
+  background: var(--danger);
+}
+
+.ai-revision-row-text {
+  margin-top: 3px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-revision-row-text.del {
+  text-decoration: line-through;
+  color: var(--color-text-secondary);
+}
+
+.ai-revision-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.ai-revision-reject,
+.ai-revision-accept {
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.ai-revision-accept {
+  border-color: var(--border);
+  color: var(--text);
 }
 
 .ai-revision-reject:hover:not(:disabled),
@@ -12579,6 +13159,56 @@ body.docs-crop-active
   border: 1px solid var(--border-strong);
   border-radius: 4px;
   padding: 0 4px;
+<<<<<<< ours
+=======
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.print-options .print-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.print-options .print-field span {
+  flex: 1;
+}
+
+.print-options .print-field .print-select {
+  flex: 1.6 1 auto;
+  min-width: 0;
+  width: auto;
+  margin: 0;
+}
+
+.print-options .print-copies {
+  width: 64px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.print-options .print-select:disabled,
+.print-options .print-copies:disabled,
+.print-options .print-radio input:disabled {
+  opacity: 0.55;
+}
+
+.print-page-count {
+  margin-top: auto;
+  padding: 2px 2px 0;
+>>>>>>> theirs
   font-size: 12px;
   background: var(--surface);
   color: var(--text);
@@ -13345,8 +13975,17 @@ body.docs-crop-active
 }
 
 .read-mode .editor-scroll {
-  background: var(--docs-pv-canvas);
+  background: var(--canvas);
   padding-top: 44px;
+}
+
+/* The crop marks are print furniture: an L at each text-boundary corner, drawn
+   against the page gaps' margins. A reading view has no paper to trim, and the
+   read-mode scroll offset leaves the marks sitting away from the text. */
+.read-mode .page-gap-paper::after,
+.read-mode .page-wrap:not(.paper-mixed)::before,
+.read-mode .page-wrap:not(.paper-mixed)::after {
+  content: none;
 }
 
 .read-exit {
@@ -13426,6 +14065,42 @@ body.docs-crop-active
   margin-left: 130px;
 }
 
+<<<<<<< ours
+=======
+/* Structural headings: a document without heading styles still shows its
+   sections through bold or all-caps lines and section numbers. The outline
+   view keeps those paragraphs visible and at their inferred depth, faded so
+   they read as a guess rather than a style in the file. */
+.view-outline .doc-page > .inferred-heading {
+  display: block;
+}
+
+.view-outline .doc-page .inferred-heading {
+  position: relative;
+  padding-left: 22px;
+  opacity: 0.62;
+}
+
+.view-outline .doc-page .inferred-heading.inferred-h1 {
+  margin-left: 0;
+}
+.view-outline .doc-page .inferred-heading.inferred-h2 {
+  margin-left: 26px;
+}
+.view-outline .doc-page .inferred-heading.inferred-h3 {
+  margin-left: 52px;
+}
+.view-outline .doc-page .inferred-heading.inferred-h4 {
+  margin-left: 78px;
+}
+.view-outline .doc-page .inferred-heading.inferred-h5 {
+  margin-left: 104px;
+}
+.view-outline .doc-page .inferred-heading.inferred-h6 {
+  margin-left: 130px;
+}
+
+>>>>>>> theirs
 /* Word outline view marks each heading with a collapse handle. The glyph is a
    real DOM widget (editor/outline-view.ts) — the old ::before had no click
    target — positioned into the indent gutter the heading padding reserves. */
@@ -13437,6 +14112,7 @@ body.docs-crop-active
   font-size: 0.8em;
   cursor: pointer;
   user-select: none;
+<<<<<<< ours
 }
 
 /* a heading with nothing under it cannot fold: keep the mark, drop the affordance */
@@ -13573,6 +14249,175 @@ body.docs-crop-active
   white-space: pre;
   user-select: none;
   pointer-events: none;
+}
+
+/* the list's own marker moves into the gutter, unchanged: a numbered list
+   keeps its numbers, a bullet list keeps its bullet */
+.view-story .doc-li {
+  padding-inline-start: 0 !important;
+}
+
+.view-story .doc-li::before {
+  position: absolute;
+  right: 100%;
+  min-width: 0;
+  margin-inline-start: 0;
+  margin-right: 0.9rem;
+  text-align: right;
+  color: var(--story-marker-ink);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+=======
+>>>>>>> theirs
+}
+
+/* a heading with nothing under it cannot fold: keep the mark, drop the affordance */
+.view-outline .doc-page .outline-handle.is-leaf {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* folding hides the deeper heading rows of the folded heading; body blocks are
+   already hidden by the :not(h1…) rule above */
+.view-outline .doc-page .outline-collapsed {
+  display: none;
+}
+
+/* ---- Story view: one column of text, the document's formatting hidden ----
+   The way InDesign's story editor and iA Writer show it: the words in one
+   column, the document's own look gone. It is a pure view — nothing in the
+   document changes. The run formatting rides the docTextStyle mark and the
+   paragraph formatting rides the block's own style, so hiding it is CSS over
+   the view class; the margin markers (editor/story-view.ts) carry the
+   structure the hidden formatting used to show. */
+
+.view-story {
+  --story-gutter: 3.25rem;
+  --story-marker-ink: var(--docs-paper-ink-faint);
+  --story-face: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --story-size: 16px;
+  --story-leading: 1.7;
+}
+
+/* the canvas shrinks to the column: no page, no margins, no header/footer */
+.view-story .doc-zoom {
+  width: auto;
+}
+
+.view-story .doc-page {
+  width: auto;
+  max-width: 46rem;
+  margin: 0 auto;
+  min-height: 0;
+  /* the gutter on the left holds the markers, the right one balances it */
+  padding: 2.5rem 3.25rem 6rem;
+  background: none;
+  box-shadow: none;
+  font-family: var(--story-face);
+  font-size: var(--story-size);
+  line-height: var(--story-leading);
+  color: var(--docs-paper-ink);
+}
+
+.view-story .page-hf,
+.view-story .page-margin-annotations {
+  display: none;
+}
+
+/* the document's own paragraph formatting: the style's face, the indent, the
+   spacing. The view brings one gap of its own (padding), so the document's
+   margins never fight it. */
+.view-story .doc-page :is(p, h1, h2, h3, h4, h5, h6, .doc-li) {
+  margin: 0 !important;
+  padding-bottom: 0.8em;
+  padding-inline-start: 0 !important;
+  text-indent: 0 !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  color: inherit !important;
+  background-color: transparent !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  text-transform: none !important;
+  font-variant-caps: normal !important;
+  text-shadow: none !important;
+}
+
+/* all headings share one look; the level shows in the margin marker. A heading
+   that is a styled paragraph (Word's numbered headings) gets the same look
+   through the class story-view.ts puts on it. */
+.view-story .doc-page :is(h1, h2, h3, h4, h5, h6),
+.view-story .doc-page .story-heading {
+  padding-top: 1em;
+  padding-bottom: 0.35em;
+  font-size: 1.2em !important;
+  font-weight: 600 !important;
+  font-style: inherit !important;
+}
+
+/* an inferred heading is a guess read from the paragraph's shape, not a style
+   in the file: it takes the same look, faded so the guess stays
+   distinguishable from a real style */
+.view-story .doc-page .story-heading-inferred {
+  opacity: 0.62;
+}
+
+/* the run's own formatting: the docTextStyle mark carries the font, the size,
+   the colour, the highlight and the spacing. The bold, italic, underline and
+   strike marks are separate elements, so they stay. */
+.view-story .doc-page [data-doc-style] {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  color: inherit !important;
+  background-color: transparent !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  text-transform: none !important;
+  font-variant-caps: normal !important;
+  text-shadow: none !important;
+}
+
+/* a raised run keeps its raised, smaller self */
+.view-story .doc-page [data-doc-style][style*='vertical-align'] {
+  font-size: 0.75em !important;
+}
+
+/* a table stays a table; only its text goes plain */
+.view-story .doc-page .doc-table {
+  max-width: 100%;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  color: inherit !important;
+}
+
+/* the margin markers: a faded '#' per heading level, a '>' for a quote */
+.view-story .doc-page :is(p, h1, h2, h3, h4, h5, h6, .doc-li) {
+  position: relative;
+}
+
+.view-story .story-marker {
+  position: absolute;
+  right: 100%;
+  width: var(--story-gutter);
+  margin-right: 0.9rem;
+  text-align: right;
+  color: var(--story-marker-ink);
+  font-family: var(--story-face);
+  font-size: 0.85em;
+  line-height: 1;
+  white-space: pre;
+  user-select: none;
+  pointer-events: none;
+}
+
+.view-story .story-marker-inferred {
+  opacity: 0.62;
 }
 
 /* the list's own marker moves into the gutter, unchanged: a numbered list
@@ -14337,6 +15182,147 @@ ruby.doc-ruby rt {
 /* Draw ▸ Pens gallery: one slot per remembered pen, Word style */
 .ink-pens {
   gap: 2px;
+<<<<<<< ours
+=======
+}
+
+.ink-pen-slot {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  width: 44px;
+  height: 58px;
+  padding: 4px 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+
+.ink-pen-slot:not(:disabled):hover {
+  background: var(--hover);
+}
+
+.ink-pen-slot.active {
+  background: var(--hover);
+  border-color: var(--accent);
+}
+
+.ink-pen-slot:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ink-pen-glyph {
+  display: inline-flex;
+}
+
+.ink-pen-bar {
+  width: 28px;
+  border-radius: 2px;
+}
+
+.ink-pen-slot > .rb-caret-svg {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+}
+
+.ink-pen-slot.active .ink-pen-bar {
+  width: 22px;
+  margin-right: 12px;
+}
+
+.ink-pen-pop {
+  min-width: 190px;
+  padding: 8px;
+}
+
+.ink-pen-preview {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.ink-pen-preview > span {
+  display: block;
+  width: 100%;
+  border-radius: 2px;
+}
+
+.ink-pen-section {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 6px 0 4px;
+}
+
+.ink-pen-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 20px);
+  gap: 6px;
+  padding: 2px;
+}
+
+.ink-pen-grid .ink-swatch {
+  width: 20px;
+  height: 20px;
+}
+
+.layout-menu .ink-pen-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 7px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+  position: relative;
+}
+
+.layout-menu .ink-pen-item:not(:disabled):hover {
+  background: var(--hover);
+}
+
+.layout-menu .ink-pen-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ink-pen-more {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 4px 4px;
+}
+
+.ink-pen-more input[type='color'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Page Number Format dialog */
+.pgnum-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 10px 0;
+  font-size: 13px;
+>>>>>>> theirs
 }
 
 .ink-pen-slot {
@@ -14775,6 +15761,7 @@ tr > .page-gap-cut {
   align-items: center;
   gap: 6px;
   margin-bottom: 3px;
+<<<<<<< ours
 }
 
 .comment-bubble .comment-avatar {
@@ -14785,6 +15772,161 @@ tr > .page-gap-cut {
 
 .comment-bubble .comment-author {
   font-size: 11px;
+=======
+}
+
+.comment-bubble .comment-avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 9px;
+}
+
+.comment-bubble .comment-author {
+  font-size: 11px;
+}
+
+.comment-bubble .comment-when {
+  font-size: 9.5px;
+}
+
+.comment-bubble .comment-text {
+  margin-left: 28px;
+}
+
+.comment-bubble .comment-reply {
+  margin: 6px 0 0 0;
+  padding: 6px 0 0 0;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+}
+
+.comment-bubble .comment-reply-input {
+  display: none;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.comment-bubble.active .comment-reply-input,
+.comment-bubble.comment-popup .comment-reply-input {
+  display: block;
+}
+
+.comment-bubble .comment-card-actions {
+  visibility: hidden;
+}
+
+.comment-bubble:hover .comment-card-actions,
+.comment-bubble.active .comment-card-actions,
+.comment-bubble.comment-popup .comment-card-actions,
+.comment-bubble .comment-card-actions:has([aria-expanded='true']) {
+  visibility: visible;
+}
+
+.comment-bubble .comment-resolve,
+.comment-bubble .comment-more,
+.comment-bubble .comment-like {
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+}
+
+.comment-like {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  border-radius: 4px;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.comment-like:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.comment-like.on {
+  color: var(--accent);
+}
+
+.comment-like.on svg {
+  fill: currentColor;
+}
+
+.comment-bubble .comment-edit-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  margin-top: 2px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 10px;
+  resize: vertical;
+}
+
+.comment-bubble .comment-compose-actions button {
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.comment-bubble.active {
+  border-color: var(--accent);
+  box-shadow: var(--docs-shadow-menu);
+}
+
+/* thread popped up from its anchor glyph while Show Comments is off: floats over the margin */
+.comment-bubble.comment-popup {
+  z-index: 4;
+  box-shadow: var(--docs-shadow-menu);
+}
+
+/* revision balloons (Deleted:/Formatted:) sit in the markup strip as Word draws them:
+   a revision-ink bar and bare text, no card frame */
+.rev-bubble {
+  cursor: default;
+  background: none;
+  border: 0;
+  border-left: 3px solid var(--docs-paper-rev-ink);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 2px 6px 2px 8px;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.rev-bubble-del {
+  border-left-color: var(--rev-del-ink, var(--docs-paper-rev-ink));
+}
+
+.rev-bubble-fmt {
+  border-left-color: var(--rev-fmt-ink, var(--docs-paper-rev-ink));
+}
+
+.rev-bubble .rev-bubble-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 1px;
+}
+
+.rev-bubble .rev-bubble-author {
+  font-weight: 700;
+}
+
+.rev-bubble .rev-bubble-when {
+  flex: none;
+  opacity: 0.7;
+  font-size: 0.9em;
+>>>>>>> theirs
 }
 
 .comment-bubble .comment-when {
@@ -16416,6 +17558,7 @@ tr > .page-gap-cut {
   word-break: break-all;
 }
 
+<<<<<<< ours
 /* ask_clarification card docked in the composer slot (adapted from the html app) */
 :root {
   --clarify-focus-ring: rgb(35 36 37 / 20%);
@@ -16901,6 +18044,8 @@ tr > .page-gap-cut {
   }
 }
 
+=======
+>>>>>>> theirs
 /* ---- Mailings: the mail merge panel and the field list ---- */
 
 .modal-mailmerge {
@@ -16974,6 +18119,7 @@ tr > .page-gap-cut {
   white-space: pre-wrap;
 }
 
+<<<<<<< ours
 .modal label.protect-check.mailmerge-radio {
   display: inline-flex;
   margin-bottom: 0;
@@ -16984,6 +18130,13 @@ tr > .page-gap-cut {
   .modal label.protect-check.mailmerge-radio {
     min-height: 44px;
   }
+=======
+.mailmerge-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+>>>>>>> theirs
 }
 
 .mailmerge-pattern {
@@ -17009,6 +18162,7 @@ tr > .page-gap-cut {
   color: var(--text-dim);
 }
 
+<<<<<<< ours
 .layout-menu.rb-field-list {
   width: 220px;
   max-height: 320px;
@@ -17018,6 +18172,29 @@ tr > .page-gap-cut {
   background: var(--hover);
   outline: 2px solid var(--docs-focus-ring);
   outline-offset: -2px;
+=======
+.rb-field-list {
+  width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.rb-field-item {
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 5px 8px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.rb-field-item:hover {
+  background: var(--color-bg-subtle);
+>>>>>>> theirs
 }
 
 /* Show Revisions in Balloons: the deleted run leaves the flow; a thin marker

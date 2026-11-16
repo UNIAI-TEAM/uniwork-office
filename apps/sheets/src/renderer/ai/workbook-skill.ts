@@ -29,29 +29,44 @@ export const workbookToolsFor = (createDocument: boolean): typeof WORKBOOK_TOOLS
  * — workflow, op catalog, cross-cutting discipline — while per-domain field
  * definitions and conventions live in prompts/guides/*.md, loaded on demand
  * via load_guide.
+ *
+ * The base prompt is imported raw and therefore fixed at build time, so the
+ * placeholder section is a getter rather than a string: which labels exist is
+ * a property of the open workbook, and a model told about a placeholder that
+ * is not there — or not told about one that is — misreads the sheet either way.
  */
 export function createWorkbookSkill(deps: SheetsSkillDeps): AgentSkill {
   // C-BOUND: a UniWork working copy never writes new files beside itself
   const createDocument = (): boolean => cap('createDocument') && deps.isUniworkBound?.() !== true
   return {
     id: 'sheets',
+<<<<<<< ours
     // live: the loop re-reads both before every request
     get systemPrompt() {
       // The base prompt is imported raw and therefore fixed at build time, so
       // the placeholder section is appended here: which labels exist is a
       // property of the open workbook, and a model told about a placeholder
       // that is not there — or not told about one that is — misreads the sheet.
+=======
+    get systemPrompt() {
+>>>>>>> theirs
       const index = deps.redactions?.()
       const labels = index?.isEmpty
         ? []
         : (deps.getActiveSheetInfo().sheets.flatMap((sheet) => index?.labelsFor(sheet.id) ?? []) ??
           [])
+<<<<<<< ours
       const base = basePromptFor(createDocument())
       return labels.length > 0 ? `${base}\n\n${placeholderInstruction(labels)}` : base
     },
     get tools() {
       return workbookToolsFor(createDocument())
     },
+=======
+      return labels.length > 0 ? `${basePrompt}\n\n${placeholderInstruction(labels)}` : basePrompt
+    },
+    tools: WORKBOOK_TOOLS,
+>>>>>>> theirs
     buildContext: () => buildWorkbookContext(deps),
     executeTool: (call) => executeWorkbookTool(call, deps),
     verifyResponse: verifySheetsResponse,

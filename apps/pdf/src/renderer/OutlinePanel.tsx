@@ -94,12 +94,16 @@ function PendingItem({
   }
   return (
     <>
+<<<<<<< ours
       <div
         className="pdf-outline-item pdf-bookmark-row"
         role="treeitem"
         aria-level={depth + 1}
         style={{ paddingLeft: 10 + depth * 14 }}
       >
+=======
+      <div className="pdf-outline-item pdf-bookmark-row" style={{ paddingLeft: 10 + depth * 14 }}>
+>>>>>>> theirs
         {editing ? (
           <input
             autoFocus
@@ -118,6 +122,10 @@ function PendingItem({
               type="button"
               className="pdf-bookmark-title"
               onClick={() => onGoToPage(node.pageIndex)}
+<<<<<<< ours
+=======
+              data-tip={`p. ${node.pageIndex + 1}`}
+>>>>>>> theirs
             >
               {node.title}
             </button>
@@ -128,10 +136,14 @@ function PendingItem({
                   className="rb-icon"
                   aria-label={labels.rename}
                   data-tip={labels.rename}
+<<<<<<< ours
                   onClick={() => {
                     setDraft(node.title)
                     setEditing(true)
                   }}
+=======
+                  onClick={() => setEditing(true)}
+>>>>>>> theirs
                 >
                   ✎
                 </button>

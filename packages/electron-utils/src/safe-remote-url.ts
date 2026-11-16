@@ -218,6 +218,15 @@ export interface FetchWithSsrfGuardOptions {
   /** Redirect hops to follow. Each hop is revalidated. Defaults to 5. */
   maxRedirects?: number
   headers?: Record<string, string>
+<<<<<<< ours
+=======
+  /**
+   * Cancels the request (and any redirect still to be followed). A caller
+   * reading a server it does not control passes a timeout here so a trickling
+   * answer cannot pin it forever.
+   */
+  signal?: AbortSignal
+>>>>>>> theirs
   /** Injectable for tests; defaults to undici's fetch (which honors the pinned dispatcher). */
   fetchImpl?: typeof fetch
 }
@@ -265,7 +274,11 @@ export async function fetchWithSsrfGuard(
   rawUrl: string,
   options: FetchWithSsrfGuardOptions = {},
 ): Promise<Response | null> {
+<<<<<<< ours
   const { maxRedirects = 5, headers, fetchImpl } = options
+=======
+  const { maxRedirects = 5, headers, signal, fetchImpl } = options
+>>>>>>> theirs
   // maxRedirects arrives from callers (CLI flags, IPC-adjacent config): an
   // Infinity value would follow redirects forever, so normalize to 0..10.
   const hopBudget = Number.isFinite(maxRedirects)
@@ -275,8 +288,17 @@ export async function fetchWithSsrfGuard(
   for (let hop = 0; hop <= hopBudget; hop++) {
     const target = await resolveSafeRemoteTarget(current)
     if (!target) return null
+<<<<<<< ours
     // headers stays absent rather than explicitly undefined (exactOptionalPropertyTypes)
     const init: Record<string, unknown> = { ...(headers ? { headers } : {}), redirect: 'manual' }
+=======
+    // headers/signal stay absent rather than explicitly undefined (exactOptionalPropertyTypes)
+    const init: Record<string, unknown> = {
+      ...(headers ? { headers } : {}),
+      ...(signal ? { signal } : {}),
+      redirect: 'manual',
+    }
+>>>>>>> theirs
     let dispatcher: Dispatcher | undefined
     if (!target.literal && !globalDispatcherRoutesThroughProxy()) {
       // A forward proxy resolves at its own exit, so pinning is neither

@@ -126,11 +126,15 @@ function applyNow(
     settled = true
     editor.off('transaction', onTransaction)
     clearTimeout(timer)
+<<<<<<< ours
     try {
       if (!landed && !editor.isDestroyed) fallback()
     } finally {
       endEdit()
     }
+=======
+    if (!landed && !editor.isDestroyed) fallback()
+>>>>>>> theirs
   }
   const onTransaction = () => {
     if (editor.state.doc !== before) finish(true)

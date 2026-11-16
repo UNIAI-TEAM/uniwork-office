@@ -58,11 +58,19 @@ beforeEach(async () => {
   state.pick.mockReset()
   const { registerDocsIpc } = await import('../src/main/docs-main')
   registerDocsIpc()
+<<<<<<< ours
 }, 30_000)
 
 afterEach(() => rmSync(state.root, { recursive: true, force: true }))
 
 const blocker = () => join(state.root, 'documents', 'UniWork Office')
+=======
+})
+
+afterEach(() => rmSync(state.root, { recursive: true, force: true }))
+
+const blocker = () => join(state.root, 'documents', 'GenOffice')
+>>>>>>> theirs
 const selected = () => join(state.root, 'picked', 'saved.docx')
 const documentBytes = () => buildDocx({ bodyXml: '<w:p><w:r><w:t>Save fixture</w:t></w:r></w:p>' })
 

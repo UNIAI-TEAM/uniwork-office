@@ -70,13 +70,18 @@ describe('the Mailings tab', () => {
     return container
   }
 
+<<<<<<< ours
   it('offers the fields of the data source in an anchored layout-menu popup', () => {
+=======
+  it('offers the fields of the data source', () => {
+>>>>>>> theirs
     const view = renderMailings()
     const fieldButton = [...view.querySelectorAll<HTMLButtonElement>('button.rb-big')].find(
       (b) => b.textContent === t('ribbonMailingsInsertField'),
     )!
     expect(fieldButton.disabled).toBe(false)
     act(() => fieldButton.click())
+<<<<<<< ours
     const menu = view.querySelector<HTMLElement>('.rb-field-list')!
     expect(menu).not.toBeNull()
     expect(menu.classList.contains('layout-menu')).toBe(true)
@@ -123,6 +128,10 @@ describe('the Mailings tab', () => {
       document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
     })
     expect(view.querySelector('.rb-field-list')).toBeNull()
+=======
+    const items = [...view.querySelectorAll<HTMLButtonElement>('button.rb-field-item')]
+    expect(items.map((b) => b.textContent)).toEqual(['FirstName', 'LastName'])
+>>>>>>> theirs
   })
 
   it('inserts the merge field of the field the user clicked', () => {
@@ -150,6 +159,7 @@ describe('the Mailings tab', () => {
     const view = renderMailings()
     expect(view.textContent).toContain(t('ribbonMailingsRecord', { n: 1, total: 2 }))
   })
+<<<<<<< ours
 
   it('renders custom protect-check radios in the Mail Merge modal and singular/plural done copy', async () => {
     const onMerge = vi.fn().mockResolvedValueOnce({ ok: true, count: 1 })
@@ -176,4 +186,6 @@ describe('the Mailings tab', () => {
       t('ribbonMailingsMergedOne', { n: 1 }),
     )
   })
+=======
+>>>>>>> theirs
 })

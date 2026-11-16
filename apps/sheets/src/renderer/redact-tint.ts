@@ -27,7 +27,10 @@
  * the mark — and the protection — is still there. Re-toggling the mark restores
  * the two.
  */
+<<<<<<< ours
 import { CellValueType, type ICellData } from '@univerjs/core'
+=======
+>>>>>>> theirs
 import { NO_FILL_STYLE } from './edit-journal'
 import type { UniverRuntime, UniverWorksheet } from './univer-state'
 import type { MarkKey } from './redact-actions'
@@ -69,6 +72,7 @@ export function readCellFill(range: FacadeRange): string | null {
  */
 export function tintRange(range: FacadeRange, fill: string = MARK_FILL): string | null {
   const previousFill = readCellFill(range)
+<<<<<<< ours
   setBackgroundPreservingStrings(range, () => range.setBackground(fill))
   return previousFill
 }
@@ -127,6 +131,12 @@ function setBackgroundPreservingStrings(range: FacadeRange, applyFill: () => voi
   }
 }
 
+=======
+  range.setBackground(fill)
+  return previousFill
+}
+
+>>>>>>> theirs
 /**
  * Build the mark for a range, tinting the cells as it goes.
  *
@@ -161,6 +171,7 @@ export function restoreCellFill(
   previousFill: string | null | undefined,
   workbookId: string,
 ): void {
+<<<<<<< ours
   setBackgroundPreservingStrings(range, () => {
     if (previousFill) {
       range.setBackground(previousFill)
@@ -172,5 +183,16 @@ export function restoreCellFill(
       range: range.getRange(),
       style: { type: 'bg', value: { ...NO_FILL_STYLE } },
     })
+=======
+  if (previousFill) {
+    range.setBackground(previousFill)
+    return
+  }
+  runtime.univerAPI.syncExecuteCommand('sheet.command.set-style', {
+    unitId: workbookId,
+    subUnitId: sheetId,
+    range: range.getRange(),
+    style: { type: 'bg', value: { ...NO_FILL_STYLE } },
+>>>>>>> theirs
   })
 }

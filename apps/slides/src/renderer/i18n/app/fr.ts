@@ -30,6 +30,17 @@ export const fr = {
   appExportPdfProgress: 'Exportation du PDF…',
   appExportPdfDone: 'PDF exporté : {path}',
   appExportPdfFailed: 'Échec de l’exportation du PDF : {error}',
+  appExportVideoTitle: 'Exporter en vidéo',
+  appExportVideoResolution: 'Résolution',
+  appExportVideoSeconds: 'Secondes passées sur chaque diapositive',
+  appExportVideoUseTimings: 'Utiliser les minutages et narrations enregistrés s’ils existent',
+  appExportVideoCreate: 'Créer la vidéo',
+  appExportVideoCancel: 'Annuler',
+  appExportVideoProgress: 'Encodage de la vidéo… {percent} %',
+  appExportVideoDone: 'Vidéo exportée : {path}',
+  appExportVideoFailed: 'Échec de l’export vidéo : {error}',
+  appExportVideoUnsupported:
+    'Aucun encodeur vidéo H.264 n’est disponible sur ce système, l’export MP4 est impossible',
   appStatusBgAppliedAll: 'Couleur d’arrière-plan appliquée à toutes les diapositives',
   appStatusThemeApplied: 'Thème « {name} » appliqué',
   appStatusThemeApplyFailed: 'Échec de l’application du thème : {error}',
@@ -67,6 +78,10 @@ export const fr = {
   appStatusAudioInserted: 'Audio inséré (incorporé dans le .pptx)',
   appStatusModel3dInserted:
     'Modèle 3D inséré : sélectionnez-le pour le faire pivoter (PowerPoint l’affiche aussi en 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'Le modèle 3D n’a pas pu être dessiné ici ; son image reste inchangée',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'L’enregistrement est vide ; rien n’a été inséré',
   appStatusRecordingInserted:
     'Enregistrement d’écran inséré dans la diapositive actuelle (webm incorporé)',
@@ -205,6 +220,7 @@ export const fr = {
   appCtxSendToBack: 'Mettre à l’arrière-plan',
   appCtxBringForward: 'Avancer',
   appCtxSendBackward: 'Reculer',
+  appCtxRotate: 'Rotation',
   appCtxRotateLeft90: 'Faire pivoter de 90° à gauche',
   appCtxRotateRight90: 'Faire pivoter de 90° à droite',
   appCtxFlipH: 'Retourner horizontalement',
@@ -275,6 +291,26 @@ export const fr = {
     'La durée totale du diaporama était de {duration}. Voulez-vous enregistrer le minutage des diapositives pour le défilement automatique ?',
   appRehearseDiscard: 'Ne pas enregistrer',
   appRehearseSave: 'Enregistrer',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Enregistrer la narration',
+  appRecordSummary:
+    'Durée de l’enregistrement : {duration}. Enregistrer la narration et le minutage de chaque diapositive ?',
+  appRecordDiscard: 'Ne pas enregistrer',
+  appRecordSave: 'Enregistrer',
+  appStatusRecordSaved: 'Narration enregistrée sur {count} diapositives (PowerPoint la lit aussi)',
+  appStatusRecordFailed: 'L’enregistrement n’a pas pu être sauvegardé',
+  appStatusNarrationCleared: 'Narration effacée',
+  appSettingsTitle: 'Paramètres IA',
+  appSettingsAccount: 'Compte Genspark',
+  appSettingsChecking: 'Vérification…',
+  appSettingsLoggedIn: 'Connecté',
+  appSettingsLoggedInEmail: 'Connecté : {email}',
+  appSettingsLoggedOut: 'Non connecté (les fonctionnalités IA nécessitent un compte Genspark)',
+  appSettingsLoginPending: 'En attente de la connexion dans le navigateur…',
+  appSettingsLogin: 'Se connecter à Genspark',
+  appSettingsModel: 'Modèle',
+>>>>>>> theirs
   appSettingsCancel: 'Annuler',
   appCropHint: 'Entrée pour confirmer · Échap pour annuler · Cliquez à l’extérieur pour confirmer',
   appStatusZoomsInserted:

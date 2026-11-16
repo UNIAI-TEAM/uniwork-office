@@ -1,8 +1,17 @@
 /** Home tab of the slides ribbon. Extracted from Ribbon.tsx. */
 import { useState } from 'react'
 import { platformShortcuts } from '@genoffice/i18n'
+<<<<<<< ours
 import { brushTipKbd, slidesAriaProp, slidesPlainLabel, slidesTipKbd } from '../shortcuts'
 import { ColorPicker, isSymbolFontFamily, partitionFontFamilies, UniAiMark } from '@genoffice/ui'
+=======
+import {
+  ColorPicker,
+  isSymbolFontFamily,
+  partitionFontFamilies,
+  useScrollWindow,
+} from '@genoffice/ui'
+>>>>>>> theirs
 import { saveEditSelection } from '../TextEditOverlay'
 import { armColorInput } from '../color-input'
 import { displayFontFamily } from '../konva-adapter'
@@ -69,6 +78,9 @@ import {
   NUMBER_PRESETS,
   bulletRunText,
 } from '../bullet-presets'
+
+/** The New Slide screentip shows the platform's real chord: ⇧⌘N on mac, Ctrl+M elsewhere. */
+const IS_MAC = navigator.platform.toLowerCase().includes('mac')
 
 // Symbol fonts (Wingdings & co.) render their own name as pictographs, so the
 // picker shows those names in the UI font (like Word) instead of the font itself.
@@ -196,6 +208,15 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
   const uninstalledCatalog = new Set(fontCatalog.filter((c) => !c.installed).map((c) => c.family))
   const matchesFontFilter = (f: string) =>
     !fontFilter.trim() || f.toLowerCase().includes(fontFilter.trim().toLowerCase())
+  const fontMenuWindow = useScrollWindow(fontOpen)
+  let fontRow = 0
+  const previewAt = (f: string) =>
+    fontMenuWindow.inWindow(fontRow++) ? fontPreviewFamily(f) : undefined
+  // a download row has no preview but still occupies a row of the scroller
+  const skipRow = () => {
+    fontRow++
+    return undefined
+  }
   const EMU_PER_PX = 9525
   const commitHangDraft = () => {
     const px = parseFloat(hangDraft.replace(',', '.'))
@@ -444,8 +465,12 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             disabled={!hasDoc}
             onClick={onAddSlide}
             data-tip={platformShortcuts(t('ribbonNewSlideTip'))}
+<<<<<<< ours
             data-tip-kbd={slidesTipKbd('slides-14')}
             aria-keyshortcuts={slidesAriaProp('slides-14')}
+=======
+            data-tip-kbd={IS_MAC ? '⇧⌘N' : 'Ctrl+M'}
+>>>>>>> theirs
           >
             <span className="rb-big-icon">
               <span className="rb-split-main">
@@ -616,6 +641,8 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
               {fontOpen && (
                 <div
                   className="rb-drop rb-menu rb-menu-scroll rb-font-menu"
+                  ref={fontMenuWindow.ref}
+                  onScroll={fontMenuWindow.onScroll}
                   onMouseDown={(e) => e.stopPropagation()}
                 >
                   {(curFontFamily &&
@@ -632,7 +659,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
                       <button
                         key={f}
                         className={f === curFontFamily ? 'on' : ''}
-                        style={{ fontFamily: fontPreviewFamily(f) }}
+                        style={{ fontFamily: previewAt(f) }}
                         onMouseDown={(e) => {
                           e.preventDefault()
                           onFontFamily(f)
@@ -649,7 +676,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
                         <button
                           key={f}
                           className={f === curFontFamily ? 'on' : ''}
-                          style={{ fontFamily: fontPreviewFamily(f) }}
+                          style={{ fontFamily: previewAt(f) }}
                           onMouseDown={(e) => {
                             e.preventDefault()
                             onFontFamily(f)
@@ -671,7 +698,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
                             <button
                               key={c.family}
                               className={c.family === curFontFamily ? 'on' : ''}
-                              style={{ fontFamily: fontPreviewFamily(c.family) }}
+                              style={{ fontFamily: previewAt(c.family) }}
                               onMouseDown={(e) => {
                                 e.preventDefault()
                                 onFontFamily(c.family)
@@ -684,6 +711,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
                             <button
                               key={c.family}
                               className="rb-font-download"
+                              style={{ fontFamily: skipRow() }}
                               disabled={fontBusy.has(c.family)}
                               onMouseDown={(e) => {
                                 e.preventDefault()

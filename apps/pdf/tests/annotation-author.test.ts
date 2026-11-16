@@ -82,9 +82,16 @@ describe('the author of a saved annotation', () => {
     })
   })
 
+<<<<<<< ours
   it('falls back to UniWork Office, still as a text string, when no author is known', async () => {
     const authors = await savedAuthors()
     expect(authors.get('Highlight')).toEqual(['UniWork Office'])
     expect(authors.get('Ink')).toEqual(['UniWork Office'])
+=======
+  it('falls back to GenOffice, still as a text string, when no author is known', async () => {
+    const authors = await savedAuthors()
+    expect(authors.get('Highlight')).toEqual(['GenOffice'])
+    expect(authors.get('Ink')).toEqual(['GenOffice'])
+>>>>>>> theirs
   })
 })

@@ -65,11 +65,33 @@ export const OPEN_FILTER_PANEL_OPERATION = 'sheet.operation.open-filter-panel'
 /// (800 MB renderer RSS). Above this the filter dialog explains instead of
 /// offering.
 export const FULL_LOAD_MAX_CELLS = 1_000_000
-/// Bounding-box ceiling for the same offer: block installs write a dense
-/// matrix over the box, so a sparse sheet's empty area still costs about
-/// 55 B of heap per cell (249k stored cells in a 20M box: 11 s, 1.1 GB JS
-/// heap; a 280M box ran out of memory).
+/// Style-only blanks (a fill brushed over empty rows, a border frame around
+/// the data) are installed too but hold no value; they get their own, looser
+/// ceiling on the total stored count so formatting alone cannot deny the
+/// offer for a workbook whose data is modest (genoffice#1927). Measured:
+/// 868k values + 887k style-only blanks load in 56 s to 575 MB of JS heap.
+export const FULL_LOAD_MAX_STORED_CELLS = 2_000_000
+/// Bounding-box ceiling for the same offer, over the box the value cells
+/// span: block installs write a dense matrix over each block that holds a
+/// cell, so a sparse sheet's empty area still costs about 55 B of heap per
+/// cell (249k stored cells in a 20M box: 11 s, 1.1 GB JS heap; a 280M box
+/// ran out of memory). Each block installs only the box its cells span, so
+/// styled blanks beyond the value extent cost their own column, not the block.
 export const FULL_LOAD_MAX_GRID_CELLS = 10_000_000
+/// Unprompted background Full Load (autoFullLoadsAtOpen in load-budget.ts):
+/// a streamed book stalls on a sidecar round-trip at every scroll past the
+/// ±80-row/±8-column buffer, so books cheap enough to make resident load
+/// themselves shortly after open. The user never asked, so the budget is a
+/// fraction of the offer caps above — 500k stored cells is a few seconds
+/// and well under 300 MB of heap by those measurements. Bigger books keep
+/// the explicit Full Load offer.
+export const AUTO_FULL_LOAD_MAX_STORED_CELLS = 500_000
+/// Dense-box bound for the same unprompted load (~55 B of heap per grid
+/// cell): 2M ≈ ~110 MB worst case.
+export const AUTO_FULL_LOAD_MAX_GRID_CELLS = 2_000_000
+/// After the 1.5 s closure-activation kick, so first paint, the initial
+/// stream and closure setup all win the sidecar before the background load.
+export const AUTO_FULL_LOAD_DELAY_MS = 4_000
 /// Largest range a sort / move snapshot journals cell by cell; the gate
 /// refuses bigger ones up front instead of letting the save drop them.
 export const REORDER_JOURNAL_MAX_CELLS = 200_000
