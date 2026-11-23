@@ -7,8 +7,8 @@ export const nl = {
     'Beschrijf de tabel, gegevens of grafiek die je nodig hebt — AI maakt het direct.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Aanmelden bij Genspark',
-  aiGskLoginOk: 'Aangemeld bij Genspark',
+  aiGskLoginBtn: 'Aanmelden bij UniWork',
+  aiGskLoginOk: 'Aangemeld bij UniWork',
 >>>>>>> theirs
   aiUndelivered: 'Niet verzonden',
   aiRetry: 'Opnieuw proberen',

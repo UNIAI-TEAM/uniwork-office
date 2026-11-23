@@ -61,7 +61,7 @@ const STATIC_FORM_FILLS_KEY = PDFName.of('GenOfficeStaticFormFills')
 <<<<<<< ours
 const DEFAULT_PDF_AUTHOR = 'UniWork Office'
 =======
-const DEFAULT_ANNOT_AUTHOR = 'GenOffice'
+const DEFAULT_ANNOT_AUTHOR = 'UniWork Office'
 >>>>>>> theirs
 
 const rectsIntersect = (a: readonly number[], b: readonly number[]): boolean =>

@@ -7,8 +7,8 @@ export const es = {
     'Describe la tabla, los datos o el gráfico que necesitas: la IA los crea directamente.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Iniciar sesión en Genspark',
-  aiGskLoginOk: 'Sesión iniciada en Genspark',
+  aiGskLoginBtn: 'Iniciar sesión en UniWork',
+  aiGskLoginOk: 'Sesión iniciada en UniWork',
 >>>>>>> theirs
   aiUndelivered: 'No enviado',
   aiRetry: 'Reintentar',

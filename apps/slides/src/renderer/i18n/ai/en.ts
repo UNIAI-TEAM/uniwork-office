@@ -25,9 +25,9 @@ export const en = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Sign in to Genspark',
-  aiGskLoginOk: 'Signed in to Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'Sign in to UniWork',
+  aiGskLoginOk: 'Signed in to UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'Open AI assistant',
   aiFactCheckBtn: 'AI Fact Check',

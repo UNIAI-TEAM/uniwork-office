@@ -11,9 +11,9 @@ export const ja = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Genspark にサインイン',
-  aiGskLoginOk: 'Genspark にサインインしました',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'UniWork にサインイン',
+  aiGskLoginOk: 'UniWork にサインインしました',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'AI アシスタントを開く',
   aiSummarizeBtn: 'AI 要約',

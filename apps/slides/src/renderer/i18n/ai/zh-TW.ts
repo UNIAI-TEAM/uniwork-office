@@ -25,9 +25,9 @@ export const zhTW = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: '登入 Genspark',
-  aiGskLoginOk: '已登入 Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: '登入 UniWork',
+  aiGskLoginOk: '已登入 UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: '開啟 AI 助手',
   aiFactCheckBtn: 'AI 事實核查',

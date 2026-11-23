@@ -25,9 +25,9 @@ export const ms = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Log masuk ke Genspark',
-  aiGskLoginOk: 'Berjaya log masuk ke Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'Log masuk ke UniWork',
+  aiGskLoginOk: 'Berjaya log masuk ke UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'Buka pembantu AI',
   aiFactCheckBtn: 'Semak Fakta AI',

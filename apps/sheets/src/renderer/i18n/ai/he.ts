@@ -6,8 +6,8 @@ export const he = {
   aiEmptyBuildBody: 'תארו את הטבלה, הנתונים או התרשים הדרושים — ה-AI יוצר אותם במקום.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'התחבר ל-Genspark',
-  aiGskLoginOk: 'מחובר ל-Genspark',
+  aiGskLoginBtn: 'התחבר ל-UniWork',
+  aiGskLoginOk: 'מחובר ל-UniWork',
 >>>>>>> theirs
   aiUndelivered: 'לא נשלח',
   aiRetry: 'נסה שוב',

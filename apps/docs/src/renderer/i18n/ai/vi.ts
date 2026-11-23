@@ -11,9 +11,9 @@ export const vi = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Đăng nhập vào Genspark',
-  aiGskLoginOk: 'Đã đăng nhập Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'Đăng nhập vào UniWork',
+  aiGskLoginOk: 'Đã đăng nhập UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'Mở trợ lý AI',
   aiSummarizeBtn: 'AI Tóm tắt',

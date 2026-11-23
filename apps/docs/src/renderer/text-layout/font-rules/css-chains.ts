@@ -278,7 +278,7 @@ function latinChainHead(ascii: string): string[] {
   const jp = fams.findIndex((fam) => /^'Noto (?:Sans|Serif) JP'$/.test(fam))
   const latin = fams.filter(
     (fam, i) =>
-      !(jp >= 0 && i > jp && /^'GenOffice (?:Sans KR|Serif KR|Batang)'$/.test(fam)) &&
+      !(jp >= 0 && i > jp && /^'UniWork Office (?:Sans KR|Serif KR|Batang)'$/.test(fam)) &&
       !/noto (sans|serif) cjk/i.test(fam) &&
       !/ JA GO'$/.test(fam) &&
       !/^(serif|sans-serif|monospace)$/.test(fam),

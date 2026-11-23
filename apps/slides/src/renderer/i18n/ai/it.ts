@@ -25,9 +25,9 @@ export const it = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Accedi a Genspark',
-  aiGskLoginOk: 'Accesso a Genspark effettuato',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'Accedi a UniWork',
+  aiGskLoginOk: 'Accesso a UniWork effettuato',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: "Apri l'assistente IA",
   aiFactCheckBtn: 'Fact-check IA',

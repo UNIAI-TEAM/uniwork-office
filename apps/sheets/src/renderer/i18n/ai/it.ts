@@ -6,8 +6,8 @@ export const it = {
   aiEmptyBuildBody: 'Descrivi la tabella, i dati o il grafico che ti servono: l’IA li crea subito.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Accedi a Genspark',
-  aiGskLoginOk: 'Accesso a Genspark effettuato',
+  aiGskLoginBtn: 'Accedi a UniWork',
+  aiGskLoginOk: 'Accesso a UniWork effettuato',
 >>>>>>> theirs
   aiUndelivered: 'Non inviato',
   aiRetry: 'Riprova',

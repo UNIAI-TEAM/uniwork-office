@@ -11,9 +11,9 @@ export const ar = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'تسجيل الدخول إلى Genspark',
-  aiGskLoginOk: 'تم تسجيل الدخول إلى Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'تسجيل الدخول إلى UniWork',
+  aiGskLoginOk: 'تم تسجيل الدخول إلى UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'فتح مساعد الذكاء الاصطناعي',
   aiSummarizeBtn: 'تلخيص AI',

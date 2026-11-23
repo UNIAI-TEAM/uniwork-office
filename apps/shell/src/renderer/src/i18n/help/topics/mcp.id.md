@@ -1,6 +1,6 @@
 # Menghubungkan agen pemrograman
 
-GenOffice berbicara dalam Model Context Protocol, jadi agen pemrograman dapat membaca, menulis, dan merender dokumen Anda lewat mesin yang sama dengan yang dipakai aplikasi. Agen itu tidak sedang menebak-nebak format berkas: ia memperoleh skema op bertipe dari definisi yang sama dengan yang dipakai eksekutor untuk memvalidasi.
+UniWork Office berbicara dalam Model Context Protocol, jadi agen pemrograman dapat membaca, menulis, dan merender dokumen Anda lewat mesin yang sama dengan yang dipakai aplikasi. Agen itu tidak sedang menebak-nebak format berkas: ia memperoleh skema op bertipe dari definisi yang sama dengan yang dipakai eksekutor untuk memvalidasi.
 
 ## Mendaftarkannya dari aplikasi
 
@@ -14,7 +14,7 @@ Inilah tempatnya: **Pengaturan ▸ Integrasi**. Panel ini punya dua bagian, dan 
 
 - “Ubah ~/Downloads/report.md menjadi dokumen Word”
 - “Buat presentasi 6 slide tentang hasil Q3 kami”
-- “Konversi budget.xlsx ke PDF dan buka di GenOffice”
+- “Konversi budget.xlsx ke PDF dan buka di UniWork Office”
 
 ## Mendaftarkannya dari baris perintah
 
@@ -76,7 +76,7 @@ Agen yang tidak mengenal kosakata op akan menebak. Skill itu membawa referensi d
 
 ## Apa yang bisa dicapainya di dalam aplikasi
 
-Server itu tidak dibatasi pada berkas di disk. Selama GenOffice berjalan, agen juga bisa bekerja melalui jendela:
+Server itu tidak dibatasi pada berkas di disk. Selama UniWork Office berjalan, agen juga bisa bekerja melalui jendela:
 
 - **`open_in_genoffice`** membuka berkas di sebuah tab dan memfokuskannya.
 - **`open_documents`** mencantumkan setiap dokumen yang Anda buka — id, jenis, path, dan apakah ada perubahan yang belum disimpan —, lalu membaca isi terkini salah satunya, menyimpannya di tempatnya, atau menutupnya, dengan menyimpan lebih dulu kecuali Anda menyuruhnya membuang.

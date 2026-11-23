@@ -11,9 +11,9 @@ export const ko = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Genspark 로그인',
-  aiGskLoginOk: 'Genspark에 로그인했습니다',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'UniWork 로그인',
+  aiGskLoginOk: 'UniWork에 로그인했습니다',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'AI 도우미 열기',
   aiSummarizeBtn: 'AI 요약',

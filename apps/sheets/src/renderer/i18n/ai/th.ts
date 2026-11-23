@@ -6,8 +6,8 @@ export const th = {
   aiEmptyBuildBody: 'อธิบายตาราง ข้อมูล หรือแผนภูมิที่ต้องการ แล้ว AI จะสร้างให้ทันที',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'ลงชื่อเข้าใช้ Genspark',
-  aiGskLoginOk: 'ลงชื่อเข้าใช้ Genspark แล้ว',
+  aiGskLoginBtn: 'ลงชื่อเข้าใช้ UniWork',
+  aiGskLoginOk: 'ลงชื่อเข้าใช้ UniWork แล้ว',
 >>>>>>> theirs
   aiUndelivered: 'ส่งไม่สำเร็จ',
   aiRetry: 'ลองอีกครั้ง',

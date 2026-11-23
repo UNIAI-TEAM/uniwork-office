@@ -7,8 +7,8 @@ export const de = {
     'Beschreibe die gewünschte Tabelle, Daten oder Diagramme — die KI erstellt sie direkt.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Bei Genspark anmelden',
-  aiGskLoginOk: 'Bei Genspark angemeldet',
+  aiGskLoginBtn: 'Bei UniWork anmelden',
+  aiGskLoginOk: 'Bei UniWork angemeldet',
 >>>>>>> theirs
   aiUndelivered: 'Nicht gesendet',
   aiRetry: 'Erneut versuchen',

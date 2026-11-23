@@ -6,8 +6,8 @@ export const pl = {
   aiEmptyBuildBody: 'Opisz potrzebną tabelę, dane lub wykres — AI utworzy je od razu.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Zaloguj się do Genspark',
-  aiGskLoginOk: 'Zalogowano do Genspark',
+  aiGskLoginBtn: 'Zaloguj się do UniWork',
+  aiGskLoginOk: 'Zalogowano do UniWork',
 >>>>>>> theirs
   aiUndelivered: 'Nie wysłano',
   aiRetry: 'Ponów',

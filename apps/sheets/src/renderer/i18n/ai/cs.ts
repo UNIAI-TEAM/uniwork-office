@@ -7,8 +7,8 @@ export const cs = {
     'Popište tabulku, data nebo graf, které potřebujete — AI je vytvoří přímo na místě.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Přihlásit se ke Genspark',
-  aiGskLoginOk: 'Přihlášeno ke Genspark',
+  aiGskLoginBtn: 'Přihlásit se ke UniWork',
+  aiGskLoginOk: 'Přihlášeno ke UniWork',
 >>>>>>> theirs
   aiUndelivered: 'Neodesláno',
   aiRetry: 'Zkusit znovu',

@@ -1,6 +1,6 @@
 # Podłączenie z agentem programistycznym
 
-GenOffice mówi językiem Model Context Protocol, więc agent programistyczny może czytać, zapisywać i renderować twoje dokumenty przez te same silniki, których używa aplikacja. Agent nie zgaduje formatu pliku: otrzymuje typowane schematy op z tych samych definicji, względem których waliduje executor.
+UniWork Office mówi językiem Model Context Protocol, więc agent programistyczny może czytać, zapisywać i renderować twoje dokumenty przez te same silniki, których używa aplikacja. Agent nie zgaduje formatu pliku: otrzymuje typowane schematy op z tych samych definicji, względem których waliduje executor.
 
 ## Rejestrowanie w aplikacji
 
@@ -14,7 +14,7 @@ Robisz to w **Ustawienia ▸ Integracje**. Panel ma dwie połowy i możesz skorz
 
 - “Zamień ~/Downloads/report.md na dokument Word”
 - “Zrób prezentację z 6 slajdów o naszych wynikach za III kwartał”
-- “Przekonwertuj budget.xlsx do PDF i otwórz w GenOffice”
+- “Przekonwertuj budget.xlsx do PDF i otwórz w UniWork Office”
 
 ## Rejestrowanie z wiersza poleceń
 
@@ -76,7 +76,7 @@ Agent, który nie zna słownictwa op, będzie zgadywał. Skill zabiera ze sobą 
 
 ## Do czego sięga w aplikacji
 
-Serwer nie ogranicza się do plików na dysku. Dopóki GenOffice działa, agent może pracować także przez okno:
+Serwer nie ogranicza się do plików na dysku. Dopóki UniWork Office działa, agent może pracować także przez okno:
 
 - **`open_in_genoffice`** otwiera plik w karcie i ustawia na niej fokus.
 - **`open_documents`** wymienia każdy otwarty dokument — id, typ, ścieżkę i to, czy ma niezapisane zmiany —, a następnie czyta bieżącą zawartość jednego z nich, zapisuje go w miejscu albo go zamyka, najpierw zapisując, chyba że każesz mu odrzucić zmiany.

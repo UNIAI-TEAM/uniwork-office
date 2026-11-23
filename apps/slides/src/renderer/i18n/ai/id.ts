@@ -25,9 +25,9 @@ export const id = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Masuk ke Genspark',
-  aiGskLoginOk: 'Berhasil masuk ke Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'Masuk ke UniWork',
+  aiGskLoginOk: 'Berhasil masuk ke UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'Buka asisten AI',
   aiFactCheckBtn: 'Cek Fakta AI',

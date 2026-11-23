@@ -25,9 +25,9 @@ export const es = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Iniciar sesión en Genspark',
-  aiGskLoginOk: 'Sesión iniciada en Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'Iniciar sesión en UniWork',
+  aiGskLoginOk: 'Sesión iniciada en UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'Abrir el asistente de IA',
   aiFactCheckBtn: 'Verificación IA',

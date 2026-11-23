@@ -6,8 +6,8 @@ export const hi = {
   aiEmptyBuildBody: 'जो तालिका, डेटा या चार्ट चाहिए बताएँ — AI उसे तुरंत बना देता है।',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Genspark में साइन इन करें',
-  aiGskLoginOk: 'Genspark में साइन इन हो गए',
+  aiGskLoginBtn: 'UniWork में साइन इन करें',
+  aiGskLoginOk: 'UniWork में साइन इन हो गए',
 >>>>>>> theirs
   aiUndelivered: 'भेजा नहीं गया',
   aiRetry: 'फिर से कोशिश करें',

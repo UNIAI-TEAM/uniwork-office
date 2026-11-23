@@ -11,9 +11,9 @@ export const ru = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Войти в Genspark',
-  aiGskLoginOk: 'Выполнен вход в Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'Войти в UniWork',
+  aiGskLoginOk: 'Выполнен вход в UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'Открыть ИИ-помощника',
   aiSummarizeBtn: 'ИИ-резюме',

@@ -5,8 +5,8 @@ export const zh = {
   aiEmptyBuildBody: '描述想要的表格、数据或图表，AI 直接生成。',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: '登录 Genspark',
-  aiGskLoginOk: '已登录 Genspark',
+  aiGskLoginBtn: '登录 UniWork',
+  aiGskLoginOk: '已登录 UniWork',
 >>>>>>> theirs
   aiUndelivered: '未发送成功',
   aiRetry: '重试',

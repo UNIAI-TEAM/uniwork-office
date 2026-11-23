@@ -2185,7 +2185,7 @@ export const strings = {
     aiNetworkError:
       'Ağ sorunu: AI hizmetine ulaşılamadı. Bağlantınızı kontrol edip yeniden deneyin',
     aiCreditsExhausted:
-      'Genspark krediniz bitti. Yüklemek için genspark.ai/pricing adresini ziyaret edin, sonra yeniden deneyin',
+      'UniWork krediniz bitti. Yüklemek için uniworkos.com/pricing adresini ziyaret edin, sonra yeniden deneyin',
     aiToolReadPages: '{start}-{end}. sayfaları oku',
     aiToolSearch: '"{query}" ara ({count} eşleşme)',
     aiToolGoto: '{page}. sayfaya git',
@@ -2424,7 +2424,7 @@ export const strings = {
     removeStamp: 'Bu filigranı / üst bilgiyi / alt bilgiyi seçmek için tıklayın',
     props: 'Özellikler',
     propsTitle: 'Belge özellikleri',
-    ribbonAiAssistant: 'Genspark',
+    ribbonAiAssistant: 'AI',
     ribbonAiAssistantTip: 'AI asistanını aç',
     propTitle: 'Başlık',
     propAuthor: 'Yazar',
@@ -2635,7 +2635,7 @@ export const strings = {
     aiNetworkError:
       'Hálózati probléma: nem sikerült elérni az AI-szolgáltatást. Ellenőrizd a kapcsolatot, és próbáld újra',
     aiCreditsExhausted:
-      'Elfogytak a Genspark-kreditek. Töltsd fel az egyenleged a genspark.ai/pricing oldalon, majd próbáld újra',
+      'Elfogytak a UniWork-kreditek. Töltsd fel az egyenleged a uniworkos.com/pricing oldalon, majd próbáld újra',
     aiToolReadPages: 'Oldalak elolvasása: {start}-{end}',
     aiToolSearch: '„{query}” keresése ({count} találat)',
     aiToolGoto: 'Ugrás az oldalra: {page}',
@@ -2876,7 +2876,7 @@ export const strings = {
     removeStamp: 'Kattints a vízjel / élőfej / élőláb kijelöléséhez',
     props: 'Tulajdonságok',
     propsTitle: 'Dokumentum tulajdonságai',
-    ribbonAiAssistant: 'Genspark',
+    ribbonAiAssistant: 'AI',
     ribbonAiAssistantTip: 'AI-asszisztens megnyitása',
     propTitle: 'Cím',
     propAuthor: 'Szerző',

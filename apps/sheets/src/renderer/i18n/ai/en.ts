@@ -6,8 +6,8 @@ export const en = {
   aiEmptyBuildBody: 'Describe the table, data, or chart you need — AI creates it in place.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Sign in to Genspark',
-  aiGskLoginOk: 'Signed in to Genspark',
+  aiGskLoginBtn: 'Sign in to UniWork',
+  aiGskLoginOk: 'Signed in to UniWork',
 >>>>>>> theirs
   aiUndelivered: 'Not sent',
   aiRetry: 'Retry',

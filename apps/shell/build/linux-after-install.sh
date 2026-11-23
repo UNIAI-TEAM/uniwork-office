@@ -95,7 +95,7 @@ fi
 # deb/rpm post-install. Replaces electron-builder's default template, so its
 # chrome-sandbox and AppArmor steps are repeated here (genoffice#2150).
 set -e
-app="/opt/GenOffice"
+app="/opt/UniWork Office"
 # Chromium aborts when the SUID helper exists without 4755; Chrome's deb sets it unconditionally.
 [ -f "$app/chrome-sandbox" ] && { chown root:root "$app/chrome-sandbox" 2>/dev/null || true; chmod 4755 "$app/chrome-sandbox" 2>/dev/null || true; }
 # Ubuntu 24.04+ restricts unprivileged userns; --skip-kernel-load doubles as the abi/4.0 check.
@@ -131,9 +131,9 @@ if [ -d "$shell_new" ]; then
   mkdir -p "$templates_dir"
   for ext in docx xlsx pptx; do
     case "$ext" in
-      docx) name="GenOffice Document.docx" ;;
-      xlsx) name="GenOffice Spreadsheet.xlsx" ;;
-      pptx) name="GenOffice Presentation.pptx" ;;
+      docx) name="UniWork Office Document.docx" ;;
+      xlsx) name="UniWork Office Spreadsheet.xlsx" ;;
+      pptx) name="UniWork Office Presentation.pptx" ;;
     esac
     # cp -f is the fallback for a busybox install(1) without -m. A template
     # that cannot be written must not fail the whole package install.

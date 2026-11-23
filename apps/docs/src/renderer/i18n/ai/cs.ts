@@ -11,9 +11,9 @@ export const cs = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Přihlásit se ke Genspark',
-  aiGskLoginOk: 'Přihlášeno ke Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'Přihlásit se ke UniWork',
+  aiGskLoginOk: 'Přihlášeno ke UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'Otevřít asistenta AI',
   aiSummarizeBtn: 'Shrnutí AI',

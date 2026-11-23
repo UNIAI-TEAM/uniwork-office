@@ -39,17 +39,17 @@ Ezek nem egyszerű kapcsolók — minden képességnél kiválasztod a kiszolgá
 
 ## Alapértelmezett alkalmazástársítások
 
-A Beállításokban a GenOffice beállítható alapértelmezett kezelőként a .docx / .xlsx / .pptx / .pdf és hasonló fájltípusokhoz (ez rendszerszintű beállítás; ha a rendszer kéri, hagyd jóvá).
+A Beállításokban a UniWork Office beállítható alapértelmezett kezelőként a .docx / .xlsx / .pptx / .pdf és hasonló fájltípusokhoz (ez rendszerszintű beállítás; ha a rendszer kéri, hagyd jóvá).
 
 ## Harmadik felek közleményei és frissítések
 
 - Súgó ▸ Harmadik felek közleményei: az alkalmazással szállított nyílt forráskódú összetevők teljes licenclistája.
 - Súgó ▸ Frissítések keresése: kézi ellenőrzést indít; ha van újabb verzió, felajánlja a telepítést.
 
-## Bejelentkezés a Gensparkba
+## Bejelentkezés a UniWorkba
 
-- A bejelentkezési pont (a Beállításokban vagy a felhőbeli projektlistában) **eszközkódos** folyamatot használ: a GenOffice megjelenít egy kódot, és megnyitja a bejelentkezési oldalt a böngészőben; ha végeztél, a folyamat automatikusan folytatódik.
-- A bejelentkezésre kizárólag ezekhez van szükség: a felhőbeli projektlistához és a Genspark által üzemeltetett modellekhez. Enélkül is működik minden helyi funkció és az egyéni modellek.
+- A bejelentkezési pont (a Beállításokban vagy a felhőbeli projektlistában) **eszközkódos** folyamatot használ: a UniWork Office megjelenít egy kódot, és megnyitja a bejelentkezési oldalt a böngészőben; ha végeztél, a folyamat automatikusan folytatódik.
+- A bejelentkezésre kizárólag ezekhez van szükség: a felhőbeli projektlistához és a UniWork által üzemeltetett modellekhez. Enélkül is működik minden helyi funkció és az egyéni modellek.
 - A kijelentkezés egyetlen kattintás a Beállításokban.
 
 ## MCP-integráció (haladó felhasználóknak / AI-klienseknek)

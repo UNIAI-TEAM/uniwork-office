@@ -6,8 +6,8 @@ export const ms = {
   aiEmptyBuildBody: 'Terangkan jadual, data atau carta yang anda perlukan — AI terus menciptanya.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Log masuk ke Genspark',
-  aiGskLoginOk: 'Berjaya log masuk ke Genspark',
+  aiGskLoginBtn: 'Log masuk ke UniWork',
+  aiGskLoginOk: 'Berjaya log masuk ke UniWork',
 >>>>>>> theirs
   aiUndelivered: 'Tidak dihantar',
   aiRetry: 'Cuba lagi',

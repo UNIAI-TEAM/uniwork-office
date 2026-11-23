@@ -6,8 +6,8 @@ export const id = {
   aiEmptyBuildBody: 'Jelaskan tabel, data, atau bagan yang Anda perlukan — AI langsung membuatnya.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Masuk ke Genspark',
-  aiGskLoginOk: 'Berhasil masuk ke Genspark',
+  aiGskLoginBtn: 'Masuk ke UniWork',
+  aiGskLoginOk: 'Berhasil masuk ke UniWork',
 >>>>>>> theirs
   aiUndelivered: 'Tidak terkirim',
   aiRetry: 'Coba lagi',

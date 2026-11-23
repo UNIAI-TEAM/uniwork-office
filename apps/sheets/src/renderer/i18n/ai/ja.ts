@@ -6,8 +6,8 @@ export const ja = {
   aiEmptyBuildBody: '欲しい表・データ・グラフを伝えると、AI がその場で作成します。',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Genspark にサインイン',
-  aiGskLoginOk: 'Genspark にサインインしました',
+  aiGskLoginBtn: 'UniWork にサインイン',
+  aiGskLoginOk: 'UniWork にサインインしました',
 >>>>>>> theirs
   aiUndelivered: '送信できませんでした',
   aiRetry: '再試行',

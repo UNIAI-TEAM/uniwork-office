@@ -1,6 +1,6 @@
 # Kết nối tác nhân lập trình
 
-GenOffice nói chuyện theo Model Context Protocol, nên một tác nhân lập trình có thể đọc, ghi và kết xuất tài liệu của bạn qua đúng những engine mà ứng dụng dùng. Tác nhân không phải đoán mò một định dạng tệp: nó nhận lược đồ thao tác có kiểu từ đúng những định nghĩa mà bộ thực thi dùng để kiểm tra.
+UniWork Office nói chuyện theo Model Context Protocol, nên một tác nhân lập trình có thể đọc, ghi và kết xuất tài liệu của bạn qua đúng những engine mà ứng dụng dùng. Tác nhân không phải đoán mò một định dạng tệp: nó nhận lược đồ thao tác có kiểu từ đúng những định nghĩa mà bộ thực thi dùng để kiểm tra.
 
 ## Đăng ký từ trong ứng dụng
 
@@ -14,7 +14,7 @@ Việc này làm ở **Cài đặt ▸ Tích hợp**. Bảng đó có hai nửa,
 
 - “Chuyển đổi ~/Downloads/report.md thành tài liệu Word”
 - “Tạo bài thuyết trình 6 trang trình bày về kết quả quý 3 của chúng tôi”
-- “Chuyển đổi budget.xlsx sang PDF và mở trong GenOffice”
+- “Chuyển đổi budget.xlsx sang PDF và mở trong UniWork Office”
 
 ## Đăng ký từ dòng lệnh
 
@@ -76,7 +76,7 @@ Một tác nhân không biết từ vựng thao tác sẽ đoán mò. Kỹ năng
 
 ## Nó chạm được gì trong ứng dụng
 
-Máy chủ không chỉ dừng ở các tệp trên đĩa. Chừng nào GenOffice còn chạy, tác nhân cũng có thể làm việc qua cửa sổ:
+Máy chủ không chỉ dừng ở các tệp trên đĩa. Chừng nào UniWork Office còn chạy, tác nhân cũng có thể làm việc qua cửa sổ:
 
 - **`open_in_genoffice`** mở một tệp trong một thẻ và đưa thẻ đó lên tiền cảnh.
 - **`open_documents`** liệt kê mọi tài liệu bạn đang mở — id, loại, đường dẫn và có thay đổi chưa lưu hay không —, rồi đọc nội dung hiện tại của một tài liệu, lưu tại chỗ hoặc đóng nó lại, lưu trước trừ khi bạn bảo nó bỏ thay đổi.

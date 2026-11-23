@@ -6,8 +6,8 @@ export const zhTW = {
   aiEmptyBuildBody: '描述想要的表格、資料或圖表，AI 直接生成。',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: '登入 Genspark',
-  aiGskLoginOk: '已登入 Genspark',
+  aiGskLoginBtn: '登入 UniWork',
+  aiGskLoginOk: '已登入 UniWork',
 >>>>>>> theirs
   aiUndelivered: '未傳送成功',
   aiRetry: '重試',

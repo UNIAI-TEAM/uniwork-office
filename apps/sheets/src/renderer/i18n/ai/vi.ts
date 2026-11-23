@@ -6,8 +6,8 @@ export const vi = {
   aiEmptyBuildBody: 'Mô tả bảng, dữ liệu hoặc biểu đồ bạn cần — AI sẽ tạo trực tiếp tại chỗ.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Đăng nhập vào Genspark',
-  aiGskLoginOk: 'Đã đăng nhập Genspark',
+  aiGskLoginBtn: 'Đăng nhập vào UniWork',
+  aiGskLoginOk: 'Đã đăng nhập UniWork',
 >>>>>>> theirs
   aiUndelivered: 'Chưa gửi',
   aiRetry: 'Thử lại',

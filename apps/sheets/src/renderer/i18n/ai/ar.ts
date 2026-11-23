@@ -6,8 +6,8 @@ export const ar = {
   aiEmptyBuildBody: 'صف الجدول أو البيانات أو المخطط الذي تريده — ينشئه الذكاء الاصطناعي مباشرة.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'تسجيل الدخول إلى Genspark',
-  aiGskLoginOk: 'تم تسجيل الدخول إلى Genspark',
+  aiGskLoginBtn: 'تسجيل الدخول إلى UniWork',
+  aiGskLoginOk: 'تم تسجيل الدخول إلى UniWork',
 >>>>>>> theirs
   aiUndelivered: 'لم يتم الإرسال',
   aiRetry: 'إعادة المحاولة',

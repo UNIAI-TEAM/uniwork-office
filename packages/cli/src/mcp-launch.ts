@@ -100,7 +100,7 @@ export function mcpLaunchFromLauncher(
 <<<<<<< ours
   if (exists(`${dir}${sep}..${sep}..${sep}UniWork Office.exe`)) return windowsAppLaunch(dir)
 =======
-  if (exists(`${dir}${sep}..${sep}..${sep}GenOffice.exe`))
+  if (exists(`${dir}${sep}..${sep}..${sep}UniWork Office.exe`))
     return compact(windowsAppLaunch(dir), opts)
 >>>>>>> theirs
   const bundle = exists(`${dir}${sep}genoffice.cjs`)

@@ -20,9 +20,9 @@ export const vi = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Đăng nhập Genspark',
-  aiGskLoginOk: 'Đã đăng nhập Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'Đăng nhập UniWork',
+  aiGskLoginOk: 'Đã đăng nhập UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'Mở trợ lý AI',
   aiFactCheckBtn: 'Kiểm chứng thông tin AI',

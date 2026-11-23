@@ -6,8 +6,8 @@ export const ru = {
   aiEmptyBuildBody: 'Опишите нужную таблицу, данные или диаграмму — ИИ создаст их на месте.',
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Войти в Genspark',
-  aiGskLoginOk: 'Выполнен вход в Genspark',
+  aiGskLoginBtn: 'Войти в UniWork',
+  aiGskLoginOk: 'Выполнен вход в UniWork',
 >>>>>>> theirs
   aiUndelivered: 'Не отправлено',
   aiRetry: 'Повторить',

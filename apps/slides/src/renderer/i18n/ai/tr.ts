@@ -17,9 +17,9 @@ export const tr = {
   aiQcPageSkipped: 'Sayfa {n}: otomatik düzen denetimi atlandı',
   aiQcStopped: 'Düzen denetimi durduruldu',
   aiQcCapped: '{count} sayfa daha denetlenmedi (çalıştırma başına sınır)',
-  aiGskLoginBtn: 'Genspark’a giriş yap',
-  aiGskLoginOk: 'Genspark’a giriş yapıldı',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'UniWork’a giriş yap',
+  aiGskLoginOk: 'UniWork’a giriş yapıldı',
+  aiPanelTitle: 'UniAI',
   aiOpenAssistant: 'AI asistanı aç',
   aiFactCheckBtn: 'AI Doğruluk Denetimi',
   aiFactCheckPrompt:
@@ -116,7 +116,7 @@ export const tr = {
   aiErrOverloaded: 'AI hizmeti şu anda yoğun — lütfen birazdan yeniden deneyin',
   aiErrNetwork: 'Ağ sorunu: AI hizmetine ulaşılamadı. Bağlantınızı denetleyip yeniden deneyin',
   aiCreditsExhausted:
-    'Genspark krediniz tükendi. Yüklemek için genspark.ai/pricing adresini ziyaret edin, sonra yeniden deneyin',
+    'UniWork krediniz tükendi. Yüklemek için uniworkos.com/pricing adresini ziyaret edin, sonra yeniden deneyin',
   aiErrRequestFailed: 'İstek gönderilemedi: {msg}',
   aiErrGenerateFailed: 'Oluşturma başarısız',
   aiErrRegenFailed: 'Slayt yeniden oluşturulamadı',

@@ -1,6 +1,6 @@
 # 连接编程代理
 
-GenOffice 说 Model Context Protocol，所以编程代理可以通过应用所用的同一套引擎来读写并渲染你的文档。代理不是靠猜文件格式：它拿到的类型化 op schema，与执行器校验所依据的是同一份定义。
+UniWork Office 说 Model Context Protocol，所以编程代理可以通过应用所用的同一套引擎来读写并渲染你的文档。代理不是靠猜文件格式：它拿到的类型化 op schema，与执行器校验所依据的是同一份定义。
 
 ## 在应用里注册
 
@@ -14,7 +14,7 @@ GenOffice 说 Model Context Protocol，所以编程代理可以通过应用所�
 
 - “把 ~/Downloads/report.md 转成 Word 文档”
 - “做一份 6 页的幻灯片，介绍我们第三季度的业绩”
-- “把 budget.xlsx 转成 PDF，并在 GenOffice 里打开”
+- “把 budget.xlsx 转成 PDF，并在 UniWork Office 里打开”
 
 ## 从命令行注册
 
@@ -76,7 +76,7 @@ GENOFFICE_MCP_COMPACT_SCHEMAS=1 genoffice mcp
 
 ## 它在应用里能触达什么
 
-服务器不只限于磁盘上的文件。GenOffice 运行期间，代理还可以通过窗口来干活：
+服务器不只限于磁盘上的文件。UniWork Office 运行期间，代理还可以通过窗口来干活：
 
 - **`open_in_genoffice`** 在一个标签页里打开文件，并把它切到前台。
 - **`open_documents`** 列出你已经打开的每个文档——id、类型、路径，以及有没有未保存的改动——然后读取某个文档的当前内容、就地保存，或把它关掉，默认先保存，除非你让它丢弃。

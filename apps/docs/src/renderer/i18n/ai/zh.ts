@@ -10,9 +10,9 @@ export const zh = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: '登录 Genspark',
-  aiGskLoginOk: '已登录 Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: '登录 UniWork',
+  aiGskLoginOk: '已登录 UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: '打开 AI 助手',
   aiSummarizeBtn: 'AI 总结',

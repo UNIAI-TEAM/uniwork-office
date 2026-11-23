@@ -68,14 +68,14 @@ link="/usr/bin/genoffice"
 # same ownership rule as the post-install: only a link into our install dir is ours
 if [ -L "$link" ]; then
   case "$(readlink "$link")" in
-    /opt/GenOffice/*) rm -f "$link" ;;
+    /opt/UniWork Office/*) rm -f "$link" ;;
   esac
 >>>>>>> theirs
 fi
 # Drop the KDE "Create New" templates the post-install step installed. Only
 # our exact file names are removed, so the directory and every other app's
 # templates stay (genoffice#2384).
-for name in "GenOffice Document.docx" "GenOffice Spreadsheet.xlsx" "GenOffice Presentation.pptx"; do
+for name in "UniWork Office Document.docx" "UniWork Office Spreadsheet.xlsx" "UniWork Office Presentation.pptx"; do
   rm -f "/usr/share/templates/$name"
 done
 exit 0

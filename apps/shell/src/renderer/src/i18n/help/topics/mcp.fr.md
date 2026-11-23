@@ -1,6 +1,6 @@
 # Connecter un agent de codage
 
-GenOffice parle le Model Context Protocol : un agent de programmation peut donc lire, écrire et rendre vos documents avec les mêmes moteurs que l’application. L’agent ne devine pas un format de fichier : il reçoit les schémas typés des ops à partir des définitions mêmes contre lesquelles l’executor valide.
+UniWork Office parle le Model Context Protocol : un agent de programmation peut donc lire, écrire et rendre vos documents avec les mêmes moteurs que l’application. L’agent ne devine pas un format de fichier : il reçoit les schémas typés des ops à partir des définitions mêmes contre lesquelles l’executor valide.
 
 ## L’enregistrer depuis l’application
 
@@ -14,7 +14,7 @@ C’est dans **Paramètres ▸ Intégrations** qu’on fait cela. Le panneau a d
 
 - “Transforme ~/Downloads/report.md en document Word”
 - “Prépare une présentation de 6 diapositives sur nos résultats du T3”
-- “Convertis budget.xlsx en PDF et ouvre-le dans GenOffice”
+- “Convertis budget.xlsx en PDF et ouvre-le dans UniWork Office”
 
 ## L’enregistrer depuis la ligne de commande
 
@@ -76,7 +76,7 @@ Un agent qui ne connaît pas le vocabulaire des ops devine. La compétence embar
 
 ## Ce qu’il atteint dans l’application
 
-Le serveur ne se limite pas aux fichiers sur le disque. Tant que GenOffice tourne, l’agent peut aussi travailler par la fenêtre :
+Le serveur ne se limite pas aux fichiers sur le disque. Tant que UniWork Office tourne, l’agent peut aussi travailler par la fenêtre :
 
 - **`open_in_genoffice`** ouvre un fichier dans un onglet et le met au premier plan.
 - **`open_documents`** liste tous les documents que vous avez ouverts — id, type, chemin, et s’ils ont des modifications non enregistrées —, puis lit le contenu actuel de l’un d’eux, l’enregistre sur place ou le ferme, en enregistrant d’abord, sauf si vous lui demandez de jeter.

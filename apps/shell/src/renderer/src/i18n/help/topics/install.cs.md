@@ -1,4 +1,4 @@
-# Instalace GenOffice
+# Instalace UniWork Office
 
 Každá sestavení je zveřejněno na [stránce Releases](https://github.com/genspark-ai/genoffice/releases/latest). Všechna pocházejí z `main`; instalátory pro macOS a Windows jsou podepsané.
 
@@ -18,11 +18,11 @@ Starší verze zůstávají na stránce Releases.
 
 ## V systému macOS
 
-Otevřete soubor `.dmg` a přetáhněte **GenOffice** do složky Aplikace. U sestavení Intel vás při prvním spuštění požádá o potvrzení otevření: klikněte na aplikaci v Aplikacích pravým tlačítkem ▸ Otevřít. To je Gatekeeper, který narazí na obraz disku, který vypadá jako nepodepsaný, a ne poškozené stažení.
+Otevřete soubor `.dmg` a přetáhněte **UniWork Office** do složky Aplikace. U sestavení Intel vás při prvním spuštění požádá o potvrzení otevření: klikněte na aplikaci v Aplikacích pravým tlačítkem ▸ Otevřít. To je Gatekeeper, který narazí na obraz disku, který vypadá jako nepodepsaný, a ne poškozené stažení.
 
 ## V systému Windows
 
-Spusťte instalátor `.exe`. Umístí GenOffice do nabídky Start a zaregistruje `.docx`, `.xlsx`, `.pptx`, `.pdf` a podobné, takže dvojklik na soubor jej otevře.
+Spusťte instalátor `.exe`. Umístí UniWork Office do nabídky Start a zaregistruje `.docx`, `.xlsx`, `.pptx`, `.pdf` a podobné, takže dvojklik na soubor jej otevře.
 
 ## V systému Linux
 

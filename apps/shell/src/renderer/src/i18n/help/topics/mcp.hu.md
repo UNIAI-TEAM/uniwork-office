@@ -1,6 +1,6 @@
 # Kódoló ügynök csatlakoztatása
 
-A GenOffice támogatja a Model Context Protocolt, így egy kódoló ügynök a dokumentumaidat ugyanazokkal a motorokkal olvashatja, írhatja és renderelheti, mint maga az alkalmazás. Az ügynök nem találgatja a fájlformátumot: a típusos op-sémákat ugyanazokból a definíciókból kapja, amelyek alapján a végrehajtó is ellenőriz.
+A UniWork Office támogatja a Model Context Protocolt, így egy kódoló ügynök a dokumentumaidat ugyanazokkal a motorokkal olvashatja, írhatja és renderelheti, mint maga az alkalmazás. Az ügynök nem találgatja a fájlformátumot: a típusos op-sémákat ugyanazokból a definíciókból kapja, amelyek alapján a végrehajtó is ellenőriz.
 
 ## Regisztrálás az alkalmazásból
 
@@ -76,7 +76,7 @@ Az az ügynök, amely nem ismeri az op-szókincset, találgatni fog. A képessé
 
 ## Mihez fér hozzá az alkalmazásban
 
-A kiszolgáló nem korlátozódik a lemezen lévő fájlokra. Amíg a GenOffice fut, az ügynök az ablakon keresztül is dolgozhat:
+A kiszolgáló nem korlátozódik a lemezen lévő fájlokra. Amíg a UniWork Office fut, az ügynök az ablakon keresztül is dolgozhat:
 
 - **`open_in_genoffice`** megnyit egy fájlt egy új lapon, és előtérbe hozza.
 - **`open_documents`** kilistázza az összes megnyitott dokumentumot — azonosító, típus, útvonal, valamint hogy van-e mentetlen módosítása —, majd beolvassa az egyik élő tartalmát, a helyén elmenti, vagy bezárja; bezárás előtt ment, hacsak nem kéred az elvetést.

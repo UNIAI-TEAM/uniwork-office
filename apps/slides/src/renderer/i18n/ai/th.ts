@@ -25,9 +25,9 @@ export const th = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'ลงชื่อเข้าใช้ Genspark',
-  aiGskLoginOk: 'ลงชื่อเข้าใช้ Genspark แล้ว',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'ลงชื่อเข้าใช้ UniWork',
+  aiGskLoginOk: 'ลงชื่อเข้าใช้ UniWork แล้ว',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'เปิดผู้ช่วย AI',
   aiFactCheckBtn: 'ตรวจสอบข้อเท็จจริง AI',

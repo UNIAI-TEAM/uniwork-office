@@ -1,6 +1,6 @@
 # Einen Coding-Agenten anbinden
 
-GenOffice spricht das Model Context Protocol: Ein Coding-Agent kann Ihre Dokumente also über dieselben Engines lesen, schreiben und rendern wie die App. Der Agent rät nicht an einem Dateiformat — er erhält die typisierten op-Schemas aus genau den Definitionen, gegen die der Executor prüft.
+UniWork Office spricht das Model Context Protocol: Ein Coding-Agent kann Ihre Dokumente also über dieselben Engines lesen, schreiben und rendern wie die App. Der Agent rät nicht an einem Dateiformat — er erhält die typisierten op-Schemas aus genau den Definitionen, gegen die der Executor prüft.
 
 ## In der App einrichten
 
@@ -14,7 +14,7 @@ GenOffice spricht das Model Context Protocol: Ein Coding-Agent kann Ihre Dokumen
 
 - “Mach aus ~/Downloads/report.md ein Word-Dokument”
 - “Erstelle eine Präsentation mit 6 Folien zu unseren Q3-Ergebnissen”
-- “Wandle budget.xlsx in PDF um und öffne es in GenOffice”
+- “Wandle budget.xlsx in PDF um und öffne es in UniWork Office”
 
 ## Über die Kommandozeile einrichten
 
@@ -76,7 +76,7 @@ Ein Agent, der das op-Vokabular nicht kennt, wird raten. Der Skill bringt die Re
 
 ## Was er in der App erreichen kann
 
-Der Server ist nicht auf Dateien auf der Festplatte beschränkt. Solange GenOffice läuft, kann der Agent auch durch das Fenster arbeiten:
+Der Server ist nicht auf Dateien auf der Festplatte beschränkt. Solange UniWork Office läuft, kann der Agent auch durch das Fenster arbeiten:
 
 - **`open_in_genoffice`** öffnet eine Datei in einem Tab und holt ihn in den Vordergrund.
 - **`open_documents`** listet jedes Dokument auf, das Sie geöffnet haben — id, Typ, Pfad und ob es ungespeicherte Änderungen gibt —, und liest dann den aktuellen Inhalt eines Dokuments, speichert es an Ort und Stelle, oder schließt es, wobei vorher gesichert wird, sofern Sie es nicht dem Verwerfen überlassen.

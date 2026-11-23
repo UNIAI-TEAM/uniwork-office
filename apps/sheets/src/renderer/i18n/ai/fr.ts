@@ -7,8 +7,8 @@ export const fr = {
     "Décrivez le tableau, les données ou le graphique voulu — l'IA les crée directement.",
 <<<<<<< ours
 =======
-  aiGskLoginBtn: 'Se connecter à Genspark',
-  aiGskLoginOk: 'Connecté à Genspark',
+  aiGskLoginBtn: 'Se connecter à UniWork',
+  aiGskLoginOk: 'Connecté à UniWork',
 >>>>>>> theirs
   aiUndelivered: 'Non envoyé',
   aiRetry: 'Réessayer',

@@ -1,4 +1,4 @@
-# Installer GenOffice
+# Installer UniWork Office
 
 Chaque build est publié sur la [page Releases](https://github.com/genspark-ai/genoffice/releases/latest). Tous proviennent de `main` ; les installeurs macOS et Windows sont signés.
 
@@ -18,11 +18,11 @@ Les versions antérieures restent sur la page Releases.
 
 ## Sous macOS
 
-Ouvrez le `.dmg` et faites glisser **GenOffice** dans Applications. Sur une version Intel, le premier lancement demande de confirmer l’ouverture : clic droit sur l’application dans Applications ▸ Ouvrir. C’est Gatekeeper qui rencontre une image disque sans signature, pas un téléchargement endommagé.
+Ouvrez le `.dmg` et faites glisser **UniWork Office** dans Applications. Sur une version Intel, le premier lancement demande de confirmer l’ouverture : clic droit sur l’application dans Applications ▸ Ouvrir. C’est Gatekeeper qui rencontre une image disque sans signature, pas un téléchargement endommagé.
 
 ## Sous Windows
 
-Lancez l’installeur `.exe`. Il place GenOffice dans le menu Démarrer et enregistre `.docx`, `.xlsx`, `.pptx`, `.pdf` et formats voisins, si bien qu’un double-clic sur un fichier l’ouvre.
+Lancez l’installeur `.exe`. Il place UniWork Office dans le menu Démarrer et enregistre `.docx`, `.xlsx`, `.pptx`, `.pdf` et formats voisins, si bien qu’un double-clic sur un fichier l’ouvre.
 
 ## Sous Linux
 

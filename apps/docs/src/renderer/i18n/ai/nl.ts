@@ -11,9 +11,9 @@ export const nl = {
 <<<<<<< ours
   aiPanelTitle: 'UniAI',
 =======
-  aiGskLoginBtn: 'Aanmelden bij Genspark',
-  aiGskLoginOk: 'Aangemeld bij Genspark',
-  aiPanelTitle: 'Genspark',
+  aiGskLoginBtn: 'Aanmelden bij UniWork',
+  aiGskLoginOk: 'Aangemeld bij UniWork',
+  aiPanelTitle: 'UniAI',
 >>>>>>> theirs
   aiOpenAssistant: 'AI-assistent openen',
   aiSummarizeBtn: 'AI-samenvatting',
