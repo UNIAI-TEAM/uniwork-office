@@ -4,7 +4,11 @@
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
+<<<<<<< ours
   "description": "UniWork cloud tools (web/image search, image generation, media analysis) for the editors' AI. No Electron deps; runs in the main process.",
+=======
+  "description": "Shared web/image search (Genspark, Serper, Serply, SearchApi, Tavily, Parallel, DuckDuckGo fallback) for docs/sheets/slides AI. No Electron deps; runs in main process (Node fetch).",
+>>>>>>> theirs
   "exports": {
     ".": "./src/index.ts"
   },
@@ -20,6 +24,10 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "typescript": "^5.9.3",
+<<<<<<< ours
     "vitest": "4.1.12"
+=======
+    "vitest": "^4.1.12"
+>>>>>>> theirs
   }
 }

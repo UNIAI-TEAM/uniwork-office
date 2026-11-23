@@ -100,7 +100,43 @@ describe('isQcEnabled', () => {
   })
 })
 
+<<<<<<< ours
 describe('geometry-only QC (UniWork AI takes no screenshot in a QC turn)', () => {
+=======
+describe('vision capability fallback', () => {
+  it('sends MiniMax-M3 screenshots while keeping MiniMax-M2.7 text-only', () => {
+    const settings = { ...defaultAiSettings(), provider: 'minimax' as const }
+    settings.providers.minimax.model = 'MiniMax-M3'
+    expect(settingsSupportVision(settings)).toBe(true)
+    settings.providers.minimax.model = 'MiniMax-M2.7'
+    expect(settingsSupportVision(settings)).toBe(false)
+  })
+
+  it('uses the selected model when a provider mixes text and vision models', () => {
+    const withProvider = (provider: AiProviderId) => ({ ...defaultAiSettings(), provider })
+    const deepseek = withProvider('deepseek')
+    expect(settingsSupportVision(deepseek)).toBe(false)
+    deepseek.providers.deepseek.model = 'deepseek-flash'
+    expect(settingsSupportVision(deepseek)).toBe(true)
+    expect(settingsSupportVision(withProvider('glm'))).toBe(false)
+    expect(settingsSupportVision(withProvider('gemini'))).toBe(true)
+  })
+
+  it('does not send screenshots to text-only models under a vision-capable provider', () => {
+    const settings = defaultAiSettings()
+    settings.providers.genspark.model = 'deep-seek-v4-flash'
+    expect(settingsSupportVision(settings)).toBe(false)
+    settings.providers.genspark.model = 'claude-opus-4-7'
+    expect(settingsSupportVision(settings)).toBe(true)
+  })
+
+  it('recognizes image-capability errors from optimistic custom endpoints', () => {
+    expect(isUnsupportedImageInputError('This model does not support image')).toBe(true)
+    expect(isUnsupportedImageInputError('Vision input is not supported by this model')).toBe(true)
+    expect(isUnsupportedImageInputError('HTTP 500: temporary provider failure')).toBe(false)
+  })
+
+>>>>>>> theirs
   it('skips the model entirely when a geometry-only page passes the deterministic audit', async () => {
     let streamed = false
     const transport: AgentTransport = {

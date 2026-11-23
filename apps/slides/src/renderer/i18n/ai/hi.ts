@@ -22,7 +22,13 @@ export const hi = {
   aiQcPageSkipped: 'पेज {n}: स्वचालित लेआउट जाँच छोड़ दी गई',
   aiQcStopped: 'लेआउट जाँच रोक दी गई',
   aiQcCapped: 'शेष {count} पेज नहीं जाँचे गए (प्रति रन सीमा)',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: 'Genspark में साइन इन करें',
+  aiGskLoginOk: 'Genspark में साइन इन हो गए',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: 'AI सहायक खोलें',
   aiFactCheckBtn: 'AI तथ्य जाँच',
   aiFactCheckPrompt:
@@ -114,6 +120,8 @@ export const hi = {
   aiErrUnknown: 'अज्ञात त्रुटि',
   aiErrStreamTimeout:
     'AI अनुरोध का समय समाप्त: नेटवर्क से कोई प्रतिक्रिया नहीं मिली, इसलिए रोक दिया गया। कनेक्शन जांचें और फिर से प्रयास करें',
+  aiErrRegion:
+    'इस मॉडल का प्रदाता आपके वर्तमान क्षेत्र में सेवा नहीं देता — कोई दूसरा मॉडल चुनें या नेटवर्क बदलें',
   aiErrOverloaded: 'AI सेवा अभी व्यस्त है — कृपया थोड़ी देर बाद फिर से प्रयास करें',
   aiErrNetwork:
     'नेटवर्क समस्या: AI सेवा से कनेक्ट नहीं हो सका। कनेक्शन जांचें और फिर से प्रयास करें',
@@ -225,7 +233,10 @@ export const hi = {
   aiSumSaveTemplate: 'स्टाइल टेम्पलेट "{name}" सहेजा गया',
   aiSumTemplatesEmpty: 'स्टाइल टेम्पलेट (खाली)',
   aiSumListTemplates: '{count} स्टाइल टेम्पलेट सूचीबद्ध किए गए',
+<<<<<<< ours
   aiPageCloudToLocal: 'क्लाउड अनुपलब्ध — स्थानीय रूप से जनरेट',
   aiViewOnlyNotice:
     'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

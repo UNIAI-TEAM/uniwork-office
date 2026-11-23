@@ -1,3 +1,4 @@
+<<<<<<< ours
 import { describe, expect, it, vi } from 'vitest'
 import {
   IBAN_LENGTHS,
@@ -8,6 +9,11 @@ import {
 } from '../src/renderer/redact-patterns'
 import type { RedactPattern } from '../src/renderer/redact-patterns'
 import { redactFindStringsFor } from '../src/renderer/i18n/redact-find-strings'
+=======
+import { describe, expect, it } from 'vitest'
+import { IBAN_LENGTHS, findPattern } from '../src/renderer/redact-patterns'
+import type { RedactPattern } from '../src/renderer/redact-patterns'
+>>>>>>> theirs
 import { findPatternsInIndex, patternMarks } from '../src/renderer/search'
 import type { SearchIndex } from '../src/renderer/search'
 
@@ -394,6 +400,7 @@ describe('findPatternsInIndex skipPage', () => {
     expect(kept[0]!.text).toBe('x@y.co')
   })
 })
+<<<<<<< ours
 
 describe('redact patterns — CCCD', () => {
   it('matches unseparated and 3-3-3-3 / 4-4-4 grouped synthetic CCCDs with valid province and century/gender', () => {
@@ -613,3 +620,5 @@ describe('redact patterns — CCCD and MST precedence over phone', () => {
     expect(en.redactPatternMst).toContain('MST')
   })
 })
+=======
+>>>>>>> theirs

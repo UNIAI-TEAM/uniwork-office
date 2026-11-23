@@ -3,6 +3,11 @@ export const zh = {
   aiComposerPlaceholderBuild: '描述要生成的表格、数据或图表…',
   aiEmptyBuildTitle: '让 AI 帮你从零建表',
   aiEmptyBuildBody: '描述想要的表格、数据或图表，AI 直接生成。',
+<<<<<<< ours
+=======
+  aiGskLoginBtn: '登录 Genspark',
+  aiGskLoginOk: '已登录 Genspark',
+>>>>>>> theirs
   aiUndelivered: '未发送成功',
   aiRetry: '重试',
   aiOpenAssistant: '打开 AI 助手',
@@ -54,6 +59,7 @@ export const zh = {
   aiSave: '保存',
   aiUnknownError: '未知错误',
   aiTimeoutError: 'AI 请求超时：网络长时间无响应，已停止。请检查网络后重试',
+  aiRegionError: '该模型的厂商不向当前地区提供服务，请换一个模型或切换网络',
   aiOverloadedError: 'AI 服务当前繁忙，请稍后重试',
   aiNetworkError: '网络有问题，无法连接 AI 服务。请检查网络后重试',
   aiToolWorkbookContext: '读取工作表信息',

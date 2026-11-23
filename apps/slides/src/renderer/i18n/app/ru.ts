@@ -30,6 +30,16 @@ export const ru = {
   appExportPdfProgress: 'Экспорт PDF…',
   appExportPdfDone: 'PDF экспортирован: {path}',
   appExportPdfFailed: 'Не удалось экспортировать PDF: {error}',
+  appExportVideoTitle: 'Экспорт в видео',
+  appExportVideoResolution: 'Разрешение',
+  appExportVideoSeconds: 'Секунд на каждый слайд',
+  appExportVideoUseTimings: 'Использовать записанные интервалы и дикторский текст, если есть',
+  appExportVideoCreate: 'Создать видео',
+  appExportVideoCancel: 'Отмена',
+  appExportVideoProgress: 'Кодирование видео… {percent}%',
+  appExportVideoDone: 'Видео экспортировано: {path}',
+  appExportVideoFailed: 'Не удалось экспортировать видео: {error}',
+  appExportVideoUnsupported: 'В системе нет видеокодировщика H.264, экспорт в MP4 невозможен',
   appStatusBgAppliedAll: 'Цвет фона применен ко всем слайдам',
   appStatusThemeApplied: 'Применена тема «{name}»',
   appStatusThemeApplyFailed: 'Не удалось применить тему: {error}',
@@ -66,6 +76,10 @@ export const ru = {
   appStatusAudioInserted: 'Звук вставлен (внедрен в .pptx)',
   appStatusModel3dInserted:
     '3D-модель вставлена: выделите ее, чтобы повернуть (PowerPoint тоже показывает ее в 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'Не удалось отрисовать 3D-модель здесь; ее изображение не изменилось',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'Запись пуста; ничего не вставлено',
   appStatusRecordingInserted: 'Запись экрана вставлена на текущий слайд (внедрен webm)',
   appStatusRecording:
@@ -199,6 +213,7 @@ export const ru = {
   appCtxSendToBack: 'На задний план',
   appCtxBringForward: 'Переместить вперед',
   appCtxSendBackward: 'Переместить назад',
+  appCtxRotate: 'Повернуть',
   appCtxRotateLeft90: 'Повернуть на 90° влево',
   appCtxRotateRight90: 'Повернуть на 90° вправо',
   appCtxFlipH: 'Отразить по горизонтали',
@@ -269,6 +284,27 @@ export const ru = {
     'Общая продолжительность показа: {duration}. Сохранить время показа слайдов для автоматической смены?',
   appRehearseDiscard: 'Не сохранять',
   appRehearseSave: 'Сохранить',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Записать речевое сопровождение',
+  appRecordSummary:
+    'Длительность записи: {duration}. Сохранить речевое сопровождение и время каждого слайда?',
+  appRecordDiscard: 'Не сохранять',
+  appRecordSave: 'Сохранить',
+  appStatusRecordSaved:
+    'Речевое сопровождение сохранено, слайдов: {count} (PowerPoint его тоже воспроизводит)',
+  appStatusRecordFailed: 'Не удалось сохранить запись',
+  appStatusNarrationCleared: 'Речевое сопровождение очищено',
+  appSettingsTitle: 'Настройки ИИ',
+  appSettingsAccount: 'Учетная запись Genspark',
+  appSettingsChecking: 'Проверка…',
+  appSettingsLoggedIn: 'Выполнен вход',
+  appSettingsLoggedInEmail: 'Выполнен вход: {email}',
+  appSettingsLoggedOut: 'Вход не выполнен (для функций ИИ требуется учетная запись Genspark)',
+  appSettingsLoginPending: 'Ожидание входа в браузере…',
+  appSettingsLogin: 'Войти в Genspark',
+  appSettingsModel: 'Модель',
+>>>>>>> theirs
   appSettingsCancel: 'Отмена',
   appCropHint: 'Enter — подтвердить · Esc — отменить · Щелчок снаружи — подтвердить',
   appStatusZoomsInserted:

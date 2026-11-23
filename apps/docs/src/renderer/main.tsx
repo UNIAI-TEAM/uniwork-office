@@ -2,6 +2,10 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { htmlDir, htmlLang, type Lang } from '@genoffice/i18n'
 import { App } from './App'
+<<<<<<< ours
+=======
+import { installKeyLayer } from './key-layer'
+>>>>>>> theirs
 import { setAuthorName } from './author-name'
 import { LocaleProvider, setModuleLang } from './i18n/locale'
 import type { DocTheme, UiTheme } from '../shared/ipc'
@@ -10,6 +14,10 @@ import '@genoffice/ui/screentip.css'
 import '@genoffice/ui/ai-model-picker.css'
 import '@genoffice/ui/ai-queue-strip.css'
 import '@genoffice/ui/ai-usage.css'
+<<<<<<< ours
+=======
+import '@genoffice/ui/ai-skills.css'
+>>>>>>> theirs
 import '@genoffice/ui/color-picker.css'
 import '@genoffice/ui/dropdown.css'
 import '@genoffice/ui/ribbon-collapse.css'
@@ -27,8 +35,12 @@ import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
 import { setAltChunkHtmlConverter } from '@genoffice/docx-engine'
 
 installScreenTips()
+<<<<<<< ours
 // this renderer's model chip and Send guard follow the shell's UniWork AI availability flag
 mirrorUniworkAiFlag()
+=======
+installKeyLayer()
+>>>>>>> theirs
 if (window.desktop?.convertAltChunkHtml) {
   setAltChunkHtmlConverter((html) => window.desktop.convertAltChunkHtml(html))
 }
@@ -75,9 +87,13 @@ async function bootstrap(): Promise<void> {
   window.desktop?.onAiPanelPrefsChanged?.(applyAiPanelPrefs)
   await window.desktop
     ?.getAuthorName?.()
+<<<<<<< ours
     .then((name) => {
       if (typeof name === 'string') setAuthorName(name)
     })
+=======
+    .then(setAuthorName)
+>>>>>>> theirs
     .catch(() => {})
   window.desktop?.onAuthorNameChanged?.(setAuthorName)
   const root = createRoot(document.getElementById('root')!)

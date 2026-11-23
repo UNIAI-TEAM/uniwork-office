@@ -170,6 +170,7 @@ describe('the redaction part survives a real save', () => {
     ])
   })
 
+<<<<<<< ours
   it('shifts and re-keys marks when the same save renames a sheet and inserts rows or columns', async () => {
     const plan: SheetEditPlan = {
       renames: [{ sheetName: 'Sheet1', newName: 'Q3' }],
@@ -231,6 +232,8 @@ describe('the redaction part survives a real save', () => {
     ).toEqual(expected)
   })
 
+=======
+>>>>>>> theirs
   it('keeps the part when the save does not know the marks', async () => {
     // The CLI and the second phase of a split save never load the marks; an
     // empty list there cleared the part, un-hiding everything on any edit.

@@ -5,7 +5,10 @@
  */
 import type { Group, PerspectiveCamera, Scene, WebGLRenderer } from 'three'
 import {
+<<<<<<< ours
   isGlbContainer,
+=======
+>>>>>>> theirs
   MODEL3D_EMU_PER_METER,
   MODEL3D_FOV,
   MODEL3D_LIGHTS,
@@ -42,7 +45,10 @@ export async function loadModel(
   bytes: Uint8Array,
   canvas = document.createElement('canvas'),
 ): Promise<ModelView> {
+<<<<<<< ours
   if (!isGlbContainer(bytes)) throw new Error('Invalid GLB container')
+=======
+>>>>>>> theirs
   const THREE = await import('three')
   const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js')
   const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)

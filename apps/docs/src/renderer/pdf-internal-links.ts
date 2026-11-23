@@ -77,7 +77,13 @@ export function collectPdfInternalLinks(
 
   const sources: Array<{ el: HTMLElement; win: FlowWindow; anchor: string; title: string }> = []
   for (const win of windows) {
+<<<<<<< ours
     const els = win.el.querySelectorAll<HTMLElement>('a[href^="#"], .doc-toc-line')
+=======
+    const els = win.el.querySelectorAll<HTMLElement>(
+      'a[href^="#"], .doc-toc-line:not([data-toc-nolink])',
+    )
+>>>>>>> theirs
     for (const el of els) {
       const href = el.getAttribute('href')
       const anchor = href ? href.slice(1) : (el.dataset.tocAnchor ?? '')

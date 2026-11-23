@@ -47,6 +47,12 @@ const SKIP_DIR = /^(node_modules|out|dist|release|tests|__tests__|target)$/
 const IMPLICIT = ['electron']
 
 /**
+ * Packages whose files are built into committed data rather than imported:
+ * the icon outlines of Docs' Insert > Icons (tools/docs-icon-library).
+ */
+const DATA_SOURCES = ['@fluentui/svg-icons']
+
+/**
  * Packages copied into the installer verbatim by electron-builder rather than
  * bundled — the gsk CLI and its runtime deps are spawned, never imported, so
  * they are invisible to the import scan.
@@ -68,8 +74,21 @@ function extraResourceSeeds() {
 const NOTE = {
   '@fluentui/react-icons':
     'Copyright (c) Microsoft Corporation. Licensed under the MIT License.\nhttps://github.com/microsoft/fluentui-system-icons',
+  '@fluentui/svg-icons':
+    'Copyright (c) 2020 Microsoft Corporation. Licensed under the MIT License.\nhttps://github.com/microsoft/fluentui-system-icons',
   '@genspark/cli':
     'Copyright (c) Genspark. Licensed under the MIT License.\nhttps://www.npmjs.com/package/@genspark/cli',
+}
+
+/**
+ * Notices a package's own files leave out: rhwp publishes only its MIT
+ * license, while its WebAssembly build carries Rust crates and a BSD-3-Clause
+ * port that its repository documents separately.
+ */
+const EXTRA_NOTICE = {
+  '@rhwp/core': 'tools/notices/rhwp-core.txt',
+  // the hyphenation pattern sets Docs loads keep their own licences
+  hyphen: 'tools/notices/hyphen-patterns.txt',
 }
 
 /** SPDX strings that need a word on which side of a dual license we take */
@@ -110,7 +129,7 @@ function bareName(spec) {
 const NPM_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/
 
 function importedNames() {
-  const names = new Set([...IMPLICIT, ...extraResourceSeeds()])
+  const names = new Set([...IMPLICIT, ...DATA_SOURCES, ...extraResourceSeeds()])
   for (const g of SRC_GLOBS) {
     for (const file of walk(join(ROOT, g))) {
       const text = readFileSync(file, 'utf8')
@@ -180,11 +199,16 @@ function closure(seed) {
   return { resolved: [...seen].filter(([, v]) => v !== null), missing }
 }
 
-function noticeText(dir) {
+function noticeText(name, dir) {
+  const parts = []
   for (const f of ['NOTICE', 'NOTICE.txt', 'NOTICE.md']) {
-    if (existsSync(join(dir, f))) return readFileSync(join(dir, f), 'utf8').trim()
+    if (existsSync(join(dir, f))) {
+      parts.push(readFileSync(join(dir, f), 'utf8').trim())
+      break
+    }
   }
-  return null
+  if (EXTRA_NOTICE[name]) parts.push(readFileSync(join(ROOT, EXTRA_NOTICE[name]), 'utf8').trim())
+  return parts.length > 0 ? parts.join('\n\n') : null
 }
 
 function spdxOf(name, pkg) {
@@ -260,7 +284,7 @@ for (const [name, { dir, pkg }] of resolved) {
     const repo = repoOf(pkg)
     out += `Licensed under ${spdxOf(name, pkg)}.${repo ? `\n${repo}` : ''}\n`
   }
-  const notice = noticeText(dir)
+  const notice = noticeText(name, dir)
   if (notice) out += `\nNOTICE:\n${notice}\n`
 }
 
@@ -360,9 +384,15 @@ const FONTS = [
     '© The Noto Project Authors, original Reserved Font Name "Noto". Modified advance widths;\nrenamed per OFL 1.1.',
   ],
   [
+<<<<<<< ours
     'Inter 4.x (UniWork Sans, Workbench UI)',
     'SIL OFL 1.1',
     '© 2016 The Inter Project Authors (https://github.com/rsms/inter).\nLatin, Latin Extended and Vietnamese woff2 subsets; unmodified otherwise.',
+=======
+    'GenOffice Bengali (Noto Sans Bengali derivative)',
+    'SIL OFL 1.1',
+    '© The Noto Project Authors, original Reserved Font Name "Noto". Modified advance widths;\nrenamed per OFL 1.1.',
+>>>>>>> theirs
   ],
   [
     'KaTeX webfonts',

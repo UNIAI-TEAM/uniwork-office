@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
+<<<<<<< ours
 import { buildOcrBakeInserts, groupLines, ocrBakeForSave } from '../src/renderer/ocr-bake'
+=======
+import { buildOcrBakeInserts, groupLines } from '../src/renderer/ocr-bake'
+>>>>>>> theirs
 import { pdfToView } from '../src/renderer/annotations'
 import type { OcrWord } from '../src/renderer/ocr-layer'
 
@@ -79,6 +83,7 @@ describe('buildOcrBakeInserts', () => {
     expect(inserts[0]!.rotate).toBe(90)
   })
 })
+<<<<<<< ours
 
 describe('ocrBakeForSave', () => {
   const inserts = ['line one', 'line two']
@@ -92,3 +97,5 @@ describe('ocrBakeForSave', () => {
     expect(ocrBakeForSave(inserts, { readOnly: false, drainedAfterBake: true })).toEqual([])
   })
 })
+=======
+>>>>>>> theirs

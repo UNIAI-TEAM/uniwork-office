@@ -43,6 +43,19 @@ describe('docStyleCss paragraph borders', () => {
       parsedWith('Box', { borderSides: { t: { spacePt: 1 }, l: { spacePt: 4 }, b: {}, r: {} } }),
     )
     expect(boxed).toContain('padding-top:1pt;padding-bottom:0 }')
+<<<<<<< ours
+=======
+  })
+
+  it("a style's shadowed border drops in the remapped colour on the dark page", () => {
+    const line = { szPt: 1.5, color: 'C00000', shadow: true as const }
+    const css = docStyleCss(
+      parsedWith('BOX', { borderSides: { t: line, b: line, l: line, r: line } }),
+    )
+    expect(css).toContain('box-shadow:4px var(--pbdr-drop-y, 4px) 0 var(--pbdr-drop-c, #C00000)')
+    expect(css).toMatch(/--pbdr-drop-c:#[0-9a-f]{6}/)
+    expect(css).not.toContain('--dk-drop')
+>>>>>>> theirs
   })
 
   it('emits nothing for a side reset to none', () => {

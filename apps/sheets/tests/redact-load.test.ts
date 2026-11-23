@@ -316,6 +316,10 @@ describe('what the renderer installs for each answer', () => {
   it('leaves a workbook that withholds nothing exactly as it was', () => {
     const session = redactionSessionFor({ status: 'absent' }, SHEETS, t)
     const result = readCells(context(session.index), ['B2'])
+<<<<<<< ours
     expect(result.B2).toMatchObject({ value: '13800138000' })
+=======
+    expect(result.B2).toEqual({ value: '13800138000' })
+>>>>>>> theirs
   })
 })

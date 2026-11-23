@@ -22,7 +22,13 @@ export const ru = {
   aiQcPageSkipped: 'Страница {n}: автоматическая проверка макета пропущена',
   aiQcStopped: 'Проверка макета остановлена',
   aiQcCapped: 'Ещё {count} стр. не проверено (лимит за один запуск)',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: 'Войти в Genspark',
+  aiGskLoginOk: 'Выполнен вход в Genspark',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: 'Открыть ИИ-помощника',
   aiFactCheckBtn: 'ИИ-фактчекинг',
   aiFactCheckPrompt:
@@ -115,6 +121,8 @@ export const ru = {
   aiErrUnknown: 'Неизвестная ошибка',
   aiErrStreamTimeout:
     'Тайм-аут запроса ИИ: сеть не отвечает, выполнение остановлено. Проверьте подключение и повторите попытку',
+  aiErrRegion:
+    'Поставщик этой модели не обслуживает ваш текущий регион — выберите другую модель или смените сеть',
   aiErrOverloaded: 'Сервис ИИ сейчас перегружен — повторите попытку чуть позже',
   aiErrNetwork:
     'Проблема с сетью: не удалось подключиться к сервису ИИ. Проверьте подключение и повторите попытку',
@@ -226,7 +234,10 @@ export const ru = {
   aiSumSaveTemplate: 'Сохранён шаблон стиля «{name}»',
   aiSumTemplatesEmpty: 'Шаблоны стиля (пусто)',
   aiSumListTemplates: 'Показано шаблонов стиля: {count}',
+<<<<<<< ours
   aiPageCloudToLocal: 'Облако недоступно — создано локально',
   aiViewOnlyNotice:
     'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

@@ -15,6 +15,10 @@ function state(parts: {
   formulas?: Map<string, Map<string, string>>
   cached?: Map<string, Map<string, string | number | boolean>>
   overlay?: Map<string, Map<string, unknown>>
+<<<<<<< ours
+=======
+  external?: Map<string, Map<string, unknown>>
+>>>>>>> theirs
   structural?: Map<string, { kind: string; [key: string]: unknown }[]>
 }): LazyWorkbookState {
   return {
@@ -25,6 +29,11 @@ function state(parts: {
     },
     recalc: {
       overlay: parts.overlay ?? new Map(),
+<<<<<<< ours
+=======
+      externalOverlay: parts.external ?? new Map(),
+      incompleteRuns: new Set(),
+>>>>>>> theirs
     },
     formulaText: parts.formulas ?? new Map(),
     cachedFormulaValues: parts.cached ?? new Map(),
@@ -124,6 +133,7 @@ describe('liveFormulaCacheValues', () => {
     ).toEqual([])
   })
 
+<<<<<<< ours
   it('skips comparison cells the recalc overlay already contributes', () => {
     const read = reader(new Map([['sheet-1', { B2: cellOf(10, '=A2*2') }]]))
     expect(
@@ -132,6 +142,28 @@ describe('liveFormulaCacheValues', () => {
           formulas: new Map([['sheet-1', new Map([['1:1', '=A2*2']])]]),
           cached: new Map([['sheet-1', new Map([['1:1', 6]])]]),
           overlay: new Map([['sheet-1', new Map([['1:1', { v: 10 }]])]]),
+=======
+  it('skips comparison cells the recalc or external-link overlays already contribute', () => {
+    const read = reader(
+      new Map([
+        ['sheet-1', { B2: cellOf(10, '=A2*2') }],
+        ['sheet-2', { A1: cellOf(20, '[1]Sheet1!A1') }],
+      ]),
+    )
+    expect(
+      liveFormulaCacheValues(
+        state({
+          formulas: new Map([
+            ['sheet-1', new Map([['1:1', '=A2*2']])],
+            ['sheet-2', new Map([['0:0', '[1]Sheet1!A1']])],
+          ]),
+          cached: new Map([
+            ['sheet-1', new Map([['1:1', 6]])],
+            ['sheet-2', new Map([['0:0', 6]])],
+          ]),
+          overlay: new Map([['sheet-1', new Map([['1:1', { v: 10 }]])]]),
+          external: new Map([['sheet-2', new Map([['0:0', { v: 20 }]])]]),
+>>>>>>> theirs
         }),
         read,
       ),

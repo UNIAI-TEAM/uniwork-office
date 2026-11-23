@@ -4,6 +4,11 @@ export const he = {
   aiComposerPlaceholderBuild: 'תארו את הטבלה, הנתונים או התרשים ליצירה…',
   aiEmptyBuildTitle: 'תנו ל-AI לבנות את חוברת העבודה הזו עבורכם',
   aiEmptyBuildBody: 'תארו את הטבלה, הנתונים או התרשים הדרושים — ה-AI יוצר אותם במקום.',
+<<<<<<< ours
+=======
+  aiGskLoginBtn: 'התחבר ל-Genspark',
+  aiGskLoginOk: 'מחובר ל-Genspark',
+>>>>>>> theirs
   aiUndelivered: 'לא נשלח',
   aiRetry: 'נסה שוב',
   aiOpenAssistant: 'פתיחת עוזר ה-AI',
@@ -55,6 +60,7 @@ export const he = {
   aiSave: 'שמירה',
   aiUnknownError: 'שגיאה לא ידועה',
   aiTimeoutError: 'תם הזמן לבקשת ה-AI: אין תגובה מהרשת וההרצה הופסקה. בדוק את החיבור ונסה שוב',
+  aiRegionError: 'ספק המודל הזה אינו פועל באזור הנוכחי שלך — בחרו מודל אחר או החליפו רשת',
   aiOverloadedError: 'שירות ה-AI עמוס כרגע — נסו שוב בעוד רגע',
   aiNetworkError: 'בעיית רשת: לא ניתן להתחבר לשירות ה-AI. בדוק את החיבור ונסה שוב',
   aiToolWorkbookContext: 'קריאת פרטי חוברת העבודה',

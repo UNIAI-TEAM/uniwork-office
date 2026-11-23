@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
+<<<<<<< ours
 import { addTokenUsage, formatTokenCount, usageAriaLabel } from '../src/AiUsageChip'
+=======
+import { addTokenUsage, cacheHitPercent, formatTokenCount } from '../src/AiUsageChip'
+>>>>>>> theirs
 import { AI_USAGE_LABELS } from '../src/strings-ai-usage'
 
 describe('formatTokenCount', () => {
@@ -47,12 +51,17 @@ describe('AI_USAGE_LABELS', () => {
     for (const [lang, labels] of Object.entries(AI_USAGE_LABELS)) {
       expect(labels.runTitle.length, lang).toBeGreaterThan(0)
       expect(labels.sessionTitle.length, lang).toBeGreaterThan(0)
+<<<<<<< ours
       expect(labels.inputTokens.length, lang).toBeGreaterThan(0)
       expect(labels.outputTokens.length, lang).toBeGreaterThan(0)
+=======
+      expect(labels.cacheHit, lang).toContain('{pct}')
+>>>>>>> theirs
     }
   })
 })
 
+<<<<<<< ours
 describe('usageAriaLabel', () => {
   it('spells out input and output tokens instead of the arrows', () => {
     expect(usageAriaLabel({ inputTokens: 1234, outputTokens: 300 }, 'en')).toBe(
@@ -64,5 +73,25 @@ describe('usageAriaLabel', () => {
     expect(usageAriaLabel({ outputTokens: 7 }, 'en', true)).toBe(
       'Session token usage: 7 output tokens',
     )
+=======
+describe('cacheHitPercent', () => {
+  it('is the cached share of the input', () => {
+    expect(cacheHitPercent({ inputTokens: 1000, cacheReadTokens: 820 })).toBe(82)
+    expect(cacheHitPercent({ inputTokens: 1000, cacheReadTokens: 0 })).toBe(0)
+  })
+
+  it('is unknown when the provider reports no cache figure', () => {
+    expect(cacheHitPercent({ inputTokens: 1000 })).toBeNull()
+    expect(cacheHitPercent({ cacheReadTokens: 5 })).toBeNull()
+  })
+
+  it('sums cache figures across turns', () => {
+    expect(
+      addTokenUsage(
+        { inputTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 90 },
+        { inputTokens: 120, cacheReadTokens: 90 },
+      ),
+    ).toEqual({ inputTokens: 220, cacheReadTokens: 90, cacheWriteTokens: 90 })
+>>>>>>> theirs
   })
 })

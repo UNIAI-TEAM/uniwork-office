@@ -1165,9 +1165,18 @@ describe('pageBorderStyleOf', () => {
 
 describe('rowFillAttrs', () => {
   it('measures the stored split extra against the rounded CSS height', () => {
-    expect(rowFillAttrs(310.4, 10.4)).toEqual({ style: 'height:310px', 'data-split-extra': '10.0' })
-    expect(rowFillAttrs(309.6, 9.6)).toEqual({ style: 'height:310px', 'data-split-extra': '10.0' })
-    expect(rowFillAttrs(310.4)).toEqual({ style: 'height:310px' })
+    const fill = { 'data-row-fill': '1' }
+    expect(rowFillAttrs(310.4, 10.4)).toEqual({
+      style: 'height:310px',
+      ...fill,
+      'data-split-extra': '10.0',
+    })
+    expect(rowFillAttrs(309.6, 9.6)).toEqual({
+      style: 'height:310px',
+      ...fill,
+      'data-split-extra': '10.0',
+    })
+    expect(rowFillAttrs(310.4)).toEqual({ style: 'height:310px', ...fill })
   })
 
   // border-spacing 2px: the measured pitch is tr height + 2, so the tr gets the
@@ -1175,9 +1184,168 @@ describe('rowFillAttrs', () => {
   it('takes the border-spacing gap out of a separate-borders row height', () => {
     expect(rowFillAttrs(310.4, 10.4, 2)).toEqual({
       style: 'height:308px',
+      'data-row-fill': '1',
       'data-split-extra': '10.0',
     })
-    expect(rowFillAttrs(310.4, 0, 2)).toEqual({ style: 'height:308px' })
+    expect(rowFillAttrs(310.4, 0, 2)).toEqual({ style: 'height:308px', 'data-row-fill': '1' })
+  })
+})
+
+describe('split-row fill alignment', () => {
+  it('top-aligns a filled row so the fill lands below the content', () => {
+    // Word aligns per fragment; a centered tr would push every fragment down
+    const css = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/styles.css'),
+      'utf8',
+    )
+    const at = css.indexOf('.doc-table tr[data-row-fill] > td,')
+    expect(at).toBeGreaterThan(-1)
+    expect(css.slice(at, css.indexOf('}', at))).toMatch(/vertical-align: top !important;/)
+  })
+})
+
+describe('rowGapPx', () => {
+  const rect = (top: number, bottom: number) => () => ({ top, bottom }) as DOMRect
+  const table = (collapse: string) => {
+    const t = document.createElement('table')
+    t.style.borderCollapse = collapse
+    t.innerHTML =
+      '<tbody><tr><td></td></tr><tr class="page-gap"><td></td></tr><tr><td></td></tr><tr><td></td></tr></tbody>'
+    document.body.appendChild(t)
+    t.getBoundingClientRect = rect(100, 401)
+    const rows = Array.from(t.querySelectorAll('tr'))
+    rows[0].getBoundingClientRect = rect(100.5, 150.5)
+    rows[2].getBoundingClientRect = rect(150.5, 200.5)
+    rows[3].getBoundingClientRect = rect(200.5, 400.5)
+    return rows
+  }
+
+  it('gives an edge row of a collapsed table the outer half border', () => {
+    const rows = table('collapse')
+    expect(rowGapPx(rows[0])).toBe(0.5)
+    expect(rowGapPx(rows[2])).toBe(0)
+    expect(rowGapPx(rows[3])).toBe(0.5)
+    expect(rowGapPx(rows[3], 2)).toBe(0.25)
+  })
+
+  it('keeps a last-row fill at the same height on every pass', () => {
+    const natural = 97.73
+    const want = 31.77
+    let measured = natural
+    let extra = 0
+    const seen: string[] = []
+    for (let pass = 0; pass < 4; pass++) {
+      const target = measured - extra + want
+      const attrs = rowFillAttrs(target, want, 0.5)
+      seen.push(attrs.style)
+      measured = parseFloat(attrs.style.slice('height:'.length)) + 0.5
+      extra = parseFloat(attrs['data-split-extra']!)
+    }
+    expect(new Set(seen)).toEqual(new Set(['height:129px']))
+  })
+})
+
+describe('leadDropsSpaceBefore', () => {
+  const blocks = [{ section: 0 }, { section: 0 }, { section: 1 }, {}]
+  it('drops the space-before of a page-leading block after a natural break', () => {
+    expect(leadDropsSpaceBefore(blocks, 1)).toBe(true)
+  })
+  it('keeps it on the first block of a new section and of the document', () => {
+    expect(leadDropsSpaceBefore(blocks, 2)).toBe(false)
+    expect(leadDropsSpaceBefore(blocks, 0)).toBe(false)
+  })
+  it('treats an unset section as section 0', () => {
+    expect(leadDropsSpaceBefore(blocks, 3)).toBe(false)
+  })
+})
+
+describe('page-break-lead margin drop', () => {
+  const css = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/styles.css'),
+    'utf8',
+  )
+  it('is display-only: the measuring pass still sees the declared space-before', () => {
+    expect(css).toMatch(
+      /\.page-break-lead:not\(\.measuring-natural \*\)\s*\{\s*margin-top: 0 !important;/,
+    )
+    expect(css).not.toMatch(/\n\.page-break-lead\s*\{/)
+  })
+})
+
+describe('canvasZoomOf', () => {
+  it('reads the zoom the host applies, not the caller fallback', () => {
+    expect(canvasZoomOf({ style: { zoom: '0.84' } }, 1)).toBe(0.84)
+    expect(canvasZoomOf({ style: { zoom: '1' } }, 0.84)).toBe(1)
+  })
+  it('an unset or unusable inline zoom is the unzoomed canvas', () => {
+    expect(canvasZoomOf({ style: { zoom: '' } }, 0.84)).toBe(1)
+    expect(canvasZoomOf({ style: { zoom: 'abc' } }, 0.84)).toBe(1)
+  })
+  it('without a host the fallback stands', () => {
+    expect(canvasZoomOf(null, 0.84)).toBe(0.84)
+  })
+})
+
+describe('a single shape rides the chrome rotator layer', () => {
+  const rect = (top: number, height: number): DOMRect =>
+    ({ top, height, bottom: top + height, left: 0, right: 100, width: 100 }) as DOMRect
+
+  it('syncFloatShifts parks the canvas display shift on the rotator', () => {
+    const pm = document.createElement('div')
+    const wrapper = document.createElement('div')
+    wrapper.className = 'doc-protected-floating'
+    const rotator = document.createElement('div')
+    rotator.className = 'box-rotator'
+    const box = document.createElement('div')
+    box.className = 'doc-textbox'
+    rotator.append(box)
+    wrapper.append(rotator)
+    pm.append(wrapper)
+    box.getBoundingClientRect = () => rect(50, 113)
+
+    // virtual top 100 under origin 0: the box paints 50 px too high
+    syncFloatShifts(pm, [{ el: box, top: 100 }], 0, 1)
+    expect(rotator.style.getPropertyValue('--page-float-dy')).toBe('50.0px')
+    // the box itself must stay unshifted inside the turning layer
+    expect(box.style.getPropertyValue('--page-float-dy')).toBe('')
+    expect(box.dataset.pageFloatDy).toBe('50')
+
+    // idempotent: with the shift applied the rect already includes it
+    box.getBoundingClientRect = () => rect(100, 113)
+    syncFloatShifts(pm, [{ el: box, top: 100 }], 0, 1)
+    expect(rotator.style.getPropertyValue('--page-float-dy')).toBe('50.0px')
+  })
+
+  it('measureBlocks finds the floating box nested under the rotator', async () => {
+    const shapeXml = buildShapeParagraphXml({ prst: 'rect', withTextbox: true, id: 42 }).replace(
+      '<wp:positionH relativeFrom="column"><wp:align>center</wp:align></wp:positionH>',
+      '<wp:positionH relativeFrom="column"><wp:posOffset>500000</wp:posOffset></wp:positionH>',
+    )
+    const parsed = await parseDocx(await buildDocx({ bodyXml: shapeXml }))
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions: editorExtensions,
+      content: blocksToPmDoc(parsed.blocks) as never,
+    })
+    let pos = -1
+    editor.state.doc.descendants((node, at) => {
+      if (pos === -1 && node.type.name === 'docProtected' && node.attrs.textboxes) pos = at
+      return true
+    })
+    editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)))
+    setFloatingWrap(editor, 'front')
+    const wrapper = editor.view.nodeDOM(pos) as HTMLElement
+    const boxEl = wrapper.querySelector('.doc-textbox') as HTMLElement
+    expect(wrapper.classList.contains('doc-protected-floating')).toBe(true)
+    wrapper.getBoundingClientRect = () => rect(0, 0)
+    boxEl.getBoundingClientRect = () => rect(120, 113)
+
+    const measured = measureBlocks(editor.view.dom as HTMLElement, 0, 1)
+    const found = measured.floats.filter((f) => f.el === boxEl)
+    expect(found).toHaveLength(1)
+    expect(found[0].top).toBe(120)
+    expect(found[0].height).toBe(113)
+    editor.destroy()
   })
 })
 

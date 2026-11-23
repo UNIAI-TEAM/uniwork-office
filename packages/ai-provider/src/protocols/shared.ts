@@ -1,5 +1,31 @@
+<<<<<<< ours
 import type { AgentStreamNotice, AgentToolCall } from '@genoffice/agent-core'
 import type { AiTokenUsage } from '../types'
+=======
+import type { AgentToolCall } from '@genoffice/agent-core'
+import type { AiTokenUsage } from '../types'
+
+// ---- endpoint URL composition ----
+
+/**
+ * Append a provider endpoint path to a base URL without string concatenation.
+ *
+ * A custom base URL may carry a query string (Azure-style `?api-version=…`,
+ * gateways that pin a version) and a fragment. Concatenating would push the
+ * path into the query component, so the request 404s or lands on the wrong
+ * route. Setting `pathname` keeps the query in place and the fragment is
+ * dropped — it is never sent to the server anyway.
+ */
+export function endpointUrl(baseUrl: string, path: string, search?: string): string {
+  const url = new URL(baseUrl)
+  const base = url.pathname.replace(/\/+$/, '')
+  const suffix = path.replace(/^\/+/, '')
+  url.pathname = suffix ? `${base}/${suffix}` : base
+  url.hash = ''
+  if (search !== undefined) url.search = search
+  return url.toString()
+}
+>>>>>>> theirs
 
 // ---- streaming (SSE line splitting shared by all providers) ----
 
@@ -256,6 +282,25 @@ export function usageCount(value: unknown): number | undefined {
   return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : undefined
 }
 
+<<<<<<< ours
+=======
+/** OpenAI-shaped usage (Chat Completions and Responses name the same figures differently). */
+export function openAiUsage(
+  input: unknown,
+  output: unknown,
+  details: { cached_tokens?: unknown } | null | undefined,
+): AiTokenUsage | undefined {
+  const usage: AiTokenUsage = {}
+  const inputTokens = usageCount(input)
+  const outputTokens = usageCount(output)
+  const cached = usageCount(details?.cached_tokens)
+  if (inputTokens !== undefined) usage.inputTokens = inputTokens
+  if (outputTokens !== undefined) usage.outputTokens = outputTokens
+  if (cached !== undefined) usage.cacheReadTokens = cached
+  return inputTokens !== undefined || outputTokens !== undefined ? usage : undefined
+}
+
+>>>>>>> theirs
 /**
  * Models occasionally emit unescaped " inside string values (e.g. English quotes in Chinese copy).
  * Single-pass scan: a " inside a string whose next non-whitespace char is not structural gets escaped.

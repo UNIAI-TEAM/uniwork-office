@@ -28,8 +28,13 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "saxes": "^6.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
+<<<<<<< ours
     "vitest": "4.1.12"
+=======
+    "vitest": "^4.1.12"
+>>>>>>> theirs
   }
 }

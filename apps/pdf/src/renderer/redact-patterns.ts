@@ -1,6 +1,7 @@
 /**
  * Sensitive-information patterns for Search & Redact (Acrobat's Find Text ▸ Patterns):
  * phone numbers, email addresses, credit card numbers, US Social Security numbers,
+<<<<<<< ours
  * Vietnamese Citizen IDs (CCCD), Vietnamese tax IDs (MST), dates and IBANs. Ported from
  * pdfcraft's crates/redact/src/patterns.rs. Each matcher is deterministic and returns
  * [start, end) offsets into the page text, which the caller maps onto text-item geometry.
@@ -8,14 +9,25 @@
 
 export type RedactPattern =
   'phone' | 'email' | 'credit-card' | 'ssn' | 'cccd' | 'mst' | 'date' | 'iban'
+=======
+ * dates and IBANs. Ported from pdfcraft's crates/redact/src/patterns.rs. Each matcher
+ * is deterministic and returns [start, end) offsets into the page text, which the
+ * caller maps onto text-item geometry.
+ */
+
+export type RedactPattern = 'phone' | 'email' | 'credit-card' | 'ssn' | 'date' | 'iban'
+>>>>>>> theirs
 
 export const REDACT_PATTERNS: readonly RedactPattern[] = [
   'phone',
   'email',
   'credit-card',
   'ssn',
+<<<<<<< ours
   'cccd',
   'mst',
+=======
+>>>>>>> theirs
   'date',
   'iban',
 ]
@@ -64,6 +76,7 @@ function runContinues(s: S, k: number, step: 1 | -1, seps: string): boolean {
   }
 }
 
+<<<<<<< ours
 const LABEL_CHAR_RE = /^[\p{Alphabetic}\p{M}]$/u
 const isLabelChar = (c: string | undefined): boolean => c !== undefined && LABEL_CHAR_RE.test(c)
 
@@ -82,6 +95,17 @@ const PHONE_LABELS = new Set([
   'telefon',
   'telefono',
   'telephone',
+=======
+const PHONE_LABELS = new Set([
+  'tel',
+  'tél',
+  'tele',
+  'telefon',
+  'telefono',
+  'teléfono',
+  'telephone',
+  'téléphone',
+>>>>>>> theirs
   'phone',
   'ph',
   'cell',
@@ -91,12 +115,17 @@ const PHONE_LABELS = new Set([
   'mobile',
   'mob',
   'mobil',
+<<<<<<< ours
+=======
+  'móvil',
+>>>>>>> theirs
   'movil',
   'handy',
   'fax',
   'tlf',
   'telf',
   'gsm',
+<<<<<<< ours
   'sdt',
   'dt',
   'dien thoai',
@@ -111,11 +140,16 @@ const NON_PHONE_ID_LABELS: Record<string, true> = {
   iban: true,
 }
 
+=======
+])
+
+>>>>>>> theirs
 /** Whether the text before `i` is a phone label, with one to four spaces, colons or dots between. */
 function labelled(s: S, i: number): boolean {
   let j = i
   while (i - j < 4 && ' :.\u00a0'.includes(at(s, j - 1) ?? 'x')) j--
   const end = j
+<<<<<<< ours
   while (end - j < 16 && isLabelChar(at(s, j - 1))) j--
   if (end === i || end === j) return false
   const word1 = foldLabel(s.slice(j, end))
@@ -255,6 +289,14 @@ function phone(s: S, i: number): number | null {
   if (cccd(s, i) !== null || mst(s, i) !== null) return null
   const vn = vnPhoneUnlabelled(s, i)
   if (vn !== null) return vn
+=======
+  while (end - j < 12 && isAlpha(at(s, j - 1))) j--
+  if (end === i || isAlnum(at(s, j - 1))) return false
+  return PHONE_LABELS.has(s.slice(j, end).toLowerCase())
+}
+
+function phone(s: S, i: number): number | null {
+>>>>>>> theirs
   const SEPS = ' -.()'
   // A slash joins the area code to the number in Italian and German landlines ("0426/123456").
   const RUN_SEPS = ' -.()/'
@@ -304,11 +346,15 @@ function phone(s: S, i: number): number | null {
     const trunk = trunkZero && n >= 7 && n <= 15 && lead >= 2 && date(s, i) === null
     ok = nanp || trunk
   }
+<<<<<<< ours
   if (!ok) return null
   for (let k = i; k < end; k++) {
     if (cccd(s, k) !== null || mst(s, k) !== null) return null
   }
   return end - i
+=======
+  return ok ? end - i : null
+>>>>>>> theirs
 }
 
 /** Scripts written without spaces between words: their letters never join an address. */
@@ -551,8 +597,11 @@ const MATCHERS: Record<RedactPattern, (s: S, i: number) => number | null> = {
   email,
   'credit-card': creditCard,
   ssn,
+<<<<<<< ours
   cccd,
   mst,
+=======
+>>>>>>> theirs
   date,
   iban,
 }

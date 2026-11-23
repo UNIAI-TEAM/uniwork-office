@@ -9,8 +9,11 @@ import {
 } from 'react'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import type { CommentImage, CommentInfo } from '@genoffice/docx-engine'
+<<<<<<< ours
 import { isWebFrame } from '../capabilities'
 import { displayCommentAuthor } from '../comment-author'
+=======
+>>>>>>> theirs
 import { useI18n } from '../i18n/locale'
 import { absoluteDate, authorInitials, authorInk } from '../editor/comment-card'
 import { revWhen } from '../editor/margin-annotations'
@@ -51,11 +54,15 @@ function jumpTo(id: string) {
 function CommentHead({
   c,
   unknownAuthor,
+<<<<<<< ours
   authorLabel,
+=======
+>>>>>>> theirs
   actions,
 }: {
   c: CommentInfo
   unknownAuthor: string
+<<<<<<< ours
   /** G8-02: the neutral author shows in the UI language; any other author verbatim */
   authorLabel: (author: string) => string
   actions?: ReactNode
@@ -64,6 +71,14 @@ function CommentHead({
   return (
     <div className="comment-card-head">
       <span className="comment-avatar" aria-hidden="true" style={{ background: authorInk(name) }}>
+=======
+  actions?: ReactNode
+}) {
+  const name = c.author || unknownAuthor
+  return (
+    <div className="comment-card-head">
+      <span className="comment-avatar" style={{ background: authorInk(name) }}>
+>>>>>>> theirs
         {authorInitials(c)}
       </span>
       <span className="comment-meta">
@@ -103,8 +118,11 @@ export const CommentsPanel = memo(function CommentsPanel({
   docNode: PmNode
   /** show the new-comment composer (selection captured by the caller) */
   composing: boolean
+<<<<<<< ours
   /** read-only view of comments: no edit/delete/reply/resolve/new-comment controls */
   readOnly?: boolean
+=======
+>>>>>>> theirs
   onSubmitNew: (text: string, image?: CommentImage) => void
   /** Reply to a comment (anchor shares the parent comment's range) */
   onReply: (parentId: string, text: string) => void
@@ -229,21 +247,30 @@ export const CommentsPanel = memo(function CommentsPanel({
     })
   }
 
+<<<<<<< ours
   const authorLabel = (author: string) =>
     displayCommentAuthor(author, t('editorNeutralCommentAuthor'))
 
   const editBox = (
     <div data-esc-local="" className="comment-reply-compose">
+=======
+  const editBox = (
+    <div className="comment-reply-compose">
+>>>>>>> theirs
       <textarea
         autoFocus
         value={editDraft}
         onChange={(e) => setEditDraft(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitEdit()
+<<<<<<< ours
           if (e.key === 'Escape') {
             e.preventDefault()
             setEditingId(null)
           }
+=======
+          if (e.key === 'Escape') setEditingId(null)
+>>>>>>> theirs
         }}
       />
       <div className="comment-compose-actions">
@@ -256,8 +283,11 @@ export const CommentsPanel = memo(function CommentsPanel({
   )
 
   const headActions = (c: CommentInfo, root: boolean, replies: CommentInfo[]) => {
+<<<<<<< ours
     // G8-12: a read-only pane (server-comment mode) carries no edit/delete/resolve controls
     if (readOnly) return null
+=======
+>>>>>>> theirs
     const deleteIds = [c.id, ...replies.map((r) => r.id)]
     const deleteLabel = root
       ? replies.length > 0
@@ -337,7 +367,11 @@ export const CommentsPanel = memo(function CommentsPanel({
   const renderThread = (c: CommentInfo) => {
     const anchor = anchorTexts.get(c.id) ?? ''
     const replies = repliesOf(c.id)
+<<<<<<< ours
     const editing = !readOnly && editingId === c.id
+=======
+    const editing = editingId === c.id
+>>>>>>> theirs
     const unknown = t('appUnknownAuthor')
     return (
       <div
@@ -359,12 +393,16 @@ export const CommentsPanel = memo(function CommentsPanel({
           }
           onKeyDown={editing ? undefined : onCardKey(c.id)}
         >
+<<<<<<< ours
           <CommentHead
             c={c}
             unknownAuthor={unknown}
             authorLabel={authorLabel}
             actions={headActions(c, true, replies)}
           />
+=======
+          <CommentHead c={c} unknownAuthor={unknown} actions={headActions(c, true, replies)} />
+>>>>>>> theirs
           {anchor && <div className="comment-anchor">“{anchor.slice(0, 60)}”</div>}
           {editing ? (
             editBox
@@ -377,6 +415,7 @@ export const CommentsPanel = memo(function CommentsPanel({
         </div>
         {replies.map((r) => (
           <div key={r.id} className="comment-reply">
+<<<<<<< ours
             <CommentHead
               c={r}
               unknownAuthor={unknown}
@@ -384,6 +423,10 @@ export const CommentsPanel = memo(function CommentsPanel({
               actions={headActions(r, false, [])}
             />
             {!readOnly && editingId === r.id ? (
+=======
+            <CommentHead c={r} unknownAuthor={unknown} actions={headActions(r, false, [])} />
+            {editingId === r.id ? (
+>>>>>>> theirs
               editBox
             ) : (
               <>
@@ -393,9 +436,14 @@ export const CommentsPanel = memo(function CommentsPanel({
             )}
           </div>
         ))}
+<<<<<<< ours
         {!readOnly && !c.done && (
           <input
             data-esc-local=""
+=======
+        {!c.done && (
+          <input
+>>>>>>> theirs
             className="comment-reply-input"
             type="text"
             placeholder={t('appReplyPlaceholder')}
@@ -444,6 +492,15 @@ export const CommentsPanel = memo(function CommentsPanel({
               if (e.key === 'Escape') {
                 e.preventDefault()
                 onCancelNew()
+              }
+            }}
+            onPaste={(e) => {
+              const file = Array.from(e.clipboardData.files).find((f) =>
+                f.type.startsWith('image/'),
+              )
+              if (file) {
+                e.preventDefault()
+                stageImage(file)
               }
             }}
             onPaste={(e) => {

@@ -22,7 +22,13 @@ export const ms = {
   aiQcPageSkipped: 'Halaman {n}: semakan susun atur automatik dilangkau',
   aiQcStopped: 'Semakan susun atur dihentikan',
   aiQcCapped: '{count} halaman lagi tidak disemak (had setiap larian)',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: 'Log masuk ke Genspark',
+  aiGskLoginOk: 'Berjaya log masuk ke Genspark',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: 'Buka pembantu AI',
   aiFactCheckBtn: 'Semak Fakta AI',
   aiFactCheckPrompt:
@@ -114,6 +120,8 @@ export const ms = {
   aiErrUnknown: 'Ralat tidak diketahui',
   aiErrStreamTimeout:
     'Permintaan AI tamat masa: rangkaian tidak memberi respons, proses dihentikan. Semak sambungan anda dan cuba lagi',
+  aiErrRegion:
+    'Penyedia model ini tidak memberi perkhidmatan di rantau semasa anda — pilih model lain atau tukar rangkaian',
   aiErrOverloaded: 'Perkhidmatan AI sedang sibuk — sila cuba lagi sebentar lagi',
   aiErrNetwork:
     'Masalah rangkaian: tidak dapat menghubungi perkhidmatan AI. Semak sambungan anda dan cuba lagi',
@@ -225,7 +233,10 @@ export const ms = {
   aiSumSaveTemplate: 'Menyimpan templat gaya "{name}"',
   aiSumTemplatesEmpty: 'Templat gaya (kosong)',
   aiSumListTemplates: 'Menyenaraikan {count} templat gaya',
+<<<<<<< ours
   aiPageCloudToLocal: 'Awan tidak tersedia — dijana secara setempat',
   aiViewOnlyNotice:
     'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

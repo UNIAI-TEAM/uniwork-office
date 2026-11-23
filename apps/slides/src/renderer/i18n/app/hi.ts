@@ -30,6 +30,17 @@ export const hi = {
   appExportPdfProgress: 'PDF निर्यात किया जा रहा है…',
   appExportPdfDone: 'PDF निर्यात किया गया: {path}',
   appExportPdfFailed: 'PDF निर्यात विफल: {error}',
+  appExportVideoTitle: 'वीडियो के रूप में निर्यात',
+  appExportVideoResolution: 'रिज़ॉल्यूशन',
+  appExportVideoSeconds: 'प्रत्येक स्लाइड पर बिताए सेकंड',
+  appExportVideoUseTimings: 'रिकॉर्ड किए गए समय और वर्णन उपलब्ध होने पर उपयोग करें',
+  appExportVideoCreate: 'वीडियो बनाएँ',
+  appExportVideoCancel: 'रद्द करें',
+  appExportVideoProgress: 'वीडियो एन्कोड हो रहा है… {percent}%',
+  appExportVideoDone: 'वीडियो निर्यात हुआ: {path}',
+  appExportVideoFailed: 'वीडियो निर्यात विफल: {error}',
+  appExportVideoUnsupported:
+    'इस सिस्टम पर H.264 वीडियो एन्कोडर उपलब्ध नहीं है, इसलिए MP4 निर्यात संभव नहीं है',
   appStatusBgAppliedAll: 'पृष्ठभूमि रंग सभी स्लाइड पर लागू किया गया',
   appStatusThemeApplied: 'थीम "{name}" लागू की गई',
   appStatusThemeApplyFailed: 'थीम लागू करने में विफल: {error}',
@@ -68,6 +79,10 @@ export const hi = {
   appStatusAudioInserted: 'ऑडियो सम्मिलित किया गया (.pptx में एम्बेड किया गया)',
   appStatusModel3dInserted:
     '3D मॉडल डाला गया: घुमाने के लिए इसे चुनें (PowerPoint भी इसे 3D में दिखाता है)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: '3D मॉडल यहाँ नहीं बनाया जा सका; इसका चित्र नहीं बदला',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'रिकॉर्डिंग खाली है; कुछ भी सम्मिलित नहीं किया गया',
   appStatusRecordingInserted:
     'स्क्रीन रिकॉर्डिंग वर्तमान स्लाइड में सम्मिलित की गई (एम्बेडेड webm)',
@@ -202,6 +217,7 @@ export const hi = {
   appCtxSendToBack: 'सबसे पीछे भेजें',
   appCtxBringForward: 'आगे लाएँ',
   appCtxSendBackward: 'पीछे भेजें',
+  appCtxRotate: 'घुमाएँ',
   appCtxRotateLeft90: '90° बाएँ घुमाएँ',
   appCtxRotateRight90: '90° दाएँ घुमाएँ',
   appCtxFlipH: 'क्षैतिज पलटें',
@@ -272,6 +288,25 @@ export const hi = {
     'स्लाइड शो की कुल अवधि {duration} रही। क्या स्लाइड स्वतः बदलने के लिए प्रत्येक स्लाइड का समय सहेजना चाहते हैं?',
   appRehearseDiscard: 'न सहेजें',
   appRehearseSave: 'सहेजें',
+<<<<<<< ours
+=======
+  appRecordTitle: 'कथन रिकॉर्ड करें',
+  appRecordSummary: 'रिकॉर्डिंग की अवधि {duration}। क्या हर स्लाइड का कथन और समय सहेजें?',
+  appRecordDiscard: 'न सहेजें',
+  appRecordSave: 'सहेजें',
+  appStatusRecordSaved: '{count} स्लाइडों पर कथन सहेजा गया (PowerPoint भी इसे चलाता है)',
+  appStatusRecordFailed: 'रिकॉर्डिंग सहेजी नहीं जा सकी',
+  appStatusNarrationCleared: 'कथन साफ़ किया गया',
+  appSettingsTitle: 'AI सेटिंग्स',
+  appSettingsAccount: 'Genspark खाता',
+  appSettingsChecking: 'जाँच हो रही है…',
+  appSettingsLoggedIn: 'साइन इन किया गया',
+  appSettingsLoggedInEmail: 'साइन इन किया गया: {email}',
+  appSettingsLoggedOut: 'साइन इन नहीं किया गया (AI सुविधाओं के लिए Genspark खाता आवश्यक है)',
+  appSettingsLoginPending: 'ब्राउज़र साइन-इन की प्रतीक्षा हो रही है…',
+  appSettingsLogin: 'Genspark में साइन इन करें',
+  appSettingsModel: 'मॉडल',
+>>>>>>> theirs
   appSettingsCancel: 'रद्द करें',
   appCropHint: 'पुष्टि के लिए Enter · रद्द करने के लिए Esc · पुष्टि के लिए बाहर क्लिक करें',
   appStatusZoomsInserted: '{count} ज़ूम डाले गए: स्लाइड शो में क्लिक करके उनकी स्लाइड पर जाएँ',

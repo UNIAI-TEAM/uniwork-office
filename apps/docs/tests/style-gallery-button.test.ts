@@ -7,6 +7,11 @@ import { Editor } from '@tiptap/core'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { computeFormatState } from '../src/renderer/components/ribbon-format-state'
 import { Ribbon } from '../src/renderer/components/Ribbon'
+<<<<<<< ours
+=======
+import { commandRunner } from './helpers/ribbon-props'
+import { MERGE_RANGE_ALL } from '../src/renderer/mail-merge/range'
+>>>>>>> theirs
 
 function makeEditor(): Editor {
   return new Editor({
@@ -30,10 +35,17 @@ function ribbonProps(editor: Editor) {
     onOpen: noop,
     onSave: noop,
     onSaveAs: noop,
+<<<<<<< ours
     onConvert: noop,
     onNameWithAi: noop,
     showAi: false,
     onToggleAi: noop,
+=======
+    onNameWithAi: noop,
+    showAi: false,
+    onCommand: commandRunner(editor),
+    editTarget: { hasSelection: false, editable: true, field: false },
+>>>>>>> theirs
     section: null,
     onSection: noop,
     activeSection: null,
@@ -75,14 +87,20 @@ function ribbonProps(editor: Editor) {
     header: null,
     onHeader: noop,
     onPageNumFormat: noop,
+<<<<<<< ours
     onInsertField: noop,
+=======
+>>>>>>> theirs
     footer: null,
     onFooter: noop,
     hfEditing: null,
     onHfAction: noop,
     onHfEdit: noop,
     showMarks: false,
+<<<<<<< ours
     onShowMarks: noop,
+=======
+>>>>>>> theirs
     showRuler: false,
     onShowRuler: noop,
     showNav: false,
@@ -95,7 +113,10 @@ function ribbonProps(editor: Editor) {
     onToggleComments: noop,
     commentsMode: 'contextual' as const,
     onCommentsMode: noop,
+<<<<<<< ours
     canComment: false,
+=======
+>>>>>>> theirs
     onNewComment: noop,
     commentAtCaret: false,
     onDeleteComment: noop,
@@ -104,7 +125,10 @@ function ribbonProps(editor: Editor) {
     trackChanges: false,
     onTrackChanges: noop,
     spellcheck: true,
+<<<<<<< ours
     onSpellcheck: noop,
+=======
+>>>>>>> theirs
     revisionDisplay: 'all' as const,
     onRevisionDisplay: noop,
     balloonMode: 'comments' as const,
@@ -125,8 +149,15 @@ function ribbonProps(editor: Editor) {
     onProtectDoc: noop,
     onCompare: noop,
     mergeSource: null,
+<<<<<<< ours
     onPickMergeDataSource: noop,
     onMergeMailings: async () => ({ ok: true }),
+=======
+    mergeRecordIndex: 0,
+    onMergeRecordIndex: noop,
+    mergeRange: MERGE_RANGE_ALL,
+    onMergeRange: noop,
+>>>>>>> theirs
     filePath: null,
     viewMode: 'print' as const,
     onViewMode: noop,

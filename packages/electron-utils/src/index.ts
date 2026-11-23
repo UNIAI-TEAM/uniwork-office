@@ -32,6 +32,23 @@ export {
   type ViewMenuOptions,
 } from './app-menu'
 export {
+  decryptOoxml,
+  encryptOoxml,
+  isCfbFile,
+  isEncryptedOoxml,
+  OoxmlDecryptError,
+  type OoxmlDecryptFailReason,
+} from './ooxml-encryption'
+export {
+  AUTHOR_NAME_KEY,
+  AUTHOR_NAME_MAX,
+  configuredAuthorName,
+  readAuthorNameSetting,
+  resolveAuthorName,
+  sanitizeAuthorName,
+  systemAuthorName,
+} from './author-name'
+export {
   saveAsSuggestion,
   showOpenDialogWithMemory,
   showSaveDialogWithMemory,
@@ -41,12 +58,16 @@ export {
   configuredDefaultSaveDir,
   isUsableSaveDir,
   mkdirDirs,
+<<<<<<< ours
   peekDefaultSaveDir,
+=======
+>>>>>>> theirs
   readDefaultSaveDirSetting,
   resolveDefaultSaveDir,
   type PathProvider,
 } from './default-save-dir'
 export {
+<<<<<<< ours
   decryptOoxml,
   encryptOoxml,
   isCfbFile,
@@ -54,6 +75,13 @@ export {
   OoxmlDecryptError,
   type OoxmlDecryptFailReason,
 } from './ooxml-encryption'
+=======
+  EXCLUDED_FOLDERS_KEY,
+  isUnderExcludedFolder,
+  normalizeExcludedFolders,
+  readExcludedFolders,
+} from './excluded-folders'
+>>>>>>> theirs
 export { installNavigationGuard } from './navigation-guard'
 export {
   decodeChunks,
@@ -93,6 +121,19 @@ export {
   readBodyCapped,
   remoteImageHeaders,
 } from './remote-image'
+export {
+  MAX_REMOTE_TABLE_BYTES,
+  MAX_REMOTE_TABLE_CELL_CHARS,
+  MAX_REMOTE_TABLE_COLUMNS,
+  MAX_REMOTE_TABLE_ROWS,
+  detectDelimiter,
+  fetchRemoteTable,
+  parseDelimitedRow,
+  parseDelimitedTable,
+  parseHtmlTable,
+  type RemoteTable,
+  type RemoteTableSource,
+} from './remote-table'
 export { GENERATED_IMAGE_DIR, readGeneratedImage, storeGeneratedImage } from './generated-images'
 export {
   buildPrintableHtml,
@@ -130,7 +171,13 @@ export {
   type RendererHost,
 } from './renderer-scheme'
 export { installRendererProtocol, registerRendererScheme } from './renderer-protocol'
-export { atomicWriteFile, writeJsonAtomic } from './atomic-write'
+export {
+  atomicCopyFile,
+  atomicWriteFile,
+  atomicWriteVia,
+  writeJsonAtomic,
+  restrictFileToOwner,
+} from './atomic-write'
 export {
   PRINT_READY_SCRIPT,
   printHtmlDocument,
@@ -139,6 +186,7 @@ export {
   type PrintDocumentOptions,
 } from './print-window'
 export { abortOnDestroyed, type DestroyableSender } from './abort-on-destroyed'
+<<<<<<< ours
 export { createUniworkCommentsApi, installUniworkCommentsBridge } from './comments-bridge'
 export { unwrapCommentsReply } from './comments-reply'
 export {
@@ -176,6 +224,18 @@ export {
 } from './comments-poll'
 export { newerCopyMtime } from './recovery-copy'
 export { RecoveryClearEpochs, recoveryEpochKey, type RecoveryWriteTicket } from './recovery-epochs'
+=======
+export { recoveryCopyDiskNewer } from './recovery-copy'
+export {
+  LEGACY_IMPORT_KINDS,
+  LEGACY_IMPORT_SKIP_KEY,
+  readLegacyImportPrompt,
+  readLegacyImportSkip,
+  writeLegacyImportPrompt,
+  writeLegacyImportSkip,
+  type LegacyImportKind,
+} from './legacy-import-prefs'
+>>>>>>> theirs
 export {
   PDF_DEFAULT_ZOOM_KEY,
   PDF_DEFAULT_ZOOMS,
@@ -184,3 +244,13 @@ export {
   writePdfDefaultZoom,
   type PdfDefaultZoom,
 } from './pdf-zoom-prefs'
+<<<<<<< ours
+=======
+export {
+  tileRects,
+  tileWindows,
+  TILE_MIN_ROW_HEIGHT,
+  type TileRect,
+  type TileWindow,
+} from './window-tiles'
+>>>>>>> theirs

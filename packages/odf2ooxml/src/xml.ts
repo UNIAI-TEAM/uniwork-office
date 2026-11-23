@@ -57,12 +57,24 @@ export function nodeChildren(node: XNode): XNode[] {
 }
 
 export function isTextNode(node: XNode): boolean {
+<<<<<<< ours
   return typeof node['#text'] === 'string' || typeof node['#cdata'] === 'string'
+=======
+  return (
+    typeof node['#text'] === 'string' ||
+    typeof node['#cdata'] === 'string' ||
+    Array.isArray(node['#cdata'])
+  )
+>>>>>>> theirs
 }
 
 export function textOfNode(node: XNode): string {
   const cdata = node['#cdata']
   if (typeof cdata === 'string') return cdata
+<<<<<<< ours
+=======
+  if (Array.isArray(cdata)) return (cdata as XNode[]).map(textOfNode).join('')
+>>>>>>> theirs
   const text = node['#text']
   if (typeof text === 'string') return text
   let out = ''

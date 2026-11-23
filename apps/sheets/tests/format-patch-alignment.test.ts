@@ -5,11 +5,21 @@ import { applyFormatPatchToRange } from '../src/renderer/univer-sync'
 type Range = Parameters<typeof applyFormatPatchToRange>[0]
 
 function makeRange() {
+<<<<<<< ours
   const calls: { align?: string } = {}
+=======
+  const calls: { align?: string; value?: unknown } = {}
+>>>>>>> theirs
   const range = {
     setHorizontalAlignment: (value: string) => {
       calls.align = value
     },
+<<<<<<< ours
+=======
+    setValue: (value: unknown) => {
+      calls.value = value
+    },
+>>>>>>> theirs
   } as unknown as Range
   return { range, calls }
 }
@@ -32,9 +42,17 @@ describe('applyFormatPatchToRange horizontal alignment', () => {
     expect(calls.align).toBe('normal')
   })
 
+<<<<<<< ours
   it('keeps the null fallback to normal', () => {
     const { range, calls } = makeRange()
     applyFormatPatchToRange(range, { horizontalAlign: null })
     expect(calls.align).toBe('normal')
+=======
+  it('null clears the alignment instead of falling back to normal (= right)', () => {
+    const { range, calls } = makeRange()
+    applyFormatPatchToRange(range, { horizontalAlign: null })
+    expect(calls.align).toBeUndefined()
+    expect(calls.value).toEqual({ s: { ht: null } })
+>>>>>>> theirs
   })
 })

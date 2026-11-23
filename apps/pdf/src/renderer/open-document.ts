@@ -1,4 +1,7 @@
+<<<<<<< ours
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+=======
+>>>>>>> theirs
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { DOC_OPTS } from './view-config'
 
@@ -7,6 +10,7 @@ export function loadPdfForView(bytes: Uint8Array, password?: string) {
   // encrypted-document IPC and metadata checks later in the open pipeline.
   return getDocument({ data: bytes.slice(), password, ...DOC_OPTS })
 }
+<<<<<<< ours
 
 /**
  * Opens `bytes` with the active password (the on-disk password when known,
@@ -32,3 +36,5 @@ export async function withLoadedPdf<T>(
     void doc.loadingTask.destroy()
   }
 }
+=======
+>>>>>>> theirs

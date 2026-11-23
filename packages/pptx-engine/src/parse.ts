@@ -72,7 +72,11 @@ import {
   type TablePartStyle,
   type TableStyleFlags,
 } from './table-style'
+<<<<<<< ours
 import { decodeNumericCharRefs, percentFraction } from './xml-utils'
+=======
+import { decodeNumericCharRefs, percentFraction, percentPoints } from './xml-utils'
+>>>>>>> theirs
 import { readRedactLabel } from './redaction-xml'
 
 const parser = new XMLParser({
@@ -316,6 +320,14 @@ const MATH_AC_RE =
   /<mc:AlternateContent\b[^>]*>\s*<mc:Choice\b[^>]*>\s*<a14:m\b[\s\S]*?<\/mc:AlternateContent>/g
 
 /**
+ * An a14:m equation a producer wrote bare, without the mc:AlternateContent
+ * wrapper PowerPoint uses — WPS/Aspose exports do this, including inside table
+ * cells (genoffice#2644). Matched after MATH_AC_RE, so the inner block of a
+ * wrapped equation is never touched.
+ */
+const BARE_MATH_RE = /<a14:m\b[^>]*(?:\/>|>[\s\S]*?<\/a14:m>)/g
+
+/**
  * Equations are paragraph children fast-xml-parser would file outside the run
  * list (losing their position and, on rebuild, the block itself). They become a
  * run carrying the block verbatim (base64 in an attribute, TextRun.rawXml after
@@ -359,6 +371,9 @@ function parseShapeFragment(
   // fields in document order instead of being appended after all plain runs.
   const semanticXml = fragXml
     .replace(MATH_AC_RE, mathBlockAsRun)
+    // a bare a14:m: PowerPoint never writes it, but the equation would otherwise
+    // disappear from the paragraph (and from a table cell's text) on parse
+    .replace(BARE_MATH_RE, mathBlockAsRun)
     .replace(/<a:br\b[^>]*\/>|<a:br\b[\s\S]*?<\/a:br>/g, '<a:r><a:t>\n</a:t></a:r>')
     .replace(/<a:fld\b/g, '<a:r')
     .replace(/<\/a:fld>/g, '</a:r>')
@@ -492,6 +507,11 @@ function parseSpShape(
       ? parseCustGeom(rawXml || anchor.originalXml, transform.offset.cx, transform.offset.cy)
       : undefined
   let fill = parseFill(spPr, ctx)
+  // PowerPoint paints an explicit spPr fill over useBgFill="1" (Designer writes both; the
+  // slide-background fill only applies when spPr carries no fill of its own)
+  const useBgFill =
+    (node['@_useBgFill'] === '1' || node['@_useBgFill'] === 'true') &&
+    (fill === undefined || fill.type === 'none')
   const txBody = node['p:txBody']
   // Text style inheritance chain: placeholders inherit font size/color/font defaults from
   // layout/master; every other shape (text box or autoshape, on the slide, layout or master)
@@ -626,7 +646,7 @@ function parseSpShape(
     ...(customGeometry ? { customGeometry } : {}),
     ...(!presetGeometry && !customGeometry && !ph ? { noGeometry: true as const } : {}),
     fill,
-    ...(node['@_useBgFill'] === '1' || node['@_useBgFill'] === 'true' ? { useBgFill: true } : {}),
+    ...(useBgFill ? { useBgFill: true } : {}),
     ...(fillOverlay && fillOverlay.type !== 'none' ? { fillOverlay } : {}),
     ...(stroke ? { stroke } : {}),
     ...(shadow ? { shadow } : {}),
@@ -1342,6 +1362,92 @@ function parseChartUserLines(
   return out
 }
 
+/**
+ * chartUserShapes text boxes / shapes (cdr:sp with a body, anything but the straight lines
+ * handled above): anchored by frame fractions (relSizeAnchor) or EMU from+ext (absSizeAnchor),
+ * mapped into slide coordinates and parsed as ordinary shapes. Read-only overlays.
+ */
+function parseChartUserShapes(
+  usXml: string,
+  frame: Transform,
+  anchor: ByteAnchor,
+  ctx: ParseContext,
+): TextElement[] {
+  let doc: any
+  try {
+    doc = parser.parse(usXml)
+  } catch {
+    return []
+  }
+  const root = doc['c:userShapes']
+  if (!root || !frame.offset.cx || !frame.offset.cy) return []
+  const list = (k: string): any[] => {
+    const raw = root[k]
+    return Array.isArray(raw) ? raw : raw ? [raw] : []
+  }
+  const num = (n: any) => {
+    const v = parseFloat(String(n ?? ''))
+    return Number.isFinite(v) ? v : 0
+  }
+  const out: TextElement[] = []
+  const build = (a: any, rect: { x: number; y: number; cx: number; cy: number }) => {
+    const spRaw = a?.['cdr:sp']
+    const sps: any[] = Array.isArray(spRaw) ? spRaw : spRaw ? [spRaw] : []
+    for (const sp of sps) {
+      const spPr = sp?.['cdr:spPr'] ?? {}
+      const prst = spPr['a:prstGeom']?.['@_prst']
+      if (prst === 'line' || prst === 'straightConnector1') continue
+      if (rect.cx <= 0 || rect.cy <= 0) continue
+      const xfrm = spPr['a:xfrm'] ?? {}
+      const nv = sp?.['cdr:nvSpPr'] ?? {}
+      const pNode = {
+        'p:nvSpPr': {
+          'p:cNvPr': nv['cdr:cNvPr'] ?? {},
+          'p:cNvSpPr': nv['cdr:cNvSpPr'] ?? {},
+          'p:nvPr': {},
+        },
+        'p:spPr': {
+          ...spPr,
+          'a:xfrm': {
+            ...(xfrm['@_rot'] ? { '@_rot': xfrm['@_rot'] } : {}),
+            ...(xfrm['@_flipH'] ? { '@_flipH': xfrm['@_flipH'] } : {}),
+            ...(xfrm['@_flipV'] ? { '@_flipV': xfrm['@_flipV'] } : {}),
+            'a:off': { '@_x': String(Math.round(rect.x)), '@_y': String(Math.round(rect.y)) },
+            'a:ext': { '@_cx': String(Math.round(rect.cx)), '@_cy': String(Math.round(rect.cy)) },
+          },
+        },
+        ...(sp?.['cdr:style'] ? { 'p:style': sp['cdr:style'] } : {}),
+        ...(sp?.['cdr:txBody'] ? { 'p:txBody': sp['cdr:txBody'] } : {}),
+      }
+      const el = parseSpShape(pNode, anchor, ctx)
+      if (el.type === 'text' || el.type === 'shape') out.push(el as TextElement)
+    }
+  }
+  for (const a of list('cdr:relSizeAnchor')) {
+    const fx = num(a?.['cdr:from']?.['cdr:x'])
+    const fy = num(a?.['cdr:from']?.['cdr:y'])
+    const tx = num(a?.['cdr:to']?.['cdr:x'])
+    const ty = num(a?.['cdr:to']?.['cdr:y'])
+    build(a, {
+      x: frame.offset.x + fx * frame.offset.cx,
+      y: frame.offset.y + fy * frame.offset.cy,
+      cx: (tx - fx) * frame.offset.cx,
+      cy: (ty - fy) * frame.offset.cy,
+    })
+  }
+  for (const a of list('cdr:absSizeAnchor')) {
+    const fx = num(a?.['cdr:from']?.['cdr:x'])
+    const fy = num(a?.['cdr:from']?.['cdr:y'])
+    build(a, {
+      x: frame.offset.x + fx * frame.offset.cx,
+      y: frame.offset.y + fy * frame.offset.cy,
+      cx: num(a?.['cdr:ext']?.['@_cx']),
+      cy: num(a?.['cdr:ext']?.['@_cy']),
+    })
+  }
+  return out
+}
+
 function graphicFramePassthrough(node: any, anchor: ByteAnchor, ctx: ParseContext): SlideElement {
   const data = node['a:graphic']?.['a:graphicData']
   const uri: string = data?.['@_uri'] ?? ''
@@ -1386,11 +1492,14 @@ function graphicFramePassthrough(node: any, anchor: ByteAnchor, ctx: ParseContex
       ? parseChartXml(chartXml, chartTheme, (spPr) => parseFill(spPr, chartFillCtx))
       : null
     if (model && ctx.chartStyleRels?.has(String(rid))) model.hasStylePart = true
+    let userShapes: TextElement[] = []
+    const frameXfrm = parseXfrm(node['p:xfrm'])
     if (model) {
       const usXml = rid ? ctx.chartUserShapes?.get(String(rid)) : undefined
       if (usXml) {
         const lines = parseChartUserLines(usXml, ctx)
         if (lines.length) model.userLines = lines
+        userShapes = parseChartUserShapes(usXml, frameXfrm, anchor, ctx)
       }
     }
     if (model) {
@@ -1400,10 +1509,11 @@ function graphicFramePassthrough(node: any, anchor: ByteAnchor, ctx: ParseContex
         id: uid('chart'),
         type: 'chart',
         anchor,
-        transform: parseXfrm(node['p:xfrm']),
+        transform: frameXfrm,
         name: cNvPr?.['@_name'],
         ...(descr ? { descr } : {}),
         chart: model,
+        ...(userShapes.length ? { userShapes } : {}),
       } satisfies ChartElement
     }
   }
@@ -3190,19 +3300,35 @@ function parseTableCell(
 
   if (tc['a:txBody']) {
     // Table-style text defaults (bold white header text etc.) injected at the end of the inheritance chain
-    const styleChain: TextStyleLevels[] =
-      part && (part.bold !== undefined || part.textColor)
-        ? [
-            {
-              levels: [
-                {
-                  ...(part.bold !== undefined ? { bold: part.bold } : {}),
-                  ...(part.textColor ? { color: part.textColor } : {}),
-                },
-              ],
-            },
-          ]
-        : []
+    const styleChain: TextStyleLevels[] = []
+    if (part && (part.bold !== undefined || part.textColor || part.fontRef || part.font)) {
+      const level: TextStyleLevels['levels'][number] = {
+        ...(part.bold !== undefined ? { bold: part.bold } : {}),
+        ...(part.textColor ? { color: part.textColor } : {}),
+      }
+      // fontRef picks the theme scheme as unresolved refs so a run re-resolves +mn-ea with
+      // its own script (ja-JP cells on a built-in style set kana in the theme's Jpan font,
+      // not in the master's Latin <a:ea>; PowerPoint ranks tcTxStyle above those defaults)
+      if (part.fontRef) {
+        const pre = part.fontRef === 'major' ? '+mj' : '+mn'
+        const latinFont = resolveFontRef(`${pre}-lt`, ctx.theme)
+        const eaFont = resolveFontRef(`${pre}-ea`, ctx.theme)
+        const csFont = resolveFontRef(`${pre}-cs`, ctx.theme)
+        if (latinFont) Object.assign(level, { latinFont, latinFontRef: `${pre}-lt` })
+        if (eaFont) Object.assign(level, { eaFont, eaFontRef: `${pre}-ea` })
+        if (csFont) level.csFont = csFont
+      }
+      if (part.font?.latin) {
+        level.latinFont = part.font.latin
+        delete level.latinFontRef
+      }
+      if (part.font?.ea) {
+        level.eaFont = part.font.ea
+        delete level.eaFontRef
+      }
+      if (part.font?.cs) level.csFont = part.font.cs
+      styleChain.push({ levels: [level], src: 'table style' })
+    }
     // Cell text without its own size sits on presentation.xml defaultTextStyle like any
     // non-placeholder shape (Google Slides export: 14pt default, PowerPoint draws 14pt)
     if (ctx.defaultTextStyle)
@@ -3672,8 +3798,12 @@ function parseTextBody(
 
 /** <a:spcPct val="150000"/> or val="150%" → 150 (%). */
 function spcPct(node: any): number | undefined {
+<<<<<<< ours
   const ratio = percentFraction(node?.['a:spcPct']?.['@_val'])
   return ratio != null ? ratio * 100 : undefined
+=======
+  return percentPoints(node?.['a:spcPct']?.['@_val'])
+>>>>>>> theirs
 }
 
 /** <a:spcPts val="2400"/> → 24 (pt). */
@@ -3840,10 +3970,16 @@ function parseParagraph(
       : rtlAttr === '0' || rtlAttr === 'false'
         ? false
         : undefined
-  const hangAttr = pPr['@_hangingPunct']
-  const hangingOff = hangAttr === '0' || hangAttr === 'false'
-  const latinLnBrk = pPr['@_latinLnBrk'] === '1' || pPr['@_latinLnBrk'] === 'true'
-  const eaLnBrkOff = pPr['@_eaLnBrk'] === '0' || pPr['@_eaLnBrk'] === 'false'
+  // Line-break switches inherit through lstStyle/master txStyles like any level property
+  const brkFlag = (k: 'hangingPunct' | 'latinLnBrk' | 'eaLnBrk'): boolean | undefined => {
+    const v = pPr[`@_${k}`]
+    if (v === '1' || v === 'true') return true
+    if (v === '0' || v === 'false') return false
+    return dflt?.[k]
+  }
+  const hangingPunct = brkFlag('hangingPunct')
+  const latinLnBrk = brkFlag('latinLnBrk')
+  const eaLnBrk = brkFlag('eaLnBrk')
 
   // Record which properties come from an explicit pPr (the rebuild path writes only explicit items; inherited values are not baked in)
   const pPrExplicit: NonNullable<Paragraph['pPrExplicit']> = {
@@ -3857,6 +3993,9 @@ function parseParagraph(
     ...(hasIndent ? { indent: true } : {}),
     ...(tabStops.length ? { tabLst: true } : {}),
     ...(hasDefTabSz ? { defTabSz: true } : {}),
+    ...(pPr['@_hangingPunct'] != null ? { hangingPunct: true } : {}),
+    ...(pPr['@_latinLnBrk'] != null ? { latinLnBrk: true } : {}),
+    ...(pPr['@_eaLnBrk'] != null ? { eaLnBrk: true } : {}),
   }
 
   return {
@@ -3866,9 +4005,9 @@ function parseParagraph(
       ? { alignSrc: pPr['@_algn'] ? 'paragraph' : (dflt?.src?.align ?? 'inherited') }
       : {}),
     ...(rtl != null ? { rtl } : {}),
-    ...(hangingOff ? { hangingPunct: false } : {}),
-    ...(latinLnBrk ? { latinLnBrk: true } : {}),
-    ...(eaLnBrkOff ? { eaLnBrk: false } : {}),
+    ...(hangingPunct != null ? { hangingPunct } : {}),
+    ...(latinLnBrk != null ? { latinLnBrk } : {}),
+    ...(eaLnBrk != null ? { eaLnBrk } : {}),
     level,
     pPrExplicit,
     ...(lineHeight != null ? { lineHeight } : {}),
@@ -4182,7 +4321,11 @@ function parseRun(r: any, ctx: ParseContext, dflt?: LevelTextStyle): TextRun {
     ...(ownFontSize != null ? {} : { fontSizeImplicit: true }),
     ...(ownLetterSpacing != null ? { letterSpacing: ownLetterSpacing } : {}),
     ...(rPr['@_kern'] != null ? { kern: (parseInt(rPr['@_kern'], 10) || 0) / 100 } : {}),
+<<<<<<< ours
     ...(rPr['@_baseline'] ? { baseline: (percentFraction(rPr['@_baseline']) ?? 0) * 100 } : {}),
+=======
+    ...(rPr['@_baseline'] ? { baseline: percentPoints(rPr['@_baseline']) ?? 0 } : {}),
+>>>>>>> theirs
     fontFamily,
     ...(latinFamily ? { latinFamily } : {}),
     ...(fontScriptHint != null ? { fontScriptHint } : {}),

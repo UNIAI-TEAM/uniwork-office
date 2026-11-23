@@ -7,7 +7,7 @@
 import { stripRedactExt, syncRedactExt } from './redaction-xml'
 import JSZip from 'jszip'
 import { PackageArchive, relsPathFor, resolveTarget, type Relationship } from './zip'
-import { parseClrMap, parseTheme, type Theme } from './theme'
+import { parseClrMap, parseTheme, themeWithOverride, type Theme } from './theme'
 import {
   parseSlide,
   parseDecorations,
@@ -183,6 +183,7 @@ export {
   addElement,
   addPicture,
   addImageMediaAndRel,
+  isSupportedImageExt,
   deleteElement,
   buildSpXml,
   buildTableXml,
@@ -278,6 +279,7 @@ export {
   type ChartSeries,
   type ChartKind,
   type ChartAxisStyle,
+  type ChartDataTable,
 } from './chart'
 export { parseChartExXml } from './chartex'
 export { getSlideNotes, setSlideNotes, notesPathForSlide, unescapeXml } from './notes'
@@ -324,7 +326,11 @@ export {
   readModel3dRotation,
   type Model3dRotation,
 } from './model3d'
+<<<<<<< ours
 export { glbBounds, isGlbContainer, type GlbBounds } from './glb-bounds'
+=======
+export { glbBounds, type GlbBounds } from './glb-bounds'
+>>>>>>> theirs
 export {
   addMedia,
   addModel3d,
@@ -384,6 +390,21 @@ export interface OpenedPptx {
   archive: PackageArchive
 }
 
+/**
+ * A slide's own themeOverride part (keep-source-formatting pastes) replaces the master
+ * theme's clrScheme/fontScheme for that slide: PowerPoint resolves every schemeClr on it,
+ * background included, against the override.
+ */
+function slideTheme(archive: PackageArchive, slidePath: string, theme: Theme): Theme {
+  for (const rel of archive.readRels(slidePath).values()) {
+    if (rel.type.endsWith('/themeOverride') && rel.targetMode !== 'External') {
+      const xml = archive.readText(resolveTarget(slidePath, rel.target))
+      if (xml) return themeWithOverride(theme, xml)
+    }
+  }
+  return theme
+}
+
 /** Parse one slide from the archive (assembling the inheritance-chain ctx); shared by openPptx and duplicateSlide. */
 function parseSlideFromArchive(archive: PackageArchive, slidePath: string): Slide | null {
   const slideXml = archive.readText(slidePath)
@@ -397,7 +418,7 @@ function parseSlideFromArchive(archive: PackageArchive, slidePath: string): Slid
   if (chain.themePath) {
     const themeXml = archive.readText(chain.themePath)
     if (themeXml) {
-      ctx.theme = parseTheme(themeXml)
+      ctx.theme = slideTheme(archive, slidePath, parseTheme(themeXml))
       // Dark masters remap schemeClr names (bg1→dk1 …); must be in place before any color resolution below
       ctx.theme.clrMap = parseClrMap(masterXml, layoutXml, slideXml)
       ctx.themeMediaRels = partMediaRels(archive, chain.themePath)
@@ -1123,7 +1144,7 @@ function slideInheritanceCtx(archive: PackageArchive, slidePath: string) {
   if (chain.themePath) {
     const themeXml = archive.readText(chain.themePath)
     if (themeXml) {
-      theme = parseTheme(themeXml)
+      theme = slideTheme(archive, slidePath, parseTheme(themeXml))
       theme.clrMap = parseClrMap(masterXml, layoutXml, archive.readText(slidePath) ?? undefined)
     }
   }
@@ -1470,7 +1491,8 @@ export interface EffectsPatch {
 
 /** #RRGGBB / #RRGGBBAA → <a:srgbClr> (alpha channel becomes an <a:alpha> child in 1000ths of a percent). */
 function effectColorXml(hex: string): string {
-  const m = /^#?([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$/.exec(hex)
+  const t = (hex ?? '').trim()
+  const m = /^#?([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$/.exec(t)
   const val = (m?.[1] ?? '000000').toUpperCase()
   const alpha = m?.[2] != null ? Math.round((parseInt(m[2], 16) / 255) * 100000) : 100000
   return alpha < 100000
@@ -2422,26 +2444,38 @@ export function connectionSiteForSide(el: SlideElement, side: ConnectionSide): n
   return (prst === 'ellipse' ? ELLIPSE_SIDES : RECT_SIDES)[side]
 }
 
-/** Connection point index → shape edge midpoint (edge sites of the preset geometry, else center). */
-function connectionPoint(el: SlideElement, idx: number): { x: number; y: number } {
-  const o = el.transform.offset
+/** Connection site index → unit-box point (edge sites of the preset geometry, else center). */
+function connectionSiteLocal(el: SlideElement, idx: number): { u: number; v: number } {
   const prst = el.type === 'shape' || el.type === 'picture' ? el.presetGeometry : undefined
   const sides = prst === 'ellipse' ? ELLIPSE_SIDES : RECT_SIDES
-  if (idx === sides.top) return { x: o.x + o.cx / 2, y: o.y }
-  if (idx === sides.left) return { x: o.x, y: o.y + o.cy / 2 }
-  if (idx === sides.bottom) return { x: o.x + o.cx / 2, y: o.y + o.cy }
-  if (idx === sides.right) return { x: o.x + o.cx, y: o.y + o.cy / 2 }
+  if (idx === sides.top) return { u: 0.5, v: 0 }
+  if (idx === sides.left) return { u: 0, v: 0.5 }
+  if (idx === sides.bottom) return { u: 0.5, v: 1 }
+  if (idx === sides.right) return { u: 1, v: 0.5 }
   if (prst === 'ellipse' && idx >= 1 && idx <= 7) {
     // odd ellipse sites are the 45-degree points: inset (1 - 1/sqrt2)/2 of each extent
     const k = 0.1464
     const left = idx === 1 || idx === 3
     const top = idx === 1 || idx === 7
-    return {
-      x: o.x + (left ? o.cx * k : o.cx * (1 - k)),
-      y: o.y + (top ? o.cy * k : o.cy * (1 - k)),
-    }
+    return { u: left ? k : 1 - k, v: top ? k : 1 - k }
   }
-  return { x: o.x + o.cx / 2, y: o.y + o.cy / 2 }
+  return { u: 0.5, v: 0.5 }
+}
+
+/** Connection point in slide space: site mirrored by the shape flips, then rotated about the box centre. */
+function connectionPoint(el: SlideElement, idx: number): { x: number; y: number } {
+  const t = el.transform
+  const o = t.offset
+  const site = connectionSiteLocal(el, idx)
+  const dx = ((t.flipH ? 1 - site.u : site.u) - 0.5) * o.cx
+  const dy = ((t.flipV ? 1 - site.v : site.v) - 0.5) * o.cy
+  const cxx = o.x + o.cx / 2
+  const cyy = o.y + o.cy / 2
+  const rad = ((t.rot ?? 0) / 60000) * (Math.PI / 180)
+  if (rad === 0) return { x: cxx + dx, y: cyy + dy }
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  return { x: cxx + dx * cos - dy * sin, y: cyy + dx * sin + dy * cos }
 }
 
 /**

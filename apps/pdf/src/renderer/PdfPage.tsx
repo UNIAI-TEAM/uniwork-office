@@ -7,6 +7,34 @@ import { markupLineRotation } from '../shared/markup-line'
 import type { LocalMarkup, PageGeom } from './annotations'
 import { MAX_PAGE_RENDER_PIXELS } from './view-config'
 
+function smoothPageImageUpscaling(context: CanvasRenderingContext2D): () => void {
+  const drawImage = context.drawImage
+  context.drawImage = (...args: [CanvasImageSource, ...number[]]) => {
+    const [, , , sourceWidth, sourceHeight, , , destWidth, destHeight] = args
+    // PDF.js disables interpolation at high zoom for images without /Interpolate.
+    // Smooth enlarged image draws on the viewer canvas, including scanned text.
+    if (!context.imageSmoothingEnabled && args.length === 9) {
+      const { a, b, c, d } = context.getTransform()
+      if (
+        Math.abs(destWidth) * Math.hypot(a, b) > Math.abs(sourceWidth) ||
+        Math.abs(destHeight) * Math.hypot(c, d) > Math.abs(sourceHeight)
+      ) {
+        context.imageSmoothingEnabled = true
+        try {
+          Reflect.apply(drawImage, context, args)
+        } finally {
+          context.imageSmoothingEnabled = false
+        }
+        return
+      }
+    }
+    Reflect.apply(drawImage, context, args)
+  }
+  return () => {
+    context.drawImage = drawImage
+  }
+}
+
 /** Which items in the container are within the (expanded) viewport — shared lazy-render basis
     for pages/thumbnails. Rebuild the observer when enabled flips (sidebar toggles unmount/remount the root) */
 export function useVisibleSet(
@@ -98,18 +126,22 @@ export function PdfPage({
       canvas.height = Math.floor(viewport.height * dpr)
       canvas.style.width = `${Math.floor(viewport.width)}px`
       canvas.style.height = `${Math.floor(viewport.height)}px`
-      renderTask = page.render({
-        canvas,
-        viewport,
-        // FormLayer renders interactive widgets as HTML. Exclude their saved appearance
-        // streams from the page bitmap or filled values are drawn twice after a reload.
-        annotationMode: AnnotationMode.ENABLE_FORMS,
-        transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
-      })
+      const context = canvas.getContext('2d', { alpha: false, willReadFrequently: true })
+      const restoreDrawImage = context && smoothPageImageUpscaling(context)
       try {
+        renderTask = page.render({
+          canvas,
+          viewport,
+          // FormLayer renders interactive widgets as HTML. Exclude their saved appearance
+          // streams from the page bitmap or filled values are drawn twice after a reload.
+          annotationMode: AnnotationMode.ENABLE_FORMS,
+          transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
+        })
         await renderTask.promise
       } catch {
         return // cancelled
+      } finally {
+        restoreDrawImage?.()
       }
       if (cancelled) return
       const textDiv = document.createElement('div')
@@ -166,13 +198,21 @@ export function MarkupOverlay({
           if (m.type === 'highlight') {
             style.background = `rgba(${r * 255}, ${g * 255}, ${b * 255}, 0.4)`
           } else if (m.type === 'squiggly') {
+<<<<<<< ours
             // Wavy line pinned to the quad's baseline edge; the stretched viewBox keeps
+=======
+            // Wavy line pinned to the quad's bottom edge; the stretched viewBox keeps
+>>>>>>> theirs
             // the wave periodic at any quad width while non-scaling-stroke keeps the
             // stroke 2px at any zoom (matches the saved annotation's appearance)
             const bar = `rgb(${r * 255}, ${g * 255}, ${b * 255})`
             const points = Array.from({ length: 21 }, (_, k) => {
               const y = k % 2 === 0 ? 3 : k % 4 === 1 ? 0.7 : 5.3
+<<<<<<< ours
               return sideways ? `${baselineLeft ? y : 6 - y},${k * 5}` : `${k * 5},${y}`
+=======
+              return `${k * 5},${y}`
+>>>>>>> theirs
             }).join(' ')
             return (
               <div
@@ -181,6 +221,7 @@ export function MarkupOverlay({
                 style={style}
               >
                 <svg
+<<<<<<< ours
                   width={sideways ? '6' : '100%'}
                   height={sideways ? '100%' : '6'}
                   viewBox={sideways ? '0 0 6 100' : '0 0 100 6'}
@@ -192,6 +233,13 @@ export function MarkupOverlay({
                       ? { top: 0, ...(baselineLeft ? { left: 0 } : { right: 0 }) }
                       : { bottom: 0, left: 0 }),
                   }}
+=======
+                  width="100%"
+                  height="6"
+                  viewBox="0 0 100 6"
+                  preserveAspectRatio="none"
+                  style={{ position: 'absolute', bottom: 0, left: 0, overflow: 'visible' }}
+>>>>>>> theirs
                   aria-hidden
                 >
                   <polyline

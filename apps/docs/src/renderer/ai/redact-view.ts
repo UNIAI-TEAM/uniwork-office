@@ -62,6 +62,10 @@ const ATOM_TYPES = new Set([
   'docNoteRef',
   'docXeMark',
   'docRuby',
+<<<<<<< ours
+=======
+  'docEqLayout',
+>>>>>>> theirs
   'docInlineImage',
   'docInlineMath',
   'docCellBoxes',

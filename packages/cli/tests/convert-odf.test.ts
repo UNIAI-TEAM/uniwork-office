@@ -1,8 +1,15 @@
 import { existsSync } from 'node:fs'
+<<<<<<< ours
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
+=======
+import { join } from 'node:path'
+import JSZip from 'jszip'
+import { describe, expect, it } from 'vitest'
+import { xlsxSidecarPath } from '../src/resources'
+>>>>>>> theirs
 import { run, tempDir } from './helpers'
 
 const ODF_NAMESPACES =
@@ -23,7 +30,13 @@ async function buildZip(files: Record<string, string>): Promise<Uint8Array> {
 }
 
 async function entryText(path: string, entry: string): Promise<string> {
+<<<<<<< ours
   const zip = await JSZip.loadAsync(await readFile(path))
+=======
+  const zip = await JSZip.loadAsync(
+    await import('node:fs/promises').then((fs) => fs.readFile(path)),
+  )
+>>>>>>> theirs
   const file = zip.file(entry)
   return file ? file.async('string') : ''
 }
@@ -43,6 +56,10 @@ describe('genoffice convert ODF import filters', () => {
       '<style:text-properties fo:font-weight="bold"/></style:style></office:styles>' +
       '</office:document-styles>'
     const odt = join(dir, 'report.odt')
+<<<<<<< ours
+=======
+    const { writeFile } = await import('node:fs/promises')
+>>>>>>> theirs
     await writeFile(odt, await buildZip({ 'content.xml': content, 'styles.xml': styles }))
 
     const out = join(dir, 'report.docx')
@@ -66,6 +83,10 @@ describe('genoffice convert ODF import filters', () => {
       '</draw:frame></draw:page>' +
       '</office:presentation></office:body></office:document-content>'
     const odp = join(dir, 'deck.odp')
+<<<<<<< ours
+=======
+    const { writeFile } = await import('node:fs/promises')
+>>>>>>> theirs
     await writeFile(odp, await buildZip({ 'content.xml': content }))
 
     const out = join(dir, 'deck.pptx')
@@ -79,6 +100,10 @@ describe('genoffice convert ODF import filters', () => {
 
   it('converts .ott/.otp templates through the same filters as .odt/.odp', async () => {
     const dir = tempDir()
+<<<<<<< ours
+=======
+    const { writeFile } = await import('node:fs/promises')
+>>>>>>> theirs
     const textContent =
       `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${ODF_NAMESPACES} office:version="1.2">` +
       '<office:body><office:text><text:h text:outline-level="1">Templated</text:h></office:text></office:body></office:document-content>'
@@ -100,13 +125,20 @@ describe('genoffice convert ODF import filters', () => {
     expect(await entryText(otpOut, 'ppt/slides/slide1.xml')).toContain('Deck template')
   })
 
+<<<<<<< ours
   it('refuses .ods and .ots spreadsheet conversions before reaching the xlsx sidecar', async () => {
     const dir = tempDir()
+=======
+  it.skipIf(!xlsxSidecarPath())('converts .ots through the workbook sidecar route', async () => {
+    const dir = tempDir()
+    const { writeFile } = await import('node:fs/promises')
+>>>>>>> theirs
     const sheetContent =
       `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${ODF_NAMESPACES} office:version="1.2">` +
       '<office:body><office:spreadsheet><table:table table:name="Probe"><table:table-row>' +
       '<table:table-cell office:value-type="float" office:value="10"><text:p>10</text:p></table:table-cell>' +
       '</table:table-row></table:table></office:spreadsheet></office:body></office:document-content>'
+<<<<<<< ours
     for (const [ext, mime] of [
       ['ods', 'application/vnd.oasis.opendocument.spreadsheet'],
       ['ots', 'application/vnd.oasis.opendocument.spreadsheet-template'],
@@ -189,11 +221,31 @@ describe('genoffice convert ODF import filters', () => {
       expect(ok.code).toBe(0)
       expect(existsSync(upperOut)).toBe(true)
     }
+=======
+    const ots = join(dir, 'grid.ots')
+    await writeFile(
+      ots,
+      await buildZip({
+        mimetype: 'application/vnd.oasis.opendocument.spreadsheet-template',
+        'META-INF/manifest.xml':
+          '<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet-template"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>',
+        'content.xml': sheetContent,
+      }),
+    )
+    const otsOut = join(dir, 'grid.xlsx')
+    const r = await run(['convert', ots, '--to', 'xlsx', '--out', otsOut, '--json'])
+    expect(r.code).toBe(0)
+    expect(r.json().detail).toMatchObject({ sheets: 1 })
+>>>>>>> theirs
   })
 
   it('refuses ODF routes that do not exist', async () => {
     const dir = tempDir()
     const odt = join(dir, 'report.odt')
+<<<<<<< ours
+=======
+    const { writeFile } = await import('node:fs/promises')
+>>>>>>> theirs
     await writeFile(odt, await buildZip({ 'content.xml': '<?xml version="1.0"?><x/>' }))
     const r = await run(['convert', odt, '--to', 'pptx', '--json'])
     expect(r.code).toBe(1)

@@ -18,8 +18,11 @@ export const MARKDOWN_CHANNELS = {
   rememberWikiFragment: 'markdown:remember-wiki-fragment',
   /** take the fragment remembered for a path, '' when there is none */
   takeWikiFragment: 'markdown:take-wiki-fragment',
+<<<<<<< ours
   /** main -> view: a fragment is waiting for the note this view already shows */
   wikiFragmentReady: 'markdown:wiki-fragment-ready',
+=======
+>>>>>>> theirs
   /** list the vault's notes for the `[[` suggester, breadth-first from the root */
   listWikiNotes: 'markdown:list-wiki-notes',
   /** create the note an unresolved `[[wiki link]]` names (never overwrites) */
@@ -78,7 +81,11 @@ export const MARKDOWN_CHANNELS = {
   aiPanelPrefsChanged: 'app:ai-panel-prefs-changed',
 } as const
 
+<<<<<<< ours
 /** bare target: no brackets, no alias (`name`, `name#Heading`, `#Heading`) */
+=======
+/** the raw text between `[[ ]]`, verbatim, as the editor holds it */
+>>>>>>> theirs
 export interface WikiLinkResolveRequest {
   /** absolute path of the document holding the links; '' when untitled */
   fromPath: string
@@ -138,6 +145,10 @@ export interface WikiHeadsRequest {
   /** absolute path of the open document, '' while untitled */
   fromPath: string
 }
+<<<<<<< ours
+=======
+
+>>>>>>> theirs
 export type WikiCreateNoteResult =
   | {
       ok: true
@@ -268,6 +279,16 @@ export interface SaveMarkdownRequest {
    * before the user confirms. Ignored when the document already has a path.
    */
   suggestedName?: string
+<<<<<<< ours
+=======
+  /**
+   * Name offered in the Save As dialog for a document that has never been
+   * saved. A plain ⌘S on an untitled document still asks where the file goes —
+   * the model-proposed name (or the first heading) prefills that dialog rather
+   * than replacing it, so the reader still chooses the location.
+   */
+  defaultName?: string
+>>>>>>> theirs
   /** write even though the file changed on disk since it was loaded or last saved */
   overwrite?: boolean
 }
@@ -351,10 +372,13 @@ import type { MarkdownTheme } from './markdown-theme'
 export interface MarkdownApi {
   /** Take the md path pending for this view (queued at tab creation); null = new untitled document */
   consumePending(): Promise<string | null>
+<<<<<<< ours
   /** Web frame only (UNI-1865): the renderer reports that the opened document finished
    *  mounting, so the passive lag detector's settle stamp starts at first paint. Absent
    *  on desktop. */
   noteDocumentMounted?(): void
+=======
+>>>>>>> theirs
   /** open any shell-routed document path (an AI answer's filenav citation) */
   openSourcePath(path: string): Promise<void>
   /**
@@ -375,10 +399,17 @@ export interface MarkdownApi {
   /** Take the fragment remembered for `path`; '' when there is none (it is consumed) */
   takeWikiFragment(path: string): Promise<string>
   /**
+<<<<<<< ours
    * A wiki link into the note this view already shows: the shell only
    * activates the tab, so main says the fragment for `path` is waiting.
    */
   onWikiFragmentReady?(handler: (path: string) => void): () => void
+=======
+   * List the vault's notes for the `[[` suggester: the resolution root walked
+   * breadth-first (the order the resolver matches in), capped so a huge
+   * library cannot stall the popup.
+   */
+>>>>>>> theirs
   listWikiNotes(): Promise<WikiNoteEntry[]>
   /**
    * Create the note an unresolved `[[target]]` names — Obsidian's "create new
@@ -393,7 +424,11 @@ export interface MarkdownApi {
    * and list that note's headings and block ids. Read-only — the suggester
    * lists what is there, it never writes an id into another file.
    */
+<<<<<<< ours
   wikiHeads?(request: WikiHeadsRequest): Promise<WikiHeadEntry[]>
+=======
+  wikiHeads(request: WikiHeadsRequest): Promise<WikiHeadEntry[]>
+>>>>>>> theirs
   /** Notes whose links resolve to `path` (the backlinks panel); '' answers []. */
   wikiBacklinks(path: string): Promise<WikiBacklink[]>
   wikiTags(): Promise<{ tag: string; files: string[] }[]>
@@ -547,6 +582,7 @@ export interface MarkdownApi {
   onAiSettingsChanged(handler: () => void): () => void
   /** shell only: switch to Home and open Settings › Account, UniWork AI sign-in (rejects in standalone) */
   openAiModelSettings(): Promise<void>
+<<<<<<< ours
   /** shell only: switch to Home and open Settings › Skills (the skills list) */
   openSkillsSettings(): Promise<void>
   /** the skills the user installed into UniWork Office (userData/skills) */
@@ -554,6 +590,15 @@ export interface MarkdownApi {
   /** the body of one installed skill, by name — the main process resolves the path */
   skillText(name: string): Promise<string>
   /** UniWork cloud sign-in state (shell-registered ai:gsk-status; loggedIn = signed in + entitled) */
+=======
+  /** shell only: switch to Home and open Settings › Integrations (the skills list) */
+  openSkillsSettings(): Promise<void>
+  /** the skills the user installed into GenOffice (userData/skills) */
+  skillsList(): Promise<UserSkillEntry[]>
+  /** the body of one installed skill, by name — the main process resolves the path */
+  skillText(name: string): Promise<string>
+  /** Genspark login state (shell-registered ai:gsk-status) — gates generate_image with the cloud-tools toggle */
+>>>>>>> theirs
   aiGskStatus(): Promise<GenSparkAccountStatus>
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>

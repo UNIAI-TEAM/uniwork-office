@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { app } from 'electron'
+<<<<<<< ours
 import {
   CLI_COMMAND,
   cleanupCliLinks,
@@ -14,6 +15,10 @@ import {
 import type { CliLinkState } from '../shared/home-api'
 import { writeAppSetting } from './app-settings'
 import { pruneStaleSchemeHandlers } from './uniwork-handler-entry'
+=======
+import { installCliLink } from '@genoffice/cli/install'
+import { writeAppSetting } from './app-settings'
+>>>>>>> theirs
 
 const SETTING_KEY = 'cliLink'
 
@@ -46,11 +51,21 @@ function cliLinkSupported(): boolean {
 
 /**
  * Every launch: record where the genoffice launcher lives so agents can find it
+<<<<<<< ours
  * without a PATH (the `genoffice` skill reads `~/.genoffice/launcher`). That is
  * one line in the app's own ~/.genoffice folder and nothing else: the command on the
  * PATH (a symlink in a bin folder, a Windows PATH entry) is only created when the
  * user asks for it in Settings (installCliLinkOnRequest).
  * Silent and best effort.
+=======
+ * without a PATH (the `genoffice` skill reads `~/.genoffice/launcher`), then
+ * try to expose it on the PATH. The dmg has no installer step to do that, so
+ * macOS retries on each start until a writable directory turns up. Windows
+ * gets its PATH entry from the NSIS installer on every install and update, so
+ * nothing runs here: the PATH probe spawns PowerShell, and with Windows
+ * Terminal as the default console host a hidden child still flashes a window
+ * on the first launch of each version (genoffice#2011). Silent and best effort.
+>>>>>>> theirs
  */
 export function recordCliLauncher(): void {
   if (!app.isPackaged) return
@@ -61,6 +76,7 @@ export function recordCliLauncher(): void {
       console.log('[genoffice] cli launcher not recorded: app runs from a temporary mount')
       return
     }
+<<<<<<< ours
     writeLauncherFile(launcherFilePath(process.env), launcherDir())
   } catch (err) {
     console.warn(
@@ -112,6 +128,14 @@ export function installCliLinkOnRequest(settingsPath: string): CliLinkState {
   try {
     writeLauncherFile(launcherFilePath(process.env), launcherDir())
     const outcome = installCliLink(linkOptions())
+=======
+    const dir = join(process.resourcesPath, 'cli')
+    writeLauncherFile(launcherFilePath(process.env), dir)
+    if (process.platform === 'win32') return
+    const version = app.getVersion()
+    const launcher = join(dir, 'genoffice')
+    const outcome = installCliLink({ launcher })
+>>>>>>> theirs
     console.log(
       `[genoffice] cli link: ${outcome.status}${outcome.location ? ` (${outcome.location})` : ''}` +
         (outcome.pathHint ? `; not on PATH, add it with: ${outcome.pathHint}` : ''),

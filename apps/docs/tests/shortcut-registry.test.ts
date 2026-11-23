@@ -18,6 +18,7 @@ import {
 } from '../src/renderer/shortcuts'
 import { DOCS_MENU_SHORTCUTS } from '../src/shared/docs-shortcuts'
 import { strings } from '../src/renderer/i18n/strings'
+import { COMMANDS, type CommandDef } from '../src/shared/commands'
 
 const CASES: [ShortcutPlatform, ShortcutSurface][] = [
   ['win', 'desktop'],
@@ -114,6 +115,7 @@ describe('shortcut registry', () => {
   })
 
   it('lists every menu accelerator', () => {
+<<<<<<< ours
     const listed = new Set(SHORTCUTS.map((def) => def.action))
     for (const [item, id] of Object.entries(DOCS_MENU_SHORTCUTS))
       expect(listed.has(id), `${item} (${id}) is not in the shortcut sheet`).toBe(true)
@@ -123,5 +125,32 @@ describe('shortcut registry', () => {
     const source = readFileSync(join(__dirname, '../src/main/docs-main.ts'), 'utf8')
     expect(source.match(/accelerator: ['"`]/g) ?? []).toEqual([])
     expect(source.match(/accelerator: acc\(/g)?.length).toBeGreaterThan(15)
+=======
+    // most live in the command table; the menu builder still spells a few itself
+    const source = readFileSync(join(__dirname, '../src/main/docs-main.ts'), 'utf8')
+    const accelerators = [
+      ...Object.values<CommandDef>(COMMANDS).flatMap((def) =>
+        typeof def.accelerator === 'string' ? [def.accelerator] : [],
+      ),
+      ...[...source.matchAll(/accelerator: '([^']+)'/g)].map((m) => m[1]),
+    ]
+    expect(accelerators.length).toBeGreaterThan(15)
+    const listed = new Set(SHORTCUTS.flatMap((def) => chords(def, false)))
+    for (const accelerator of accelerators) {
+      // Electron writes modifiers in any order; the sheet renders Ctrl+Alt+Shift+key
+      const parts = accelerator.split('+')
+      const key = parts.pop()!
+      const mods = new Set(parts)
+      const normalized = [
+        mods.has('CmdOrCtrl') || mods.has('Ctrl') ? 'Ctrl' : null,
+        mods.has('Alt') ? 'Alt' : null,
+        mods.has('Shift') ? 'Shift' : null,
+        key,
+      ]
+        .filter(Boolean)
+        .join('+')
+      expect(listed.has(normalized), `${accelerator} is not in the shortcut sheet`).toBe(true)
+    }
+>>>>>>> theirs
   })
 })

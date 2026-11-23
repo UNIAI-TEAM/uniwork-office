@@ -55,6 +55,10 @@ export interface TrackChangesOptions {
   changedLines: ChangedLines
   changedLinesColor: LineColor
   commentColor: RevColor
+<<<<<<< ours
+=======
+  /** the open document's setting (w:doNotTrackMoves), not a preference: the stored value is unused */
+>>>>>>> theirs
   trackMoves: boolean
   moveFromMark: RevMark
   moveFromColor: RevColor
@@ -276,6 +280,7 @@ export function trackChangesOptionsCss(o: TrackChangesOptions): string {
       `:where(.app) .has-rpr-change{${o.fmtMark === 'none' ? RESET_MARK : `color:${ink};${markDecl(o.fmtMark, ink)}`}}`,
     )
   }
+<<<<<<< ours
   if (!o.trackMoves) {
     // moves read as a plain deletion + insertion (the author stylesheet colors them like one)
     rules.push(
@@ -294,6 +299,19 @@ export function trackChangesOptionsCss(o: TrackChangesOptions): string {
     move('doc-move-from', o.moveFromMark, o.moveFromColor, d.moveFromMark)
     move('doc-move-to', o.moveToMark, o.moveToColor, d.moveToMark)
   }
+=======
+  // trackMoves only decides how a new cut + paste is recorded: moves already in the document keep their markup
+  const move = (cls: string, mark: RevMark, color: RevColor, defMark: RevMark) => {
+    // by-author: drop the fixed move green so the author stylesheet (or the root ink) applies
+    if (color === 'author') rules.push(`.${cls}{--docs-paper-rev-ink:inherit}`)
+    else if (color !== d.moveFromColor)
+      rules.push(`.app .${cls}{--docs-paper-rev-ink:${revColorVar(color)}}`)
+    if (mark !== defMark)
+      rules.push(`:where(.app) .${cls}{${markDecl(mark, 'var(--docs-paper-rev-ink)')}}`)
+  }
+  move('doc-move-from', o.moveFromMark, o.moveFromColor, d.moveFromMark)
+  move('doc-move-to', o.moveToMark, o.moveToColor, d.moveToMark)
+>>>>>>> theirs
   if (o.changedLines === 'none') rules.push('.app .change-bar{display:none}')
   const out: string[] = []
   if (vars.length) out.push(`.app{${vars.join(';')}}`)
@@ -303,6 +321,11 @@ export function trackChangesOptionsCss(o: TrackChangesOptions): string {
 
 /** which move ends take the author's ink instead of Word's fixed move green */
 export const movesByAuthor = (o: TrackChangesOptions): { from: boolean; to: boolean } => ({
+<<<<<<< ours
   from: !o.trackMoves || o.moveFromColor === 'author',
   to: !o.trackMoves || o.moveToColor === 'author',
+=======
+  from: o.moveFromColor === 'author',
+  to: o.moveToColor === 'author',
+>>>>>>> theirs
 })

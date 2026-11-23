@@ -34,7 +34,11 @@ describe('the delimited import progress wiring', () => {
   })
 
   it('registers the import with the registry the cancel reaches', () => {
+<<<<<<< ours
     expect(mainSource).toContain('pendingImports.start(event.sender.id)')
+=======
+    expect(mainSource).toContain('pendingImports.start(owner)')
+>>>>>>> theirs
     expect(mainSource).toContain('pendingImports.cancel(event.sender.id)')
     // the controller the import runs under is the one the registry hands out
     expect(mainSource).toContain('signal: importController.signal')
@@ -67,6 +71,7 @@ describe('the delimited import progress wiring', () => {
     expect(mainSource).toContain('pendingImports.wasCancelled(importController)')
     expect(appSource).toContain('appImportCanceled')
   })
+<<<<<<< ours
 
   it('cancels a pending import when the Sheets webContents is destroyed', () => {
     const destroyedBlock = mainSource.slice(
@@ -98,4 +103,6 @@ describe('the delimited import progress wiring', () => {
     expect(secondAbortCheck).toBeGreaterThan(writeCall)
     expect(secondAbortCheck).toBeLessThan(tempCleanup)
   })
+=======
+>>>>>>> theirs
 })

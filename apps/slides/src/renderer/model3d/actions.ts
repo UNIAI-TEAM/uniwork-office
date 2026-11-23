@@ -2,7 +2,11 @@
  * 3D models in the editor: the renderer draws them (scene.ts), the main process stores the
  * rotation and the drawing as PowerPoint does (pptx-engine/model3d.ts).
  */
+<<<<<<< ours
 import { isGlbContainer, NO_ROTATION, type Model3dRotation } from '@genoffice/pptx-engine/model3d'
+=======
+import { NO_ROTATION, type Model3dRotation } from '@genoffice/pptx-engine/model3d'
+>>>>>>> theirs
 import type { RenderSlide } from '@genoffice/pptx-render'
 import type { ActionCtx } from '../action-context'
 import { FIT_WIDTH } from '../app-constants'
@@ -31,7 +35,10 @@ export async function insertModel3dFile(ctx: ActionCtx): Promise<void> {
     posterBase64 = bytesToBase64(await view.png(size.width, size.height, NO_ROTATION))
   } catch {
     ctx.setStatus(t('appStatusModel3dNoPreview'))
+<<<<<<< ours
     if (!isGlbContainer(picked.bytes)) return
+=======
+>>>>>>> theirs
   } finally {
     view?.dispose()
   }

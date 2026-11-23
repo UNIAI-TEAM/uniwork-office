@@ -12,6 +12,7 @@ import {
 } from '@genoffice/ui'
 import { findShortcut } from '@genoffice/shortcuts'
 import { useI18n } from '../i18n/locale'
+<<<<<<< ours
 import { cap } from '../capabilities'
 import {
   markdownAria,
@@ -21,6 +22,8 @@ import {
   type MarkdownCommand,
 } from '../shortcuts'
 import { OPEN_LINK_EVENT } from '../editor/tableKeymap'
+=======
+>>>>>>> theirs
 import { MARKDOWN_THEME_IDS, type MarkdownTheme } from '../../shared/markdown-theme'
 import type { StringKey } from '../i18n/locale'
 import { uiOp, type BlockType, type ListKind, type StylableMark } from '../editor/ops'
@@ -56,10 +59,15 @@ interface Props {
   dirty: boolean
   onSave: () => void
   onSaveAs: () => void
+<<<<<<< ours
   /** absent = no Export Word entry (desktop: the shell File menu owns it; web frame: the entry) */
   onExport?: () => void
   /** the document is not ready (a view-only copy can still be exported: that only reads it) */
   exportDisabled?: boolean
+=======
+  /** Ask the model for a name, then open Save As with it prefilled */
+  onNameWithAi: () => void
+>>>>>>> theirs
   onFind: () => void
   autoSave: boolean
   onToggleAutoSave: (on: boolean) => void
@@ -89,10 +97,13 @@ interface Props {
   onCopyBlockLink: () => void
   spellcheck: boolean
   onToggleSpellcheck: () => void
+<<<<<<< ours
   /** false on the web (cap 'autoSave'): no AutoSave toggle */
   showAutoSave?: boolean
   /** false on the web (cap 'ai'): no AI group */
   showAi?: boolean
+=======
+>>>>>>> theirs
   mdTheme: MarkdownTheme
   onMarkdownTheme: (theme: MarkdownTheme) => void
   aiOpen: boolean
@@ -227,6 +238,7 @@ function ThemePicker({
   useDismissablePopover(open, () => setOpen(false), {
     inside: () => [wrapRef.current],
   })
+<<<<<<< ours
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -238,6 +250,8 @@ function ThemePicker({
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [open])
+=======
+>>>>>>> theirs
   return (
     <div className="md-theme-wrap" ref={wrapRef}>
       <IconBtn
@@ -274,8 +288,11 @@ function ThemePicker({
   )
 }
 
+<<<<<<< ours
 /** `title` is the plain command name (the accessible name); the tooltip adds the `command` row's chord and
  * the chord also goes to aria-keyshortcuts */
+=======
+>>>>>>> theirs
 function IconBtn({
   title,
   command,
@@ -313,8 +330,12 @@ export function Ribbon({
   dirty,
   onSave,
   onSaveAs,
+<<<<<<< ours
   onExport,
   exportDisabled = false,
+=======
+  onNameWithAi,
+>>>>>>> theirs
   onFind,
   autoSave,
   onToggleAutoSave,
@@ -338,8 +359,11 @@ export function Ribbon({
   onCopyBlockLink,
   spellcheck,
   onToggleSpellcheck,
+<<<<<<< ours
   showAutoSave = true,
   showAi = true,
+=======
+>>>>>>> theirs
   mdTheme,
   onMarkdownTheme,
   aiOpen,
@@ -522,9 +546,47 @@ export function Ribbon({
         <button
           type="button"
           className="qa-btn"
+<<<<<<< ours
           data-tip={withMarkdownHint(t('undo'), 'undo')}
           aria-label={markdownPlainLabel(t('undo'))}
           aria-keyshortcuts={markdownAria('undo') || undefined}
+=======
+          data-tip={t('save')}
+          aria-label={t('save')}
+          disabled={disabled || !dirty}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onSave}
+        >
+          <IconSave size={16} />
+        </button>
+        <button
+          type="button"
+          className="qa-btn qa-save-as"
+          data-tip={t('saveAs')}
+          aria-label={t('saveAs')}
+          disabled={disabled}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onSaveAs}
+        >
+          {t('saveAs')}
+        </button>
+        <button
+          type="button"
+          className="qa-btn qa-name-with-ai"
+          data-tip={t('aiNameFile')}
+          aria-label={t('aiNameFile')}
+          disabled={off}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onNameWithAi}
+        >
+          {t('aiNameFile')}
+        </button>
+        <button
+          type="button"
+          className="qa-btn"
+          data-tip={t('undo')}
+          aria-label={t('undo')}
+>>>>>>> theirs
           disabled={sourceHistory ? !sourceHistory.canUndo : off || !state?.canUndo}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() =>
@@ -549,10 +611,16 @@ export function Ribbon({
         </button>
         <button
           type="button"
+<<<<<<< ours
           className="qa-btn"
           data-tip={withMarkdownHint(t('findTip'), 'find')}
           aria-label={markdownPlainLabel(t('findTip'))}
           aria-keyshortcuts={markdownAria('find') || undefined}
+=======
+          className="qa-btn qa-find"
+          data-tip={t('findTip')}
+          aria-label={t('findTip')}
+>>>>>>> theirs
           disabled={findOff}
           onMouseDown={(e) => e.preventDefault()}
           onClick={onFind}
@@ -720,6 +788,7 @@ export function Ribbon({
                   </span>
                 )}
               </span>
+<<<<<<< ours
               {/* writes a `^id` into the document and links by file name: the vault only (cap 'wikiVault'),
                   and `off` already covers a view-only or locked copy */}
               {cap('wikiVault') && (
@@ -727,6 +796,11 @@ export function Ribbon({
                   <IconBlockLink size={ICON} />
                 </IconBtn>
               )}
+=======
+              <IconBtn title={t('blockLink')} disabled={off} onClick={onCopyBlockLink}>
+                <IconBlockLink size={ICON} />
+              </IconBtn>
+>>>>>>> theirs
             </div>
           </div>
         )}
@@ -838,12 +912,21 @@ export function Ribbon({
                 <IconOutlineView size={ICON} />
               </IconBtn>
             )}
+<<<<<<< ours
             {/* the paper theme persists through the desktop's config file (cap 'mdTheme': no web store) */}
             {cap('mdTheme') && (
               <ThemePicker mdTheme={mdTheme} disabled={disabled} onPick={onMarkdownTheme} />
             )}
             {/* the vault views read the desktop's notes folder (cap 'wikiVault': off on the web) */}
             {cap('wikiVault') && !sourceMode && (
+=======
+            <ThemePicker
+              mdTheme={mdTheme}
+              disabled={disabled || sourceMode || sourceViewOpen}
+              onPick={onMarkdownTheme}
+            />
+            {!sourceMode && (
+>>>>>>> theirs
               <IconBtn
                 title={t('backlinks')}
                 active={backlinksOpen}
@@ -853,7 +936,11 @@ export function Ribbon({
                 <IconBacklinks size={ICON} />
               </IconBtn>
             )}
+<<<<<<< ours
             {cap('wikiVault') && !sourceMode && (
+=======
+            {!sourceMode && (
+>>>>>>> theirs
               <IconBtn
                 title={t('tags')}
                 active={tagsOpen}
@@ -863,7 +950,11 @@ export function Ribbon({
                 <IconTag size={ICON} />
               </IconBtn>
             )}
+<<<<<<< ours
             {cap('wikiVault') && !sourceMode && (
+=======
+            {!sourceMode && (
+>>>>>>> theirs
               <IconBtn title={t('graph')} disabled={disabled} onClick={onOpenGraph}>
                 <IconGraph size={ICON} />
               </IconBtn>
@@ -876,7 +967,11 @@ export function Ribbon({
             >
               <IconSpellcheck size={ICON} />
             </IconBtn>
+<<<<<<< ours
             {showAi && !sourceMode && (
+=======
+            {!sourceMode && (
+>>>>>>> theirs
               <IconBtn
                 title={t('redactEnable')}
                 active={redactEnabled}

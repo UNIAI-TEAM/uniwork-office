@@ -8,7 +8,13 @@ export const ms = {
   aiStarterPolishAll: 'Perhalusi keseluruhan dokumen dengan nada lebih profesional',
   aiStarterContinue: 'Teruskan menulis dari bahagian akhir dokumen',
   aiStarterFillTemplate: 'Cari dan isi ruang letak dalam dokumen ini',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: 'Log masuk ke Genspark',
+  aiGskLoginOk: 'Berjaya log masuk ke Genspark',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: 'Buka pembantu AI',
   aiSummarizeBtn: 'Ringkasan AI',
   aiSummarizePrompt: 'Ringkaskan kandungan utama dan perkara penting dokumen ini',
@@ -115,6 +121,11 @@ export const ms = {
     'Jejak perubahan dihidupkan: suntingan kandungan AI ditandakan sebagai semakan (sisipan bergaris bawah, pemadaman bergaris batal); terima atau tolak dalam Semakan',
   aiTrackOffTitle:
     'Jejak perubahan dimatikan: suntingan AI terus berkuat kuasa (masih boleh dikembalikan melalui snapshot versi)',
+  aiRevisionBarTitle: 'Semakan',
+  aiRevisionCount: '{count} perubahan belum selesai',
+  aiRevisionRejectAll: 'Tolak semua',
+  aiRevisionAcceptAll: 'Terima semua',
+  aiRevisionPara: 'Perenggan {n}',
   aiTurnLimit:
     '(Had pusingan panggilan alat untuk permintaan ini telah dicapai; jawapan di atas berdasarkan langkah yang telah selesai dan mungkin tidak lengkap.)',
   aiStopped: '(Dihentikan)',
@@ -126,6 +137,8 @@ export const ms = {
   aiUnknownError: 'Ralat tidak diketahui',
   aiTimeoutError:
     'Permintaan AI tamat masa: rangkaian tidak memberi respons, proses dihentikan. Semak sambungan anda dan cuba lagi',
+  aiRegionError:
+    'Penyedia model ini tidak memberi perkhidmatan di rantau semasa anda — pilih model lain atau tukar rangkaian',
   aiOverloadedError: 'Perkhidmatan AI sedang sibuk — sila cuba lagi sebentar lagi',
   aiNetworkError:
     'Masalah rangkaian: tidak dapat menghubungi perkhidmatan AI. Semak sambungan anda dan cuba lagi',
@@ -133,6 +146,9 @@ export const ms = {
   aiSumImageAttachment: 'Lampiran imej {name}',
   aiSumRead: 'Baca {name}',
   aiSumReadAttachmentName: 'Baca lampiran {name}',
+  aiSumSkillsList: 'Senarai skill dipasang',
+  aiSumSkillRead: 'Baca skill {name}',
+  aiSumRunCli: 'Jalankan {args}',
   aiSumWebSearch: 'Carian web',
   aiSumWebSearchDone: 'Mencari "{query}" ({count} hasil)',
   aiSumImageSearch: 'Carian imej',
@@ -195,6 +211,7 @@ export const ms = {
   aiCmdImages: '{count} imej dikemas kini',
   aiCmdToc: 'Jadual kandungan disisipkan ({count} entri)',
   aiCmdSkipped: ' ({count} blok dilindungi dilangkau)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
   aiClarifyTitle: 'Beberapa soalan sebelum meneruskan',
@@ -209,6 +226,8 @@ export const ms = {
   aiClarifySubmit: 'Teruskan',
   aiSumClarify: 'Penjelasan dijawab',
   aiSumClarifySkipped: 'Penjelasan dilangkau',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Jana peta minda dokumen ini',
   aiMindMapBtn: 'Peta Minda AI',
   aiMindMapPrompt:
@@ -219,9 +238,20 @@ export const ms = {
   aiMindMapAskPrompt: 'Terangkan tentang "{label}" dalam dokumen ini',
   aiMindMapJump: 'Lompat ke petik yang dirujuk',
   aiMindMapExport: 'Eksport PNG',
+<<<<<<< ours
   aiMindMapReset: 'Set semula pandangan',
   aiMindMapExpand: 'Kembangkan cabang',
   aiMindMapCollapse: 'Lipat cabang',
   aiMindMapExportSvg: 'Eksport SVG',
   aiMindMapInsert: 'Sisipkan ke dokumen',
+=======
+  aiMindMapExportSvg: 'Eksport SVG',
+  aiMindMapInsert: 'Sisipkan ke dokumen',
+  aiMindMapReset: 'Set semula pandangan',
+  aiMindMapExpand: 'Kembangkan cabang',
+  aiMindMapCollapse: 'Lipat cabang',
+  aiMindMapToggleLayout: 'Tukar susun atur',
+  aiMindMapLayoutTopDown: 'Tukar kepada susun atur atas ke bawah',
+  aiMindMapLayoutLeftRight: 'Tukar kepada susun atur kiri ke kanan',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

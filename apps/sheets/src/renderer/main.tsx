@@ -8,16 +8,25 @@ import '@genoffice/ui/screentip.css'
 import '@genoffice/ui/ai-model-picker.css'
 import '@genoffice/ui/ai-queue-strip.css'
 import '@genoffice/ui/ai-usage.css'
+<<<<<<< ours
+=======
+import '@genoffice/ui/ai-skills.css'
+>>>>>>> theirs
 import '@genoffice/ui/color-picker.css'
 import '@genoffice/ui/dropdown.css'
 import '@genoffice/ui/ribbon-collapse.css'
 import '@genoffice/ui/markdown.css'
 import '@genoffice/ui/ai-panel-prefs.css'
 import '@genoffice/ui/ai-scope-quote.css'
+import '@genoffice/ui/image-viewer.css'
 import '@univerjs/preset-sheets-core/lib/index.css'
 
+<<<<<<< ours
 import { cap } from './capabilities'
 import { EngineUnavailableScreen } from './EngineUnavailableScreen'
+=======
+import { App } from './App'
+>>>>>>> theirs
 import {
   installCanvasFontFallback,
   registerTextDingbatsFace,

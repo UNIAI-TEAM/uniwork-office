@@ -1,14 +1,23 @@
+<<<<<<< ours
 import { useMemo, useState } from 'react'
+=======
+import { useEffect, useMemo, useState } from 'react'
+>>>>>>> theirs
 import type { Editor } from '@tiptap/core'
 import { mergeFieldInstruction } from '@genoffice/docx-engine'
 import type { MergeDataSource, MergeOutputMode } from '../../shared/ipc'
 import type { PmNode } from '../editor/convert'
 import { documentText, substituteMergeFields } from '../mail-merge/template'
+<<<<<<< ours
 import {
   mergedCountLabel,
   type MailMergeRequest,
   type MailMergeResponse,
 } from '../mail-merge/output'
+=======
+import type { MailMergeRequest, MailMergeResponse } from '../mail-merge/output'
+import { firstRecordInRange, recordsInRange, type MergeRange } from '../mail-merge/range'
+>>>>>>> theirs
 import {
   AVERY_5160,
   clampGridCount,
@@ -44,6 +53,17 @@ export interface MailMergePanelProps {
   /** the record the preview shows */
   recordIndex: number
   onRecordIndex: (index: number) => void
+<<<<<<< ours
+=======
+  /** the records the merge takes, of those the preview steps through */
+  range: MergeRange
+  /** the kind of output the panel opens on */
+  initialMode?: MergeOutputMode
+  /** counts the asks, so the same kind asked for again is taken again */
+  pick?: number
+  /** turn the document into a sheet of labels on this layout (Update Labels then keeps it in step) */
+  onLabelSheet?: (layout: MergePageLayout) => void
+>>>>>>> theirs
   onClose: () => void
 }
 
@@ -55,11 +75,25 @@ export function MailMergePanel({
   onMerge,
   recordIndex,
   onRecordIndex,
+<<<<<<< ours
   onClose,
 }: MailMergePanelProps) {
   const { t, lang } = useI18n()
   const modalKeys = useModalKeys(onClose)
   const [mode, setMode] = useState<MergeOutputMode>('perRecord')
+=======
+  range,
+  initialMode = 'perRecord',
+  pick,
+  onLabelSheet,
+  onClose,
+}: MailMergePanelProps) {
+  const { t } = useI18n()
+  const modalKeys = useModalKeys(onClose)
+  const [mode, setMode] = useState<MergeOutputMode>(initialMode)
+  // the menu still runs while the panel is open: Labels after Envelopes changes the kind
+  useEffect(() => setMode(initialMode), [initialMode, pick])
+>>>>>>> theirs
   const [namePattern, setNamePattern] = useState('')
   // the label stock: the built-in sheet, or an even custom grid on Letter/A4
   const [labelStock, setLabelStock] = useState<'avery5160' | 'custom'>('avery5160')
@@ -91,6 +125,10 @@ export function MailMergePanel({
 
   const records = source?.records ?? []
   const record = records[recordIndex]
+<<<<<<< ours
+=======
+  const merged = recordsInRange(records, range, recordIndex)
+>>>>>>> theirs
   // the template with this record's values in it, as the user reads it
   const preview = useMemo(() => {
     if (!record) return ''
@@ -102,14 +140,23 @@ export function MailMergePanel({
   }
 
   const runMerge = async () => {
+<<<<<<< ours
     if (!source || records.length === 0) return
+=======
+    if (!source || merged.length === 0) return
+>>>>>>> theirs
     setBusy(true)
     setError('')
     setDone('')
     try {
       const result = await onMerge({
         mode,
+<<<<<<< ours
         records,
+=======
+        records: merged,
+        firstRecord: firstRecordInRange(range, recordIndex),
+>>>>>>> theirs
         fields: source.fields,
         namePattern,
         layout: layoutOf(),
@@ -123,7 +170,11 @@ export function MailMergePanel({
         setBusy(false)
         return
       }
+<<<<<<< ours
       setDone(mergedCountLabel(t, lang, result.count ?? records.length))
+=======
+      setDone(t('ribbonMailingsMerged', { n: result.count ?? merged.length }))
+>>>>>>> theirs
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -196,69 +247,108 @@ export function MailMergePanel({
           <div className="mailmerge-section">
             <div className="mailmerge-label">{t('ribbonMailingsOutput')}</div>
             <div className="modal-row">
+<<<<<<< ours
               <label className="protect-check mailmerge-radio">
+=======
+              <label className="mailmerge-radio">
+>>>>>>> theirs
                 <input
                   type="radio"
                   name="mailmerge-output"
                   checked={mode === 'perRecord'}
                   onChange={() => setMode('perRecord')}
                 />
+<<<<<<< ours
                 <span className="ctl" aria-hidden="true" />
                 {t('ribbonMailingsOutputPerRecord')}
               </label>
               <label className="protect-check mailmerge-radio">
+=======
+                {t('ribbonMailingsOutputPerRecord')}
+              </label>
+              <label className="mailmerge-radio">
+>>>>>>> theirs
                 <input
                   type="radio"
                   name="mailmerge-output"
                   checked={mode === 'single'}
                   onChange={() => setMode('single')}
                 />
+<<<<<<< ours
                 <span className="ctl" aria-hidden="true" />
+=======
+>>>>>>> theirs
                 {t('ribbonMailingsOutputSingle')}
               </label>
             </div>
             <div className="modal-row">
+<<<<<<< ours
               <label className="protect-check mailmerge-radio">
+=======
+              <label className="mailmerge-radio">
+>>>>>>> theirs
                 <input
                   type="radio"
                   name="mailmerge-output"
                   checked={mode === 'labels'}
                   onChange={() => setMode('labels')}
                 />
+<<<<<<< ours
                 <span className="ctl" aria-hidden="true" />
                 {t('ribbonMailingsOutputLabels')}
               </label>
               <label className="protect-check mailmerge-radio">
+=======
+                {t('ribbonMailingsOutputLabels')}
+              </label>
+              <label className="mailmerge-radio">
+>>>>>>> theirs
                 <input
                   type="radio"
                   name="mailmerge-output"
                   checked={mode === 'envelopes'}
                   onChange={() => setMode('envelopes')}
                 />
+<<<<<<< ours
                 <span className="ctl" aria-hidden="true" />
+=======
+>>>>>>> theirs
                 {t('ribbonMailingsOutputEnvelopes')}
               </label>
             </div>
             {mode === 'labels' && (
               <div className="mailmerge-pattern">
+<<<<<<< ours
                 <label className="protect-check mailmerge-radio">
+=======
+                <label className="mailmerge-radio">
+>>>>>>> theirs
                   <input
                     type="radio"
                     name="mailmerge-stock"
                     checked={labelStock === 'avery5160'}
                     onChange={() => setLabelStock('avery5160')}
                   />
+<<<<<<< ours
                   <span className="ctl" aria-hidden="true" />
                   {t('ribbonMailingsStock5160')}
                 </label>
                 <label className="protect-check mailmerge-radio">
+=======
+                  {t('ribbonMailingsStock5160')}
+                </label>
+                <label className="mailmerge-radio">
+>>>>>>> theirs
                   <input
                     type="radio"
                     name="mailmerge-stock"
                     checked={labelStock === 'custom'}
                     onChange={() => setLabelStock('custom')}
                   />
+<<<<<<< ours
                   <span className="ctl" aria-hidden="true" />
+=======
+>>>>>>> theirs
                   {t('ribbonMailingsStockCustom')}
                 </label>
                 {droppedLabelBlocks > 0 && (
@@ -297,6 +387,21 @@ export function MailMergePanel({
                     </label>
                   </div>
                 )}
+<<<<<<< ours
+=======
+                <div className="modal-row">
+                  <button
+                    name="createLabelSheet"
+                    disabled={!onLabelSheet || !editor.isEditable}
+                    onClick={() => {
+                      const layout = layoutOf()
+                      if (layout) onLabelSheet?.(layout)
+                    }}
+                  >
+                    {t('ribbonMailingsCreateSheet')}
+                  </button>
+                </div>
+>>>>>>> theirs
               </div>
             )}
             {mode === 'envelopes' && (
@@ -327,7 +432,15 @@ export function MailMergePanel({
               </label>
             )}
             <div className="modal-row">
+<<<<<<< ours
               <button className="btn-primary" disabled={busy} onClick={() => void runMerge()}>
+=======
+              <button
+                className="btn-primary"
+                disabled={busy || merged.length === 0}
+                onClick={() => void runMerge()}
+              >
+>>>>>>> theirs
                 {t('ribbonMailingsFinish')}
               </button>
             </div>

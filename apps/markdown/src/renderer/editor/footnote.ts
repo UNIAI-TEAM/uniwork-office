@@ -1,8 +1,14 @@
 import { Extension, Node, mergeAttributes, nodeInputRule } from '@tiptap/core'
 import type { Editor, MarkdownLexerConfiguration, MarkdownToken } from '@tiptap/core'
+<<<<<<< ours
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
+=======
+import { Plugin, TextSelection } from '@tiptap/pm/state'
+import type { Node as PmNode } from '@tiptap/pm/model'
+import type { EditorView } from '@tiptap/pm/view'
+>>>>>>> theirs
 import { renderItem } from './markdownStyleRenderers'
 
 /**
@@ -90,6 +96,7 @@ export function tokenizeFootnoteDefinition(
 }
 
 /**
+<<<<<<< ours
  * Offset of the first line-start `[^label]:` before the paragraph ends. marked
  * consults this to cut the paragraph that would otherwise swallow the
  * definition line, and it probes the source minus its first character, so
@@ -98,6 +105,12 @@ export function tokenizeFootnoteDefinition(
  * stops at the first blank line instead of walking the rest of the document.
  * Blank means spaces only, as in marked's paragraph rule: a tab-only line does
  * not end the paragraph, so the scan continues past it.
+=======
+ * Offset of the first line-start `[^label]:` after a newline. marked consults
+ * this to cut the paragraph that would otherwise swallow the definition line,
+ * and it probes the source minus its first character, so position 0 — never a
+ * true line start when a paragraph is being cut — is skipped.
+>>>>>>> theirs
  */
 export function footnoteDefStart(src: string): number {
   let br = src.indexOf('\n')
@@ -105,7 +118,10 @@ export function footnoteDefStart(src: string): number {
     const lineStart = br + 1
     const next = src.indexOf('\n', lineStart)
     const line = src.slice(lineStart, next < 0 ? undefined : next)
+<<<<<<< ours
     if (/^ *$/.test(line)) return -1
+=======
+>>>>>>> theirs
     if (DEF_OPEN_RE.test(line)) return lineStart
     br = next
   }
@@ -249,6 +265,7 @@ const firstOfType = (doc: PmNode, type: string, label: string): number | null =>
   return found
 }
 
+<<<<<<< ours
 const flashKey = new PluginKey<DecorationSet>('footnoteFlash')
 let flashTimer: number | null = null
 
@@ -267,6 +284,15 @@ function flash(view: EditorView, pos: number): void {
       view.dispatch(view.state.tr.setMeta(flashKey, DecorationSet.empty))
     }
   }, 1200)
+=======
+/** brief highlight on the jumped-to node; a class on the node's own DOM, no document state */
+function flash(view: EditorView, pos: number): void {
+  const el = view.nodeDOM(pos) as HTMLElement | null
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  el.classList.add('md-footnote-flash')
+  window.setTimeout(() => el.classList.remove('md-footnote-flash'), 1200)
+>>>>>>> theirs
 }
 
 /** click a reference to jump to its definition, and a definition back to its first reference */
@@ -278,6 +304,7 @@ export const FootnoteNav = Extension.create({
 
   addProseMirrorPlugins() {
     return [
+<<<<<<< ours
       new Plugin<DecorationSet>({
         key: flashKey,
         state: {
@@ -292,6 +319,10 @@ export const FootnoteNav = Extension.create({
           decorations(state) {
             return flashKey.getState(state)
           },
+=======
+      new Plugin({
+        props: {
+>>>>>>> theirs
           handleClickOn: (view, _pos, node, _nodePos, event) => {
             if (node.type.name !== 'footnoteReference' && node.type.name !== 'footnoteDefinition') {
               return false

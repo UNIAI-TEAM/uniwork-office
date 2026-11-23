@@ -30,6 +30,17 @@ export const ms = {
   appExportPdfProgress: 'Mengeksport PDF…',
   appExportPdfDone: 'PDF dieksport: {path}',
   appExportPdfFailed: 'Eksport PDF gagal: {error}',
+  appExportVideoTitle: 'Eksport sebagai video',
+  appExportVideoResolution: 'Resolusi',
+  appExportVideoSeconds: 'Saat untuk setiap slaid',
+  appExportVideoUseTimings: 'Guna pemasaan dan narasi yang dirakam jika ada',
+  appExportVideoCreate: 'Cipta Video',
+  appExportVideoCancel: 'Batal',
+  appExportVideoProgress: 'Mengekod video… {percent}%',
+  appExportVideoDone: 'Video dieksport: {path}',
+  appExportVideoFailed: 'Eksport video gagal: {error}',
+  appExportVideoUnsupported:
+    'Tiada pengekod video H.264 pada sistem ini, eksport MP4 tidak dapat dilakukan',
   appStatusBgAppliedAll: 'Warna latar belakang digunakan pada semua slaid',
   appStatusThemeApplied: 'Tema "{name}" digunakan',
   appStatusThemeApplyFailed: 'Gagal menggunakan tema: {error}',
@@ -67,6 +78,10 @@ export const ms = {
   appStatusAudioInserted: 'Audio diselitkan (dibenamkan dalam .pptx)',
   appStatusModel3dInserted:
     'Model 3D disisipkan: pilih untuk memutarnya (PowerPoint juga memaparkannya dalam 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'Model 3D tidak dapat dilukis di sini; gambarnya tidak berubah',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'Rakaman kosong; tiada apa-apa diselitkan',
   appStatusRecordingInserted: 'Rakaman skrin diselitkan pada slaid semasa (webm dibenamkan)',
   appStatusRecording:
@@ -203,6 +218,7 @@ export const ms = {
   appCtxSendToBack: 'Hantar ke Belakang',
   appCtxBringForward: 'Bawa ke Depan',
   appCtxSendBackward: 'Hantar ke Belakang Satu Aras',
+  appCtxRotate: 'Putar',
   appCtxRotateLeft90: 'Putar Kiri 90°',
   appCtxRotateRight90: 'Putar Kanan 90°',
   appCtxFlipH: 'Balikkan Melintang',
@@ -271,6 +287,25 @@ export const ms = {
     'Jumlah masa persembahan ialah {duration}. Adakah anda mahu menyimpan pemasaan slaid untuk peralihan slaid automatik?',
   appRehearseDiscard: 'Jangan Simpan',
   appRehearseSave: 'Simpan',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Rakam Naratif',
+  appRecordSummary: 'Tempoh rakaman {duration}. Simpan naratif dan masa setiap slaid?',
+  appRecordDiscard: 'Jangan Simpan',
+  appRecordSave: 'Simpan',
+  appStatusRecordSaved: 'Naratif disimpan pada {count} slaid (PowerPoint turut memainkannya)',
+  appStatusRecordFailed: 'Rakaman tidak dapat disimpan',
+  appStatusNarrationCleared: 'Naratif dikosongkan',
+  appSettingsTitle: 'Tetapan AI',
+  appSettingsAccount: 'Akaun Genspark',
+  appSettingsChecking: 'Menyemak…',
+  appSettingsLoggedIn: 'Telah log masuk',
+  appSettingsLoggedInEmail: 'Telah log masuk: {email}',
+  appSettingsLoggedOut: 'Belum log masuk (ciri AI memerlukan akaun Genspark)',
+  appSettingsLoginPending: 'Menunggu log masuk pelayar…',
+  appSettingsLogin: 'Log masuk ke Genspark',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Batal',
   appCropHint: 'Enter untuk mengesahkan · Esc untuk membatalkan · Klik di luar untuk mengesahkan',
   appStatusZoomsInserted:

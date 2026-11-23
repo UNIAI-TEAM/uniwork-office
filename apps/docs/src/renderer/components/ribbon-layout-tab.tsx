@@ -1,13 +1,18 @@
-import { useRef, useState } from 'react'
-import { type SectionSettings, type TextboxDisplay } from '@genoffice/docx-engine'
-import { WRAP_OPTIONS } from './ContextMenu'
+import { useContext, useRef, useState } from 'react'
+import { type SectionSettings } from '@genoffice/docx-engine'
 import { MarginDialog, marginsFitPage, type PageMargins } from './MarginDialog'
 import { LengthInput } from './LengthInput'
 import { PaperSizeDialog } from './PaperSizeDialog'
-import { insertColumnBreak, insertTextWrappingBreak } from '../editor/page-break'
-import { setFloatingWrap, shapeWrapOf } from '../editor/floating-z-order'
 import { useI18n, type StringKey } from '../i18n/locale'
+<<<<<<< ours
 import { shortcutAria, shortcutHint } from '../shortcuts'
+=======
+import type { ActionCommandId } from '../../shared/commands'
+import { type PageMarginsPayload } from '../commands/menu-commands'
+import { RbCommand, RibbonCommandContext, useRibbonCommand, useRunCommand } from './ribbon-command'
+import { textDirectionContext } from '../commands/text-direction'
+import { ArrangeGroup } from './ribbon-arrange-group'
+>>>>>>> theirs
 import { useMeasurement } from '../use-measurement'
 import {
   IconCaret,
@@ -16,19 +21,13 @@ import {
   IconOrientation,
   IconPageBreak,
   IconPageSize,
-  IconPosition,
-  IconWrapText,
+  IconTextDirection,
+  IconLineNumbers,
+  IconHyphenation,
 } from './icons'
 
 /** icon size for the big icon-over-label ribbon buttons (slides ribbon parity) */
-import {
-  BIG,
-  TabProps,
-  activeParaAttrs,
-  insertPageBreakAt,
-  setParaAttrs,
-  toggleDropdown,
-} from './ribbon-tabs'
+import { BIG, TabProps, activeParaAttrs, setParaAttrs, toggleDropdown } from './ribbon-tabs'
 
 /** Word's Margins gallery order; Mirrored's left/right are inside/outside and switch on w:mirrorMargins */
 export const MARGIN_PRESETS: Array<{
@@ -91,6 +90,14 @@ export const MARGIN_PRESETS: Array<{
   },
 ]
 
+/** Word's Line Numbers menu: off, or when the count starts over */
+const LINE_NUMBER_CHOICES: Array<[string, StringKey]> = [
+  ['none', 'ribbonListNone'],
+  ['continuous', 'ribbonBreakContinuous'],
+  ['newPage', 'ribbonLnRestartPage'],
+  ['newSection', 'ribbonLnRestartSection'],
+]
+
 const LAST_CUSTOM_MARGINS_KEY = 'aidocs.marginLastCustom'
 
 function readLastCustomMargins(): PageMargins | null {
@@ -142,14 +149,12 @@ interface LayoutTabProps extends TabProps {
   onSection: (next: SectionSettings) => void
   /** Multi-section documents: index of the cursor's section (0-based); null for single-section */
   activeSection: number | null
-  onInsertSectionBreak: (type: 'nextPage' | 'continuous' | 'evenPage' | 'oddPage') => void
   onPaperSizeAll: (
     portraitW: number,
     portraitH: number,
     orientation: SectionSettings['orientation'],
   ) => void
   mirrorMargins: boolean
-  onMirrorMargins: (on: boolean) => void
 }
 
 export function LayoutTab({
@@ -160,10 +165,8 @@ export function LayoutTab({
   section,
   onSection,
   activeSection,
-  onInsertSectionBreak,
   onPaperSizeAll,
   mirrorMargins,
-  onMirrorMargins,
 }: LayoutTabProps) {
   const { t } = useI18n()
   const { format } = useMeasurement()
@@ -175,19 +178,24 @@ export function LayoutTab({
   const marginCaption = (m: PageMargins & { mirror?: true }) =>
     `${t('ribbonMarginTop')} ${format(m.top)} · ${t('ribbonMarginBottom')} ${format(m.bottom)} · ${t(m.mirror ? 'ribbonMarginInside' : 'ribbonMarginLeft')} ${format(m.left)} · ${t(m.mirror ? 'ribbonMarginOutside' : 'ribbonMarginRight')} ${format(m.right)}`
 
-  const applyMargins = (m: PageMargins, mirror?: boolean) => {
-    if (!section || !marginsFitPage(m, section.pageWidth, section.pageHeight)) return
-    // a user-set value is an ordinary margin, not the file's header-proof fixed one
-    onSection({
-      ...section,
-      marginTop: m.top,
-      marginRight: m.right,
-      marginBottom: m.bottom,
-      marginLeft: m.left,
-      marginTopFixed: undefined,
-      marginBottomFixed: undefined,
-    })
-    if (mirror !== undefined) onMirrorMargins(mirror)
+  const textDirectionOff = useRibbonCommand('format-text-direction').disabled
+  const cellTextDirection = useContext(RibbonCommandContext)?.format.cellTextDirection ?? null
+  const textDirection = textDirectionContext(editor, cellTextDirection, section)
+  const runCommand = useRunCommand()
+  /** a pick from a gallery: run the command, close the gallery */
+  const pick = (id: ActionCommandId, payload?: string) => {
+    runCommand(id, payload)
+    setDropdown(() => null)
+  }
+  const pickMargins = (m: PageMargins, mirror?: boolean) => {
+    const payload: PageMarginsPayload = {
+      top: m.top,
+      right: m.right,
+      bottom: m.bottom,
+      left: m.left,
+      mirror,
+    }
+    pick('page-margins', JSON.stringify(payload))
   }
 
   const marginsActive = (m: PageMargins & { mirror?: true }) =>
@@ -198,6 +206,7 @@ export function LayoutTab({
     section.marginLeft === m.left &&
     !!m.mirror === mirrorMargins
 
+<<<<<<< ours
   // Arrange group: enabled when a floating object (image/textbox) is selected; maps to Word's Position / Wrap Text
   const protAttrs = editor.getAttributes('docProtected')
   const isImage = protAttrs?.blockType === 'image' && !!protAttrs.imageDataUrl
@@ -253,6 +262,8 @@ export function LayoutTab({
     setDropdown(() => null)
   }
 
+=======
+>>>>>>> theirs
   /** selection captured when a field takes focus (commit target on blur) */
   const inputTargetRef = useRef<{ from: number; to: number } | null>(null)
   const commitPara = (attr: string, twips: number | null) => {
@@ -279,12 +290,12 @@ export function LayoutTab({
     `${attr}:${shown ?? ''}:${hasDoc}:${editor.state.selection.from}`
   /** Word shows indents in the measurement unit and permits negative ones
    *  (text into the margin); the ribbon bounds them by the page width. */
-  const indentInput = (attr: string, title: string) => {
+  const indentInput = (attr: string, title: string, caption: string) => {
     const twips = Number(paraAttrs[attr]) || 0
     const bound = section?.pageWidth ?? 12240
     return (
       <label className="layout-num" data-tip={title}>
-        <span>{title}</span>
+        <span>{caption}</span>
         <LengthInput
           key={fieldKey(attr)}
           value={twips}
@@ -302,18 +313,19 @@ export function LayoutTab({
   }
   /** Spacing stays in points, as in Word. Commit on Enter/blur (not per
    *  keystroke) so a half-typed value is not clamped mid-entry. */
-  const ptInput = (attr: string, title: string) => {
+  const ptInput = (attr: string, title: string, caption: string) => {
     const twips = Number(paraAttrs[attr]) || 0
     const shown = Math.round(twips / 20)
     return (
       <label className="layout-num" data-tip={title}>
-        <span>{title}</span>
+        <span>{caption}</span>
         <input
           type="number"
           min={0}
           max={400}
           step={1}
           disabled={!hasDoc}
+          aria-label={title}
           key={fieldKey(attr, shown)}
           defaultValue={shown}
           onKeyDown={(e) => {
@@ -340,6 +352,36 @@ export function LayoutTab({
     <>
       <div className="ribbon-group">
         <div className="ribbon-group-items">
+          <div className="rb-split-wrap">
+            <button
+              className="rb-big"
+              disabled={textDirectionOff}
+              data-tip={t('ribbonTextDirection')}
+              onClick={() => toggleDropdown(setDropdown, 'textdirection')}
+            >
+              <span className="rb-big-icon">
+                <IconTextDirection size={BIG} />
+                <IconCaret />
+              </span>
+              <span>{t('ribbonTextDirection')}</span>
+            </button>
+            {dropdown === 'textdirection' && (
+              <div data-rb-panel="" className="layout-menu">
+                {textDirection.choices.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    className={textDirection.current === value ? 'active' : ''}
+                    onClick={() => pick('format-text-direction', value)}
+                  >
+                    {t(label)}
+                  </button>
+                ))}
+                <button onClick={() => pick('format-text-direction')}>
+                  {t('ribbonTextDirectionOptions')}
+                </button>
+              </div>
+            )}
+          </div>
           <div className="rb-split-wrap">
             <button
               className="rb-big"
@@ -372,10 +414,7 @@ export function LayoutTab({
                       {lastCustom && (
                         <button
                           className={marginsActive(lastCustom) ? 'active' : ''}
-                          onClick={() => {
-                            applyMargins(lastCustom)
-                            setDropdown(() => null)
-                          }}
+                          onClick={() => pickMargins(lastCustom)}
                         >
                           <b>{t('ribbonMarginLastCustom')}</b>
                           <span>{marginCaption(lastCustom)}</span>
@@ -386,10 +425,7 @@ export function LayoutTab({
                           key={m.key}
                           className={marginsActive(m) ? 'active' : ''}
                           disabled={!marginsFitPage(m, section.pageWidth, section.pageHeight)}
-                          onClick={() => {
-                            applyMargins(m, !!m.mirror)
-                            setDropdown(() => null)
-                          }}
+                          onClick={() => pickMargins(m, !!m.mirror)}
                         >
                           <b>{t(m.nameKey)}</b>
                           <span>{marginCaption(m)}</span>
@@ -426,13 +462,17 @@ export function LayoutTab({
               <div data-rb-panel="" className="layout-menu">
                 <button
                   className={section.orientation === 'portrait' ? 'active' : ''}
-                  onClick={() => setOrientation('portrait')}
+                  onClick={() =>
+                    section.orientation !== 'portrait' && pick('page-orientation', 'portrait')
+                  }
                 >
                   <b>{t('ribbonPortrait')}</b>
                 </button>
                 <button
                   className={section.orientation === 'landscape' ? 'active' : ''}
-                  onClick={() => setOrientation('landscape')}
+                  onClick={() =>
+                    section.orientation !== 'landscape' && pick('page-orientation', 'landscape')
+                  }
                 >
                   <b>{t('ribbonLandscape')}</b>
                 </button>
@@ -460,7 +500,7 @@ export function LayoutTab({
                     <button
                       key={p.key}
                       className={activeKey === p.key ? 'active' : ''}
-                      onClick={() => setPaper(p.w, p.h)}
+                      onClick={() => pick('page-size', `${p.w},${p.h}`)}
                     >
                       <b>{p.name}</b>
                       <span>{paperSizeCaption(p.w, p.h, format)}</span>
@@ -497,10 +537,7 @@ export function LayoutTab({
                   <button
                     key={n}
                     className={section.columns === n ? 'active' : ''}
-                    onClick={() => {
-                      onSection({ ...section, columns: n })
-                      setDropdown(() => null)
-                    }}
+                    onClick={() => pick('page-columns', String(n))}
                   >
                     {n === 1
                       ? t('ribbonOneColumn')
@@ -528,6 +565,7 @@ export function LayoutTab({
             {dropdown === 'sectbreak' && (
               <div data-rb-panel="" className="layout-menu">
                 <div className="layout-menu-head">{t('ribbonBreaksPageGroup')}</div>
+<<<<<<< ours
                 {/* the row is named by its title; the description (with the key) describes it */}
                 <button
                   aria-label={t('ribbonBreakPage')}
@@ -538,9 +576,13 @@ export function LayoutTab({
                     setDropdown(() => null)
                   }}
                 >
+=======
+                <button onClick={() => pick('insert-page-break')}>
+>>>>>>> theirs
                   <b>{t('ribbonBreakPage')}</b>
                   <span>{t('ribbonBreakPageDesc', { keys: shortcutHint('page-break') })}</span>
                 </button>
+<<<<<<< ours
                 <button
                   aria-label={t('ribbonBreakColumn')}
                   aria-description={t('ribbonBreakColumnDesc', {
@@ -552,57 +594,74 @@ export function LayoutTab({
                     setDropdown(() => null)
                   }}
                 >
+=======
+                <button onClick={() => pick('insert-column-break')}>
+>>>>>>> theirs
                   <b>{t('ribbonBreakColumn')}</b>
                   <span>{t('ribbonBreakColumnDesc', { keys: shortcutHint('column-break') })}</span>
                 </button>
-                <button
-                  onClick={() => {
-                    insertTextWrappingBreak(editor)
-                    setDropdown(() => null)
-                  }}
-                >
+                <button onClick={() => pick('insert-text-wrapping-break')}>
                   <b>{t('ribbonBreakTextWrapping')}</b>
                   <span>{t('ribbonBreakTextWrappingDesc')}</span>
                 </button>
                 <div className="layout-menu-head">{t('ribbonSectionBreak')}</div>
-                <button
-                  onClick={() => {
-                    onInsertSectionBreak('nextPage')
-                    setDropdown(() => null)
-                  }}
-                >
+                <button onClick={() => pick('insert-section-break', 'nextPage')}>
                   <b>{t('ribbonBreakNextPage')}</b>
                   <span>{t('ribbonBreakNextPageDesc')}</span>
                 </button>
-                <button
-                  onClick={() => {
-                    onInsertSectionBreak('continuous')
-                    setDropdown(() => null)
-                  }}
-                >
+                <button onClick={() => pick('insert-section-break', 'continuous')}>
                   <b>{t('ribbonBreakContinuous')}</b>
                   <span>{t('ribbonBreakContinuousDesc')}</span>
                 </button>
-                <button
-                  onClick={() => {
-                    onInsertSectionBreak('evenPage')
-                    setDropdown(() => null)
-                  }}
-                >
+                <button onClick={() => pick('insert-section-break', 'evenPage')}>
                   <b>{t('ribbonBreakEvenPage')}</b>
                   <span>{t('ribbonBreakEvenPageDesc')}</span>
                 </button>
-                <button
-                  onClick={() => {
-                    onInsertSectionBreak('oddPage')
-                    setDropdown(() => null)
-                  }}
-                >
+                <button onClick={() => pick('insert-section-break', 'oddPage')}>
                   <b>{t('ribbonBreakOddPage')}</b>
                   <span>{t('ribbonBreakOddPageDesc')}</span>
                 </button>
               </div>
             )}
+          </div>
+          <div className="rb-col rb-pair">
+            <div className="rb-split-wrap">
+              <button
+                className={`rb-small ${section?.lineNumbers ? 'active' : ''}`}
+                disabled={!enabled}
+                data-tip={t('ribbonLineNumbers')}
+                onClick={() => toggleDropdown(setDropdown, 'linenumbers')}
+              >
+                <IconLineNumbers size={14} />
+                <span className="rb-small-label">{t('ribbonLineNumbers')}</span>
+                <IconCaret />
+              </button>
+              {dropdown === 'linenumbers' && section && (
+                <div data-rb-panel="" className="layout-menu">
+                  {LINE_NUMBER_CHOICES.map(([value, labelKey]) => (
+                    <button
+                      key={value}
+                      className={(section.lineNumbers?.restart ?? 'none') === value ? 'active' : ''}
+                      onClick={() => pick('layout-line-numbers', value)}
+                    >
+                      {t(labelKey)}
+                    </button>
+                  ))}
+                  <button
+                    className={paraAttrs.suppressLineNumbers === true ? 'active' : ''}
+                    onClick={() => pick('layout-suppress-line-numbers')}
+                  >
+                    {t('ribbonLnSuppress')}
+                  </button>
+                  <button onClick={() => pick('layout-line-numbering-options')}>
+                    {t('ribbonLnOptions')}
+                  </button>
+                </div>
+              )}
+            </div>
+            <RbCommand cmd="tools-hyphenation" look="small">
+              <IconHyphenation size={14} />
+            </RbCommand>
           </div>
         </div>
         <div className="ribbon-group-label">{t('ribbonGroupPageSetup')}</div>
@@ -613,12 +672,14 @@ export function LayoutTab({
       <div className="ribbon-group">
         <div className="ribbon-group-items layout-para">
           <div className="layout-col">
-            {indentInput('indentLeft', t('ribbonIndentLeft'))}
-            {indentInput('indentRight', t('ribbonIndentRight'))}
+            <span className="layout-col-head">{t('ribbonParaIndent')}</span>
+            {indentInput('indentLeft', t('ribbonIndentLeft'), t('ribbonParaLeft'))}
+            {indentInput('indentRight', t('ribbonIndentRight'), t('ribbonParaRight'))}
           </div>
           <div className="layout-col">
-            {ptInput('spaceBefore', t('ribbonSpaceBefore'))}
-            {ptInput('spaceAfter', t('ribbonSpaceAfter'))}
+            <span className="layout-col-head">{t('ribbonParaSpacing')}</span>
+            {ptInput('spaceBefore', t('ribbonSpaceBefore'), t('ribbonParaBefore'))}
+            {ptInput('spaceAfter', t('ribbonSpaceAfter'), t('ribbonParaAfter'))}
           </div>
         </div>
         <div className="ribbon-group-label">{t('ribbonGroupParagraph')}</div>
@@ -626,79 +687,7 @@ export function LayoutTab({
 
       <div className="ribbon-sep" />
 
-      <div className="ribbon-group">
-        <div className="ribbon-group-items">
-          <div className="rb-split-wrap">
-            <button
-              className="rb-big"
-              disabled={!canPosition}
-              data-tip={t('ribbonPosition')}
-              onClick={() => toggleDropdown(setDropdown, 'arrange-pos')}
-            >
-              <span className="rb-big-icon">
-                <IconPosition size={BIG} />
-                <IconCaret />
-              </span>
-              <span>{t('ribbonPosition')}</span>
-            </button>
-            {dropdown === 'arrange-pos' && (
-              <div data-rb-panel="" className="layout-menu">
-                <button
-                  className={currentWrap ? '' : 'active'}
-                  onClick={() => applyInlinePosition()}
-                >
-                  <b>{t('appWrapInline')}</b>
-                </button>
-                <div className="pos-grid">
-                  {(['top', 'center', 'bottom'] as const).map((v) =>
-                    (['left', 'center', 'right'] as const).map((h) => (
-                      <button
-                        key={`${v}-${h}`}
-                        className={`pos-cell ph-${h} pv-${v}${
-                          protAttrs?.imagePosH === h && protAttrs?.imagePosV === v ? ' active' : ''
-                        }`}
-                        data-tip={t('ribbonPosition')}
-                        aria-label={t('ribbonPosition')}
-                        onClick={() => applyPositionPreset(h, v)}
-                      >
-                        <span className="pos-dot" />
-                      </button>
-                    )),
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="rb-split-wrap">
-            <button
-              className="rb-big"
-              disabled={!canWrap}
-              data-tip={t('ribbonWrapText')}
-              onClick={() => toggleDropdown(setDropdown, 'arrange-wrap')}
-            >
-              <span className="rb-big-icon">
-                <IconWrapText size={BIG} />
-                <IconCaret />
-              </span>
-              <span>{t('ribbonWrapText')}</span>
-            </button>
-            {dropdown === 'arrange-wrap' && (
-              <div data-rb-panel="" className="layout-menu">
-                {WRAP_OPTIONS.map((opt) => (
-                  <button
-                    key={String(opt.value)}
-                    className={currentWrap === opt.value ? 'active' : ''}
-                    onClick={() => applyWrap(opt.value)}
-                  >
-                    <b>{t(opt.labelKey)}</b>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="ribbon-group-label">{t('ribbonGroupArrange')}</div>
-      </div>
+      <ArrangeGroup editor={editor} hasDoc={hasDoc} dropdown={dropdown} setDropdown={setDropdown} />
 
       {marginDialog && section && (
         <MarginDialog
@@ -712,7 +701,7 @@ export function LayoutTab({
           pageWidth={section.pageWidth}
           pageHeight={section.pageHeight}
           onApply={(m, mirror) => {
-            applyMargins(m, mirror)
+            pickMargins(m, mirror)
             localStorage.setItem(LAST_CUSTOM_MARGINS_KEY, JSON.stringify(m))
           }}
           onClose={() => setMarginDialog(false)}

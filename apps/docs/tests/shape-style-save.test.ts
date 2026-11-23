@@ -152,6 +152,7 @@ describe('shape rotation and outline width survive save', () => {
     expect(firstBox(await parseDocx(saved)).borderWidthPx).toBe(3)
     editor.destroy()
   })
+<<<<<<< ours
 
   it('persists rotation, outline width, fill, and border color on a shape without text', async () => {
     const textlessXml = buildShapeParagraphXml({
@@ -189,4 +190,6 @@ describe('shape rotation and outline width survive save', () => {
     expect(reopened.borderColor).toBe('00B050')
     editor.destroy()
   })
+=======
+>>>>>>> theirs
 })

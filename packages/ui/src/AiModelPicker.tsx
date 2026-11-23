@@ -201,6 +201,7 @@ export function AiModelPicker({
     inside: () => [chipRef.current, popRef.current],
   })
 
+<<<<<<< ours
   // UniWork AI cannot answer while the host does not offer it (no organization, the capability or
   // the format off): the composer's send stays off and the hint says so, with the account settings
   // as the way out. Once a cloud read has completed in any state but ready (signed out, not
@@ -223,6 +224,16 @@ export function AiModelPicker({
     setAiModelNeedHint(needHint, openSettings ? openSettingsOnce : null)
     return () => setAiModelNeedHint(null)
   }, [needHint, openSettings, openSettingsOnce])
+=======
+  const groups = useMemo(
+    () => (settings ? aiModelPickerGroups(settings, loggedIn) : []),
+    [settings, loggedIn],
+  )
+  const current = settings ? aiModelPickerSelection(settings) : null
+  const sameGroup = (g: { id: string; endpoint?: string | undefined }) =>
+    g.id === current?.provider && (g.id !== 'custom' || g.endpoint === current?.endpoint)
+  const currentUsable = groups.some(sameGroup)
+>>>>>>> theirs
 
   const toggle = () => {
     if (!open) {
@@ -328,8 +339,15 @@ export function AiModelPicker({
   }
 
   if (!settings) return null
+<<<<<<< ours
   const chipText = settings.uniworkModel?.trim() || UNIWORK_LABEL
   const chipLabel = `${strings.title}: ${chipText}`
+=======
+  const chipText =
+    currentUsable && current
+      ? current.model || (groups.find(sameGroup)?.label ?? '')
+      : strings.choose
+>>>>>>> theirs
 
   return (
     <div
@@ -349,10 +367,15 @@ export function AiModelPicker({
         className={`ai-model-chip${open ? ' open' : ''}`}
         onClick={toggle}
         aria-expanded={open}
+<<<<<<< ours
         aria-controls={open ? popId : undefined}
         title={chipLabel}
         data-tip={chipLabel}
         aria-label={chipLabel}
+=======
+        data-tip={`${strings.title}: ${chipText}`}
+        aria-label={`${strings.title}: ${chipText}`}
+>>>>>>> theirs
       >
         <ProviderLogo />
         <span className="ai-model-chip-text">{chipText}</span>
@@ -376,6 +399,7 @@ export function AiModelPicker({
           aria-label={strings.title}
           style={popStyle}
         >
+<<<<<<< ours
           <div className="ai-model-current">
             <ProviderLogo />
             <span className="ai-model-item-body">
@@ -387,6 +411,44 @@ export function AiModelPicker({
                 </span>
               )}
             </span>
+=======
+          <div className="ai-model-pop-list">
+            {groups.map((g) => (
+              <div key={g.endpoint ? `${g.id}:${g.endpoint}` : g.id} className="ai-model-group">
+                <div className="ai-model-group-head">
+                  <ProviderLogo id={g.id} />
+                  <span>{g.label}</span>
+                </div>
+                {(g.models.length > 0 ? g.models : ['']).map((m) => {
+                  const selected = sameGroup(g) && current?.model === m
+                  return (
+                    <button
+                      key={`${g.id}:${g.endpoint ?? ''}:${m}`}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className={`ai-model-item${selected ? ' selected' : ''}`}
+                      onClick={() => pick({ provider: g.id, endpoint: g.endpoint, model: m })}
+                    >
+                      <span className="ai-model-item-text">{m || g.label}</span>
+                      {selected && (
+                        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+                          <path
+                            d="M2.5 6.5 5 9l4.5-6"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+>>>>>>> theirs
           </div>
           {creditsAriaText && <span className="ai-model-sr-only">{creditsAriaText}</span>}
           {footerInfo && (
@@ -402,6 +464,7 @@ export function AiModelPicker({
     </div>
   )
 }
+<<<<<<< ours
 
 /** the product name; the chip shows the served model instead once the host knows it */
 const UNIWORK_LABEL = 'UniWork AI'
@@ -423,3 +486,5 @@ function effectiveZoom(el: HTMLElement | null): number {
   }
   return 1
 }
+=======
+>>>>>>> theirs

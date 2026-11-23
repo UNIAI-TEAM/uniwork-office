@@ -13,7 +13,10 @@ import JSZip from 'jszip'
 
 import {
   csvGridShape,
+<<<<<<< ours
   csvGridShapeYielding,
+=======
+>>>>>>> theirs
   csvRows,
   escapeXml,
   resolveImportDelimiter,
@@ -49,9 +52,13 @@ export async function csvToXlsxBufferForOpen(
   options?: CsvImportOptions,
 ): Promise<{ buffer: Buffer; empty: boolean }> {
   const resolved = delimiter ?? resolveImportDelimiter(csvText)
+<<<<<<< ours
   // the open path runs in the main process: the scan hands the event loop back
   // so the progress events and the Cancel click are handled while it runs
   const shape = await csvGridShapeYielding(csvText, resolved, loopPause(), options)
+=======
+  const shape = csvGridShape(csvText, resolved, options)
+>>>>>>> theirs
   const buffer = await xlsxBufferFromGrid(csvRows(csvText, resolved), shape, sheetName, options)
   return { buffer, empty: shape.rows === 0 }
 }
@@ -78,6 +85,7 @@ export async function blankXlsxBuffer(sheetName = 'Sheet1'): Promise<Buffer> {
   return xlsxBufferFromGrid([], shape, sheetName)
 }
 
+<<<<<<< ours
 /** how long the import may hold the event loop before it lets queued work run */
 const SLICE_MS = 25
 
@@ -96,6 +104,8 @@ function loopPause(): () => Promise<void> {
   }
 }
 
+=======
+>>>>>>> theirs
 /**
  * The workbook for a grid, with the worksheet streamed into the archive: the
  * XML never exists as one string, and the archive takes it as it comes.
@@ -164,9 +174,14 @@ function worksheetXmlStream(
   shape: CsvGridShape,
   options?: CsvImportOptions,
 ): Readable {
+<<<<<<< ours
   const pause = loopPause()
   return Readable.from(
     (async function* (): AsyncGenerator<Buffer> {
+=======
+  return Readable.from(
+    (function* (): Generator<Buffer> {
+>>>>>>> theirs
       // The archive reads the worksheet as it compresses it, so the rows
       // arrive at the compressor's pace: the row count is the progress, and an
       // abort lands while the compression is still running (the error the
@@ -181,10 +196,13 @@ function worksheetXmlStream(
       })
       for (const chunk of chunks) {
         options?.signal?.throwIfAborted()
+<<<<<<< ours
         // The archive pulls this stream through promise callbacks only, so
         // without a real event-loop turn here the whole write runs as one
         // task and nothing queued behind it (Cancel) is handled until the end.
         await pause()
+=======
+>>>>>>> theirs
         yield Buffer.from(chunk, 'utf8')
       }
     })(),

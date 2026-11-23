@@ -30,6 +30,17 @@ export const it = {
   appExportPdfProgress: 'Esportazione del PDF…',
   appExportPdfDone: 'PDF esportato: {path}',
   appExportPdfFailed: 'Esportazione del PDF non riuscita: {error}',
+  appExportVideoTitle: 'Esporta come video',
+  appExportVideoResolution: 'Risoluzione',
+  appExportVideoSeconds: 'Secondi per ogni diapositiva',
+  appExportVideoUseTimings: 'Usa intervalli e narrazioni registrati se presenti',
+  appExportVideoCreate: 'Crea video',
+  appExportVideoCancel: 'Annulla',
+  appExportVideoProgress: 'Codifica video in corso… {percent}%',
+  appExportVideoDone: 'Video esportato: {path}',
+  appExportVideoFailed: 'Esportazione video non riuscita: {error}',
+  appExportVideoUnsupported:
+    'Nessun codificatore video H.264 disponibile su questo sistema, impossibile esportare in MP4',
   appStatusBgAppliedAll: 'Colore di sfondo applicato a tutte le diapositive',
   appStatusThemeApplied: 'Tema "{name}" applicato',
   appStatusThemeApplyFailed: 'Applicazione del tema non riuscita: {error}',
@@ -68,6 +79,11 @@ export const it = {
   appStatusAudioInserted: 'Audio inserito (incorporato nel file .pptx)',
   appStatusModel3dInserted:
     'Modello 3D inserito: selezionalo per ruotarlo (anche PowerPoint lo mostra in 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview:
+    'Impossibile disegnare qui il modello 3D; la sua immagine resta invariata',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'La registrazione è vuota; non è stato inserito nulla',
   appStatusRecordingInserted:
     'Registrazione dello schermo inserita nella diapositiva corrente (webm incorporato)',
@@ -206,6 +222,7 @@ export const it = {
   appCtxSendToBack: 'Porta in secondo piano',
   appCtxBringForward: 'Porta avanti',
   appCtxSendBackward: 'Porta indietro',
+  appCtxRotate: 'Ruota',
   appCtxRotateLeft90: 'Ruota di 90° a sinistra',
   appCtxRotateRight90: 'Ruota di 90° a destra',
   appCtxFlipH: 'Capovolgi orizzontalmente',
@@ -276,6 +293,27 @@ export const it = {
     "Il tempo totale della presentazione è stato {duration}. Vuoi salvare gli intervalli delle diapositive per l'avanzamento automatico?",
   appRehearseDiscard: 'Non salvare',
   appRehearseSave: 'Salva',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Registra commento',
+  appRecordSummary:
+    'Durata della registrazione: {duration}. Salvare il commento e la durata di ogni diapositiva?',
+  appRecordDiscard: 'Non salvare',
+  appRecordSave: 'Salva',
+  appStatusRecordSaved: 'Commento salvato in {count} diapositive (riprodotto anche da PowerPoint)',
+  appStatusRecordFailed: 'Impossibile salvare la registrazione',
+  appStatusNarrationCleared: 'Commento cancellato',
+  appSettingsTitle: 'Impostazioni IA',
+  appSettingsAccount: 'Account Genspark',
+  appSettingsChecking: 'Verifica in corso…',
+  appSettingsLoggedIn: 'Accesso effettuato',
+  appSettingsLoggedInEmail: 'Accesso effettuato: {email}',
+  appSettingsLoggedOut:
+    'Accesso non effettuato (le funzionalità IA richiedono un account Genspark)',
+  appSettingsLoginPending: "In attesa dell'accesso dal browser…",
+  appSettingsLogin: 'Accedi a Genspark',
+  appSettingsModel: 'Modello',
+>>>>>>> theirs
   appSettingsCancel: 'Annulla',
   appCropHint: "Invio per confermare · Esc per annullare · Fai clic all'esterno per confermare",
   appStatusZoomsInserted:

@@ -138,6 +138,12 @@ export function NavPane({
   pageInfo,
   onClose,
   cuts,
+<<<<<<< ours
+=======
+  tabRequest,
+  onTabRequestDone,
+  onTabChange,
+>>>>>>> theirs
 }: {
   editor: Editor
   doc: PmNode
@@ -147,6 +153,11 @@ export function NavPane({
   /** the current pass's page cuts for the thumbnails (page edges) */
   cuts?: () => readonly PageCut[] | undefined
   onClose: () => void
+  /** a tab asked for from outside the pane (View > Sidebar > Thumbnail) */
+  tabRequest?: { tab: NavTab; nonce: number } | null
+  /** the request was acted on; one left standing would be acted on again when the pane next opens */
+  onTabRequestDone?: () => void
+  onTabChange?: (tab: NavTab) => void
 }) {
   const { t } = useI18n()
   const session = sessionOf(editor)
@@ -182,9 +193,22 @@ export function NavPane({
       session.tab = next
       persistSession(session)
       setTabState(next)
+      // told as it happens: a menu command right after the click reads the tab App holds
+      onTabChange?.(next)
     },
-    [session],
+    [session, onTabChange],
   )
+  const requestNonce = tabRequest?.nonce
+  useEffect(() => {
+    if (!tabRequest) return
+    setTab(tabRequest.tab)
+    onTabRequestDone?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one switch per request, not per render
+  }, [requestNonce])
+  useEffect(() => {
+    onTabChange?.(session.tab)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the tab the pane opens on
+  }, [])
   const setMaxLevel = (n: number) => {
     session.maxLevel = n
     persistSession(session)

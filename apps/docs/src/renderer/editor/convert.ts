@@ -1,3 +1,4 @@
+import { citationRuns } from './citations'
 import {
   mergePPrFormat,
   parseLazyMediaUrl,
@@ -11,6 +12,8 @@ import {
   stripParaMarkColor,
   ommlToLatex,
   patchFieldParagraphXml,
+  patchFieldTablePageXml,
+  rewriteSeqResultsXml,
   applyImageWrap,
   applyImageZOrder,
   applyShapeWrapAt,
@@ -27,10 +30,20 @@ import {
   type TextboxSizePatch,
   patchTextboxParas,
   generateTableModelXml,
+<<<<<<< ours
   resolvePropChangeXml,
   inlinePictureDrawingXml,
   patchRunPictureXml,
   type RunPictureGeometry,
+=======
+  nextBookmarkIdAllocator,
+  resolvePropChangeXml,
+  inlinePictureDrawingXml,
+  patchRunPictureXml,
+  setRunPictureAlt,
+  type RunPictureGeometry,
+  NEW_PICTURE_SVG_SUFFIX,
+>>>>>>> theirs
   NEW_PICTURE_TOKEN_PREFIX,
   symbolGlyph,
   symbolPuaChar,
@@ -44,6 +57,9 @@ import {
   type GeneratedBlock,
   type ImageWrap,
   type NewChart,
+  type DrawingGroup,
+  type EncloseStyle,
+  type GroupMember,
   type NewImage,
   type ParaFormat,
   type PropChangeInfo,
@@ -61,18 +77,38 @@ import {
   type EffectiveRPr,
 } from '@genoffice/docx-engine'
 import { t } from '../i18n/locale'
+import { defaultNoteNumFmt } from '../note-format'
 import { symbolFontCovers } from '../font-check'
 import { charScaleEm, textHasComplexScript, wordKerns } from '../line-metrics'
+<<<<<<< ours
+=======
+import { blockFingerprint } from './carried-nodes'
+import type { SeqRenumber } from './field-results'
+>>>>>>> theirs
 import { inferredBidi } from './direction'
 import { splitCellBoxGroup } from './protected-render'
 import { inlineMathML } from './equation'
 import { isStraightLineKind } from './shape-svg'
 import { borderDrawnPx, collapsedEdgePx } from './border-metrics'
 import { parseRunBorderAttr } from './run-border'
+import { parseEaLayoutAttr, twoLinesWidthEm } from './asian-layout'
+import { parseOtfAttr } from './run-typography'
+import { parseLangAttr } from './proofing-language'
 import { parseTextOutlineAttr } from './text-outline'
-import { charScaleXAttr, parseGlowAttr, parseTextEffectAttr } from './text-effects'
+import {
+  charScaleXAttr,
+  parseFxOwnAttr,
+  parseGlowAttr,
+  parseReflectionAttr,
+  parseTextShadowAttr,
+  parseTextEffectAttr,
+} from './text-effects'
 import { SHAPE_INLINE_WRAP, shapeWrapOf } from './floating-z-order'
+<<<<<<< ours
 import { REDACT_BDR } from './redaction'
+=======
+import type { GroupMemberSource } from './object-multi-select'
+>>>>>>> theirs
 import { holdsDeclaredWidth, resolveTableWidth } from './table-geometry'
 import {
   DEFAULT_CELL_MAR,
@@ -95,6 +131,15 @@ export {
 } from '../table-layout'
 import type { PictureLayer } from './image-rotation'
 import { tableFloatSideRoom } from './anchor-geometry'
+<<<<<<< ours
+=======
+import {
+  pictureVectorAltOf,
+  pictureVectorAttr,
+  pictureVectorOf,
+  type PictureVector,
+} from './picture-vectors'
+>>>>>>> theirs
 
 export { holdsDeclaredWidth }
 
@@ -152,6 +197,7 @@ function redactLabelIn(rawRPr: string): string {
     .replace(/&amp;/g, '&')
 }
 
+<<<<<<< ours
 const REDACT_BDR_ELEMENT_RE = /<w:bdr\b[^>]*>[\s\S]*?<\/w:bdr>|<w:bdr\b[^>]*\/>/g
 
 /** whether a w:bdr element is the exact border written by setRedaction (no author attributes) */
@@ -204,6 +250,8 @@ function stripRedactRPr(rawRPr: string): string | undefined {
   return stripped
 }
 
+=======
+>>>>>>> theirs
 export function blocksToPmDoc(
   blocks: Block[],
   sections?: SectionInfo[],
@@ -299,6 +347,9 @@ function formatAttrs(format: ParaFormat | undefined, runs?: Run[]): Record<strin
     styleSpaceBeforeAuto: styleAutoUnderLiteral(format, 'Before'),
     styleSpaceAfterAuto: styleAutoUnderLiteral(format, 'After'),
     contextualSpacing: format?.contextualSpacing ?? null,
+    suppressAutoHyphens: format?.suppressAutoHyphens ?? null,
+    mirrorIndents: format?.mirrorIndents ?? null,
+    adjustRightInd: format?.adjustRightInd ?? null,
     keepNext: format?.keepNext ?? null,
     keepLines: format?.keepLines ?? null,
     widowControl: format?.widowControl ?? null,
@@ -307,6 +358,7 @@ function formatAttrs(format: ParaFormat | undefined, runs?: Run[]): Record<strin
     shadingFill: format?.shadingFill ?? null,
     shadingDisplay: format?.shadingDisplay ?? null,
     shadingClear: format?.shadingClear ?? null,
+    shadingPattern: format?.shadingPattern ? JSON.stringify(format.shadingPattern) : null,
     borderReset: format?.borderReset ?? null,
     borders: format?.borders ?? null,
     borderLines: format?.borderLines ? JSON.stringify(format.borderLines) : null,
@@ -322,6 +374,13 @@ function formatAttrs(format: ParaFormat | undefined, runs?: Run[]): Record<strin
     autoSpace: format?.autoSpace ?? null,
     wordWrap: format?.wordWrap ?? null,
     overflowPunct: format?.overflowPunct ?? null,
+    overflowPunctDirect: format?.overflowPunctDirect ?? null,
+    wordWrapDirect: format?.wordWrapDirect ?? null,
+    autoSpaceDE: format?.autoSpaceDE ?? null,
+    autoSpaceDN: format?.autoSpaceDN ?? null,
+    kinsoku: format?.kinsoku ?? null,
+    topLinePunct: format?.topLinePunct ?? null,
+    textAlignment: format?.textAlignment ?? null,
     eaLang: format?.eastAsiaLang ?? null,
     snapToGrid: format?.snapToGrid ?? null,
     emptyRunSize: format?.emptyRunSizeHalfPoints ?? null,
@@ -457,6 +516,7 @@ function blockToPmNode(
           outlineOnly: block.outlineOnly ?? null,
           bookmarks: block.bookmarks ?? null,
           hiddenBookmarks: block.hiddenBookmarks ?? null,
+          permEditable: block.permEditable ?? false,
           commentStarts: block.commentStarts ?? null,
           commentEnds: block.commentEnds ?? null,
           pPrChange: block.pPrChangeInfo ? JSON.stringify(block.pPrChangeInfo) : null,
@@ -484,6 +544,7 @@ function blockToPmNode(
           ilvl: block.list?.ilvl ?? 0,
           bookmarks: block.bookmarks ?? null,
           hiddenBookmarks: block.hiddenBookmarks ?? null,
+          permEditable: block.permEditable ?? false,
           commentStarts: block.commentStarts ?? null,
           commentEnds: block.commentEnds ?? null,
           pPrChange: block.pPrChangeInfo ? JSON.stringify(block.pPrChangeInfo) : null,
@@ -508,6 +569,7 @@ function blockToPmNode(
           aiChanged: false,
           bookmarks: block.bookmarks ?? null,
           hiddenBookmarks: block.hiddenBookmarks ?? null,
+          permEditable: block.permEditable ?? false,
           commentStarts: block.commentStarts ?? null,
           commentEnds: block.commentEnds ?? null,
           sdtShell: block.sdtShell ? JSON.stringify(block.sdtShell) : null,
@@ -558,6 +620,7 @@ function blockToPmNode(
           label: block.label ?? block.type,
           previewText: block.previewText ?? '',
           imageDataUrl: block.imageDataUrl ?? null,
+          imageVector: pictureVectorAttr(block.imageDataUrl, block.imageVectorUrl),
           oleProgId: block.oleProgId ?? null,
           imageWidthPx: block.imageWidthPx ?? null,
           imageHeightPx: block.imageHeightPx ?? null,
@@ -600,6 +663,7 @@ function blockToPmNode(
           imagePosH: block.imagePosH ?? null,
           imagePosV: block.imagePosV ?? null,
           imageRotDeg: block.imageRotDeg ?? null,
+          imageAlt: block.imageAlt ?? null,
           imageFlipH: block.imageFlipH ?? false,
           imageFlipV: block.imageFlipV ?? false,
           imageBorder: block.imageBorder ?? null,
@@ -936,7 +1000,13 @@ export function tableModelToPmNode(
               cellMar: cell.cellMarTwips ?? null,
               textDirection: cell.textDirection ?? null,
               noWrap: cell.noWrap ?? null,
+<<<<<<< ours
               hideMark: cell.hideMark ?? false,
+=======
+              fitText: cell.fitText ?? null,
+              hideMark: cell.hideMark ?? false,
+              widthPct: cell.widthPct ?? false,
+>>>>>>> theirs
               tcPrEdited: false,
               fill: cell.fill ?? null,
               color: cell.styleColor ?? null,
@@ -946,6 +1016,7 @@ export function tableModelToPmNode(
               borders: cell.borders ?? null,
               collapsedBw: collapsedCellBw(row, cellIndex),
               rawTcPr: cell.rawTcPr ?? null,
+              permEditable: cell.permEditable ?? false,
               cellRevision: cell.cellRevision ?? null,
               tcPrChange: cell.tcPrChange ?? null,
               // a merged-away cell has no node: its merge record moves up to the restart cell
@@ -976,12 +1047,21 @@ function cellContentNodes(cell: TableCell): PmNode[] {
   ).map((paragraph) => {
     const list = 'list' in paragraph ? paragraph.list : undefined
     const styleId = ('styleId' in paragraph ? paragraph.styleId : undefined) ?? null
+    // bookmark names ride the paragraph attrs so pmTableToModel can carry them
+    // back into the save model (the regenerated cell XML re-emits the anchors)
+    const bookmarks = 'bookmarks' in paragraph ? paragraph.bookmarks : undefined
+    const hiddenBookmarks = 'hiddenBookmarks' in paragraph ? paragraph.hiddenBookmarks : undefined
+    const bookmarkAttrs = {
+      ...(bookmarks?.length ? { bookmarks } : {}),
+      ...(hiddenBookmarks?.length ? { hiddenBookmarks } : {}),
+    }
     return list
       ? {
           type: 'docListItem',
           attrs: {
             ...formatAttrs(paragraph, paragraph.runs),
             styleId,
+            ...bookmarkAttrs,
             kind: list.kind,
             numId: list.numId,
             ilvl: list.ilvl,
@@ -990,7 +1070,7 @@ function cellContentNodes(cell: TableCell): PmNode[] {
         }
       : {
           type: 'docParagraph',
-          attrs: { ...formatAttrs(paragraph, paragraph.runs), styleId },
+          attrs: { ...formatAttrs(paragraph, paragraph.runs), styleId, ...bookmarkAttrs },
           content: runsToInline(paragraph.runs),
         }
   })
@@ -1083,7 +1163,9 @@ export function tableStructureSignature(table: PmNode): string {
         cell.attrs?.textDirection ?? null,
         cell.attrs?.cellMar ?? null,
         cell.attrs?.noWrap ?? null,
+        cell.attrs?.fitText ?? null,
         cell.attrs?.tcPrEdited ?? false,
+        cell.attrs?.widthPct ?? false,
       ]),
     ]),
   })
@@ -1117,6 +1199,11 @@ export function tableFormattingSignature(table: PmNode): string {
       (row.content ?? []).map((cell) =>
         (cell.content ?? []).map((paragraph) => [
           normalizedFormat(nodeFormat(paragraph)),
+          // a style-only edit must regenerate too: without this the
+          // unchanged-formatting path would freeze the paragraph's old style
+          paragraph.attrs?.styleId ?? null,
+          nodeBookmarks(paragraph, 'bookmarks') ?? null,
+          nodeBookmarks(paragraph, 'hiddenBookmarks') ?? null,
           // list toggles must force regeneration (the text patch keeps old pPr)
           paragraph.type === 'docListItem'
             ? [paragraph.attrs?.kind, paragraph.attrs?.numId, paragraph.attrs?.ilvl]
@@ -1308,6 +1395,7 @@ export function pmTableToModel(table: PmNode): TableModel {
           'w:cellMerge',
         ),
         gridGap: cellNode.attrs?.gridGap ? true : undefined,
+        widthPct: cellNode.attrs?.widthPct ? true : undefined,
         // edited tcPr groups are written from the attrs; a null direction / margin
         // set means "explicitly horizontal" / "same as the table" (element removed)
         ...(cellNode.attrs?.tcPrEdited || table.attrs?.docxIndex == null
@@ -1317,6 +1405,7 @@ export function pmTableToModel(table: PmNode): TableModel {
                 (cellNode.attrs?.textDirection as TableCell['textDirection']) ?? 'lrTb',
               cellMarTwips: (cellNode.attrs?.cellMar as TableCell['cellMarTwips']) ?? {},
               noWrap: !!cellNode.attrs?.noWrap,
+              fitText: !!cellNode.attrs?.fitText,
             }
           : {}),
       }
@@ -1346,19 +1435,30 @@ export function pmTableToModel(table: PmNode): TableModel {
         cell: {
           ...style,
           paras: cellParas.map(paragraphText),
-          richParas: cellParas.map((paragraph) => ({
-            ...nodeFormat(paragraph),
-            ...(paragraph.type === 'docListItem' && paragraph.attrs?.numId
-              ? {
-                  list: {
-                    kind: (paragraph.attrs.kind as 'bullet' | 'ordered') ?? 'bullet',
-                    numId: String(paragraph.attrs.numId),
-                    ilvl: Number(paragraph.attrs.ilvl) || 0,
-                  },
-                }
-              : {}),
-            runs: inlineToRuns(paragraph.content ?? []),
-          })),
+          richParas: cellParas.map((paragraph) => {
+            const bookmarks = nodeBookmarks(paragraph, 'bookmarks')
+            const hiddenBookmarks = nodeBookmarks(paragraph, 'hiddenBookmarks')
+            return {
+              ...nodeFormat(paragraph),
+              // the cell paragraph's w:pStyle rides along (generate.ts writes it
+              // back); without it a style-only edit is lost on regeneration
+              ...(paragraph.attrs?.styleId ? { styleId: String(paragraph.attrs.styleId) } : {}),
+              // bookmark names opening inside the cell paragraph (REF/TOC anchors
+              // would otherwise disappear when the cell rebuilds)
+              ...(bookmarks?.length ? { bookmarks } : {}),
+              ...(hiddenBookmarks?.length ? { hiddenBookmarks } : {}),
+              ...(paragraph.type === 'docListItem' && paragraph.attrs?.numId
+                ? {
+                    list: {
+                      kind: (paragraph.attrs.kind as 'bullet' | 'ordered') ?? 'bullet',
+                      numId: String(paragraph.attrs.numId),
+                      ilvl: Number(paragraph.attrs.ilvl) || 0,
+                    },
+                  }
+                : {}),
+              runs: inlineToRuns(paragraph.content ?? []),
+            }
+          }),
           ...(nestedModels.length > 0
             ? { nestedTables: nestedModels, nestedTableAnchors: nestedAnchors }
             : {}),
@@ -1539,6 +1639,18 @@ export function runsToInline(runs: Run[]): PmNode[] {
         },
       })
       if (run.math.breakAfter) nodes.push({ type: 'hardBreak', attrs: { mathBreak: true } })
+<<<<<<< ours
+=======
+      continue
+    }
+    if (run.eqLayout) {
+      const { kind, a, b, style, xml } = run.eqLayout
+      nodes.push({
+        type: 'docEqLayout',
+        ...atomMarks,
+        attrs: { kind, a, b, style: style ?? null, xml: xml ?? '' },
+      })
+>>>>>>> theirs
       continue
     }
     if (run.ruby) {
@@ -1557,7 +1669,14 @@ export function runsToInline(runs: Run[]): PmNode[] {
           kind: run.noteRef.kind,
           id: run.noteRef.id,
           num: parseInt(run.text, 10) || 1,
+<<<<<<< ours
           rawRPr: run.rawRPr ?? null,
+=======
+          fmt: run.noteRef.numFmt ?? defaultNoteNumFmt(run.noteRef.kind),
+          mark: run.noteRef.customMark ?? null,
+          rawRPr: run.rawRPr ?? null,
+          hiddenBookmarks: run.noteRef.bookmarks ?? null,
+>>>>>>> theirs
         },
       })
       continue
@@ -1585,6 +1704,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
         ...atomMarks,
         attrs: {
           dataUrl: run.image.dataUrl,
+          vector: pictureVectorAttr(run.image.dataUrl, run.image.vectorUrl),
           widthPx: run.image.widthPx ?? null,
           heightPx: run.image.heightPx ?? null,
           xml: run.image.xml,
@@ -1617,7 +1737,21 @@ export function runsToInline(runs: Run[]): PmNode[] {
       })
     }
     if (run.xeTerm !== undefined) {
+<<<<<<< ours
       nodes.push({ type: 'docXeMark', ...atomMarks, attrs: { term: run.xeTerm } })
+=======
+      nodes.push({
+        type: 'docXeMark',
+        ...atomMarks,
+        attrs: {
+          term: run.xeTerm,
+          ta: run.taInstr ?? null,
+          taRuns: run.taRuns ? JSON.stringify(run.taRuns) : null,
+          tc: run.tcInstr ?? null,
+          switches: run.xeSwitches ?? null,
+        },
+      })
+>>>>>>> theirs
     }
   }
   markLeadRule(nodes)
@@ -1658,7 +1792,11 @@ function runMarks(run: Run): PmMark[] {
   const cs = run.effective?.cs ? run.effective : undefined
   if (run.bold) marks.push({ type: 'bold' })
   if (run.italic) marks.push({ type: 'italic' })
-  if (run.underline) marks.push({ type: 'underline' })
+  if (run.underline)
+    marks.push({
+      type: 'underline',
+      attrs: { line: run.underlineStyle ?? null, color: run.underlineColor ?? null },
+    })
   if (run.strike) marks.push({ type: 'strike' })
   if (run.link)
     marks.push({
@@ -1677,7 +1815,7 @@ function runMarks(run: Run): PmMark[] {
     })
   if (run.sym) marks.push({ type: 'docSym', attrs: { font: run.sym.font, char: run.sym.char } })
   if (run.instrField !== undefined) {
-    const isZotero = /^\s*(?:ADDIN\s+)?(?:ZOTERO_|CSL_)/i.test(run.instrField)
+    const isZotero = ZOTERO_FIELD_INSTR_RE.test(run.instrField)
     let fieldId: number | null = null
     if (isZotero) {
       if (Number.isSafeInteger(run.zoteroFieldId) && Number(run.zoteroFieldId) > 0) {
@@ -1754,10 +1892,18 @@ function runMarks(run: Run): PmMark[] {
     run.textEffect ||
     run.dstrike ||
     run.glow ||
+    run.textShadow ||
+    run.textReflection ||
+    run.fxOwn !== undefined ||
     run.positionHalfPoints ||
     run.bdr ||
+    run.fitTextTwips !== undefined ||
+    run.eaLayout !== undefined ||
+    run.lang !== undefined ||
+    run.noProof !== undefined ||
     run.vertAlign ||
     run.em ||
+    run.otf !== undefined ||
     run.bold === false ||
     run.italic === false ||
     run.caps ||
@@ -1781,6 +1927,7 @@ function runMarks(run: Run): PmMark[] {
     // lifted out of the raw rPr and the run is re-tagged: without it the
     // border survives a reopen but the document quietly stops withholding
     // anything, and a model can read the whole thing again.
+<<<<<<< ours
     const isRedacted = typeof run.rawRPr === 'string' && REDACT_RPR_RE.test(run.rawRPr)
     if (isRedacted) {
       marks.push({
@@ -1795,6 +1942,16 @@ function runMarks(run: Run): PmMark[] {
       isRedacted && hasRedactBdrInRPr(run.rawRPr!) && isRedactRunBorder(run.bdr)
         ? undefined
         : run.bdr
+=======
+    if (typeof run.rawRPr === 'string' && REDACT_RPR_RE.test(run.rawRPr)) {
+      marks.push({
+        type: 'redaction',
+        // bdr and rawRPr are what the save path needs to write the mark back;
+        // docTextStyle already carries the border, this re-asserts it on ours
+        attrs: { label: redactLabelIn(run.rawRPr), rawRPr: run.rawRPr },
+      })
+    }
+>>>>>>> theirs
     marks.push({
       type: 'docTextStyle',
       attrs: {
@@ -1819,10 +1976,30 @@ function runMarks(run: Run): PmMark[] {
         textEffect: run.textEffect ?? null,
         dstrike: run.dstrike ?? null,
         glow: run.glow ? JSON.stringify(run.glow) : null,
+        textShadow: run.textShadow ? JSON.stringify(run.textShadow) : null,
+        textReflection: run.textReflection ? JSON.stringify(run.textReflection) : null,
+        fxOwn: run.fxOwn === undefined ? null : JSON.stringify(run.fxOwn),
         positionHalfPoints: run.positionHalfPoints ?? null,
+<<<<<<< ours
         bdr: styleBdr ? JSON.stringify(styleBdr) : null,
+=======
+        bdr: run.bdr ? JSON.stringify(run.bdr) : null,
+        bdrOwn: run.bdrOwn === undefined ? null : run.bdrOwn ? JSON.stringify(run.bdrOwn) : 'none',
+        // in the order the mark declares its attrs: a table's formatting signature
+        // serialises them in order and compares it with the editor's
+        fitText: run.fitTextTwips ?? null,
+        eaLayout: run.eaLayout
+          ? JSON.stringify({
+              ...run.eaLayout,
+              ...(run.eaLayout.combine ? { w: twoLinesWidthEm(run.text) } : {}),
+            })
+          : null,
+        lang: run.lang === undefined ? null : JSON.stringify(run.lang),
+        noProof: run.noProof ?? null,
+>>>>>>> theirs
         vertAlign: run.vertAlign ?? null,
         em: run.em ?? null,
+        otf: run.otf === undefined ? null : JSON.stringify(run.otf),
         boldOff: run.bold === false || null,
         italicOff: run.italic === false || null,
         caps: run.caps ?? null,
@@ -1848,6 +2025,8 @@ function runMarks(run: Run): PmMark[] {
   return marks
 }
 
+const EMU_PER_PX = 9525
+
 // ---- ProseMirror doc -> SaveBlock[] (dirty detection via content signatures) ----
 
 export interface SavePlan {
@@ -1869,12 +2048,23 @@ export interface SavePlan {
   deletedCount: number
   totalOriginal: number
   /** cell pictures inserted by the editor, for SaveOptions.newPictures */
+<<<<<<< ours
   newPictures: Record<string, { base64: string; mime: NewImage['mime'] }>
+=======
+  newPictures: Record<string, NewPictureBytes>
+  /** objects grouped in the editor: each group's drawings save as one, by saveBlocks index */
+  groups: DrawingGroup[]
+  /** blocks that stand for drawings of the paragraph before them, by saveBlocks index */
+  carried: number[]
+>>>>>>> theirs
   /** the trailing sectPr's tracked change was accepted / rejected in the editor */
   trailingSectPrChange?: 'accept' | 'reject'
 }
 
-const ZOTERO_FIELD_INSTR_RE = /^\s*(?:ADDIN\s+)?(?:ZOTERO_|CSL_)/i
+// a CITATION field keeps its result's runs the way a Zotero field does, and a mail-merge
+// rule field its id: two Next Record fields side by side are two fields
+const ZOTERO_FIELD_INSTR_RE =
+  /^\s*(?:(?:ADDIN\s+)?(?:ZOTERO_|CSL_)|CITATION\s|(?:NEXT|NEXTIF|SKIPIF|MERGEREC|MERGESEQ|ASK|FILLIN|SET)(?=\s|$))/i
 type ZoteroFieldPart = 'single' | 'begin' | 'inside' | 'end'
 interface ZoteroTextRef {
   blockIndex: number
@@ -1969,9 +2159,15 @@ export function normalizeZoteroFieldParts(doc: PmNode): PmNode {
       const cur = members[i]
       // a field pasted between two runs (into a citation's result or a
       // bibliography paragraph) ends this field there instead of nesting
+<<<<<<< ours
       let split = refs
         .slice(order.get(prev)! + 1, order.get(cur)!)
         .some((between) => between.fieldId !== id)
+=======
+      let split =
+        prev.instr !== cur.instr ||
+        refs.slice(order.get(prev)! + 1, order.get(cur)!).some((between) => between.fieldId !== id)
+>>>>>>> theirs
       for (let b = prev.blockIndex + 1; b < cur.blockIndex && !split; b++) {
         split = !isParagraphBlock(b)
       }
@@ -2027,6 +2223,18 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
   const originalByIndex = new Map<number, Block>()
   for (const block of originalBlocks) {
     if (!block.hidden && block.docxIndex !== null) originalByIndex.set(block.docxIndex, block)
+  }
+
+  // A rebuilt table's cell bookmark anchors get ids from the document's own
+  // allocator, seeded past every id the untouched blocks keep — the engine's
+  // process-level counter does not know the document, and a colliding id makes
+  // Word pair bookmarkStart / bookmarkEnd across the wrong anchors. The save's
+  // generated paragraphs seed past these too (the engine reads them off the
+  // pre-rendered blocks), so one save never mints the same id twice.
+  const tableBookmarkCtx = {
+    allocateBookmarkId: nextBookmarkIdAllocator(
+      originalBlocks.map((b) => b.originalXml ?? '').join(''),
+    ),
   }
 
   // Mixed-encoding guard: parse compresses wild producer relativeHeight values
@@ -2087,8 +2295,44 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
   const saveBlockIndexByDocx = new Map<number, number>()
   let changedCount = 0
   const usedIndexes = new Set<number>()
+  const newRangeEnds = { commentStarts: new Set<string>(), commentEnds: new Set<string>() }
   /** record where an original anchor ended up in saveBlocks (set before push) */
   const mapAnchor = (idx: number) => saveBlockIndexByDocx.set(idx, saveBlocks.length)
+
+  const groupMembers = new Map<string, GroupMember[]>()
+  const carried: number[] = []
+  const groupNoted = new Set<PmNode>()
+  /** the node's drawings that belong to a group (or are carried), as the block about to be pushed holds them */
+  const noteGroupedDrawings = (node: PmNode, at: number) => {
+    if (groupNoted.has(node)) return
+    groupNoted.add(node)
+    const member = (attrs: PmNode['attrs'], drawing: number) => {
+      const id = attrs?.groupId as string | null | undefined
+      const box = attrs?.groupBox as { x: number; y: number; w: number; h: number } | null
+      if (!id || !box) return
+      const list = groupMembers.get(id) ?? []
+      list.push({
+        block: at,
+        drawing,
+        xEmu: Math.round(box.x * EMU_PER_PX),
+        yEmu: Math.round(box.y * EMU_PER_PX),
+        widthEmu: Math.round(box.w * EMU_PER_PX),
+        heightEmu: Math.round(box.h * EMU_PER_PX),
+      })
+      groupMembers.set(id, list)
+    }
+    if (node.type === 'docProtected') {
+      member(node.attrs, 0)
+      if (node.attrs?.carried) carried.push(at)
+      return
+    }
+    // a paragraph's floating pictures are its anchored drawings, in run order
+    let drawing = 0
+    for (const child of node.content ?? []) {
+      if (child.type !== 'docInlineImage' || !child.attrs?.wrap || child.attrs?.rule) continue
+      member(child.attrs, drawing++)
+    }
+  }
 
   const recordSdtEmit = (node: PmNode, sb: SaveBlock, at: number) => {
     const idx = node.attrs?.docxIndex as number | null | undefined
@@ -2119,6 +2363,7 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
     emits.push({ at, idx, open, close })
   }
 
+  const pagedTables = pagedTableStarts(doc.content ?? [])
   for (const node of doc.content ?? []) {
     const revision = node.attrs?.blockRevision as {
       kind: 'ins' | 'del'
@@ -2128,6 +2373,7 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
     } | null
     const pushBlock = (block: SaveBlock) => {
       recordSdtEmit(node, block, saveBlocks.length)
+      noteGroupedDrawings(node, saveBlocks.length)
       saveBlocks.push(revision ? { ...block, revision } : block)
     }
     if (node.type === 'docTable') {
@@ -2168,21 +2414,26 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
           changedCount++
           pushBlock({
             kind: 'xml',
-            xml: generateTableModelXml(model, original.originalXml ?? undefined),
+            xml: generateTableModelXml(model, original.originalXml ?? undefined, tableBookmarkCtx),
           })
         }
       } else {
         changedCount++
-        pushBlock({ kind: 'xml', xml: generateTableModelXml(model) })
+        pushBlock({ kind: 'xml', xml: generateTableModelXml(model, undefined, tableBookmarkCtx) })
       }
       continue
     }
     if (node.type === 'docProtected') {
       const idx = node.attrs?.docxIndex as number | null
-      if (idx !== null && idx !== undefined && originalByIndex.has(idx) && !usedIndexes.has(idx)) {
-        usedIndexes.add(idx)
-        mapAnchor(idx)
-        const original = originalByIndex.get(idx)!
+      const member = memberOriginal(node)
+      const fromFile =
+        idx !== null && idx !== undefined && originalByIndex.has(idx) && !usedIndexes.has(idx)
+      if (member || fromFile) {
+        if (fromFile) {
+          usedIndexes.add(idx!)
+          mapAnchor(idx!)
+        }
+        const original = member ?? originalByIndex.get(idx!)!
         if (original.blockRevision && !revision && original.originalXml) {
           changedCount++
           pushBlock({ kind: 'xml', xml: unwrapBlockRevisionXml(original.originalXml) })
@@ -2199,6 +2450,15 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
           })
           continue
         }
+<<<<<<< ours
+=======
+        const renumbered = seqRenumberedXml(node, original)
+        if (renumbered) {
+          changedCount++
+          pushBlock({ kind: 'xml', xml: renumbered })
+          continue
+        }
+>>>>>>> theirs
         const imagePatch = imagePatchOf(node, original)
         const tableTexts = tableTextsPatch(node, original)
         const textboxTexts = textboxParasPatch(node, original)
@@ -2292,6 +2552,9 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
                   replaceImage: {
                     base64: imageReplace.base64,
                     mime: imageReplace.mime as NewImage['mime'],
+                    ...(pictureVectorOf(imageReplace.base64)
+                      ? { svgBase64: pictureVectorOf(imageReplace.base64) }
+                      : {}),
                   },
                 }
               : {}),
@@ -2341,10 +2604,19 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
                 : node.attrs?.imageZOrder != null
                   ? Number(node.attrs.imageZOrder)
                   : undefined
+            // a shape moved from where it is drawn keeps the frame those offsets measure from
+            const frame = node.attrs?.imageOffsetFrame as {
+              h: 'page' | 'margin' | 'column'
+              v: 'page' | 'margin' | 'paragraph'
+            } | null
             xml = applyImageWrap(
               xml,
               wrap,
-              { x: textboxOffsetX!, y: textboxOffsetY! },
+              {
+                x: textboxOffsetX!,
+                y: textboxOffsetY!,
+                ...(frame ? { relH: frame.h, relV: frame.v } : {}),
+              },
               undefined,
               rank,
             )
@@ -2379,8 +2651,11 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
             kind: 'xml',
             xml: applyImageZOrder(original.originalXml, original.imageZOrder),
           })
+        } else if (member) {
+          changedCount++
+          pushBlock({ kind: 'xml', xml: member.originalXml! })
         } else {
-          pushBlock({ kind: 'original', docxIndex: idx })
+          pushBlock({ kind: 'original', docxIndex: idx! })
         }
       } else if (idx !== null && idx !== undefined && originalByIndex.has(idx)) {
         // pasted copy: the anchor is consumed by the first occurrence, so clone from the block's own data
@@ -2391,7 +2666,10 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
           pushBlock({ kind: 'image', image })
         } else if (original.originalXml) {
           changedCount++
-          pushBlock({ kind: 'xml', xml: stripAnchorMarkers(original.originalXml) })
+          pushBlock({
+            kind: 'xml',
+            xml: stripAnchorMarkers(seqRenumberedXml(node, original) ?? original.originalXml),
+          })
         } else {
           console.warn('dropping unclonable copy of protected block', node.attrs?.label)
         }
@@ -2399,6 +2677,11 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
         // editor-created table or other self-contained fragment
         changedCount++
         let xml = String(node.attrs.genXml)
+        // brought in from another file and not touched since: its XML is not ours to rebuild
+        if (node.attrs.genPristine && node.attrs.genPristine === blockFingerprint(node.attrs)) {
+          pushBlock({ kind: 'xml', xml })
+          continue
+        }
         const table = node.attrs?.table as TableModel | null
         if (table && node.attrs?.blockType === 'table') {
           xml = patchTableCellTexts(
@@ -2411,20 +2694,29 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
         // patch bails out entirely when the title text nodes don't line up)
         const genField = node.attrs?.fieldDisplay as FieldDisplay | null
         if (genField?.kind === 'tocLine' && genField.right) {
-          xml = patchFieldParagraphXml(xml, { right: genField.right })
+          xml =
+            genField.pageSep !== undefined
+              ? patchFieldTablePageXml(xml, genField.pageSep + genField.right)
+              : tocLineWithPage(xml, genField.right)
         }
+        // every line has its page now: the table is a result, not a request for Word to build it
+        if (pagedTables.has(node)) xml = xml.replace(DIRTY_FIELD_BEGIN, '$1')
         // patch textbox paragraphs for newly-inserted textboxes/shapes with text
         const genTextboxes = node.attrs?.textboxes as TextboxDisplay[] | null
         const hasNonEmptyTextbox =
           genTextboxes != null &&
           genTextboxes.length > 0 &&
           genTextboxes.some((box) =>
+<<<<<<< ours
             box.paras.some(
               (p) =>
                 p.runs.some((r) => r.text !== '') ||
                 p.listMarker?.numId != null ||
                 p.indentLeft != null,
             ),
+=======
+            box.paras.some((p) => p.runs.some((r) => r.text !== '' || r.image)),
+>>>>>>> theirs
           )
         if (hasNonEmptyTextbox) {
           // editor-built XML has exactly one txbxContent per box, in box order
@@ -2461,6 +2753,10 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
               // undefined keeps the generated XML untouched when never edited
               rotDeg: genBox.rotDeg ?? undefined,
               borderWidthPx: genBox.borderWidthPx ?? undefined,
+<<<<<<< ours
+=======
+              vert: genBox.vert ?? null,
+>>>>>>> theirs
             },
           ])
         }
@@ -2494,6 +2790,8 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
       } else if (node.attrs?.genImage) {
         changedCount++
         const image = { ...(node.attrs.genImage as NewImage) }
+        const svgBase64 = pictureVectorOf(image.base64)
+        if (svgBase64) image.svgBase64 = svgBase64
         if (node.attrs.imageWidthPx) image.widthPx = Number(node.attrs.imageWidthPx)
         if (node.attrs.imageHeightPx) image.heightPx = Number(node.attrs.imageHeightPx)
         const align = node.attrs.imageAlign as NewImage['align'] | null
@@ -2506,6 +2804,7 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
         if (node.attrs.imageRotDeg) image.rotDeg = Number(node.attrs.imageRotDeg)
         if (node.attrs.imageFlipH) image.flipH = true
         if (node.attrs.imageFlipV) image.flipV = true
+        if (node.attrs.imageAlt) image.altText = String(node.attrs.imageAlt)
         pushBlock({ kind: 'image', image })
       } else if (node.attrs?.genChart) {
         // in-place edits live in chartDisplay; the saved part reflects them
@@ -2551,6 +2850,8 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
     ) {
       usedIndexes.add(idx!)
       mapAnchor(idx!)
+      for (const end of ['commentStarts', 'commentEnds'] as const)
+        for (const id of original[end] ?? []) newRangeEnds[end].add(id)
       pushBlock({ kind: 'original', docxIndex: idx! })
     } else {
       changedCount++
@@ -2565,17 +2866,23 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
         applyRawPPr(generated, original!)
       } else if (original) {
         // A split twin inherits the source node's attrs, but pPrChange and
-        // bookmark/comment anchors belong only to the anchored original.
+        // bookmark anchors belong only to the anchored original.
         delete generated.pPrChange
         delete generated.numberingChange
         delete generated.sectPrChange
         delete generated.bookmarks
         delete generated.hiddenBookmarks
-        delete generated.commentStarts
-        delete generated.commentEnds
         // A grouped shell (partial open/close of a multi-block sdt) must be
         // emitted exactly once, by the anchor.
         if (generated.sdtShell?.group !== undefined) delete generated.sdtShell
+      }
+      // Twins of one paragraph all carry its comment ranges: the first written keeps them.
+      // A range made on a twin after the split (a comment on the new empty line) is its own.
+      for (const end of ['commentStarts', 'commentEnds'] as const) {
+        const fresh = generated[end]?.filter((id) => !newRangeEnds[end].has(id))
+        for (const id of fresh ?? []) newRangeEnds[end].add(id)
+        if (fresh?.length) generated[end] = fresh
+        else delete generated[end]
       }
       pushBlock({
         kind: 'generated',
@@ -2678,11 +2985,23 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
       else if (raw.includes('"resolved":"accept"')) trailingSectPrChange = 'accept'
     }
   }
+<<<<<<< ours
+=======
+  registerTextboxPictures(doc)
+>>>>>>> theirs
   return {
     saveBlocks,
     chartPatches,
     saveBlockIndexByDocx,
     newPictures: Object.fromEntries(newPictures),
+<<<<<<< ours
+=======
+    // a group needs two members that are still in the document
+    groups: Array.from(groupMembers.values())
+      .filter((members) => members.length > 1)
+      .map((members) => ({ members })),
+    carried,
+>>>>>>> theirs
     changedCount,
     deletedCount,
     totalOriginal: originalByIndex.size,
@@ -2745,6 +3064,8 @@ function imageFromProtectedAttrs(node: PmNode): NewImage | null {
   const image: NewImage = lazy
     ? { base64: '', mime: 'image/png', sourcePart: lazy.partPath, widthPx, heightPx }
     : { base64: m![2], mime: m![1] as NewImage['mime'], widthPx, heightPx }
+  const svgBase64 = pictureVectorOf(image.base64)
+  if (svgBase64) image.svgBase64 = svgBase64
   const align = node.attrs?.imageAlign as NewImage['align'] | null
   if (align) image.align = align
   applyImageFloatAttrs(image, node.attrs)
@@ -2752,6 +3073,7 @@ function imageFromProtectedAttrs(node: PmNode): NewImage | null {
   if (node.attrs?.imageRotDeg) image.rotDeg = Number(node.attrs.imageRotDeg)
   if (node.attrs?.imageFlipH) image.flipH = true
   if (node.attrs?.imageFlipV) image.flipV = true
+  if (node.attrs?.imageAlt) image.altText = String(node.attrs.imageAlt)
   return image
 }
 
@@ -2829,6 +3151,63 @@ interface ImageBlockPatch {
   rotDeg?: number
   flipH?: boolean
   flipV?: boolean
+  /** alternative text; '' removes; undefined = keep */
+  altText?: string
+}
+
+/**
+ * A save reads the file back, where the children of a group taken apart are
+ * drawings of one paragraph, hence one node. `next` (the file as read) with
+ * them kept as the separate nodes `prev` (the editor) had; where the two do
+ * not line up, `next` as read.
+ */
+export function keepGroupMembersApart(prev: PmNode, next: PmNode): PmNode {
+  const before = prev.content ?? []
+  const after = next.content ?? []
+  if (!before.some((node) => node.attrs?.carried)) return next
+  if (before.filter((node) => !node.attrs?.carried).length !== after.length) return next
+  const boxCount = (node: PmNode): number =>
+    (node.attrs?.textboxes as unknown[] | null | undefined)?.length ?? 0
+  const content: PmNode[] = []
+  let at = 0
+  for (let i = 0; i < before.length; i++) {
+    if (before[i].attrs?.carried) return next
+    const read = after[at++]
+    let end = i + 1
+    while (end < before.length && before[end].attrs?.carried) end++
+    const members = before.slice(i, end)
+    const same =
+      members.length > 1 &&
+      !!before[i].attrs?.member &&
+      read.type === 'docProtected' &&
+      boxCount(read) === members.reduce((sum, node) => sum + boxCount(node), 0)
+    if (same) {
+      const [host, ...carried] = members
+      content.push(
+        { ...host, attrs: { ...host.attrs, docxIndex: read.attrs?.docxIndex } },
+        ...carried,
+      )
+    } else {
+      content.push(read)
+    }
+    i = end - 1
+  }
+  return { ...next, content }
+}
+
+/** A child of a group taken apart as a block of the file: its edits are told from, and patched into, its own paragraph. */
+function memberOriginal(node: PmNode): Block | null {
+  const member = node.attrs?.member as GroupMemberSource | null | undefined
+  if (!member) return null
+  return {
+    id: 'group-member',
+    type: 'passthrough',
+    docxIndex: null,
+    originalXml: member.xml,
+    textboxes: member.boxes,
+    imageOffsetXEmu: member.xEmu,
+    imageOffsetYEmu: member.yEmu,
+  }
 }
 
 /** size/align/wrap changes on an original image block; null when untouched */
@@ -2870,6 +3249,8 @@ function imagePatchOf(node: PmNode, original: Block): ImageBlockPatch | null {
   const flipV = !!node.attrs?.imageFlipV
   if (flipH !== (original.imageFlipH ?? false)) patch.flipH = flipH
   if (flipV !== (original.imageFlipV ?? false)) patch.flipV = flipV
+  const altText = String(node.attrs?.imageAlt ?? '')
+  if (altText !== (original.imageAlt ?? '')) patch.altText = altText
   const posH = (node.attrs?.imagePosH as ImageBlockPatch['posH'] | null) ?? null
   const posV = (node.attrs?.imagePosV as ImageBlockPatch['posV'] | null) ?? null
   if (
@@ -3011,8 +3392,8 @@ export function textboxParaSignature(para: TextboxDisplay['paras'][number]): str
 }
 
 /** all-empty sub-editor content counts as "still no text" for a paras:[] box */
-function boxStillEmpty(paras: TextboxDisplay['paras']): boolean {
-  return paras.every((p) => p.runs.every((r) => r.text === ''))
+export function boxStillEmpty(paras: TextboxDisplay['paras']): boolean {
+  return paras.every((p) => p.runs.every((r) => r.text === '' && !r.image))
 }
 
 /**
@@ -3115,15 +3496,29 @@ function textboxStylesPatch(node: PmNode, original: Block): (ShapeStylePatch | n
       (box.borderWidthPx ?? null) !== (initial[index].borderWidthPx ?? null)
         ? (box.borderWidthPx ?? null)
         : undefined
+<<<<<<< ours
+=======
+    const vert =
+      (box.vert ?? null) !== (initial[index].vert ?? null) ? (box.vert ?? null) : undefined
+>>>>>>> theirs
     if (
       fillHex === undefined &&
       borderHex === undefined &&
       rotDeg === undefined &&
+<<<<<<< ours
       borderWidthPx === undefined
     )
       return null
     changed = true
     return { fillHex, borderHex, rotDeg, borderWidthPx }
+=======
+      borderWidthPx === undefined &&
+      vert === undefined
+    )
+      return null
+    changed = true
+    return { fillHex, borderHex, rotDeg, borderWidthPx, vert }
+>>>>>>> theirs
   })
   return changed ? styles : null
 }
@@ -3166,6 +3561,59 @@ function shapeWrapPatchOf(
     }
   }
   return out
+}
+
+const DIRTY_FIELD_BEGIN = /(<w:fldChar w:fldCharType="begin") w:dirty="true"/
+
+/**
+ * The first lines of the generated tables (contents, figures, index) that were
+ * built before the pages were laid out and have a page on every line by now.
+ */
+function pagedTableStarts(nodes: PmNode[]): Set<PmNode> {
+  const out = new Set<PmNode>()
+  let first: PmNode | null = null
+  let paged = true
+  for (const node of nodes) {
+    const xml = node.type === 'docProtected' ? (node.attrs?.genXml as string | null) : null
+    const field = node.attrs?.fieldDisplay as FieldDisplay | null
+    if (!xml || field?.kind !== 'tocLine') {
+      first = null
+      continue
+    }
+    if (DIRTY_FIELD_BEGIN.test(xml)) {
+      first = node
+      paged = true
+    }
+    if (!first) continue
+    if (!field.noPage && !field.right) paged = false
+    if (xml.includes('w:fldCharType="end"')) {
+      if (paged) out.add(first)
+      first = null
+    }
+  }
+  return out
+}
+
+/** a generated line gets its page; one built without a page has no run for it yet */
+function tocLineWithPage(xml: string, page: string): string {
+  const tabRun = '<w:tab/></w:r>'
+  const tab = xml.lastIndexOf(tabRun)
+  if (tab === -1 || /<w:t[\s>]/.test(xml.slice(tab)))
+    return patchFieldParagraphXml(xml, { right: page })
+  const at = tab + tabRun.length
+  const text = page.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return `${xml.slice(0, at)}<w:r><w:rPr><w:noProof/></w:rPr><w:t>${text}</w:t></w:r>${xml.slice(at)}`
+}
+
+/** a caption renumbered since the file was read: its XML with the new numbers, and the text typed into it since */
+function seqRenumberedXml(node: PmNode, original: Block): string | null {
+  const renumber = node.attrs?.seqRenumber as SeqRenumber | null | undefined
+  if (!renumber || !original.originalXml) return null
+  const xml = rewriteSeqResultsXml(original.originalXml, renumber.results)
+  const current = (node.attrs?.fieldDisplay as FieldDisplay | null)?.left ?? ''
+  const initial = original.fieldDisplay?.left ?? ''
+  const edited = current !== (renumber.left ?? initial) && current !== initial
+  return edited ? patchFieldParagraphXml(xml, { left: current }) : xml
 }
 
 function fieldTextPatch(node: PmNode, original: Block): FieldTextPatch | null {
@@ -3302,6 +3750,10 @@ function nodeFormat(node: PmNode): ParaFormat | undefined {
     format.contextualSpacing = node.attrs.contextualSpacing as boolean
   for (const key of PAGINATION_FLAG_KEYS)
     if (node.attrs?.[key] != null) format[key] = node.attrs[key] as boolean
+  if (node.attrs?.suppressAutoHyphens != null)
+    format.suppressAutoHyphens = node.attrs.suppressAutoHyphens as boolean
+  if (node.attrs?.mirrorIndents != null) format.mirrorIndents = node.attrs.mirrorIndents as boolean
+  if (node.attrs?.snapToGrid != null) format.snapToGrid = node.attrs.snapToGrid as boolean
   if (node.attrs?.pageBreakBefore) format.pageBreakBefore = true
   if (node.attrs?.bidi) format.bidi = true
   else if (node.attrs?.bidiInherited) format.bidiInherited = true
@@ -3310,8 +3762,26 @@ function nodeFormat(node: PmNode): ParaFormat | undefined {
   if (node.attrs?.overflowPunct != null) {
     format.overflowPunct = node.attrs.overflowPunct as boolean
   }
+  for (const key of [
+    'overflowPunctDirect',
+    'wordWrapDirect',
+    'autoSpaceDE',
+    'autoSpaceDN',
+    'kinsoku',
+    'topLinePunct',
+  ] as const)
+    if (node.attrs?.[key] != null) format[key] = node.attrs[key] as boolean
+  if (node.attrs?.textAlignment) format.textAlignment = String(node.attrs.textAlignment)
   if (node.attrs?.eaLang) format.eastAsiaLang = String(node.attrs.eaLang)
   if (node.attrs?.shadingFill) format.shadingFill = String(node.attrs.shadingFill)
+  if (node.attrs?.shadingPattern) {
+    try {
+      const pattern = JSON.parse(String(node.attrs.shadingPattern))
+      if (pattern && typeof pattern.val === 'string') format.shadingPattern = pattern
+    } catch {
+      /* ignore malformed */
+    }
+  }
   if (node.attrs?.borders) format.borders = String(node.attrs.borders)
   if (node.attrs?.borderLines) {
     try {
@@ -3447,6 +3917,7 @@ export function pmNodeToGeneratedBlock(node: PmNode): GeneratedBlock {
     ...(pPrChange !== undefined ? { pPrChange: pPrChange ?? null } : {}),
     ...(blockRevision !== undefined ? { blockRevision: blockRevision ?? null } : {}),
     ...paraMarkRevisions(node),
+<<<<<<< ours
   }
 }
 
@@ -3469,6 +3940,30 @@ function paraMarkRevisions(
   }
 }
 
+=======
+  }
+}
+
+/** null = no pending paragraph-mark revision; applyRawPPr strips the record the original carried */
+function paraMarkRevisions(
+  node: PmNode,
+): Pick<
+  GeneratedBlock,
+  'paraMarkDel' | 'paraMarkIns' | 'paraMarkRPrChange' | 'numberingChange' | 'sectPrChange'
+> {
+  return {
+    paraMarkDel: (node.attrs?.paraMarkDel as string | null | undefined) ?? null,
+    paraMarkIns: (node.attrs?.paraMarkIns as string | null | undefined) ?? null,
+    paraMarkRPrChange: (node.attrs?.paraMarkRPrChange as string | null | undefined) ?? null,
+    numberingChange: (node.attrs?.numberingChange as string | null | undefined) ?? null,
+    // the trailing sectPr's record is not this paragraph's own (see pmDocToSavePlan)
+    sectPrChange: trailingRecord(node.attrs?.sectPrChange)
+      ? null
+      : ((node.attrs?.sectPrChange as string | null | undefined) ?? null),
+  }
+}
+
+>>>>>>> theirs
 const trailingRecord = (raw: unknown): boolean =>
   typeof raw === 'string' && raw.includes('"trailing":true')
 
@@ -3514,14 +4009,81 @@ function nodeBookmarks(
 }
 
 /** pictures the editor placed in cells this save: placeholder token -> bytes (see SaveOptions.newPictures) */
+<<<<<<< ours
 const newPictures = new Map<string, { base64: string; mime: NewImage['mime'] }>()
+=======
+type NewPictureBytes = { base64: string; mime: NewImage['mime']; svgBase64?: string }
+const newPictures = new Map<string, NewPictureBytes>()
+>>>>>>> theirs
 let newPictureSeq = 0
 // the same node is converted more than once per save (signatures, text, save)
 let newPictureTokenOf = new WeakMap<PmNode, string>()
 
+<<<<<<< ours
 function newPictureBytes(dataUrl: string): { base64: string; mime: NewImage['mime'] } | null {
   const m = /^data:(image\/(?:png|jpeg|gif));base64,(.+)$/s.exec(dataUrl)
   return m ? { base64: m[2], mime: m[1] as NewImage['mime'] } : null
+=======
+function newPictureBytes(dataUrl: string): NewPictureBytes | null {
+  const m = /^data:(image\/(?:png|jpeg|gif));base64,(.+)$/s.exec(dataUrl)
+  if (!m) return null
+  const svgBase64 = pictureVectorOf(m[2])
+  return { base64: m[2], mime: m[1] as NewImage['mime'], ...(svgBase64 ? { svgBase64 } : {}) }
+}
+
+// a drawing kept on its node or in a text box outlives the save that numbers
+// the cell pictures from 1, so its placeholder comes from a range of its own
+const HELD_PICTURE_TOKEN_BASE = 1_000_000
+let heldPictureSeq = 0
+
+/** a placeholder for a picture's bytes that no later save hands to another picture */
+export function heldPictureToken(): string {
+  return `${NEW_PICTURE_TOKEN_PREFIX}${HELD_PICTURE_TOKEN_BASE + ++heldPictureSeq}`
+}
+
+const PICTURE_TOKEN_EMBED = new RegExp(`r:embed="(${NEW_PICTURE_TOKEN_PREFIX}[0-9]+)"`)
+
+/** the bytes a drawing's placeholder stands for go to the save with it */
+function registerHeldPicture(xml: string, dataUrl: string): void {
+  if (!xml.includes(NEW_PICTURE_TOKEN_PREFIX)) return
+  const token = PICTURE_TOKEN_EMBED.exec(xml)?.[1]
+  const bytes = token ? newPictureBytes(dataUrl) : null
+  if (token && bytes) newPictures.set(token, bytes)
+}
+
+/** pictures put into text boxes: their runs are kept on the box, not converted from nodes */
+function registerTextboxPictures(node: PmNode): void {
+  const boxes = node.attrs?.textboxes as TextboxDisplay[] | null | undefined
+  if (Array.isArray(boxes))
+    for (const box of boxes)
+      for (const para of box.paras)
+        for (const run of para.runs)
+          if (run.image) registerHeldPicture(run.image.xml, run.image.dataUrl)
+  for (const child of node.content ?? []) registerTextboxPictures(child)
+}
+
+/**
+ * The drawing of a picture inserted where its node has to carry it (a header,
+ * a footer, a text box): the save swaps the placeholder for the media part.
+ */
+export function heldPictureXml(picture: {
+  dataUrl: string
+  widthPx: number
+  heightPx: number
+  altText?: string
+}): string {
+  const bytes = newPictureBytes(picture.dataUrl)
+  if (!bytes || !(picture.widthPx > 0) || !(picture.heightPx > 0)) return ''
+  const token = heldPictureToken()
+  return inlinePictureDrawingXml({
+    rId: token,
+    svgRId: bytes.svgBase64 ? token + NEW_PICTURE_SVG_SUFFIX : undefined,
+    docPrId: token,
+    widthPx: picture.widthPx,
+    heightPx: picture.heightPx,
+    altText: picture.altText ?? pictureVectorAltOf(bytes.base64),
+  })
+>>>>>>> theirs
 }
 
 /** a cell picture inserted by the editor has bytes but no drawing yet: emit one
@@ -3539,9 +4101,17 @@ function newPictureXml(node: PmNode): string {
   newPictures.set(token, bytes)
   return inlinePictureDrawingXml({
     rId: token,
+<<<<<<< ours
     docPrId: token,
     widthPx,
     heightPx,
+=======
+    svgRId: bytes.svgBase64 ? token + NEW_PICTURE_SVG_SUFFIX : undefined,
+    docPrId: token,
+    widthPx,
+    heightPx,
+    altText: pictureVectorAltOf(bytes.base64),
+>>>>>>> theirs
     rotDeg: node.attrs?.rotDeg ? Number(node.attrs.rotDeg) : undefined,
     flipH: !!node.attrs?.flipH,
     flipV: !!node.attrs?.flipV,
@@ -3569,6 +4139,7 @@ export function inlineToRuns(content: PmNode[]): Run[] {
           prev.math ||
           prev.sym ||
           prev.ruby ||
+          prev.eqLayout ||
           prev.image)
       if (node.marks?.length) runs.push(runFromMarks(ch, node.marks))
       // an unformatted break joins a plain run only: folding it into a
@@ -3578,6 +4149,7 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       continue
     }
     if (node.type === 'docNoteRef') {
+<<<<<<< ours
       const base = atomBase(node)
       const hasRedact = node.marks?.some((m) => m.type === 'redaction') ?? false
       const markerRawRPr =
@@ -3590,16 +4162,47 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       runs.push({
         ...base,
         text: String(node.attrs?.num ?? 1),
+=======
+      const markerRawRPr = node.attrs?.rawRPr
+      const customMark = node.attrs?.mark
+      const onMark = node.attrs?.hiddenBookmarks
+      runs.push({
+        ...atomBase(node),
+        text: typeof customMark === 'string' ? customMark : String(node.attrs?.num ?? 1),
+>>>>>>> theirs
         noteRef: {
           kind: (node.attrs?.kind as 'footnote' | 'endnote') ?? 'footnote',
           id: String(node.attrs?.id ?? ''),
+          ...(typeof customMark === 'string' ? { customMark } : {}),
+          ...(Array.isArray(onMark) && onMark.length > 0 ? { bookmarks: onMark as string[] } : {}),
         },
+<<<<<<< ours
         ...(rawRPr ? { rawRPr } : {}),
+=======
+        ...(typeof markerRawRPr === 'string' && markerRawRPr ? { rawRPr: markerRawRPr } : {}),
+>>>>>>> theirs
       })
       continue
     }
     if (node.type === 'docXeMark') {
+<<<<<<< ours
       runs.push({ ...atomBase(node), text: '', xeTerm: String(node.attrs?.term ?? '') })
+=======
+      const ta = node.attrs?.ta
+      runs.push({
+        ...atomBase(node),
+        text: '',
+        xeTerm: String(node.attrs?.term ?? ''),
+        ...(typeof ta === 'string' && ta ? { taInstr: ta } : {}),
+        ...(typeof ta === 'string' && ta && citationRuns(node.attrs?.taRuns)
+          ? { taRuns: citationRuns(node.attrs?.taRuns) }
+          : {}),
+        ...(typeof node.attrs?.tc === 'string' && node.attrs.tc ? { tcInstr: node.attrs.tc } : {}),
+        ...(typeof node.attrs?.switches === 'string' && node.attrs.switches
+          ? { xeSwitches: node.attrs.switches }
+          : {}),
+      })
+>>>>>>> theirs
       continue
     }
     if (node.type === 'docInlineMath') {
@@ -3610,6 +4213,24 @@ export function inlineToRuns(content: PmNode[]): Run[] {
           text: String(node.attrs?.text ?? ''),
           math: { omml, ...(node.attrs?.display ? { display: true } : {}) },
         })
+<<<<<<< ours
+=======
+      continue
+    }
+    if (node.type === 'docEqLayout') {
+      const kind = node.attrs?.kind === 'combine' ? 'combine' : 'enclose'
+      const a = String(node.attrs?.a ?? '')
+      const b = String(node.attrs?.b ?? '')
+      const style = node.attrs?.style as EncloseStyle | null | undefined
+      const xml = String(node.attrs?.xml ?? '')
+      if (a || b) {
+        runs.push({
+          ...atomBase(node),
+          text: kind === 'combine' ? a + b : b,
+          eqLayout: { kind, a, b, ...(style ? { style } : {}), ...(xml ? { xml } : {}) },
+        })
+      }
+>>>>>>> theirs
       continue
     }
     if (node.type === 'docRuby') {
@@ -3643,6 +4264,7 @@ export function inlineToRuns(content: PmNode[]): Run[] {
           relV: (a.relV as RunPictureGeometry['relV']) ?? null,
           lineCenterV: !!a.lineCenterV,
         })
+<<<<<<< ours
       }
       if ((dataUrl || rule) && xml) {
         const base = atomBase(node)
@@ -3656,10 +4278,20 @@ export function inlineToRuns(content: PmNode[]): Run[] {
         const rawRPr = mergeRawRPr(imageRawRPr, base.rawRPr)
         runs.push({
           ...base,
+=======
+        if (a.altText != null) xml = setRunPictureAlt(xml, String(a.altText))
+      }
+      if ((dataUrl || rule) && xml) {
+        registerHeldPicture(xml, dataUrl)
+        const vector = node.attrs?.vector as PictureVector | null | undefined
+        runs.push({
+          ...atomBase(node),
+>>>>>>> theirs
           text: '',
           ...(rawRPr ? { rawRPr } : {}),
           image: {
             dataUrl,
+            ...(vector?.url && vector.for === dataUrl ? { vectorUrl: vector.url } : {}),
             xml,
             ...(rule ? { rule } : {}),
             ...(node.attrs?.widthPx ? { widthPx: Number(node.attrs.widthPx) } : {}),
@@ -3697,6 +4329,7 @@ function symRuns(run: Run): Run[] {
   return [...run.text].map((ch) => ({ ...plain, text: ch, ...(ch === glyph ? { sym } : {}) }))
 }
 
+<<<<<<< ours
 /** top-level child elements of an rPr fragment (depth-aware, attrs kept) */
 function splitRPrChildren(xml: string): Array<{ name: string; xml: string }> {
   const out: Array<{ name: string; xml: string }> = []
@@ -3743,6 +4376,8 @@ function mergeRawRPr(
   return `${authOpen}${kept.map((c) => c.xml).join('')}${authChildren.map((c) => c.xml).join('')}</w:rPr>`
 }
 
+=======
+>>>>>>> theirs
 /** an atom's marks carry its revision / comment / character style; dropping them lost the w:ins wrapper */
 function atomBase(node: PmNode): Partial<Run> {
   if (!node.marks?.length) return {}
@@ -3761,12 +4396,20 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       // byte for byte because the run model never manages a custom element.
       // Setting run.bdr as well would only duplicate what rPr already has.
       if (typeof mark.attrs?.rawRPr === 'string' && mark.attrs.rawRPr) {
+<<<<<<< ours
         redactRawRPr = mark.attrs.rawRPr
+=======
+        run.rawRPr = mark.attrs.rawRPr
+>>>>>>> theirs
       }
     } else if (mark.type === 'bold') run.bold = true
     else if (mark.type === 'italic') run.italic = true
-    else if (mark.type === 'underline') run.underline = true
-    else if (mark.type === 'strike') run.strike = true
+    else if (mark.type === 'underline') {
+      run.underline = true
+      // always spelled out: a line the editor redrew must replace the file's own style
+      run.underlineStyle = (mark.attrs?.line as string | null) || 'single'
+      run.underlineColor = (mark.attrs?.color as string | null) || 'auto'
+    } else if (mark.type === 'strike') run.strike = true
     else if (mark.type === 'link') {
       run.link = {
         href: String(mark.attrs?.href ?? ''),
@@ -3786,7 +4429,7 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       run.instrField = String(mark.attrs?.instr ?? '')
       if (mark.attrs?.beginXml) run.fldBeginXml = String(mark.attrs.beginXml)
       if (mark.attrs?.dirty === true) run.fldDirty = true
-      if (/^\s*(?:ADDIN\s+)?(?:ZOTERO_|CSL_)/i.test(run.instrField)) {
+      if (ZOTERO_FIELD_INSTR_RE.test(run.instrField)) {
         const fieldId = Number(mark.attrs?.fieldId)
         if (Number.isSafeInteger(fieldId) && fieldId > 0) run.zoteroFieldId = fieldId
         const fieldPart = mark.attrs?.fieldPart
@@ -3838,6 +4481,16 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
         const glow = parseGlowAttr(String(mark.attrs.glow))
         if (glow) run.glow = glow
       }
+      if (mark.attrs?.textShadow) {
+        const shadow = parseTextShadowAttr(String(mark.attrs.textShadow))
+        if (shadow) run.textShadow = shadow
+      }
+      if (mark.attrs?.textReflection) {
+        const reflection = parseReflectionAttr(String(mark.attrs.textReflection))
+        if (reflection) run.textReflection = reflection
+      }
+      const fxOwn = parseFxOwnAttr(mark.attrs?.fxOwn)
+      if (fxOwn) run.fxOwn = fxOwn
       if (mark.attrs?.positionHalfPoints)
         run.positionHalfPoints = Number(mark.attrs.positionHalfPoints)
       const rawRPrAttr = typeof mark.attrs?.rawRPr === 'string' ? mark.attrs.rawRPr : undefined
@@ -3847,10 +4500,29 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
           run.bdr = bdr
         }
       }
+      if (mark.attrs?.fitText != null) run.fitTextTwips = Number(mark.attrs.fitText) || 0
+      const eaLayout = parseEaLayoutAttr(mark.attrs?.eaLayout)
+      if (eaLayout) {
+        run.eaLayout = {
+          ...(eaLayout.combine ? { combine: true as const } : {}),
+          ...(eaLayout.vert ? { vert: true as const } : {}),
+          ...(eaLayout.id === undefined ? {} : { id: eaLayout.id }),
+        }
+      }
+      const lang = parseLangAttr(mark.attrs?.lang)
+      if (lang) run.lang = lang
+      if (mark.attrs?.noProof != null) run.noProof = !!mark.attrs.noProof
+      if (mark.attrs?.bdrOwn === 'none') run.bdrOwn = null
+      else if (mark.attrs?.bdrOwn) {
+        const own = parseRunBorderAttr(String(mark.attrs.bdrOwn))
+        if (own) run.bdrOwn = own
+      }
       if (mark.attrs?.vertAlign === 'superscript' || mark.attrs?.vertAlign === 'subscript') {
         run.vertAlign = mark.attrs.vertAlign
       }
       if (mark.attrs?.em) run.em = mark.attrs.em as NonNullable<Run['em']>
+      const otf = parseOtfAttr(mark.attrs?.otf)
+      if (otf) run.otf = otf
       if (mark.attrs?.cs) run.cs = true
       if (mark.attrs?.vanish) run.vanish = true
       if (mark.attrs?.vanishOwn != null) run.vanishOwn = Boolean(mark.attrs.vanishOwn)
@@ -3893,6 +4565,7 @@ function mergeRuns(runs: Run[]): Run[] {
       run.math ||
       run.sym ||
       run.ruby ||
+      run.eqLayout ||
       run.image ||
       prev?.noteRef ||
       prev?.xeTerm !== undefined ||
@@ -3901,6 +4574,7 @@ function mergeRuns(runs: Run[]): Run[] {
       prev?.math ||
       prev?.sym ||
       prev?.ruby ||
+      prev?.eqLayout ||
       prev?.image
     if (prev && !atomic && runStyleKey(prev) === runStyleKey(run)) prev.text += run.text
     else merged.push({ ...run })
@@ -3918,6 +4592,18 @@ function charFormatKey(run: Run): unknown[] {
     run.caps ?? null,
     run.dstrike ?? null,
     run.vanishOwn ?? null,
+    run.bdrOwn === undefined ? null : JSON.stringify(run.bdrOwn),
+    run.textShadow === undefined ? null : JSON.stringify(run.textShadow),
+    run.fxOwn === undefined ? null : JSON.stringify(run.fxOwn),
+    run.fitTextTwips ?? null,
+    run.eaLayout === undefined ? null : JSON.stringify(run.eaLayout),
+    run.lang === undefined ? null : JSON.stringify(run.lang),
+    run.noProof ?? null,
+    // a parsed run leaves a plain line unsaid; the editor's run spells it out
+    run.underline ? (run.underlineStyle ?? 'single') : null,
+    run.underline ? (run.underlineColor ?? 'auto') : null,
+    run.em ?? null,
+    run.otf === undefined ? null : JSON.stringify(run.otf),
   ]
 }
 
@@ -3943,8 +4629,19 @@ function runStyleKey(run: Run): string {
     run.link?.rId ?? null,
     run.commentIds?.join(' ') ?? null,
     revisionKey(run),
-    run.noteRef ? [run.noteRef.kind, run.noteRef.id] : null,
+    run.noteRef
+      ? [
+          run.noteRef.kind,
+          run.noteRef.id,
+          run.noteRef.customMark ?? null,
+          run.noteRef.bookmarks ?? null,
+        ]
+      : null,
     run.xeTerm ?? null,
+    run.xeSwitches ?? null,
+    run.taInstr ?? null,
+    run.taRuns ? JSON.stringify(run.taRuns) : null,
+    run.tcInstr ?? null,
     run.refField ?? null,
     run.instrField ?? null,
     run.fldBeginXml ?? null,
@@ -3953,6 +4650,7 @@ function runStyleKey(run: Run): string {
     run.math?.omml ?? null,
     run.sym ? [run.sym.font, run.sym.char] : null,
     run.ruby?.xml ?? null,
+    run.eqLayout ?? null,
   ])
 }
 
@@ -4001,8 +4699,19 @@ function normalizedRuns(runs: Run[]): unknown[] {
           r.link?.href ?? null,
           r.commentIds?.join(' ') ?? null,
           revisionKey(r),
-          r.noteRef ? [r.noteRef.kind, r.noteRef.id] : null,
+          r.noteRef
+            ? [
+                r.noteRef.kind,
+                r.noteRef.id,
+                r.noteRef.customMark ?? null,
+                r.noteRef.bookmarks ?? null,
+              ]
+            : null,
           r.xeTerm ?? null,
+          r.xeSwitches ?? null,
+          r.taInstr ?? null,
+          r.taRuns ? JSON.stringify(r.taRuns) : null,
+          r.tcInstr ?? null,
           r.refField ?? null,
           r.instrField ?? null,
           r.zoteroFieldPart ?? null,
@@ -4012,6 +4721,7 @@ function normalizedRuns(runs: Run[]): unknown[] {
           r.math?.omml ?? null,
           r.sym ? [r.sym.font, r.sym.char] : null,
           r.ruby?.xml ?? null,
+          r.eqLayout ?? null,
           r.image?.xml ?? null,
         ],
   )
@@ -4059,7 +4769,11 @@ function normalizedFormatFields(format: ParaFormat): unknown[] {
     format.widowControl ?? null,
     format.suppressLineNumbers ?? null,
     format.contextualSpacing ?? null,
+    format.suppressAutoHyphens ?? null,
+    format.mirrorIndents ?? null,
+    format.snapToGrid ?? null,
     format.shadingFill ?? null,
+    format.shadingPattern ? JSON.stringify(format.shadingPattern) : null,
     format.borders ?? null,
     format.borderLines ? JSON.stringify(format.borderLines) : null,
     format.tabStops ? JSON.stringify(format.tabStops) : null,
@@ -4067,6 +4781,13 @@ function normalizedFormatFields(format: ParaFormat): unknown[] {
     format.autoSpace ?? null,
     format.wordWrap ?? null,
     format.overflowPunct ?? null,
+    format.overflowPunctDirect ?? null,
+    format.wordWrapDirect ?? null,
+    format.kinsoku ?? null,
+    format.topLinePunct ?? null,
+    format.textAlignment ?? null,
+    format.autoSpaceDE ?? null,
+    format.autoSpaceDN ?? null,
     format.emptyRunSizeHalfPoints ?? null,
   ]
 }

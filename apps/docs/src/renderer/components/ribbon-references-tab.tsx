@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import type { Editor } from '@tiptap/core'
-import type { ZoteroCommand } from '../../shared/ipc'
 import {
-  bibliographyLine,
+  CITATION_STYLES,
   citationText,
+<<<<<<< ours
   generateCaptionXml,
   generateIndexFieldXml,
   type Block,
@@ -21,6 +20,15 @@ import {
   xmlOfNode,
 } from '../editor/toc-update'
 import { useI18n, type StringKey } from '../i18n/locale'
+=======
+  type CitationStyleId,
+  type SourceInfo,
+} from '@genoffice/docx-engine'
+import { Dropdown } from '@genoffice/ui'
+import { useI18n, type StringKey } from '../i18n/locale'
+import type { ActionCommandId } from '../../shared/commands'
+import { RbCommand, useRunCommand } from './ribbon-command'
+>>>>>>> theirs
 import {
   IconBook,
   IconCaption,
@@ -31,11 +39,18 @@ import {
   IconIndex,
   IconRefresh,
   IconToc,
+  IconAddText,
+  IconNextFootnote,
+  IconShowNotes,
+  IconCitationsPane,
+  IconMarkCitation,
+  IconToa,
 } from './icons'
 
 /** icon size for the big icon-over-label ribbon buttons (slides ribbon parity) */
 import { BIG, TabProps, toggleDropdown } from './ribbon-tabs'
 
+<<<<<<< ours
 const CAPTION_LABEL_KEYS = [
   'ribbonCaptionFigure',
   'ribbonCaptionTable',
@@ -131,6 +146,8 @@ function CaptionModal({
   )
 }
 
+=======
+>>>>>>> theirs
 const SOURCE_TYPES: Array<{ key: string; nameKey: StringKey }> = [
   { key: 'Book', nameKey: 'ribbonSourceBook' },
   { key: 'JournalArticle', nameKey: 'ribbonSourceJournal' },
@@ -237,160 +254,31 @@ function SourceModal({
 }
 
 interface ReferencesTabProps extends TabProps {
-  blocks: Block[]
-  onInsertNote: (kind: 'footnote' | 'endnote') => void
   sources: SourceInfo[]
-  /** footnotes/endnotes hold Zotero citation fields the bridge cannot see yet */
-  zoteroNoteFields?: boolean
+  citationStyle: CitationStyleId | null
   onAddSource: (source: SourceInfo) => void
-  /** TOC page-number backfill: docHeadings in document order → real page numbers */
-  headingPages?: () => number[] | null
 }
 
 export function ReferencesTab({
-  editor,
   hasDoc,
-  blocks,
   dropdown,
   setDropdown,
-  onInsertNote,
   sources,
-  zoteroNoteFields,
+  citationStyle,
   onAddSource,
-  headingPages,
 }: ReferencesTabProps) {
   const { t } = useI18n()
-  const [captionOpen, setCaptionOpen] = useState(false)
   const [sourceOpen, setSourceOpen] = useState(false)
-  const [zoteroBusy, setZoteroBusy] = useState<ZoteroCommand | null>(null)
-
-  const runZotero = async (command: ZoteroCommand) => {
-    if (zoteroBusy) return
+  const runCommand = useRunCommand()
+  /** a pick from a menu: run the command, close the menu */
+  const pick = (id: ActionCommandId, payload?: string) => {
+    runCommand(id, payload)
     setDropdown(() => null)
-    // every command lets Zotero rebuild the bibliography from the fields it can see;
-    // note citations are not among them yet, so their works would silently drop out
-    if (zoteroNoteFields) {
-      window.alert(t('zoteroNoteFieldsUnsupported'))
-      return
-    }
-    setZoteroBusy(command)
-    try {
-      const result = await window.desktop.zoteroCommand(command)
-      if (!result.ok) {
-        console.error('Zotero integration failed', result.error)
-        window.alert(
-          t(
-            result.errorCode === 'connection-refused'
-              ? 'zoteroConnectionError'
-              : 'zoteroOperationError',
-          ),
-        )
-      }
-    } catch (error) {
-      console.error('Zotero integration failed', error)
-      window.alert(t('zoteroOperationError'))
-    } finally {
-      setZoteroBusy(null)
-    }
-  }
-
-  const insertToc = () => {
-    const entries = collectTocEntriesWithPages(editor, headingPages)
-    if (entries.length === 0) {
-      window.alert(t('ribbonTocNoHeadings'))
-      return
-    }
-    editor
-      .chain()
-      .focus()
-      .insertContent(tocFieldNodes(entries) as never)
-      .run()
-  }
-
-  const insertCitation = (source: SourceInfo) => {
-    editor
-      .chain()
-      .focus()
-      .insertContent({ type: 'text', text: citationText(source) } as never)
-      .run()
-    setDropdown(() => null)
-  }
-
-  const insertBibliography = () => {
-    if (sources.length === 0) {
-      window.alert(t('ribbonNoSources'))
-      return
-    }
-    const nodes: Array<Record<string, unknown>> = [
-      {
-        type: 'docHeading',
-        attrs: { docxIndex: null, styleId: null, aiChanged: false, level: 1 },
-        content: [{ type: 'text', text: t('ribbonBibliographyHeading') }],
-      },
-      ...sources.map((s) => ({
-        type: 'docParagraph',
-        attrs: { docxIndex: null, styleId: null, aiChanged: false },
-        content: [{ type: 'text', text: bibliographyLine(s) }],
-      })),
-    ]
-    editor
-      .chain()
-      .focus()
-      .insertContent(nodes as never)
-      .run()
-    setDropdown(() => null)
-  }
-
-  const [xePrompt, setXePrompt] = useState<{ initial: string; at: number } | null>(null)
-
-  const markIndexEntry = () => {
-    const { from, to } = editor.state.selection
-    setXePrompt({ initial: editor.state.doc.textBetween(from, to, ' ').trim(), at: to })
-  }
-
-  const submitIndexEntry = (term: string) => {
-    if (!xePrompt) return
-    editor
-      .chain()
-      .focus()
-      .insertContentAt(Math.min(xePrompt.at, editor.state.doc.content.size), {
-        type: 'docXeMark',
-        attrs: { term },
-      } as never)
-      .run()
-  }
-
-  const insertIndex = () => {
-    const terms: string[] = []
-    editor.state.doc.descendants((node) => {
-      if (node.type.name === 'docXeMark') terms.push(String(node.attrs.term))
-    })
-    if (terms.length === 0) {
-      window.alert(t('ribbonNoIndexEntries'))
-      return
-    }
-    const unique = [...new Set(terms.map((t) => t.trim()).filter(Boolean))].sort((a, b) =>
-      a.localeCompare(b, 'zh-CN'),
-    )
-    const nodes = generateIndexFieldXml(unique).map((xml, i) => ({
-      type: 'docProtected',
-      attrs: {
-        docxIndex: null,
-        blockType: 'passthrough',
-        label: t('ribbonIndexFieldLabel'),
-        genXml: xml,
-        fieldDisplay: { kind: 'tocLine', left: unique[i], right: '', level: 1 },
-      },
-    }))
-    editor
-      .chain()
-      .focus()
-      .insertContent(nodes as never)
-      .run()
   }
 
   return (
     <>
+<<<<<<< ours
       {!cap('zotero') && (
         <>
           {/* the web build has no Zotero connector: the group stays and explains */}
@@ -494,30 +382,56 @@ export function ReferencesTab({
         </>
       )}
 
+=======
+>>>>>>> theirs
       <div className="ribbon-group">
         <div className="ribbon-group-items">
           <button
             className="rb-big"
             disabled={!hasDoc}
             data-tip={t('ribbonTocTip')}
-            onClick={insertToc}
+            onClick={() => runCommand('insert-toc')}
           >
             <span className="rb-big-icon">
               <IconToc size={BIG} />
             </span>
             <span>{t('ribbonToc')}</span>
           </button>
-          <button
-            className="rb-big"
-            disabled={!hasDoc}
-            data-tip={t('ribbonTocUpdateTip')}
-            onClick={() => updateTocField(editor, blocks, headingPages)}
-          >
-            <span className="rb-big-icon">
-              <IconRefresh size={BIG} />
-            </span>
-            <span>{t('ribbonTocUpdate')}</span>
-          </button>
+          <div className="rb-col rb-pair">
+            <div className="rb-split-wrap">
+              <button
+                className="rb-small"
+                disabled={!hasDoc}
+                data-tip={t('ribbonAddText')}
+                onClick={() => toggleDropdown(setDropdown, 'add-text')}
+              >
+                <IconAddText size={14} />
+                <span className="rb-small-label">{t('ribbonAddText')}</span>
+                <IconCaret />
+              </button>
+              {dropdown === 'add-text' && (
+                <div data-rb-panel="" className="layout-menu">
+                  <button onClick={() => pick('toc-add-text', '0')}>
+                    {t('ribbonAddTextNone')}
+                  </button>
+                  {[1, 2, 3].map((n) => (
+                    <button key={n} onClick={() => pick('toc-add-text', String(n))}>
+                      {t('appParaOutlineLevelN', { n })}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              className="rb-small"
+              disabled={!hasDoc}
+              data-tip={t('ribbonTocUpdateTip')}
+              onClick={() => runCommand('update-toc')}
+            >
+              <IconRefresh size={14} />
+              <span className="rb-small-label">{t('ribbonTocUpdate')}</span>
+            </button>
+          </div>
         </div>
         <div className="ribbon-group-label">{t('ribbonToc')}</div>
       </div>
@@ -530,8 +444,12 @@ export function ReferencesTab({
             className="rb-big"
             disabled={!hasDoc}
             data-tip={t('ribbonFootnoteTip')}
+<<<<<<< ours
             aria-keyshortcuts={shortcutAria('footnote') || undefined}
             onClick={() => onInsertNote('footnote')}
+=======
+            onClick={() => runCommand('insert-footnote')}
+>>>>>>> theirs
           >
             <span className="rb-big-icon">
               <IconFootnote size={BIG} />
@@ -542,14 +460,26 @@ export function ReferencesTab({
             className="rb-big"
             disabled={!hasDoc}
             data-tip={t('ribbonEndnoteTip')}
+<<<<<<< ours
             aria-keyshortcuts={shortcutAria('endnote') || undefined}
             onClick={() => onInsertNote('endnote')}
+=======
+            onClick={() => runCommand('insert-endnote')}
+>>>>>>> theirs
           >
             <span className="rb-big-icon">
               <IconEndnote size={BIG} />
             </span>
             <span>{t('ribbonEndnote')}</span>
           </button>
+          <div className="rb-col rb-pair">
+            <RbCommand cmd="footnote-next" look="small">
+              <IconNextFootnote size={14} />
+            </RbCommand>
+            <RbCommand cmd="view-footnotes" look="small">
+              <IconShowNotes size={14} />
+            </RbCommand>
+          </div>
         </div>
         <div className="ribbon-group-label">{t('ribbonGroupFootnotes')}</div>
       </div>
@@ -574,7 +504,11 @@ export function ReferencesTab({
             {dropdown === 'citation' && (
               <div data-rb-panel="" className="layout-menu">
                 {sources.map((s) => (
-                  <button key={s.tag} data-tip={s.title} onClick={() => insertCitation(s)}>
+                  <button
+                    key={s.tag}
+                    data-tip={s.title}
+                    onClick={() => pick('insert-citation', s.tag)}
+                  >
                     {citationText(s)} {s.title.slice(0, 12)}
                   </button>
                 ))}
@@ -589,80 +523,123 @@ export function ReferencesTab({
               </div>
             )}
           </div>
-          <button
-            className="rb-big"
-            disabled={!hasDoc}
-            data-tip={t('ribbonBibliographyTip')}
-            onClick={insertBibliography}
-          >
-            <span className="rb-big-icon">
-              <IconBook size={BIG} />
-            </span>
-            <span>{t('ribbonBibliography')}</span>
-          </button>
+          <RbCommand cmd="citations-pane" look="big">
+            <IconCitationsPane size={BIG} />
+          </RbCommand>
+          <div className="rb-col rb-pair">
+            <div className="rb-split-wrap">
+              <button
+                className="rb-small"
+                disabled={!hasDoc}
+                data-tip={t('ribbonCitationStyle')}
+                aria-haspopup="menu"
+                onClick={() => toggleDropdown(setDropdown, 'citation-style')}
+              >
+                <IconCitation size={14} />
+                <span className="rb-small-label">{t('ribbonCitationStyle')}</span>
+                <small>{CITATION_STYLES.find((s) => s.id === citationStyle)?.name ?? ''}</small>
+                <IconCaret />
+              </button>
+              {dropdown === 'citation-style' && (
+                <div data-rb-panel="" className="layout-menu" role="menu">
+                  {CITATION_STYLES.map((style) => (
+                    <button
+                      key={style.id}
+                      role="menuitemradio"
+                      aria-checked={style.id === citationStyle}
+                      onClick={() => pick('citation-style', style.id)}
+                    >
+                      {style.name}
+                      {style.id === citationStyle ? ' ✓' : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              className="rb-small"
+              disabled={!hasDoc}
+              data-tip={t('ribbonBibliographyTip')}
+              onClick={() => pick('insert-bibliography')}
+            >
+              <IconBook size={14} />
+              <span className="rb-small-label">{t('ribbonBibliography')}</span>
+            </button>
+          </div>
+        </div>
+        <div className="ribbon-group-label">{t('ribbonGroupCitationsBibliography')}</div>
+      </div>
+
+      <div className="ribbon-sep" />
+
+      <div className="ribbon-group">
+        <div className="ribbon-group-items">
           <button
             className="rb-big"
             disabled={!hasDoc}
             data-tip={t('ribbonCaptionTip')}
-            onClick={() => setCaptionOpen(true)}
+            onClick={() => runCommand('insert-caption')}
           >
             <span className="rb-big-icon">
               <IconCaption size={BIG} />
             </span>
-            <span>{t('ribbonCaption')}</span>
+            <span>{t('ribbonInsertCaption')}</span>
           </button>
-          <div className="rb-split-wrap">
-            <button
-              className="rb-big"
-              disabled={!hasDoc}
-              data-tip={t('ribbonIndexTip')}
-              onClick={() => toggleDropdown(setDropdown, 'index')}
-            >
-              <span className="rb-big-icon">
-                <IconIndex size={BIG} />
-                <IconCaret />
-              </span>
-              <span>{t('ribbonIndex')}</span>
-            </button>
-            {dropdown === 'index' && (
-              <div data-rb-panel="" className="layout-menu">
-                <button
-                  onClick={() => {
-                    markIndexEntry()
-                    setDropdown(() => null)
-                  }}
-                >
-                  {t('ribbonMarkEntry')}
-                </button>
-                <button
-                  onClick={() => {
-                    insertIndex()
-                    setDropdown(() => null)
-                  }}
-                >
-                  {t('ribbonInsertIndex')}
-                </button>
-              </div>
-            )}
+          <RbCommand cmd="insert-table-of-figures" look="big">
+            <IconToc size={BIG} />
+          </RbCommand>
+          <div className="rb-col rb-pair">
+            <RbCommand cmd="update-table-of-figures" look="small">
+              <IconRefresh size={14} />
+            </RbCommand>
+            <RbCommand cmd="insert-cross-reference" look="small">
+              <IconRefresh size={14} />
+            </RbCommand>
           </div>
         </div>
-        <div className="ribbon-group-label">{t('ribbonGroupCitationsIndex')}</div>
+        <div className="ribbon-group-label">{t('ribbonGroupCaptions')}</div>
       </div>
 
-      {captionOpen && (
-        <CaptionModal editor={editor} blocks={blocks} onClose={() => setCaptionOpen(false)} />
-      )}
+      <div className="ribbon-sep" />
+
+      <div className="ribbon-group">
+        <div className="ribbon-group-items">
+          <RbCommand cmd="mark-index-entry" look="big">
+            <IconMarkCitation size={BIG} />
+          </RbCommand>
+          <div className="rb-col rb-pair">
+            <RbCommand cmd="insert-index" look="small">
+              <IconIndex size={14} />
+            </RbCommand>
+            <RbCommand cmd="update-index" look="small">
+              <IconRefresh size={14} />
+            </RbCommand>
+          </div>
+        </div>
+        <div className="ribbon-group-label">{t('ribbonIndex')}</div>
+      </div>
+
+      <div className="ribbon-sep" />
+
+      <div className="ribbon-group">
+        <div className="ribbon-group-items">
+          <RbCommand cmd="toa-mark-citation" look="big">
+            <IconMarkCitation size={BIG} />
+          </RbCommand>
+          <div className="rb-col rb-pair">
+            <RbCommand cmd="toa-insert" look="small">
+              <IconToa size={14} />
+            </RbCommand>
+            <RbCommand cmd="toa-update" look="small">
+              <IconRefresh size={14} />
+            </RbCommand>
+          </div>
+        </div>
+        <div className="ribbon-group-label">{t('ribbonItAuthorities')}</div>
+      </div>
+
       {sourceOpen && (
         <SourceModal sources={sources} onAdd={onAddSource} onClose={() => setSourceOpen(false)} />
-      )}
-      {xePrompt && (
-        <PromptModal
-          title={t('ribbonMarkEntryTitle')}
-          placeholder={t('ribbonMarkEntryPh')}
-          initial={xePrompt.initial}
-          onSubmit={submitIndexEntry}
-          onClose={() => setXePrompt(null)}
-        />
       )}
     </>
   )

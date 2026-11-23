@@ -909,6 +909,11 @@ export function directParaFormat(
   | 'autoSpaceDN'
   | 'wordWrap'
   | 'overflowPunct'
+<<<<<<< ours
+=======
+  | 'overflowPunctDirect'
+  | 'wordWrapDirect'
+>>>>>>> theirs
   | 'contextualSpacing'
 > {
   const direct = (k: string) => eff.source[k] === 'direct'
@@ -938,6 +943,11 @@ export function directParaFormat(
   ] as const) {
     if (direct(k)) f[k] = eff[k]
   }
+<<<<<<< ours
+=======
+  if (direct('overflowPunct')) f.overflowPunctDirect = eff.overflowPunct
+  if (direct('wordWrap')) f.wordWrapDirect = eff.wordWrap
+>>>>>>> theirs
   if (direct('snapToGrid') && !eff.snapToGrid) f.snapToGrid = false
   const de = direct('autoSpaceDE') ? eff.autoSpaceDE : undefined
   const dn = direct('autoSpaceDN') ? eff.autoSpaceDN : undefined
@@ -1095,12 +1105,27 @@ function effectiveLineSource(eff: EffectivePPr, sources: readonly PropSource[] |
 }
 
 /** the layers whose line spacing a header/footer surface carries inline: the
+<<<<<<< ours
  *  strip base already lays out Normal / docDefaults, a named style and the
  *  direct pPr (plus the table style for cells) come on the paragraph */
+=======
+ *  direct pPr, the table style for cells, a named style — and, when the rule is
+ *  an absolute one, whichever layer supplied it. The strip base carries an
+ *  automatic multiplier, so an `auto` line from the implicit Normal or the
+ *  document defaults is already laid out there; `exact` and `atLeast` are
+ *  absolute heights the base cannot express, and dropping them made an
+ *  inherited rule render as an automatic line. */
+>>>>>>> theirs
 export function hfLineSources(eff: EffectivePPr, inTable: boolean): PropSource[] {
   const out: PropSource[] = ['direct']
   if (inTable) out.push('tableStyle')
   if (eff.styleId) out.push('paraStyle')
+<<<<<<< ours
+=======
+  const line = eff.spacing.line
+  const source = eff.source.line
+  if (line && line.rule !== 'auto' && source && !out.includes(source)) out.push(source)
+>>>>>>> theirs
   return out
 }
 

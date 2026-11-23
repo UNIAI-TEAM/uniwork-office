@@ -22,7 +22,11 @@ export function buildExportImagePaths(
   dir: string,
   baseName: unknown,
   pageNumbers: readonly unknown[],
+<<<<<<< ours
   ext: 'png' | 'jpg' = 'png',
+=======
+  ext: 'png' | 'jpg',
+>>>>>>> theirs
 ): string[] {
   const root = resolve(dir)
   const safeBase = String(baseName || 'page').replace(/[/\\:*?"<>|]/g, '_')

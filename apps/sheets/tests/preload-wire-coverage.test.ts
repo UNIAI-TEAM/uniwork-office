@@ -68,6 +68,7 @@ describe('preload whitelist names every sidecar wire field', () => {
       .map(([, where]) => where)
     expect(missing).toEqual([])
   })
+<<<<<<< ours
 
   it('parseWorkbookFile names every top-level workbookFileSchema field', () => {
     // The whole-source check above is blind to a name that appears elsewhere in
@@ -82,6 +83,18 @@ describe('preload whitelist names every sidecar wire field', () => {
     const missing = Object.keys(workbookFileSchema.shape).filter(
       (key) => !knownDropped.has(key) && !new RegExp(`\\b${key}\\b`).test(body),
     )
+=======
+  it('covers the comments of workbookFileSchema', () => {
+    const keys = new Map<string, string>()
+    objectKeys(workbookFileSchema, 'file', keys)
+    const commentKeys = [...keys.entries()].filter(([, where]) =>
+      where.startsWith('file.sheets[].comments[]'),
+    )
+    expect(commentKeys.map(([key]) => key)).toEqual(expect.arrayContaining(['thread', 'replies']))
+    const missing = commentKeys
+      .filter(([key]) => !preloadSource.includes(key))
+      .map(([, where]) => where)
+>>>>>>> theirs
     expect(missing).toEqual([])
   })
 })

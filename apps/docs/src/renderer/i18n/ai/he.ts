@@ -8,7 +8,13 @@ export const he = {
   aiStarterPolishAll: 'לטש את כל המסמך לטון מקצועי יותר',
   aiStarterContinue: 'המשך לכתוב מהנקודה שבה המסמך נעצר',
   aiStarterFillTemplate: 'מצא ומלא את מצייני המיקום במסמך',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: 'התחבר ל-Genspark',
+  aiGskLoginOk: 'מחובר ל-Genspark',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: 'פתיחת עוזר ה-AI',
   aiSummarizeBtn: 'סיכום AI',
   aiSummarizePrompt: 'סכם את התוכן העיקרי ואת הנקודות המרכזיות של מסמך זה',
@@ -112,6 +118,11 @@ export const he = {
     'מעקב אחר שינויים פועל: שינויי תוכן של ה-AI מסומנים כתיקונים (הוספות בקו תחתון, מחיקות בקו חוצה); קבלו או דחו בסקירה',
   aiTrackOffTitle:
     'מעקב אחר שינויים כבוי: שינויי ה-AI חלים מיד (עדיין אפשר לשחזר באמצעות תמונות מצב של גרסאות)',
+  aiRevisionBarTitle: 'שינויים',
+  aiRevisionCount: '{count} שינויים ממתינים',
+  aiRevisionRejectAll: 'דחה הכול',
+  aiRevisionAcceptAll: 'קבל הכול',
+  aiRevisionPara: 'פסקה {n}',
   aiTurnLimit:
     '(הגעתם למגבלת סבבי קריאות הכלים לבקשה זו; התשובה שלמעלה מבוססת על השלבים שהושלמו עד כה ועשויה להיות חלקית.)',
   aiStopped: '(נעצר)',
@@ -122,12 +133,16 @@ export const he = {
   aiTooManyImages: 'עד {max} תמונות בהודעה; הנוספות לא נכללו',
   aiUnknownError: 'שגיאה לא ידועה',
   aiTimeoutError: 'תם הזמן לבקשת ה-AI: אין תגובה מהרשת וההרצה הופסקה. בדוק את החיבור ונסה שוב',
+  aiRegionError: 'ספק המודל הזה אינו פועל באזור הנוכחי שלך — בחרו מודל אחר או החליפו רשת',
   aiOverloadedError: 'שירות ה-AI עמוס כרגע — נסו שוב בעוד רגע',
   aiNetworkError: 'בעיית רשת: לא ניתן להתחבר לשירות ה-AI. בדוק את החיבור ונסה שוב',
   aiSumReadAttachment: 'קריאת קובץ מצורף',
   aiSumImageAttachment: 'תמונה מצורפת {name}',
   aiSumRead: 'קריאת {name}',
   aiSumReadAttachmentName: 'קריאת הקובץ המצורף {name}',
+  aiSumSkillsList: 'רשימת מיומנויות מותקנות',
+  aiSumSkillRead: 'נקראה מיומנות {name}',
+  aiSumRunCli: 'בוצע {args}',
   aiSumWebSearch: 'חיפוש באינטרנט',
   aiSumWebSearchDone: 'חיפוש "{query}" ({count} תוצאות)',
   aiSumImageSearch: 'חיפוש תמונות',
@@ -189,6 +204,7 @@ export const he = {
   aiCmdImages: 'עודכנו {count} תמונות',
   aiCmdToc: 'הוסף תוכן עניינים ({count} ערכים)',
   aiCmdSkipped: ' (דולגו {count} בלוקים מוגנים)',
+<<<<<<< ours
   aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
   aiClarifyTitle: 'כמה שאלות לפני שאמשיך',
   aiClarifyDecide: 'החלט בשבילי',
@@ -202,6 +218,8 @@ export const he = {
   aiClarifySubmit: 'המשך',
   aiSumClarify: 'שאלות ההבהרה נענו',
   aiSumClarifySkipped: 'שאלות ההבהרה דולגו',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'צור מפת חשיבה של המסמך הזה',
   aiMindMapBtn: 'מפת חשיבה AI',
   aiMindMapPrompt:
@@ -212,9 +230,20 @@ export const he = {
   aiMindMapAskPrompt: 'ספר לי על «{label}» במסמך הזה',
   aiMindMapJump: 'מעבר לקטע המצוטט',
   aiMindMapExport: 'ייצוא PNG',
+<<<<<<< ours
   aiMindMapReset: 'איפוס תצוגה',
   aiMindMapExpand: 'הרחב ענף',
   aiMindMapCollapse: 'כווץ ענף',
   aiMindMapExportSvg: 'ייצוא SVG',
   aiMindMapInsert: 'הוספה למסמך',
+=======
+  aiMindMapExportSvg: 'ייצוא SVG',
+  aiMindMapInsert: 'הוספה למסמך',
+  aiMindMapReset: 'איפוס תצוגה',
+  aiMindMapExpand: 'הרחב ענף',
+  aiMindMapCollapse: 'כווץ ענף',
+  aiMindMapToggleLayout: 'החלף פריסה',
+  aiMindMapLayoutTopDown: 'החלף לפריסה מלמעלה למטה',
+  aiMindMapLayoutLeftRight: 'החלף לפריסה משמאל לימין',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

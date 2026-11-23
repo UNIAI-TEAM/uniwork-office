@@ -190,6 +190,7 @@ describe('ScriptFonts spans stay East-Asian-primary', () => {
     )
   })
 })
+<<<<<<< ours
 
 describe('ScriptFonts marks the composition window', () => {
   /**
@@ -230,3 +231,5 @@ describe('ScriptFonts marks the composition window', () => {
     expect(dom.classList.contains(COMPOSING)).toBe(false)
   })
 })
+=======
+>>>>>>> theirs

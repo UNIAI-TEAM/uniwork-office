@@ -15,6 +15,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyAiPanelPrefs, useAiSidebarEnabled } from '../src/ai-panel-prefs-store'
 
+<<<<<<< ours
 /**
  * Sheets passes a setter that is re-created on every render (it wraps a
  * capability check around the `useState` setter), so the hook must not treat the
@@ -31,6 +32,8 @@ function UnstableSetterDock() {
   )
 }
 
+=======
+>>>>>>> theirs
 /** Stands in for an editor's dock: `showAi` is the panel's open state. */
 function Dock() {
   const [showAi, setShowAi] = useState(true)
@@ -116,6 +119,7 @@ describe('useAiSidebarEnabled', () => {
     click('.ask-ai')
     expect(open()).toBe(true)
   })
+<<<<<<< ours
 
   it('keeps an explicit open while the switch is off when the setter changes identity every render', () => {
     act(() => root.render(createElement(UnstableSetterDock)))
@@ -125,4 +129,6 @@ describe('useAiSidebarEnabled', () => {
     click('.ask-ai')
     expect(open()).toBe(true)
   })
+=======
+>>>>>>> theirs
 })

@@ -7,7 +7,10 @@ export type {
   AgentStreamNotice,
   AgentStreamRequest,
   AgentTokenUsage,
+<<<<<<< ours
   AgentRequestPurpose,
+=======
+>>>>>>> theirs
   AgentToolCall,
   AgentToolDef,
   AgentToolResult,
@@ -18,6 +21,7 @@ export type {
   WriterCall,
   WriterKind,
 } from './types'
+<<<<<<< ours
 export { AI_RUN_IDLE_GRACE_MS, createAiRunTracker } from './ai-run-tracker'
 export type { AiRunPayload, AiRunState, AiRunTracker, AiRunTrackerOptions } from './ai-run-tracker'
 export {
@@ -59,12 +63,53 @@ export type {
   ImageUrlRegistryOptions,
   ImageUrlSource,
 } from './image-url-registry'
+=======
+export { addTokenUsage } from './types'
+>>>>>>> theirs
 export { composeSkills } from './skill'
-export type { AgentSkill, ExecutedToolCall } from './skill'
 export { withAttachedSkills, type AttachedSkill } from './attached-skills'
+export { createKnowledgeBaseSkill, formatKbSize } from './knowledge-base-skill'
+export type { KnowledgeBaseDeps, KbFileInfo, KbSearchHit, KbReadPage } from './knowledge-base-skill'
+export {
+  createAttachmentsSkill,
+  ATTACHMENT_IMAGE_EXTS,
+  ATTACHMENT_READ_CHUNK_CHARS,
+  READ_ATTACHMENT_TOOL,
+} from './attachments-skill'
+export type { AttachmentInfo, AttachmentPage, AttachmentsSkillDeps } from './attachments-skill'
+export {
+  createDocumentSkill,
+  CREATE_DOCUMENT_MAX_CHARS,
+  CREATE_DOCUMENT_TOOL,
+} from './create-document-skill'
+export type {
+  CreateDocumentDeps,
+  CreateDocumentFormat,
+  CreateDocumentRequest,
+  CreateDocumentSkill,
+} from './create-document-skill'
+export type { AgentSkill, ExecutedToolCall } from './skill'
+<<<<<<< ours
+export { withAttachedSkills, type AttachedSkill } from './attached-skills'
+=======
+export { createCliSkill, GUIDE_DOMAINS, LOAD_GUIDE_TOOL, RUN_GENOFFICE_TOOL } from './cli-skill'
+export type {
+  CliContext,
+  CliRunRequest,
+  CliRunResult,
+  CliSkill,
+  CliSkillDeps,
+  CliStagedFile,
+  GuideDomain,
+} from './cli-skill'
+export type { SkillFrontmatter, SkillRelevance } from './imported-skill'
+export { classifySkill, parseSkillFrontmatter, SKILL_FORMAT_TOKENS } from './imported-skill'
+>>>>>>> theirs
 export {
   AgentLoop,
   COMPLETED_VIA_TOOLS_TEXT,
+  CONTEXT_OMITTED_NOTE,
+  CONTEXT_SUPERSEDES_NOTE,
   DEFAULT_MAX_TURNS,
   LOOP_NUDGE_TEXTS,
   SELECTION_CLAIM_CORRECTION,

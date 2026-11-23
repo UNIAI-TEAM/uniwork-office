@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+<<<<<<< ours
   htmlExportPath,
   markdownExportPath,
   pdfExportPath,
+=======
+>>>>>>> theirs
   printPaperOption,
   printScaleOption,
   validPrintDim,
@@ -77,6 +80,7 @@ describe('print arg validators', () => {
     expect(printPaperOption({ widthTwips: 0, heightTwips: 16_838 })).toEqual({})
     expect(printPaperOption({ widthTwips: 11_906, heightTwips: 'x' })).toEqual({})
   })
+<<<<<<< ours
 })
 
 describe('pdfExportPath', () => {
@@ -124,4 +128,6 @@ describe('markdownExportPath', () => {
     expect(markdownExportPath('/tmp/report.v2')).toBe('/tmp/report.v2.md')
     expect(markdownExportPath('/tmp/report.pdf')).toBe('/tmp/report.pdf.md')
   })
+=======
+>>>>>>> theirs
 })

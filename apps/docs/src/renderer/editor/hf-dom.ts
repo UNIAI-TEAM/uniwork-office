@@ -33,6 +33,19 @@ import { effectivePPrStyle, effectiveRPrStyle } from './effective-css'
 import { setDkBackground, setDkBackgroundImage, setDkBorder, setDkColor } from './dark-page'
 import { INLINE_RULE_CLASS, inlineRuleDecls } from './inline-rule'
 import { hfParasOf } from './hf-text'
+<<<<<<< ours
+=======
+import { docHyphenationSig } from './hyphenation'
+import {
+  STATIC_HYPH_CLASS,
+  appendPieces,
+  enforceStaticLineRules,
+  hyphenPieces,
+  scheduleStaticLineRules,
+  staticHyphenationOn,
+} from './hyphenation-static'
+import { underlineDecls } from './run-typography'
+>>>>>>> theirs
 import { currentRevisionDisplay, runHiddenIn } from './revision-view'
 import { borderMergeFlags, type ParaBorderAttrs } from './para-border-merge'
 import {
@@ -52,6 +65,10 @@ import {
 export {
   PARA_BORDER_SHADOW,
   paraBorderCss,
+<<<<<<< ours
+=======
+  paraBorderDropColor,
+>>>>>>> theirs
   paraBorderLinesWithPad,
   paraBorderPadding,
   paraBorderPaddingDecls,
@@ -460,6 +477,13 @@ function applyRunStyle(span: HTMLElement, run: Run): void {
   else if (italic === false) span.style.fontStyle = 'normal'
   const deco = [run.underline && 'underline', run.strike && 'line-through'].filter(Boolean)
   if (deco.length > 0) span.style.textDecoration = deco.join(' ')
+  // one declaration styles every line of the span: a struck run keeps plain lines
+  if (run.underline && !run.strike) {
+    for (const decl of underlineDecls(run.underlineStyle, run.underlineColor)) {
+      const at = decl.indexOf(':')
+      span.style.setProperty(decl.slice(0, at), decl.slice(at + 1))
+    }
+  }
   if (run.color) {
     span.style.color = `#${run.color}`
     setDkColor(span, run.color) // dark-page twin; the authored color stays the declaration
@@ -1108,7 +1132,11 @@ export function hfReservedHeightPx(
     ? `s${[stripGeom.marginLeft, stripGeom.marginRight, stripGeom.marginTop, stripGeom.marginBottom, stripGeom.headerStripTop, stripGeom.footerDist, stripGeom.pageW, stripGeom.pageH, stripGeom.stripLeft ?? ''].map((v) => Math.round(Number(v))).join(':')}${stripGeom.legacyBands ? 'L' : ''}`
     : hfProbeGeomKey(value, estGeom)
   const key =
+<<<<<<< ours
     `${kind}|${Math.round(contentWidthPx)}|${geomKey}|${mountedDocCssSig()}|${hfProbeFontEpoch}|` +
+=======
+    `${kind}|${Math.round(contentWidthPx)}|${geomKey}|${mountedDocCssSig()}|${hfProbeFontEpoch}|${docHyphenationSig()}|` +
+>>>>>>> theirs
     `${JSON.stringify(value, noDataUrl)}|` +
     probeImages
       .map((im) => `${JSON.stringify({ ...im, dataUrl: im.dataUrl.length, wordArt: undefined })}`)
@@ -1153,6 +1181,10 @@ export function hfReservedHeightPx(
       }
     }
     host.replaceChildren(el)
+<<<<<<< ours
+=======
+    enforceStaticLineRules(el)
+>>>>>>> theirs
     dom = hfFlowHeightPx(el)
     host.replaceChildren()
     if (hfHeightCache.size >= HF_HEIGHT_CACHE_MAX) {
@@ -1475,7 +1507,9 @@ function hfRunNodes(
   display: (text: string) => string,
   imgClass: string,
 ): void {
-  for (const run of runs) {
+  const texts = runs.map((run) => display(run.text))
+  const pieces = hyphenPieces(texts)
+  runs.forEach((run, k) => {
     if (run.image?.rule) {
       const rule = document.createElement('span')
       rule.className = INLINE_RULE_CLASS
@@ -1484,18 +1518,39 @@ function hfRunNodes(
         sizeHalfPoints: run.sizeHalfPoints,
       }).join(';')
       host.append(rule)
-      if (!run.text) continue
+      if (!run.text) return
     } else if (run.image) {
       const im = hfImgNode(run.image)
       im.classList.add(imgClass)
       host.append(im)
-      if (!run.text) continue
+      if (!run.text) return
     }
     const span = document.createElement('span')
-    span.textContent = display(run.text)
+    if (pieces && pieces[k].length > 1) appendPieces(span, pieces[k])
+    else span.textContent = texts[k]
     applyRunStyle(span, run)
     host.append(span)
-  }
+  })
+}
+
+/** the spanning cell's overlay box: inside the cell margins, top-aligned */
+export function hfVSpanBodyStyle(cell: HfTableCell): Record<string, string> {
+  const mar = { ...HF_CELL_MAR, ...cell.marTwips }
+  return { inset: `${px(mar.top)} ${px(mar.right)} auto ${px(mar.left)}` }
+}
+
+/** inline pictures with nothing but whitespace beside them: Word sizes the
+ *  line to the tallest picture alone (probe 2026-11-03; visible text adds its
+ *  descent below the picture bottom as usual) */
+export function hfPictureOnlyLine(runs: Run[]): boolean {
+  return runs.some((r) => r.image && !r.image.rule) && runs.every((r) => r.text.trim() === '')
+}
+
+function hfTabGapNode(widthPx: number): HTMLElement {
+  const gap = document.createElement('span')
+  gap.className = 'page-hf-tab-gap'
+  gap.style.width = `${widthPx.toFixed(1)}px`
+  return gap
 }
 
 /** the spanning cell's overlay box: inside the cell margins, top-aligned */
@@ -1799,6 +1854,10 @@ export function makeGapHfEl(opts: {
   }
   const wrap = document.createElement('div')
   wrap.className = `page-hf page-hf-${kind} page-gap-hf`
+  if (staticHyphenationOn()) {
+    wrap.classList.add(STATIC_HYPH_CLASS)
+    scheduleStaticLineRules()
+  }
   wrap.contentEditable = 'false'
   if (geom) {
     for (const style of hfObstacleStyles(hfSideWrapObstacles(kind, images, geom))) {

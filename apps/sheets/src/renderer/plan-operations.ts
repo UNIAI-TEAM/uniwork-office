@@ -17,6 +17,10 @@ import {
 } from '@genoffice/xlsx-gateway/domain/cell-address'
 import {
   CHART_EDIT_TYPES,
+<<<<<<< ours
+=======
+  chartCellLimitError,
+>>>>>>> theirs
   chartDataFromColumns,
   chartDataFromValues,
 } from '@genoffice/xlsx-gateway/domain/chart-visual'
@@ -285,8 +289,21 @@ export function proposeOperations(
           }
           if (operation.op === 'add_chart') {
             const bounds = parseRange(operation.dataRange)
-            if (rangeCellCount(bounds) > 2000) {
-              return { ok: false, error: 'add_chart dataRange covers more than 2000 cells.' }
+            const limit = chartCellLimitError(bounds, operation.columns)
+            if (limit) return { ok: false, error: limit }
+            // Named columns are geometry the plan can fully settle without
+            // values: each letter must land inside the range (the schema
+            // already guarantees ≥2 distinct letter shapes).
+            if (operation.columns) {
+              for (const letter of operation.columns) {
+                const column = parseAddress(`${letter.toUpperCase()}1`).column
+                if (column < bounds.startColumn || column > bounds.endColumn) {
+                  return {
+                    ok: false,
+                    error: `add_chart column ${letter.toUpperCase()} lies outside the dataRange.`,
+                  }
+                }
+              }
             }
             // Named columns are geometry the plan can fully settle without
             // values: each letter must land inside the range (the schema
@@ -323,6 +340,7 @@ export function proposeOperations(
                 write.startColumn <= bounds.endColumn &&
                 write.endColumn >= bounds.startColumn,
             )
+<<<<<<< ours
             if (rangeLoaded && !writtenThisBatch) {
               const maxRow = targetSheet.getMaxRows() - 1
               const maxCol = targetSheet.getMaxColumns() - 1
@@ -337,6 +355,12 @@ export function proposeOperations(
                       )
                       .getRawValues() as (string | number | boolean | null | undefined)[][])
                   : []
+=======
+            const values = targetSheet.getRange(operation.dataRange).getRawValues() as (
+              string | number | boolean | null | undefined
+            )[][]
+            if (rangeLoaded && !writtenThisBatch) {
+>>>>>>> theirs
               if (operation.columns) {
                 // The named-columns probe refuses a named column with no
                 // numbers outright. Geometry errors cannot fire here — the

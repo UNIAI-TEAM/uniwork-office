@@ -37,7 +37,11 @@ function trackedEditor(storagePatch: Partial<TrackChangesStorage> = {}) {
   const editor = new Editor({
     element: document.createElement('div'),
     extensions: editorExtensions,
+<<<<<<< ours
     content: { type: 'doc', content: [para('one two three'), para('four')] },
+=======
+    content: { type: 'doc', content: [para('no. ok. three'), para('four')] },
+>>>>>>> theirs
   })
   Object.assign(editor.storage.trackChanges as TrackChangesStorage, {
     enabled: true,
@@ -117,6 +121,7 @@ describe('generated stylesheet', () => {
     expect(ins?.[1]).toContain('text-decoration:none')
   })
 
+<<<<<<< ours
   it('track moves off renders moves as deletion + insertion and lets the author ink apply', () => {
     const o = withOpts({ trackMoves: false })
     const css = trackChangesOptionsCss(o)
@@ -129,6 +134,23 @@ describe('generated stylesheet', () => {
     expect(revisionAuthorCss(['Ann', 'Bob'], [])).toContain(
       '.doc-ins[data-ins-author="Bob"]:not(.doc-move-to)',
     )
+=======
+  it('track moves off leaves the markup of moves already in the document alone', () => {
+    const off = withOpts({ trackMoves: false })
+    expect(trackChangesOptionsCss(off)).toBe('')
+    expect(movesByAuthor(off)).toEqual({ from: false, to: false })
+    expect(revisionAuthorCss(['Ann', 'Bob'], [], movesByAuthor(off))).toBe(
+      revisionAuthorCss(['Ann', 'Bob'], []),
+    )
+    const styled = { moveFromMark: 'dstrike', moveToColor: 'author' } as const
+    expect(trackChangesOptionsCss(withOpts({ ...styled, trackMoves: false }))).toBe(
+      trackChangesOptionsCss(withOpts(styled)),
+    )
+    expect(movesByAuthor(withOpts({ ...styled, trackMoves: false }))).toEqual({
+      from: false,
+      to: true,
+    })
+>>>>>>> theirs
   })
 
   it('fixed move colors and marks, changed lines off', () => {

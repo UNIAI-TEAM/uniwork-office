@@ -1,3 +1,4 @@
+<<<<<<< ours
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
@@ -9,6 +10,11 @@ import { csvToXlsxBufferForOpen } from '@genoffice/xlsx-gateway/gateway/csv-impo
 
 import { ImportRegistry } from '../src/main/import-registry'
 import { cleanupImportTempDirectory } from '../src/main/temp-files'
+=======
+import { describe, expect, it } from 'vitest'
+
+import { ImportRegistry } from '../src/main/import-registry'
+>>>>>>> theirs
 
 /**
  * The cancel for a delimited import (a .csv/.tsv opened as a workbook) has to
@@ -73,10 +79,19 @@ describe('the import registry', () => {
     const first = registry.start(7)
     const second = registry.start(7)
     // the first import finishes late, after the second one started
+<<<<<<< ours
     registry.finish(7, first)
     expect(registry.controllerFor(7)).toBe(second)
     expect(registry.cancel(7)).toBe(true)
     expect(second.signal.aborted).toBe(true)
+=======
+    expect(registry.finish(7, first)).toBe(false)
+    expect(registry.controllerFor(7)).toBe(second)
+    expect(registry.cancel(7)).toBe(true)
+    expect(second.signal.aborted).toBe(true)
+    expect(registry.finish(7, second)).toBe(true)
+    expect(registry.controllerFor(7)).toBeUndefined()
+>>>>>>> theirs
   })
 
   it('tells a cancelled import from one that failed on its own', () => {
@@ -96,6 +111,7 @@ describe('the import registry', () => {
     registry.finish(7, controller)
     expect(registry.wasCancelled(controller)).toBe(false)
   })
+<<<<<<< ours
 
   it('a cancelled import leaves no written worksheet / temp file and opens no session', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'sheets-cancel-import-'))
@@ -180,4 +196,6 @@ describe('the import registry', () => {
       await rm(tempRoot, { recursive: true, force: true })
     }
   })
+=======
+>>>>>>> theirs
 })

@@ -17,7 +17,13 @@ export const vi = {
   aiQcPageSkipped: 'Trang {n}: đã bỏ qua kiểm tra bố cục tự động',
   aiQcStopped: 'Đã dừng kiểm tra bố cục',
   aiQcCapped: 'Còn {count} trang chưa được kiểm tra (đạt giới hạn mỗi lần chạy)',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: 'Đăng nhập Genspark',
+  aiGskLoginOk: 'Đã đăng nhập Genspark',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: 'Mở trợ lý AI',
   aiFactCheckBtn: 'Kiểm chứng thông tin AI',
   aiFactCheckPrompt:
@@ -109,6 +115,8 @@ export const vi = {
   aiErrUnknown: 'Lỗi không xác định',
   aiErrStreamTimeout:
     'Yêu cầu AI đã hết thời gian chờ: không có phản hồi từ mạng, quá trình xử lý đã bị dừng. Vui lòng kiểm tra kết nối mạng và thử lại',
+  aiErrRegion:
+    'Nhà cung cấp của mô hình này không phục vụ khu vực hiện tại của bạn — hãy chọn mô hình khác hoặc đổi mạng',
   aiErrOverloaded: 'Dịch vụ AI hiện đang bận — vui lòng thử lại sau giây lát',
   aiErrNetwork:
     'Sự cố mạng: không thể kết nối tới dịch vụ AI. Vui lòng kiểm tra kết nối và thử lại',
@@ -220,6 +228,7 @@ export const vi = {
   aiSumSaveTemplate: 'Đã lưu mẫu phong cách "{name}"',
   aiSumTemplatesEmpty: 'Mẫu phong cách (trống)',
   aiSumListTemplates: 'Đã liệt kê {count} mẫu phong cách',
+<<<<<<< ours
   aiPageCloudToLocal: 'đám mây không khả dụng — đã tạo cục bộ',
   aiTplGalleryTitle: 'Bắt đầu từ mẫu',
   aiTplGalleryHint: 'Chọn cấu trúc mẫu, nhập chủ đề — AI điền nội dung theo mẫu.',
@@ -228,4 +237,6 @@ export const vi = {
   aiTplPages: '{n} trang',
   aiViewOnlyNotice:
     'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

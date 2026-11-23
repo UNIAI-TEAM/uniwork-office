@@ -208,14 +208,21 @@ describe('footnote round-trip', () => {
 })
 
 describe('footnote probes', () => {
+<<<<<<< ours
   it('footnoteDefStart finds line-start definitions only within the current paragraph', () => {
+=======
+  it('footnoteDefStart finds line-start definitions only', () => {
+>>>>>>> theirs
     expect(footnoteDefStart('Some text\n[^1]: x')).toBe(10)
     expect(footnoteDefStart('a [^1]: x')).toBe(-1)
     expect(footnoteDefStart('no markers')).toBe(-1)
     expect(footnoteDefStart('text\nnot one\n[^2]: y')).toBe(13)
+<<<<<<< ours
     expect(footnoteDefStart('first paragraph\n\n[^1]: next block')).toBe(-1)
     expect(footnoteDefStart('first paragraph\n   \n[^1]: next block')).toBe(-1)
     expect(footnoteDefStart('a\n\t\n[^1]: x')).toBe(4)
+=======
+>>>>>>> theirs
   })
 
   it('footnoteRefStart finds references but not escaped ones', () => {
@@ -223,6 +230,7 @@ describe('footnote probes', () => {
     expect(footnoteRefStart('an \\[^1] escape')).toBe(-1)
     expect(footnoteRefStart('plain text')).toBe(-1)
   })
+<<<<<<< ours
 
   it('parses a 500 KB document after many editor creations in linear time', () => {
     // Before the fix, each Editor appended duplicate tokenizers onto the global
@@ -248,6 +256,8 @@ describe('footnote probes', () => {
     expect(elapsed).toBeLessThan(3000)
     expect(parsed.content?.at(-1)?.type).toBe('footnoteDefinition')
   })
+=======
+>>>>>>> theirs
 })
 
 describe('footnotes through the block source map', () => {
@@ -356,6 +366,7 @@ describe('footnote editing', () => {
     editor.commands.setContent('No footnotes here.')
     expect(nextFootnoteLabel(editor.state.doc)).toBe('1')
   })
+<<<<<<< ours
 
   it('a click in a definition body is an edit; only the label jumps back, and the reference → definition flash survives a selection transaction', () => {
     const editor = createEditor()
@@ -408,4 +419,6 @@ describe('footnote editing', () => {
       Element.prototype.scrollIntoView = original
     }
   })
+=======
+>>>>>>> theirs
 })

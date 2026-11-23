@@ -21,7 +21,13 @@ export const zh = {
   aiQcPageSkipped: '第 {n} 页:已跳过自动版式检查',
   aiQcStopped: '版式检查已停止',
   aiQcCapped: '其余 {count} 页未检查(单次上限)',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: '登录 Genspark',
+  aiGskLoginOk: '已登录 Genspark',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: '打开 AI 助手',
   aiFactCheckBtn: 'AI 事实核查',
   aiFactCheckPrompt: '核查这份幻灯片的内容:检查数据、日期、名称和论断是否属实,指出并纠正错误',
@@ -108,6 +114,7 @@ export const zh = {
   aiErrEmptyOutput: '空输出',
   aiErrUnknown: '未知错误',
   aiErrStreamTimeout: 'AI 请求超时：网络长时间无响应，已停止。请检查网络后重试',
+  aiErrRegion: '该模型的厂商不向当前地区提供服务，请换一个模型或切换网络',
   aiErrOverloaded: 'AI 服务当前繁忙，请稍后重试',
   aiErrNetwork: '网络有问题，无法连接 AI 服务。请检查网络后重试',
   aiErrRequestFailed: '请求发送失败: {msg}',
@@ -218,6 +225,9 @@ export const zh = {
   aiSumSaveTemplate: '保存风格模板"{name}"',
   aiSumTemplatesEmpty: '风格模板列表（空）',
   aiSumListTemplates: '列出 {count} 个风格模板',
+<<<<<<< ours
   aiPageCloudToLocal: '云端不可用,已本地生成',
   aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
+=======
+>>>>>>> theirs
 }

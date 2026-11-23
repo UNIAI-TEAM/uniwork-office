@@ -18,7 +18,10 @@ import { InactiveSelection } from './inactiveSelection'
 import { Highlight } from './highlight'
 import { SearchHighlight } from './searchHighlight'
 import { buildMathExtensions } from './math'
+<<<<<<< ours
 import { RawHtmlBlock, RawHtmlInline } from './rawHtml'
+=======
+>>>>>>> theirs
 import { Redaction } from './Redaction'
 import {
   BlockStartEscapedParagraph,
@@ -41,7 +44,10 @@ import {
 } from './markdownStyleRenderers'
 import { boundOrderedList, boundTable, boundTaskList } from './boundedTokenizers'
 import { WikiLink, WikiLinkResolve, WikiAliasDisplay } from './wikilink'
+<<<<<<< ours
 import { WikiMarkOnInput } from './wikilinkInput'
+=======
+>>>>>>> theirs
 import type { WikiLinkOptions } from './wikilink'
 import type { SlashController, SlashItem } from './slashCommand'
 import { WikiSuggest } from './wikiSuggest'
@@ -49,6 +55,10 @@ import type { WikiSuggestController } from './wikiSuggest'
 import { WikiEmbed } from './wikiEmbed'
 import { BlockLink } from './blockId'
 import type { BlockLinkOptions } from './blockId'
+<<<<<<< ours
+=======
+import { WikiPasteLive } from './wikiPaste'
+>>>>>>> theirs
 import { FootnoteDefinition, FootnoteNav, FootnoteReference } from './footnote'
 import { t } from '../i18n/locale'
 import { cap } from '../capabilities'
@@ -152,9 +162,12 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     StyledTaskItem.configure({ nested: true }),
     // KaTeX-rendered $...$ / $$...$$ formulas (issue #100)
     ...buildMathExtensions(),
+<<<<<<< ours
     // raw HTML / comments survive open → save byte-identically
     RawHtmlBlock,
     RawHtmlInline,
+=======
+>>>>>>> theirs
     // ==highlight== (Obsidian's text highlight)
     Highlight,
     // text the reader withholds from the model: the words stay in the document
@@ -164,10 +177,14 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     // links open externally via main-process guard
     ImageAwareLink.configure({ openOnClick: false }),
     WikiLink,
+<<<<<<< ours
     WikiMarkOnInput,
     // the vault's embeds and the `[[` suggester read the notes folder (cap 'wikiVault': off on the web,
     // where `![[x]]` stays literal text)
     ...(cap('wikiVault') ? [WikiEmbed] : []),
+=======
+    WikiEmbed,
+>>>>>>> theirs
     // GFM footnotes: `[^1]` references and `[^1]: text` definitions (see footnote.ts)
     FootnoteDefinition,
     FootnoteReference,
@@ -175,6 +192,7 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     WikiLinkResolve.configure(options.wikiLink ?? {}),
     // an aliased link reads as its alias: the syntax is hidden in the view only
     WikiAliasDisplay,
+<<<<<<< ours
     // block ids and the `[[` suggester work on the notes folder (cap 'wikiVault'): `^id` markers
     // are written on demand, dimmed in the view, plain text in the file
     ...(cap('wikiVault')
@@ -187,6 +205,17 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
           }),
         ]
       : []),
+=======
+    // `^id` block markers: written on demand, dimmed in the view, plain text in the file
+    BlockLink.configure(options.blockLink ?? {}),
+    // pasted `[[links]]` and `![[embeds]]` take their live shape at once
+    WikiPasteLive,
+    WikiSuggest.configure({
+      controller: options.wikiSuggestController,
+      // keys the fragment cache: the same note asked from another document is another question
+      getDocumentPath: options.wikiLink?.getDocumentPath,
+    }),
+>>>>>>> theirs
     BlockDragHandle,
     BlockKeymap,
     TableKeymap,

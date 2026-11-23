@@ -21,7 +21,11 @@ const css = read('src/renderer/styles.css')
 describe('pdf ribbon compact density', () => {
   it('opts in: the collapse hook gets the compact labels', () => {
     expect(appSrc).toMatch(
+<<<<<<< ours
       /useRibbonCollapse\(\s*'genoffice-pdf-ribbon-collapsed',\s*\{[^}]*compact: t\('ribbonCompact'\),[^}]*expandFull: t\('ribbonExpand'\),[^}]*\},/s,
+=======
+      /useRibbonCollapse\('genoffice-pdf-ribbon-collapsed', \{[^}]*compact: t\('ribbonCompact'\),[^}]*expandFull: t\('ribbonExpand'\),[^}]*\}\)/s,
+>>>>>>> theirs
     )
   })
 

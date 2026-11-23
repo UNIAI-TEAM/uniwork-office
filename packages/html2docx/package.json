@@ -21,7 +21,12 @@
     "jszip": "^3.10.1",
     "playwright-core": "^1.61.1",
     "typescript": "^5.9.3",
+<<<<<<< ours
     "vite": "7.3.7",
     "vitest": "4.1.12"
+=======
+    "vite": "^7.3.7",
+    "vitest": "^4.1.12"
+>>>>>>> theirs
   }
 }

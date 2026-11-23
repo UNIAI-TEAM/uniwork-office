@@ -1,6 +1,7 @@
 /**
  * The fragment suggester's main-side half: what a note offers behind `[[Note#`
  * is read from the file — headings, fenced code, the frontmatter block and the
+<<<<<<< ours
  * lone-marker layout the resolver and the id writer already agree on.
  */
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -8,6 +9,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { MAX_HEAD_ENTRIES_PER_KIND, parseWikiHeads, wikiHeads } from '../src/main/wiki-heads'
+=======
+ * lone-marker layout the resolver and the id writer already
+ * agree on.
+ */
+import { describe, expect, it } from 'vitest'
+import { parseWikiHeads } from '../src/main/wiki-heads'
+>>>>>>> theirs
 
 describe('parseWikiHeads', () => {
   it('a full note: frontmatter skipped, headings, code skipped, trailing and lone markers', () => {
@@ -63,11 +71,23 @@ describe('parseWikiHeads', () => {
     expect(parseWikiHeads(raw)).toEqual([{ kind: 'heading', text: 'Outside', level: 1 }])
   })
 
+<<<<<<< ours
+=======
+  it('a shorter fence or one with an info string does not close a longer fence', () => {
+    const raw = '````md\n```js\n# inside\n```\n# still inside\n````\n\n# Outside'
+    expect(parseWikiHeads(raw)).toEqual([{ kind: 'heading', text: 'Outside', level: 1 }])
+    expect(parseWikiHeads('```\n```js\n# inside\n```\n# Out')).toEqual([
+      { kind: 'heading', text: 'Out', level: 1 },
+    ])
+  })
+
+>>>>>>> theirs
   it('a closing-bracket hash run is trimmed off the heading text', () => {
     expect(parseWikiHeads('### Title ###\n')).toEqual([
       { kind: 'heading', text: 'Title', level: 3 },
     ])
   })
+<<<<<<< ours
 
   it('caps headings and blocks independently at MAX_HEAD_ENTRIES_PER_KIND', () => {
     const lines: string[] = []
@@ -104,4 +124,6 @@ describe('wikiHeads', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+=======
+>>>>>>> theirs
 })

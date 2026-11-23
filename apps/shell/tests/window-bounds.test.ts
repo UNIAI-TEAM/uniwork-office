@@ -15,7 +15,11 @@ import {
 } from '../src/main/window-bounds'
 
 /**
+<<<<<<< ours
  * The shell window's geometry across sessions: what is stored,
+=======
+ * The shell window's geometry across sessions (genoffice#2049): what is stored,
+>>>>>>> theirs
  * what is trusted back, and the debounced/close save policy.
  *
  * The settings file is a plain JSON file a user can hand-edit, so reading it

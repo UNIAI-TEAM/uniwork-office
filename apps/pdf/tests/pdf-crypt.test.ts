@@ -11,8 +11,12 @@ import { describe, expect, it } from 'vitest'
 import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFStream, PDFString } from 'pdf-lib'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { WrongPasswordError, decryptDocument, encryptDocument } from '../src/main/pdf-crypt'
+<<<<<<< ours
 import { applySaveRequest } from '../src/main/save-pdf'
 import { savePdfToPath } from '../src/main/save-pdf-file'
+=======
+import { applySaveRequest, savePdfToPath } from '../src/main/save-pdf'
+>>>>>>> theirs
 import type { SavePdfRequest } from '../src/shared/ipc'
 
 const fixture = (name: string): Uint8Array =>

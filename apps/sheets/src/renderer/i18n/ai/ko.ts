@@ -4,6 +4,11 @@ export const ko = {
   aiComposerPlaceholderBuild: '만들 표, 데이터, 차트를 설명하세요…',
   aiEmptyBuildTitle: 'AI에게 시트 작성을 맡기세요',
   aiEmptyBuildBody: '원하는 표, 데이터, 차트를 설명하면 AI가 바로 만들어 줍니다.',
+<<<<<<< ours
+=======
+  aiGskLoginBtn: 'Genspark 로그인',
+  aiGskLoginOk: 'Genspark에 로그인했습니다',
+>>>>>>> theirs
   aiUndelivered: '전송되지 않았습니다',
   aiRetry: '다시 시도',
   aiOpenAssistant: 'AI 도우미 열기',
@@ -56,6 +61,8 @@ export const ko = {
   aiUnknownError: '알 수 없는 오류',
   aiTimeoutError:
     'AI 요청 시간 초과: 네트워크 응답이 없어 중단되었습니다. 연결을 확인한 후 다시 시도해 주세요',
+  aiRegionError:
+    '이 모델의 제공업체는 현재 지역에서 서비스를 제공하지 않습니다. 다른 모델을 선택하거나 네트워크를 변경하세요',
   aiOverloadedError: 'AI 서비스가 혼잡합니다. 잠시 후 다시 시도해 주세요',
   aiNetworkError:
     '네트워크에 문제가 있어 AI 서비스에 연결할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요',

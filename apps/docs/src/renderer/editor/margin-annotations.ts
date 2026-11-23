@@ -28,7 +28,10 @@ import { PAGE_TURN_SEL } from './pagination-gaps'
 import { pagePaperEdges, pageReaderShadow, type PageCut } from '../pagination-cuts'
 import type { EditorView } from '@tiptap/pm/view'
 import type { Mark as PmMark, Node as PmNode } from '@tiptap/pm/model'
+<<<<<<< ours
 import { displayCommentAuthor } from '../comment-author'
+=======
+>>>>>>> theirs
 import { getLang, t } from '../i18n/locale'
 import { collectRevisions } from './revisions'
 import { absoluteDate, authorInitials, authorInk } from './comment-card'
@@ -87,10 +90,13 @@ export interface MarginHandlers {
   onCommentDelete?: (id: string) => void
 }
 
+<<<<<<< ours
 /** G8-02: the neutral author shows in the UI language, as in the Comments pane */
 const authorLabel = (author: string): string =>
   displayCommentAuthor(author, t('editorNeutralCommentAuthor'))
 
+=======
+>>>>>>> theirs
 type BubbleHandlers = Pick<
   MarginHandlers,
   'onCommentReply' | 'onCommentResolve' | 'onCommentEdit' | 'onCommentDelete'
@@ -101,7 +107,11 @@ function makeBalloonIcon(c: CommentInfo, on: boolean, onJump: () => void): HTMLE
   btn.type = 'button'
   btn.className = `comment-balloon${on ? ' on' : ''}`
   btn.setAttribute('aria-pressed', on ? 'true' : 'false')
+<<<<<<< ours
   btn.title = `${authorLabel(c.author)}\n${c.text.split('\n')[0] ?? ''}`
+=======
+  btn.title = `${c.author}\n${c.text.split('\n')[0] ?? ''}`
+>>>>>>> theirs
   btn.dataset.commentId = c.id
   btn.innerHTML =
     '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M 2.99 3.91 h 10.01 v 6.83 h -5.46 L 4.81 13.46 v -2.73 h -1.82 z"/><path d="M 5.27 6.18 h 5.46 M 5.27 8.46 h 3.64"/></svg>'
@@ -130,10 +140,16 @@ function flashAnchors(pm: HTMLElement, id: string): void {
 function makeCommentHead(c: CommentInfo): HTMLElement {
   const head = document.createElement('div')
   head.className = 'comment-card-head'
+<<<<<<< ours
   const name = c.author ? authorLabel(c.author) : t('appUnknownAuthor')
   const avatar = document.createElement('span')
   avatar.className = 'comment-avatar'
   avatar.setAttribute('aria-hidden', 'true')
+=======
+  const name = c.author || t('appUnknownAuthor')
+  const avatar = document.createElement('span')
+  avatar.className = 'comment-avatar'
+>>>>>>> theirs
   avatar.style.background = authorInk(name)
   avatar.textContent = authorInitials(c)
   const meta = document.createElement('span')
@@ -447,6 +463,7 @@ function colorName(hex: string): string {
   return key ? t(key) : `#${hex}`
 }
 
+<<<<<<< ours
 function joinList(items: readonly string[]): string {
   if (items.length <= 1) return items[0] ?? ''
   try {
@@ -459,6 +476,8 @@ function joinList(items: readonly string[]): string {
   return items.join(', ')
 }
 
+=======
+>>>>>>> theirs
 /** "Formatted:" balloon text: the changed run props' new values (Word describes what the run became) */
 function fmtDesc(old: Record<string, unknown>, marks: readonly PmMark[]): string {
   const ts = marks.find((m) => m.type.name === 'docTextStyle')
@@ -504,6 +523,20 @@ export type RevItem = {
   moved?: boolean
 }
 
+<<<<<<< ours
+=======
+export type RevItem = {
+  kind: 'del' | 'fmt'
+  from: number
+  to: number
+  text: string
+  author: string
+  date: string | null
+  /** a deletion that is the source of a move (balloon says Moved) */
+  moved?: boolean
+}
+
+>>>>>>> theirs
 const revMeta = (a: { author?: unknown; date?: unknown } | null | undefined) => ({
   author: typeof a?.author === 'string' ? a.author : '',
   date: typeof a?.date === 'string' ? a.date : null,
@@ -828,6 +861,7 @@ export function syncMarginAnnotations(
     const top = (rect.top - wrapRect.top) / f
     const selected = flags.focus === c.id || flags.popup === c.id
     icons.push({
+<<<<<<< ours
       sticky: true,
       top,
       y: 0,
@@ -839,6 +873,19 @@ export function syncMarginAnnotations(
     placed.push({
       sticky: true,
       top,
+=======
+      sticky: true,
+      top,
+      y: 0,
+      x: 0,
+      make: () => makeBalloonIcon(c, selected, () => handlers?.onCommentBalloon?.(c.id)),
+    })
+    const popup = !cardsOn && flags.popup === c.id
+    if (!cardsOn && !popup) return
+    placed.push({
+      sticky: true,
+      top,
+>>>>>>> theirs
       // leader start: end of the marked range, or start of the anchor paragraph's
       // first line for range-less comments (bare w:commentReference on an empty run)
       y: blockAnchor ? top + Math.min(rect.height / f, 16) : (rect.bottom - wrapRect.top) / f - 1,
@@ -858,6 +905,24 @@ export function syncMarginAnnotations(
         return bubble
       },
     })
+<<<<<<< ours
+=======
+  }
+  // a range its paragraph holds (a comment on an empty paragraph) has no span to find
+  let holders: Map<string, HTMLElement> | undefined
+  const rangeHolders = () => {
+    if (holders) return holders
+    holders = new Map()
+    view?.state.doc.forEach((node, offset) => {
+      const starts = node.attrs.commentStarts as string[] | null
+      if (!Array.isArray(starts)) return
+      const dom = view.nodeDOM(offset)
+      if (!(dom instanceof HTMLElement)) return
+      // split twins all carry the range: the first holds it, as in navigation and the saved file
+      for (const id of starts) if (!holders!.has(id)) holders!.set(id, dom)
+    })
+    return holders
+>>>>>>> theirs
   }
   for (const c of comments) {
     if (inline || c.parentId || c.done) continue
@@ -865,6 +930,15 @@ export function syncMarginAnnotations(
     const rect = el ? [...el.getClientRects()].find((r) => r.height > 0) : undefined
     if (rect) {
       localThread(c, rect, null)
+<<<<<<< ours
+=======
+      continue
+    }
+    const holder = rangeHolders().get(c.id)
+    const holderRect = holder && [...holder.getClientRects()].find((r) => r.height > 0)
+    if (holder && holderRect) {
+      localThread(c, holderRect, holder)
+>>>>>>> theirs
       continue
     }
     // no mark in the body: anchor to the block whose XML carries the reference

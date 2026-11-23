@@ -97,6 +97,7 @@ import type {
   ExportImagesOp,
   SavePictureOp,
   ExportPdfOp,
+  VideoFileWrite,
   PrintSlidesOp,
   PrinterInfo,
   PrinterOption,
@@ -179,17 +180,6 @@ const api: SlidesApi = {
       atIndex,
       deckName,
     ),
-  cloudGenStatus: () => ipcRenderer.invoke('slides:cloud-gen-status'),
-  cloudPageCancel: () => ipcRenderer.invoke('slides:cloud-page-cancel'),
-  cloudGeneratePage: (op: {
-    brief: string
-    title?: string
-    styleSkill?: string
-    deckContext?: Record<string, unknown>
-    images?: { url: string; caption?: string }[]
-    width?: number
-    height?: number
-  }) => ipcRenderer.invoke('slides:cloud-page-generate', op),
   localGeneratePage: (op: { specJson: string }) =>
     ipcRenderer.invoke('slides:local-page-generate', op),
   editText: (op: EditTextOp) => ipcRenderer.invoke('slides:edit-text', op),
@@ -201,6 +191,8 @@ const api: SlidesApi = {
   setSlideSize: (op: SetSlideSizeOp) => ipcRenderer.invoke('slides:set-slide-size', op),
   getSlideSize: () => ipcRenderer.invoke('slides:get-slide-size'),
   editTransform: (op: EditTransformOp) => ipcRenderer.invoke('slides:edit-transform', op),
+  cancelTransformPreview: (op: { slideIndex: number }) =>
+    ipcRenderer.invoke('slides:cancel-transform-preview', op),
   editTransformMulti: (op: EditTransformMultiOp) =>
     ipcRenderer.invoke('slides:edit-transform-multi', op),
   editConnectorEndpoints: (op: EditConnectorEndpointsOp) =>
@@ -365,6 +357,12 @@ const api: SlidesApi = {
   exportImages: (op: ExportImagesOp) => ipcRenderer.invoke('slides:export-images', op),
   pickExportPdfPath: (defaultName: string) =>
     ipcRenderer.invoke('slides:pick-export-pdf-path', defaultName),
+  pickExportVideoPath: (defaultName: string) =>
+    ipcRenderer.invoke('slides:pick-export-video-path', defaultName),
+  videoFileOpen: (path: string) => ipcRenderer.invoke('slides:video-file-open', path),
+  videoFileWrite: (op: VideoFileWrite) => ipcRenderer.invoke('slides:video-file-write', op),
+  videoFileClose: (id: number, discard: boolean) =>
+    ipcRenderer.invoke('slides:video-file-close', id, discard),
   savePicture: (op: SavePictureOp) => ipcRenderer.invoke('slides:save-picture', op),
   exportPdf: (op: ExportPdfOp) => ipcRenderer.invoke('slides:export-pdf', op),
   printSlides: (op: PrintSlidesOp) => ipcRenderer.invoke('slides:print', op),
@@ -407,6 +405,7 @@ const api: SlidesApi = {
       }
     })
   },
+<<<<<<< ours
   save: (origin?: 'user' | 'auto' | 'in-place') => ipcRenderer.invoke('slides:save', origin),
   uniworkState: () => ipcRenderer.invoke('slides:uniwork-state'),
   onUniworkStateChanged: (cb: (path: string) => void) => {
@@ -424,6 +423,9 @@ const api: SlidesApi = {
     return () => ipcRenderer.removeListener('uniwork:doc-state-changed', listener)
   },
   uniworkReadOnlySave: (path?: string) => ipcRenderer.invoke('slides:uniwork-read-only-save', path),
+=======
+  save: () => ipcRenderer.invoke('slides:save'),
+>>>>>>> theirs
   saveAs: (defaultName: string) => ipcRenderer.invoke('slides:save-as', defaultName),
   onCloseSaveRequest: (handler: (origin?: 'user' | 'auto') => void) => {
     const listener = (_event: IpcRendererEvent, origin?: 'user' | 'auto') =>
@@ -469,9 +471,21 @@ const api: SlidesApi = {
     return () => ipcRenderer.removeListener('ai:settings-changed', listener)
   },
   openAiModelSettings: () => ipcRenderer.invoke('ai:open-model-settings'),
+  openSkillsSettings: () => ipcRenderer.invoke('ai:open-skills-settings'),
+  skillsList: () => ipcRenderer.invoke('ai:skills-list'),
+  skillText: (name: string) => ipcRenderer.invoke('ai:skill-text', name),
   aiStream: (request: AiStreamRequest) => ipcRenderer.invoke('ai:stream', request),
   aiStreamCancel: (requestId: string) => ipcRenderer.invoke('ai:stream-cancel', requestId),
   aiGskStatus: (withEmail?: boolean) => ipcRenderer.invoke('ai:gsk-status', withEmail),
+<<<<<<< ours
+=======
+  aiGskLogin: () => ipcRenderer.invoke('ai:gsk-login'),
+  onGskLoginLanded: (handler: () => void) => {
+    const listener = () => handler()
+    ipcRenderer.on('ai:gsk-login-landed', listener)
+    return () => ipcRenderer.removeListener('ai:gsk-login-landed', listener)
+  },
+>>>>>>> theirs
   aiLogRunFailure: (entry: AiRunFailure) => ipcRenderer.invoke('ai:log-run-failure', entry),
   webSearch: (query: string, maxResults?: number) =>
     ipcRenderer.invoke('ai:web-search', query, maxResults),
@@ -542,7 +556,31 @@ const api: SlidesApi = {
   },
 }
 
+/**
+ * Model file naming: the transport half of `suggestFileName`.
+ *
+ * Inlined rather than imported — a preload entry must stay a single-file bundle,
+ * or the sandbox drops every global it exposed. The one `ai:` channel is
+ * registered app-wide by the shell (`registerAiNamingIpc`), not by this app, the
+ * same arrangement the `project:*` bridge below already depends on. A slides
+ * window running on its own has no such handler: the invoke rejects, and the
+ * shared client treats that as a declined naming, which leaves the deck with
+ * the name it already had.
+ *
+ * `content` crosses this bridge verbatim and the main process cannot see what
+ * this editor withheld, so what the caller hands over is exactly what the model
+ * sees. A caller that passed raw document text would undo its own redactions.
+ *
+ * The global is `aiNamingApi`, not `aiOffice`: `aiOffice` is the shell's home
+ * API, and a partial one in an editor window would shadow it there.
+ */
+const aiNamingApi = {
+  suggestFileName: (input: { content: string }) =>
+    ipcRenderer.invoke('ai:suggest-file-name', input),
+}
+
 contextBridge.exposeInMainWorld('slidesApi', api)
+contextBridge.exposeInMainWorld('aiNamingApi', aiNamingApi)
 
 // Chat attachment bridge: method names/signatures match the window.desktop attachment subset in docs, so the renderer's files-skill is copied over wholesale
 const filesApi: DesktopFilesApi = {
@@ -563,6 +601,8 @@ const projectApi: ProjectApi = {
   appendChat: (args) => ipcRenderer.invoke('project:appendChat', args),
   loadChat: (args) => ipcRenderer.invoke('project:loadChat', args),
   rebindChat: (args) => ipcRenderer.invoke('project:rebindChat', args),
+  listChats: (args) => ipcRenderer.invoke('project:listChats', args),
+  deleteChat: (args) => ipcRenderer.invoke('project:deleteChat', args),
 }
 contextBridge.exposeInMainWorld('projectApi', projectApi)
 

@@ -7,12 +7,16 @@
 *.docx binary
 *.xlsx binary
 *.pptx binary
+<<<<<<< ours
 *.odt binary
 *.ott binary
 *.ods binary
 *.ots binary
 *.odp binary
 *.otp binary
+=======
+*.ods binary
+>>>>>>> theirs
 *.pdf binary
 *.gpg binary
 *.png binary

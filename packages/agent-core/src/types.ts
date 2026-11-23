@@ -39,6 +39,28 @@ export interface AgentImage {
 export interface AgentTokenUsage {
   inputTokens?: number
   outputTokens?: number
+<<<<<<< ours
+=======
+  /** share of inputTokens served from the provider's prompt cache */
+  cacheReadTokens?: number
+  /** share of inputTokens written to the prompt cache this turn */
+  cacheWriteTokens?: number
+}
+
+const USAGE_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'] as const
+
+/** Sum two usage records; a side no provider reported stays absent instead of a fake zero. */
+export function addTokenUsage(
+  prev: AgentTokenUsage | null | undefined,
+  delta: AgentTokenUsage,
+): AgentTokenUsage {
+  const out: AgentTokenUsage = { ...(prev ?? {}) }
+  for (const field of USAGE_FIELDS) {
+    const n = delta[field]
+    if (n !== undefined) out[field] = (out[field] ?? 0) + n
+  }
+  return out
+>>>>>>> theirs
 }
 
 export type AgentMessage =
@@ -167,6 +189,7 @@ export interface AgentStreamCallbacks {
   onPhase?(phase: AgentPhase): void
   /** normalized stop reason of the turn ('max_tokens' = cut off by the token limit); transports may omit this */
   onStopReason?(reason: string): void
+<<<<<<< ours
   /** a non-fatal turn notice (UniWork AI: dropped tool calls, a Retry-After wait, a new conversation); transports may omit this */
   onNotice?(notice: AgentStreamNotice): void
   /**
@@ -174,6 +197,8 @@ export interface AgentStreamCallbacks {
    * turn's streamed text, reasoning and tool calls; history is untouched. Transports may omit this.
    */
   onTurnReset?(): void
+=======
+>>>>>>> theirs
   /** tokens the provider billed for this turn; transports whose provider does not report usage omit this */
   onUsage?(usage: AgentTokenUsage): void
   onDone(): void

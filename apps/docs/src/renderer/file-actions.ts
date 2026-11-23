@@ -7,12 +7,21 @@
  */
 import {
   appRootEl,
+<<<<<<< ours
+=======
+  firstPaperOnScreen,
+>>>>>>> theirs
   previewIsOpen,
   previewPageEls,
   sectionContentWidthPx,
 } from './preview-canvas-snapshot'
 import type { Editor } from '@tiptap/core'
+import { GapCursor } from '@tiptap/pm/gapcursor'
 import { history } from '@tiptap/pm/history'
+import type { ResolvedPos } from '@tiptap/pm/model'
+import { NodeSelection, Selection } from '@tiptap/pm/state'
+import { suggestFileName } from '@genoffice/ui'
+import { modelTextOf, type RedactableNode } from './ai/redact-view'
 import {
   applyPageNumType,
   applySectionSettings,
@@ -21,6 +30,7 @@ import {
   BLANK_BULLET_NUM_ID,
   BLANK_ORDERED_NUM_ID,
   buildBlankDocx,
+  docxAsTemplate,
   paperSizeForLocale,
   findChartWorkbookPath,
   parseChartPartXml,
@@ -31,16 +41,23 @@ import {
   readPageColor,
   readSections,
   readSectionSettings,
+  writeFontConversions,
   saveDocx,
+  templateAsDocx,
   type Block,
   type CommentInfo,
   type DocProtection,
   type DefaultFonts,
   type HeaderFooter,
   type NoteInfo,
+  type NoteProps,
+  type MathPr,
   type ParsedDocFull,
+  type PropertyChanges,
+  type PageNumberChapter,
   type SectionInfo,
   type SectionSettings,
+  type CitationStyleId,
   type SourceInfo,
   type StyleUpsert,
   type ThemeColors,
@@ -48,9 +65,15 @@ import {
   type WriteProtection,
   type PictureWatermarkSpec,
   type WatermarkSpec,
+  type WrittenFontConversion,
 } from '@genoffice/docx-engine'
 import type { Dispatch, SetStateAction } from 'react'
+<<<<<<< ours
 import type { AiDocContent, OpenDocxResult, PdfExportResult } from '../shared/ipc'
+=======
+import type { AiDocContent, OpenDocxResult } from '../shared/ipc'
+import { twipsToPx } from './units'
+>>>>>>> theirs
 import {
   hfVariantsFromParsed,
   openedFileStartsDirty,
@@ -63,6 +86,7 @@ import { hfSaveOptions } from './hf-sections'
 import { fetchDocBytes } from './doc-bytes'
 import { parseDocxOffThread } from './parse-off-thread'
 import { PHASED_APPEND } from './editor/streaming-tail-guard'
+<<<<<<< ours
 import { docTextLength, docWeight, openTierFor, refusalMeasureFor } from './large-document'
 import { documentToMarkdown } from './export-markdown'
 import { collectPdfInternalLinks } from './pdf-internal-links'
@@ -73,10 +97,38 @@ import { setOpenDocumentText } from './text-layout/open-document'
 import { setNoteNumFmts } from './note-format'
 import type { CompareEntry } from './editor/compare'
 import { blocksToPmDoc, pmDocOptions, pmDocToSavePlan, type PmNode } from './editor/convert'
+=======
+import { PERM_REGIONS_LOAD } from './editor/perm-regions'
+import { docTextLength, docWeight, openTierFor } from './large-document'
+import { documentToMarkdown } from './export-markdown'
+import { docStyleCss } from './doc-style-css'
+import { setMathLimits } from './editor/math-defaults'
+import {
+  hyphenationConfigOf,
+  hyphenationDictFor,
+  loadHyphenation,
+  setHyphenation,
+  type HyphenationSettings,
+} from './editor/hyphenation'
+import { setMathWrapRules } from './editor/math-wrap'
+import { documentTextContext } from './text-layout/document-context'
+import { setOpenDocumentText } from './text-layout/open-document'
+import { sectionNotePropsOf, setNoteProps } from './note-format'
+import { refreshGroupBoxes } from './editor/object-group'
+import { settleFieldResults } from './editor/field-results'
+import {
+  blocksToPmDoc,
+  keepGroupMembersApart,
+  pmDocOptions,
+  pmDocToSavePlan,
+  type PmNode,
+} from './editor/convert'
+>>>>>>> theirs
 import { TABLE_TRAILING_SKIP, setLazyMediaHashes } from './editor/extensions'
 import { setStaticAsciiResolver } from './editor/protected-render'
 import { FORMAT_MARKS, serializeMarks } from './editor/caret-marks'
 import { TRACK_IGNORE } from './editor/revisions'
+import type { FontConversions } from './editor/font-conversion-history'
 import {
   cancelPhasedContent,
   isPhasedContentPending,
@@ -93,18 +145,26 @@ import {
 import { t, getLang, statusText, type StatusLine } from './i18n/locale'
 import { isBlankDocument, parseHtmlFragment, replaceBlockRange } from './ai/protocol'
 import { carryDocSeen } from './ai/tools'
+import { loadDesignDefault, type DesignDefault } from './design-default'
+import { marginsFitPage } from './components/MarginDialog'
 import { isDocDirty, resetCrossDocEditState } from './doc-dirty'
+import { defaultParagraphStyleId } from './style-gallery'
 import { pruneUnreferencedNumbering } from './numbering-actions'
 import { applySectPrRewrites, type SectPrRewrite } from './sectpr-rewrite'
 import { createSaveSerializer } from './save-until-persisted'
 import { checkMissingFonts, collectDocFonts } from './font-check'
 import { loadBundledStandIns } from './line-metrics'
 import { isBundledFont, isFontAvailable, setDocFontTable } from './text-layout/font-rules'
+<<<<<<< ours
+=======
+import { fontSubstituteOf } from './font-substitutes'
+>>>>>>> theirs
 import { loadSystemFontFamilies, resolveFontAliases } from './system-fonts'
 import { adoptEmbeddedFonts } from './embedded-fonts'
 import { prefetchFaces } from './font-resolve'
 import { defaultEastAsiaFontFor } from './font-list'
 import { clearPrintZoom, setPrintZoom } from './print-zoom'
+<<<<<<< ours
 import type { SaveAsExportFormat } from '../shared/save-as-format'
 import { isNarrowStatusFrame, showToast } from './components/toast-bus'
 import { cap } from './capabilities'
@@ -113,6 +173,14 @@ import { buildStandaloneHtml } from './html-export'
 import { carryAiMarks, sameDocIgnoringAiMarks } from './editor/ai-marker'
 import { aiPanelInitiallyOpen } from '@genoffice/ui'
 import { isNarrowViewport } from './narrow-viewport'
+=======
+import { collectPdfInternalLinks } from './pdf-internal-links'
+import type { PdfInternalLink } from '../shared/ipc'
+import type { SaveAsExportFormat } from '../shared/save-as-format'
+import { showToast } from './components/toast-bus'
+import { buildStandaloneHtml } from './html-export'
+import { aiPanelInitiallyOpen, shortFileError } from '@genoffice/ui'
+>>>>>>> theirs
 
 /** An export waiting for the pagination preview to mount; resolve settles the caller's exportPdf promise. */
 export type PendingPdfExport = {
@@ -126,6 +194,9 @@ export type PendingPdfExport = {
 export interface FileActionContext {
   editor: Editor | null
   doc: DocState | null
+  /** clears the comment-undo graveyard on a document swap (optional: tests
+   *  build partial contexts) */
+  resetCommentUndoStore?: () => void
   dirtyRef: { current: boolean }
   saveInFlightRef: { current: boolean }
   saveIncompleteRef: { current: boolean }
@@ -164,6 +235,9 @@ export interface FileActionContext {
   pageColorDirty: boolean
   setPageColor: (value: string | null) => void
   setPageColorDirty: (dirty: boolean) => void
+  /** File > Properties edits waiting for the next save; null when there are none */
+  propertyChanges: PropertyChanges | null
+  setPropertyChanges: (value: PropertyChanges | null) => void
   header: HeaderFooter | null
   headerDirty: boolean
   footer: HeaderFooter | null
@@ -189,13 +263,45 @@ export interface FileActionContext {
   evenOddHfDirty: boolean
   mirrorMargins: boolean
   mirrorMarginsDirty: boolean
+  /** settings.xml w:autoHyphenation as the user left it */
+  autoHyphenation: boolean
+  autoHyphenationDirty: boolean
   setTitlePg: (value: boolean) => void
   setTitlePgDirty: (dirty: boolean) => void
   setEvenOddHf: (value: boolean) => void
   setEvenOddHfDirty: (dirty: boolean) => void
   setMirrorMargins: (on: boolean) => void
   setMirrorMarginsDirty: (dirty: boolean) => void
-  pgNumEdit: { fmt?: string; start?: number } | null
+  setAutoHyphenation: (on: boolean) => void
+  setAutoHyphenationDirty: (dirty: boolean) => void
+  /** the finer hyphenation rules set in this session (only the fields changed); null when untouched */
+  hyphenationEdit: Partial<HyphenationSettings> | null
+  setHyphenationEdit: (edit: Partial<HyphenationSettings> | null) => void
+  /** a Manual… run belongs to the document it started on */
+  endManualHyphenation: () => void
+  /** settings.xml w:defaultTabStop as set in this session; null when untouched */
+  defaultTabStopEdit: number | null
+  setDefaultTabStopEdit: (twips: number | null) => void
+  /** settings.xml m:mathPr as set in this session; null when untouched */
+  mathPrEdit: MathPr | null
+  /** footnote / endnote properties set in this session; null when untouched */
+  notePropsEdit: { footnote: NoteProps; endnote: NoteProps } | null
+  setNotePropsEdit: (edit: null) => void
+  setMathPrEdit: (mathPr: MathPr | null) => void
+  /** settings.xml w:gutterAtTop as set in this session; null when untouched */
+  gutterAtTopEdit: boolean | null
+  setGutterAtTopEdit: (atTop: boolean | null) => void
+  fontConversions: FontConversions | null
+  setFontConversions: (fonts: FontConversions | null) => void
+  /** settings.xml w:characterSpacingControl as set in this session; null when untouched */
+  compressPunctEdit: boolean | null
+  /** settings.xml w:strictFirstAndLastChars as set in this session; null when untouched */
+  strictKinsokuEdit: boolean | null
+  setStrictKinsokuEdit: (strict: boolean | null) => void
+  setCompressPunctEdit: (compress: boolean | null) => void
+  trackMovesEdit: boolean | null
+  setTrackMovesEdit: (on: boolean | null) => void
+  pgNumEdit: { fmt?: string; start?: number; chapter?: PageNumberChapter | null } | null
   pgNumDirtySections: number[]
   setPgNumEdit: (value: { fmt?: string; start?: number } | null) => void
   setPgNumDirtySections: (value: number[]) => void
@@ -241,6 +347,9 @@ export interface FileActionContext {
   sources: SourceInfo[]
   sourcesDirty: boolean
   setSources: (value: SourceInfo[]) => void
+  /** the citation style picked or read for the document; null when its sources name none we know */
+  citationStyle: CitationStyleId | null
+  setCitationStyle: (value: CitationStyleId | null) => void
   setSourcesDirty: (dirty: boolean) => void
   zoteroDocumentData: string
   zoteroDocumentDataDirty: boolean
@@ -272,7 +381,10 @@ export interface FileActionContext {
   setRemovePersonalInfoDirty: (dirty: boolean) => void
   /** document (re)loaded: App resets the modify-password session state and prompts when one is set */
   onWriteProtectionLoaded: (wp: WriteProtection | null) => void
+<<<<<<< ours
   setCompareResult: (value: { otherName: string; entries: CompareEntry[] } | null) => void
+=======
+>>>>>>> theirs
   /** password-protected docx: open the password prompt (decrypt-retry loop lives in App) */
   promptDocxPassword: (info: { path: string; name: string }) => void
   /** web: the document is a password-protected package the web build cannot decrypt ("use the app") */
@@ -380,10 +492,28 @@ export function restoreMarksAfterDocRewrite(editor: Editor, snapshot: string | n
   return true
 }
 
+<<<<<<< ours
+=======
+/** the document's break points are in place before its first layout */
+async function loadDocHyphenation(parsed: ParsedDocFull): Promise<void> {
+  const dict = parsed.autoHyphenation ? hyphenationDictFor(parsed.docDefaults?.lang) : null
+  if (dict) await loadHyphenation(dict)
+}
+
+>>>>>>> theirs
 /** doc-level layout inputs living outside CSS: default tab grid + hyphenation lang */
 function applyDocLayoutSettings(editor: Editor, parsed: ParsedDocFull): void {
-  setNoteNumFmts({ footnote: parsed.footnoteProps, endnote: parsed.endnoteProps })
+  const sections = readSections(parsed)
+  setNoteProps(
+    sectionNotePropsOf(
+      parsed.settingsNoteProps,
+      sections.map((s) => s.settings),
+    ),
+    sections,
+  )
   editor.storage.tabStops.defaultTabStopTwips = parsed.defaultTabStopTwips ?? null
+  setMathLimits(parsed.mathPr)
+  setMathWrapRules(parsed.mathPr)
   editor.storage.listNumbering.defaultTabTwips = parsed.defaultTabStopTwips ?? 720
   editor.storage.listNumbering.indentNotTabStop = parsed.indentNotNumberingTabStop === true
   // Word 2013+ justified lines pull words up by shrinking spaces; legacy
@@ -394,6 +524,7 @@ function applyDocLayoutSettings(editor: Editor, parsed: ParsedDocFull): void {
   editor.storage.justifyShrink.expandBreakLines = parsed.doNotExpandShiftReturn !== true
   editor.storage.cjkPunctShrink.enabled = parsed.compressPunctuation === true
   editor.storage.cjkPunctShrink.hangPunct = parsed.compressPunctuation !== true
+  editor.storage.cjkPunctShrink.strictKinsoku = parsed.strictFirstAndLastChars === true
   editor.storage.cjkPunctShrink.legacyLayout = (parsed.compatibilityMode ?? 0) < 15
   editor.storage.cjkPunctShrink.docEastAsiaLang = parsed.docDefaults?.eastAsiaLang ?? null
   setOpenDocumentText(documentTextContext(parsed))
@@ -403,6 +534,7 @@ function applyDocLayoutSettings(editor: Editor, parsed: ParsedDocFull): void {
   const lang = parsed.autoHyphenation ? parsed.docDefaults?.lang : undefined
   if (lang) editor.view.dom.setAttribute('lang', lang)
   else editor.view.dom.removeAttribute('lang')
+  setHyphenation(editor, hyphenationConfigOf(parsed, parsed.autoHyphenation === true))
 }
 
 /**
@@ -444,6 +576,7 @@ function phasedHostFor(ctx: FileActionContext): PhasedContentHost {
         .setMeta(TRACK_IGNORE, true)
         .setMeta(TABLE_TRAILING_SKIP, true)
         .setMeta(PHASED_APPEND, true)
+        .setMeta(PERM_REGIONS_LOAD, true)
         .setContent(doc as never)
         .run(),
     appendNodes: (nodes) => {
@@ -461,6 +594,22 @@ function phasedHostFor(ctx: FileActionContext): PhasedContentHost {
   }
 }
 
+/** The first position is a picture or another whole-block object when the
+ *  document starts with one: a caret goes before it, as in Word, so that the
+ *  first key typed does not replace or delete the object. */
+function placeCaretAtStart(editor: Editor): void {
+  const { doc, tr } = editor.state
+  const start = Selection.atStart(doc)
+  let caret: Selection | null = start
+  if (start instanceof NodeSelection) {
+    const $pos = doc.resolve(start.from)
+    // `valid` is on the class but left out of its published types
+    const { valid } = GapCursor as unknown as { valid($pos: ResolvedPos): boolean }
+    caret = valid($pos) ? new GapCursor($pos) : Selection.findFrom($pos, 1, true)
+  }
+  if (caret) editor.view.dispatch(tr.setSelection(caret).setMeta('addToHistory', false))
+}
+
 /** Word parity: a freshly opened or created document starts with the caret at
  *  its beginning — typing must work without a click into the page.
  *  Skipped when something else in this webContents already holds keyboard
@@ -475,7 +624,8 @@ function focusDocumentStart(editor: Editor): void {
     // behind the opening screen the editor is display:none and DOM focus
     // silently drops — wait for it to be laid out, then focus once
     if (dom.isConnected && dom.offsetParent !== null) {
-      editor.commands.focus('start', { scrollIntoView: false })
+      placeCaretAtStart(editor)
+      editor.commands.focus(null, { scrollIntoView: false })
       if (document.activeElement !== document.body) return
     }
     if (performance.now() - startedAt < 10_000) requestAnimationFrame(attempt)
@@ -578,6 +728,7 @@ export async function loadFile(
   const generation = ++openGeneration
   let loadedBytesLength = 0
   try {
+<<<<<<< ours
     const bytes = await fetchDocBytes(result.dataUrl)
     loadedBytesLength = bytes.byteLength
     // web: no decrypt engine here; say so instead of failing in the zip parser with a raw error
@@ -585,6 +736,12 @@ export async function loadFile(
       ctx.promptAppOnlyEncrypted({ name: result.name })
       return 'canceled'
     }
+=======
+    const fetched = await fetchDocBytes(result.dataUrl)
+    // what is made from a template is a document: it saves as a .docx, declared as one
+    const bytes = result.template ? await templateAsDocx(fetched) : fetched
+    const macrosLeft = result.template === true && /\.dotm$/i.test(result.name)
+>>>>>>> theirs
     // a 0-byte .docx (touch, failed download) is not a corrupt archive but an
     // empty document: open the blank template under the file's own path
     const parsed = await parseDocxOffThread(
@@ -636,6 +793,10 @@ export async function loadFile(
     requestFontAliases(declaredFonts)
     await prefetchFaces(declaredFonts)
     await loadBundledStandIns(declaredFonts)
+<<<<<<< ours
+=======
+    await loadDocHyphenation(parsed)
+>>>>>>> theirs
     if (generation !== openGeneration) return 'superseded'
     ctx.editor.storage.listNumbering.styles = parsed.styles
     ctx.editor.storage.listNumbering.docDefaults = parsed.docDefaults
@@ -651,8 +812,8 @@ export async function loadFile(
     ctx.setRefusedMessage?.('')
     ctx.setDoc({
       parsed,
-      filePath: result.path,
-      fileName: result.name,
+      filePath: result.template ? null : result.path,
+      fileName: result.template ? t('appUntitledDocx') : result.name,
       hash: result.hash,
       encrypted: result.encrypted,
       suggestSaveAs: result.suggestSaveAs,
@@ -669,6 +830,7 @@ export async function loadFile(
     ctx.setSectionDirty(false)
     ctx.setPageColor(readPageColor(parsed))
     ctx.setPageColorDirty(false)
+    ctx.setPropertyChanges(null)
     ctx.setHeader(
       parsed.headerText || parsed.headerHasPageNumber || parsed.headerParas?.length
         ? {
@@ -698,8 +860,25 @@ export async function loadFile(
     ctx.setEvenOddHfDirty(false)
     ctx.setMirrorMargins(parsed.mirrorMargins ?? false)
     ctx.setMirrorMarginsDirty(false)
+<<<<<<< ours
     ctx.setShowComments(true)
     ctx.setCommentPanelOpen(commentsPaneOpensOnLoad(parsed.comments, parsed.blocks))
+=======
+    ctx.setAutoHyphenation(parsed.autoHyphenation ?? false)
+    ctx.setAutoHyphenationDirty(false)
+    ctx.setHyphenationEdit(null)
+    ctx.endManualHyphenation()
+    ctx.setDefaultTabStopEdit(null)
+    ctx.setMathPrEdit(null)
+    ctx.setNotePropsEdit(null)
+    ctx.setGutterAtTopEdit(null)
+    ctx.setFontConversions(null)
+    ctx.setCompressPunctEdit(null)
+    ctx.setTrackMovesEdit(null)
+    ctx.setStrictKinsokuEdit(null)
+    ctx.setShowComments(true)
+    ctx.setCommentPanelOpen(hasUnanchoredComments(parsed.comments, parsed.blocks))
+>>>>>>> theirs
     ctx.setCommentPopup(null)
     ctx.setReadMode(tier === 'readOnly')
     ctx.setLargeDocSpellOff(tier !== 'normal')
@@ -716,6 +895,7 @@ export async function loadFile(
     ctx.setEndnotes(parsed.endnotes)
     ctx.setNotesDirty(false)
     ctx.setSources(parsed.sources)
+    ctx.setCitationStyle(parsed.citationStyle ?? null)
     ctx.setSourcesDirty(false)
     ctx.setZoteroDocumentData(parsed.zoteroDocumentData)
     ctx.setZoteroDocumentDataDirty(false)
@@ -733,16 +913,17 @@ export async function loadFile(
     ctx.setRemovePersonalInfo(parsed.removePersonalInfo)
     ctx.setRemovePersonalInfoDirty(false)
     ctx.onWriteProtectionLoaded(parsed.writeProtection)
-    ctx.setCompareResult(null)
     // Recovery content still only exists in the autosave copy. Keep it dirty
     // until an explicit/automatic save lands it on the original path.
     ctx.dirtyRef.current = openedFileStartsDirty(result)
-    const missing = checkMissingFonts(collectDocFonts(parsed))
+    const missing = checkMissingFonts(collectDocFonts(parsed), fontSubstituteOf)
     // one status line per open: the Read Mode explanation outranks the rest
     if (tier === 'readOnly') {
       ctx.setStatus(t('appDocLargeReadOnly', { blocks: parsed.blocks.length }))
     } else if (tier === 'lite') {
       ctx.setStatus(t('appDocLargeSpellOff', { blocks: parsed.blocks.length }))
+    } else if (macrosLeft) {
+      ctx.setStatus(t('appTemplateMacrosDropped'))
     } else if (missing.length > 0) {
       const names = missing
         .slice(0, 3)
@@ -781,8 +962,10 @@ export async function loadFile(
       })
     }
     // visible failure: the status-bar line alone is easy to miss under the start screen
-    ctx.setStatus(t('appOpenFailed', { error: String(err) }))
-    showToast(t('appOpenFailed', { error: String(err) }), 'error')
+    console.error('[docs] open failed', err)
+    const detail = shortFileError(err)
+    ctx.setStatus(t('appOpenFailed', { error: detail }))
+    showToast(t('appOpenFailed', { error: detail }), 'error')
     return 'failed'
   }
 }
@@ -796,9 +979,88 @@ async function systemLocale(): Promise<string> {
 }
 
 async function blankDocxBytes(): Promise<Uint8Array> {
-  return buildBlankDocx({
+  const blank = await buildBlankDocx({
     eastAsiaFont: defaultEastAsiaFontFor(getLang()),
     paperSize: paperSizeForLocale(await systemLocale()),
+  })
+  return withDesignDefault(blank, loadDesignDefault())
+}
+
+/**
+ * Design > Set as Default: the blank document with the kept look written into
+ * it, so a new document starts with that look and with nothing to save.
+ */
+export async function withDesignDefault(
+  blank: Uint8Array,
+  look: DesignDefault | null,
+): Promise<Uint8Array> {
+  if (!look?.fonts && !look?.colors && !look?.spacing && !look?.page && !look?.font) return blank
+  const parsed = await parseDocx(blank)
+  const { page } = look
+  // margins kept on another paper size may not leave room for text on this one
+  const section = page && { ...readSectionSettings(parsed), ...page.section }
+  const fits =
+    !!section &&
+    marginsFitPage(
+      {
+        top: section.marginTop,
+        right: section.marginRight,
+        bottom: section.marginBottom,
+        left: section.marginLeft,
+      },
+      section.pageWidth,
+      section.pageHeight,
+    )
+  const styleId = defaultParagraphStyleId(parsed.styles) ?? 'Normal'
+  const untouched = parsed.blocks.flatMap((block) =>
+    block.hidden || block.docxIndex === null
+      ? []
+      : [{ kind: 'original' as const, docxIndex: block.docxIndex }],
+  )
+  return saveDocx(parsed, untouched, {
+    themeFonts: look.fonts,
+    themeColors: look.colors,
+    ...(page && section && fits
+      ? {
+          section,
+          mirrorMargins: page.mirror || undefined,
+          titlePg: page.titlePg || undefined,
+          evenAndOddHeaders: page.evenOdd || undefined,
+          gutterAtTop: page.section.gutterAtTop || undefined,
+        }
+      : {}),
+    styleUpserts:
+      look.spacing || look.font
+        ? [
+            {
+              styleId,
+              ...(parsed.styles.has(styleId) ? {} : { builtIn: true }),
+              ...(look.spacing
+                ? {
+                    pPr: {
+                      spaceBeforeTwips: look.spacing.beforeTwips ?? 0,
+                      spaceAfterTwips: look.spacing.afterTwips,
+                      lineSpacing: look.spacing.line,
+                    },
+                  }
+                : {}),
+              ...(look.font
+                ? {
+                    rPr: {
+                      ...(look.font.latin ? { font: look.font.latin } : {}),
+                      ...(look.font.eastAsia ? { eastAsiaFont: look.font.eastAsia } : {}),
+                      ...(look.font.sizeHalfPoints
+                        ? { sizeHalfPoints: look.font.sizeHalfPoints }
+                        : {}),
+                      ...(look.font.bold ? { bold: true } : {}),
+                      ...(look.font.italic ? { italic: true } : {}),
+                      ...(look.font.color ? { color: look.font.color } : {}),
+                    },
+                  }
+                : {}),
+            },
+          ]
+        : undefined,
   })
 }
 
@@ -833,6 +1095,10 @@ export async function newFile(ctx: FileActionContext): Promise<boolean | undefin
     requestFontAliases(declaredFonts)
     await prefetchFaces(declaredFonts)
     await loadBundledStandIns(declaredFonts)
+<<<<<<< ours
+=======
+    await loadDocHyphenation(parsed)
+>>>>>>> theirs
     if (generation !== openGeneration) return
     ctx.editor.storage.listNumbering.styles = parsed.styles
     ctx.editor.storage.listNumbering.docDefaults = parsed.docDefaults
@@ -840,9 +1106,11 @@ export async function newFile(ctx: FileActionContext): Promise<boolean | undefin
     applyDocLayoutSettings(ctx.editor, parsed)
     // a tail still streaming for the previous document must never land in this one
     cancelPhasedContent()
-    ctx.editor.commands.setContent(
-      blocksToPmDoc(parsed.blocks, readSections(parsed), pmDocOptions(parsed)) as never,
-    )
+    ctx.editor
+      .chain()
+      .setMeta(PERM_REGIONS_LOAD, true)
+      .setContent(blocksToPmDoc(parsed.blocks, readSections(parsed), pmDocOptions(parsed)) as never)
+      .run()
     resetEditorHistory(ctx.editor)
     focusDocumentStart(ctx.editor)
     noteDocumentSwapped()
@@ -861,6 +1129,7 @@ export async function newFile(ctx: FileActionContext): Promise<boolean | undefin
     ctx.setSectionDirty(false)
     ctx.setPageColor(readPageColor(parsed))
     ctx.setPageColorDirty(false)
+    ctx.setPropertyChanges(null)
     ctx.setHeader(null)
     ctx.setHeaderDirty(false)
     ctx.setFooter(null)
@@ -883,6 +1152,7 @@ export async function newFile(ctx: FileActionContext): Promise<boolean | undefin
     ctx.setEndnotes(parsed.endnotes)
     ctx.setNotesDirty(false)
     ctx.setSources([])
+    ctx.setCitationStyle(null)
     ctx.setSourcesDirty(false)
     ctx.setZoteroDocumentData(parsed.zoteroDocumentData)
     ctx.setZoteroDocumentDataDirty(false)
@@ -893,6 +1163,21 @@ export async function newFile(ctx: FileActionContext): Promise<boolean | undefin
     ctx.setCommentComposing(false)
     ctx.setTrackChanges(false)
     ctx.setTrackRevisionsDirty(false)
+<<<<<<< ours
+=======
+    ctx.setAutoHyphenation(parsed.autoHyphenation ?? false)
+    ctx.setAutoHyphenationDirty(false)
+    ctx.setHyphenationEdit(null)
+    ctx.endManualHyphenation()
+    ctx.setDefaultTabStopEdit(null)
+    ctx.setMathPrEdit(null)
+    ctx.setNotePropsEdit(null)
+    ctx.setGutterAtTopEdit(null)
+    ctx.setFontConversions(null)
+    ctx.setCompressPunctEdit(null)
+    ctx.setTrackMovesEdit(null)
+    ctx.setStrictKinsokuEdit(null)
+>>>>>>> theirs
     ctx.setProtection(null)
     ctx.setProtectionDirty(false)
     ctx.setWriteProtection(null)
@@ -900,7 +1185,6 @@ export async function newFile(ctx: FileActionContext): Promise<boolean | undefin
     ctx.setRemovePersonalInfo(false)
     ctx.setRemovePersonalInfoDirty(false)
     ctx.onWriteProtectionLoaded(null)
-    ctx.setCompareResult(null)
     ctx.dirtyRef.current = false
     // same rule as the first render, so the "open in new documents" setting holds for Cmd+N too
     ctx.setShowAi(aiPanelInitiallyOpen('aidocs.showAi'))
@@ -908,7 +1192,8 @@ export async function newFile(ctx: FileActionContext): Promise<boolean | undefin
     return true
   } catch (err) {
     if (generation !== openGeneration) return
-    ctx.setStatus(t('appNewFailed', { error: String(err) }))
+    console.error('[docs] create failed', err)
+    ctx.setStatus(t('appNewFailed', { error: shortFileError(err) }))
     return false
   }
 }
@@ -952,6 +1237,48 @@ function deriveAutoFileName(editor: Editor): string | null {
   return null
 }
 
+/** The document's own text, as the model may read it. Never the raw document. */
+function modelTextOfDocument(editor: Editor): string {
+  // A name is read off the opening of a document; 8k characters is far past
+  // anything a stem could name, and bounds the walk on the UI thread.
+  return modelTextOf(editor.getJSON() as RedactableNode, { maxChars: 8000 })
+}
+
+/**
+ * A file name from a bare stem, in the shape the save path expects.
+ *
+ * The stem is an untrusted string — a model's answer, or nothing at all — so it
+ * goes through the same sanitizer as a heading: a name carrying a separator, a
+ * control character or a reserved Windows device word would otherwise become a
+ * path the save silently refuses, or worse, writes somewhere else.
+ */
+function docxNameFromStem(stem: string): string | null {
+  const base = sanitizeFileBaseName(stem)
+  return base ? `${base}.docx` : null
+}
+
+/**
+ * Ask the model to name this document, on request.
+ *
+ * The result is the file name offered in the Save As dialog rather than a
+ * rename: moving a file that may be open elsewhere, referenced from a note, or
+ * synced is not something to do behind the reader's back. The dialog is the
+ * confirmation. Returns '' when there is nothing usable, which leaves the
+ * dialog on the name the document already has.
+ *
+ * The text handed over is `modelTextOf`, never the editor's document. A selection
+ * the reader hid from the model stays hidden from this call too — the file name
+ * is the one thing that reaches them after the model has seen the rest of the
+ * document, so a leak here would survive the redaction it was meant to outlive.
+ */
+export async function suggestedSaveAsName(ctx: FileActionContext): Promise<string> {
+  const { editor } = ctx
+  if (!editor) return ''
+  const stem = await suggestFileName({ content: modelTextOfDocument(editor) })
+  // a full file name, extension and all, because this is what the save dialog takes
+  return docxNameFromStem(stem) ?? ''
+}
+
 /**
  * The name a never-saved document's first save writes under (the first heading while it is
  * still "Untitled", else its current name); null once the document has a file. The AI panel's
@@ -971,6 +1298,7 @@ export function firstSaveName(ctx: FileActionContext): string | null {
  * `pmOverride` serializes a document of the caller's making instead of the
  * live one: the mail merge writes the template with one record's values in it,
  * and the rest of the save (the sections, the headers, the pictures) is the
+<<<<<<< ours
  * save the document would get anyway.
  */
 export async function buildDocBytes(
@@ -983,6 +1311,43 @@ export async function buildDocBytes(
   const { doc, editor } = ctx
   if (!doc || !editor) return null
   const pmJson = pmOverride ?? (editor.getJSON() as PmNode)
+=======
+ * save the document would get anyway. It is made from the live document handed
+ * to it here, after the wait for a reload: one made from a snapshot the caller
+ * took earlier could carry anchors into a document a save has since replaced.
+ * `sectionOverride` is the paper that
+ * document prints on (a label sheet, an envelope); it is an argument and not
+ * a field of `ctx` because settling the font settings swaps `ctx` for the
+ * live one.
+ */
+export async function buildDocBytes(
+  ctx: FileActionContext,
+  pmOverride?: (live: PmNode) => PmNode,
+  sectionOverride?: SectionSettings,
+): Promise<Uint8Array | null> {
+  return (await buildDoc(ctx, pmOverride, sectionOverride))?.bytes ?? null
+}
+
+/** the document's bytes, and the font conversions the file holds once these bytes are written */
+async function buildDoc(
+  ctx: FileActionContext,
+  pmOverride?: (live: PmNode) => PmNode,
+  sectionOverride?: SectionSettings,
+): Promise<{ bytes: Uint8Array; fontsWritten: WrittenFontConversion[] } | null> {
+  const current = await contextAfterReload(ctx)
+  if (!current) return null
+  ctx = current
+  const { doc, editor } = ctx
+  if (!doc || !editor) return null
+  // a group saves its members where they show now
+  if (!pmOverride) {
+    refreshGroupBoxes(editor)
+    // the fields this editor computes are saved with their result, not left for Word to update
+    settleFieldResults(editor, doc.parsed.blocks)
+  }
+  const live = editor.getJSON() as PmNode
+  const pmJson = pmOverride ? pmOverride(live) : live
+>>>>>>> theirs
   const plan = pmDocToSavePlan(pmJson, doc.parsed.blocks)
   // chart data edits patch the chart's own zip part, not the body XML
   const partXml: Record<string, string> = {}
@@ -1035,9 +1400,13 @@ export async function buildDocBytes(
       let sectPr = applySectionSettings(sec.sectPrXml, sec.settings)
       sectPr = applySectionStartType(sectPr, sec.startType)
       sectPr = applyTitlePg(sectPr, sec.titlePg)
-      // touch w:pgNumType only when the page-number format was edited (avoids dropping unmodeled attrs like chapStyle)
       if (ctx.pgNumDirtySections.includes(si)) {
-        sectPr = applyPageNumType(sectPr, sec.pageNumberFmt, sec.pageNumberStart)
+        sectPr = applyPageNumType(
+          sectPr,
+          sec.pageNumberFmt,
+          sec.pageNumberStart,
+          sec.pageNumberChapter ?? null,
+        )
       }
       rewrites.set(sec.lastBlockIndex, {
         from: sec.sectPrXml,
@@ -1055,8 +1424,15 @@ export async function buildDocBytes(
   const bytes = await saveDocx(doc.parsed, saveBlocks, {
     pageCount: ctx.pageCount,
     newPictures: Object.keys(plan.newPictures).length > 0 ? plan.newPictures : undefined,
+<<<<<<< ours
     trailingSectPrChange: plan.trailingSectPrChange,
     section: ctx.sectionDirty && ctx.section ? ctx.section : undefined,
+=======
+    groups: plan.groups.length > 0 ? plan.groups : undefined,
+    carried: plan.carried.length > 0 ? plan.carried : undefined,
+    trailingSectPrChange: plan.trailingSectPrChange,
+    section: sectionOverride ?? (ctx.sectionDirty && ctx.section ? ctx.section : undefined),
+>>>>>>> theirs
     sectionStartType: ctx.trailingStartType ?? undefined,
     pgNumType: ctx.pgNumEdit ?? undefined,
     ...hfOptions,
@@ -1067,10 +1443,30 @@ export async function buildDocBytes(
     styleUpserts:
       Object.keys(ctx.styleUpserts).length > 0 ? Object.values(ctx.styleUpserts) : undefined,
     pageColor: ctx.pageColorDirty ? ctx.pageColor : undefined,
+    properties: ctx.propertyChanges ?? undefined,
     titlePg: ctx.titlePgDirty ? ctx.titlePg : undefined,
     evenAndOddHeaders: ctx.evenOddHfDirty ? ctx.evenOddHf : undefined,
     mirrorMargins: ctx.mirrorMarginsDirty ? ctx.mirrorMargins : undefined,
+<<<<<<< ours
     trackRevisions: ctx.trackRevisionsDirty ? ctx.trackChanges : undefined,
+=======
+    autoHyphenation: ctx.autoHyphenationDirty ? ctx.autoHyphenation : undefined,
+    hyphenation: ctx.hyphenationEdit
+      ? {
+          caps: ctx.hyphenationEdit.caps,
+          consecutiveLimit: ctx.hyphenationEdit.limit,
+          zoneTwips: ctx.hyphenationEdit.zoneTwips,
+        }
+      : undefined,
+    defaultTabStopTwips: ctx.defaultTabStopEdit ?? undefined,
+    mathPr: ctx.mathPrEdit ?? undefined,
+    settingsNoteProps: ctx.notePropsEdit ?? undefined,
+    gutterAtTop: ctx.gutterAtTopEdit ?? undefined,
+    compressPunctuation: ctx.compressPunctEdit ?? undefined,
+    strictFirstAndLastChars: ctx.strictKinsokuEdit ?? undefined,
+    trackRevisions: ctx.trackRevisionsDirty ? ctx.trackChanges : undefined,
+    trackMoves: ctx.trackMovesEdit ?? undefined,
+>>>>>>> theirs
     partXml: Object.keys(partXml).length > 0 ? partXml : undefined,
     partBinary: Object.keys(partBinary).length > 0 ? partBinary : undefined,
     comments: ctx.commentsDirty ? ctx.comments : undefined,
@@ -1085,11 +1481,18 @@ export async function buildDocBytes(
     footnotes: ctx.notesDirty ? ctx.footnotes : undefined,
     endnotes: ctx.notesDirty ? ctx.endnotes : undefined,
     sources: ctx.sourcesDirty ? ctx.sources : undefined,
+    sourcesStyle: ctx.sourcesDirty ? (ctx.citationStyle ?? undefined) : undefined,
     zoteroDocumentData: ctx.zoteroDocumentDataDirty ? ctx.zoteroDocumentData : undefined,
     themeFonts: ctx.themeFontsDirty && ctx.themeFonts ? ctx.themeFonts : undefined,
     themeColors: ctx.themeColorsDirty && ctx.themeColors ? ctx.themeColors : undefined,
   })
-  return bytes
+  if (!ctx.fontConversions) return { bytes, fontsWritten: [] }
+  const fonts = await writeFontConversions(
+    bytes,
+    ctx.fontConversions.pending,
+    ctx.fontConversions.written,
+  )
+  return { bytes: fonts.bytes, fontsWritten: fonts.written }
 }
 
 /**
@@ -1130,6 +1533,37 @@ export async function writeRecoveryCopy(ctx: FileActionContext): Promise<void> {
   }
 }
 
+/** File > Save as Template: a .dotx copy of the document as it stands; the document itself stays as it is */
+export async function saveAsTemplate(ctx: FileActionContext): Promise<void> {
+  const { doc } = ctx
+  if (!doc) return
+  try {
+    // as a save does: the whole document, with what is being typed into a cell or text box
+    const generation = docGeneration
+    await waitForFullContent()
+    if (docGeneration !== generation) return
+    window.dispatchEvent(new Event('ai-docs-commit-tables'))
+    const bytes = await buildDocBytes(ctx)
+    if (!bytes) return
+    const template = await docxAsTemplate(bytes)
+    const buffer = template.buffer.slice(
+      template.byteOffset,
+      template.byteOffset + template.byteLength,
+    ) as ArrayBuffer
+    // the picture the template gallery shows: the first page, where it is in the window
+    const first = ctx.sections[0]?.settings ?? ctx.section
+    const preview = first ? firstPaperOnScreen(twipsToPx(first.pageHeight)) : null
+    const result = await window.desktop.saveTemplate(doc.fileName, buffer, preview ?? undefined)
+    if (result.ok && result.path) ctx.setStatus(t('appTemplateSaved', { path: result.path }))
+    else if (result.error) {
+      console.error('[docs] save failed', result.error)
+      ctx.setStatus(t('appSaveFailed', { error: shortFileError(result.error) }))
+    }
+  } catch (err) {
+    ctx.setStatus(t('appSaveFailed', { error: String(err) }))
+  }
+}
+
 const runSerializedSave = createSaveSerializer()
 
 /**
@@ -1162,6 +1596,34 @@ let pathlessDocSavedPath: string | null = null
 /** bumps on every document replacement: a save that awaited across it belongs to the old document */
 let docGeneration = 0
 
+/**
+ * Parsed documents a save has reloaded the editor away from. The reload
+ * rewrites the editor at once, but the context only follows on the next
+ * render: until then it pairs the new docxIndex anchors with the old blocks,
+ * and a save built from that pair writes the wrong blocks.
+ */
+const supersededParsed = new WeakSet<object>()
+
+const RELOAD_COMMIT_POLL_MS = 10
+const RELOAD_COMMIT_POLLS = 300
+
+/**
+ * The context as the last save's reload left it, with the font settings
+ * settled. Null when the document was replaced meanwhile, or when no context
+ * for the reloaded document arrives: nothing may be written from the old one.
+ */
+async function contextAfterReload(ctx: FileActionContext): Promise<FileActionContext | null> {
+  const generation = docGeneration
+  let current = ctx.settleFontSettings ? await ctx.settleFontSettings() : ctx
+  for (let polls = 0; current.doc && supersededParsed.has(current.doc.parsed); polls++) {
+    if (!current.settleFontSettings || polls >= RELOAD_COMMIT_POLLS) return null
+    await new Promise((resolve) => setTimeout(resolve, RELOAD_COMMIT_POLL_MS))
+    if (docGeneration !== generation) return null
+    current = await current.settleFontSettings()
+  }
+  return docGeneration === generation ? current : null
+}
+
 export function noteDocumentSwapped(): void {
   pathlessDocSavedPath = null
   docGeneration++
@@ -1172,6 +1634,7 @@ export function currentDocGeneration(): number {
 }
 
 /**
+<<<<<<< ours
  * A converted legacy .doc is held as a temp .docx: an explicit Save of it is a
  * Save As next to the original, never a write into the temp copy. The shell's own
  * flush for the UniWork first save (`inPlace`) does write the temp copy; an MCP
@@ -1243,10 +1706,19 @@ export function canReuseSavePass(p: {
 }
 
 /**
+=======
+>>>>>>> theirs
  * The name a Save As dialog opens on.
  *
  * A name the caller proposed for this pass leads, then the name derived from
  * the document's own first heading, then the name the document already has.
+<<<<<<< ours
+=======
+ *
+ * Named rather than inlined so the precedence is stated once and testable: a
+ * proposal that never reaches the dialog is a manual trigger that does nothing
+ * silently, which is exactly how this shipped before it had a call site.
+>>>>>>> theirs
  */
 export function dialogNameFor(
   proposed: string | undefined,
@@ -1262,7 +1734,11 @@ export function save(
   auto = false,
   newDocName?: string,
   explicitTarget?: ExplicitSaveTarget,
+<<<<<<< ours
   inPlace = false,
+=======
+  transform?: SaveTransform,
+>>>>>>> theirs
 ): Promise<boolean> {
   if (refusesConvertedAutoSave(ctx.doc, auto, inPlace, explicitTarget))
     return Promise.resolve(false)
@@ -1274,6 +1750,7 @@ export function save(
   // the retry can no longer create a duplicate file.
   const generation = docGeneration
   const exportRequest: SaveAsExportRequest = {}
+<<<<<<< ours
   return runSerializedSave(
     async () => {
       const settled = ctx.settleFontSettings ? await ctx.settleFontSettings() : ctx
@@ -1289,6 +1766,22 @@ export function save(
         incomplete: ctx.saveIncompleteRef.current,
         dirty: isDocDirty(ctx),
       }),
+=======
+  // an explicit MCP target or a transform must always write, never reuse an earlier pass
+  const nothingLeft = (from: FileActionContext) =>
+    !saveAs && !explicitTarget && !transform && !from.saveIncompleteRef.current && !isDocDirty(from)
+  return runSerializedSave(
+    async () => {
+      const settled = await contextAfterReload(ctx)
+      if (!settled || docGeneration !== generation) return false
+      // An earlier pass reloaded the document after this one was asked for:
+      // what is left to write is judged on the context that reload produced,
+      // which the queue's own check (on the captured one) could not see yet.
+      if (ctx.doc && supersededParsed.has(ctx.doc.parsed) && nothingLeft(settled)) return true
+      return saveOnce(settled, saveAs, auto, newDocName, explicitTarget, exportRequest, transform)
+    },
+    () => nothingLeft(ctx),
+>>>>>>> theirs
   ).then(async (saved) => {
     const { target } = exportRequest
     if (!target || docGeneration !== generation) return saved
@@ -1307,6 +1800,12 @@ export function save(
   })
 }
 
+<<<<<<< ours
+=======
+/** rewrites the serialized document before it is written; null calls the save off */
+export type SaveTransform = (bytes: Uint8Array) => Promise<Uint8Array | null>
+
+>>>>>>> theirs
 /** filled by a Save As pass whose dialog picked an export format instead of .docx */
 interface SaveAsExportRequest {
   target?: { format: SaveAsExportFormat; path: string }
@@ -1384,14 +1883,21 @@ async function saveOnce(
   auto: boolean,
   newDocName?: string,
   explicitTarget?: ExplicitSaveTarget,
+<<<<<<< ours
   inPlace = false,
   exportRequest?: SaveAsExportRequest,
+=======
+  exportRequest?: SaveAsExportRequest,
+  transform?: SaveTransform,
+>>>>>>> theirs
 ): Promise<boolean> {
   const { doc, editor } = ctx
   if (!doc || !editor) return false
   const saveAs = saveAsRequested || savesAsConvertedCopy(doc, auto, inPlace, explicitTarget)
   ctx.saveInFlightRef.current = true
+  const leftIncomplete = ctx.saveIncompleteRef.current
   ctx.saveIncompleteRef.current = false
+<<<<<<< ours
   // visible progress for a manual save (Save As can wait on a dialog and an upload); every
   // outcome below replaces it, and an outcome without a message of its own clears it
   const progress: StatusLine | null = auto ? null : { key: saveAs ? 'appSavingAs' : 'appSaving' }
@@ -1399,6 +1905,10 @@ async function saveOnce(
   const dropProgress = () => {
     if (progress) ctx.setStatus('')
   }
+=======
+  // set while the editor and the context are being moved to the re-parsed document
+  let reload: { from: object; to: ParsedDocFull; editorDoc: unknown } | null = null
+>>>>>>> theirs
   try {
     // a mid-stream save would serialize (and write) a truncated document
     const generation = docGeneration
@@ -1414,11 +1924,20 @@ async function saveOnce(
     // identity snapshot: detects edits that arrive while the save is in flight
     const fontSettingsVersion = ctx.fontSettingsVersionRef?.current
     const docSnapshot = editor.state.doc
+<<<<<<< ours
     const bytes = await buildDocBytes(ctx)
     if (!bytes) {
       dropProgress()
       return false
     }
+=======
+    const fresh = await buildDoc(ctx)
+    const built = fresh?.bytes ?? null
+    const bytes = built && transform ? await transform(built) : built
+    // a transform that called the save off leaves what an earlier pass left behind
+    if (built && !bytes) ctx.saveIncompleteRef.current = leftIncomplete
+    if (!bytes) return false
+>>>>>>> theirs
     const buffer = bytes.buffer.slice(
       bytes.byteOffset,
       bytes.byteOffset + bytes.byteLength,
@@ -1437,8 +1956,10 @@ async function saveOnce(
         explicitTarget.overwrite,
       )
       if (!result.ok) {
-        ctx.setStatus(t('appSaveFailed', { error: result.error ?? '' }))
-        showToast(t('appSaveFailed', { error: result.error ?? '' }), 'error')
+        console.error('[docs] save failed', result.error)
+        const detail = shortFileError(result.error ?? '')
+        ctx.setStatus(t('appSaveFailed', { error: detail }))
+        showToast(t('appSaveFailed', { error: detail }), 'error')
         explicitTarget.onError?.(result.error ?? '')
         return false
       }
@@ -1480,9 +2001,17 @@ async function saveOnce(
         if (exportAs && result.path && exportRequest) {
           exportRequest.target = { format: exportAs, path: result.path }
         } else if (result.error) {
+<<<<<<< ours
           ctx.setStatus(t('appSaveFailed', { error: result.error }))
           if (!auto) showToast(t('appSaveFailed', { error: result.error }), 'error')
         } else dropProgress()
+=======
+          console.error('[docs] save failed', result.error)
+          const detail = shortFileError(result.error)
+          ctx.setStatus(t('appSaveFailed', { error: detail }))
+          if (!auto) showToast(t('appSaveFailed', { error: detail }), 'error')
+        }
+>>>>>>> theirs
         return false
       }
       savedPath = result.path!
@@ -1493,6 +2022,7 @@ async function saveOnce(
       const result = await window.desktop.saveDocx(savedPath, buffer, auto)
       if (!result.ok) {
         // external-modified: the main process already prompted (or the autosave
+<<<<<<< ours
         // deferred to a manual save) — stay dirty, no second dialog/error banner.
         // uniwork-*: a UniWork document refused an autosave / a view-only write;
         // cancelled: the host declined the save to run its own dialog (web frame).
@@ -1500,6 +2030,15 @@ async function saveOnce(
           ctx.setStatus(t('appSaveFailed', { error: result.error ?? '' }))
           if (!auto) showToast(t('appSaveFailed', { error: result.error ?? '' }), 'error')
         } else dropProgress()
+=======
+        // deferred to a manual save) — stay dirty, no second dialog/error banner
+        if (result.reason !== 'external-modified') {
+          console.error('[docs] save failed', result.error)
+          const detail = shortFileError(result.error ?? '')
+          ctx.setStatus(t('appSaveFailed', { error: detail }))
+          if (!auto) showToast(t('appSaveFailed', { error: detail }), 'error')
+        }
+>>>>>>> theirs
         return false
       }
       passwordIntentPending = result.passwordIntentPending === true
@@ -1547,13 +2086,18 @@ async function saveOnce(
       return true
     }
     // Reload from saved bytes so docxIndex anchors point at the new file.
+    supersededParsed.add(doc.parsed)
+    reload = { from: doc.parsed, to: reparsed, editorDoc: editor.state.doc }
     setLazyMediaHashes(reparsed.extras.lazyMediaHashes)
     setDocFontTable(reparsed.fontTable)
     editor.storage.listNumbering.styles = reparsed.styles
     editor.storage.listNumbering.docDefaults = reparsed.docDefaults
     editor.storage.listNumbering.defs = reparsed.numbering
     applyDocLayoutSettings(editor, reparsed)
-    const rebasedPm = blocksToPmDoc(reparsed.blocks, readSections(reparsed), pmDocOptions(reparsed))
+    const rebasedPm = keepGroupMembersApart(
+      editor.getJSON() as PmNode,
+      blocksToPmDoc(reparsed.blocks, readSections(reparsed), pmDocOptions(reparsed)),
+    )
     let unchanged = false
     try {
       // the AI marker is not file content: a marked doc is still the saved doc
@@ -1575,7 +2119,12 @@ async function saveOnce(
       editor
         .chain()
         .setMeta(TRACK_IGNORE, true)
+<<<<<<< ours
         .setContent(carryAiMarks(editor.state.doc, rebasedPm) as never)
+=======
+        .setMeta(PERM_REGIONS_LOAD, true)
+        .setContent(rebasedPm as never)
+>>>>>>> theirs
         .run()
       resetEditorHistory(editor)
       const chain = editor
@@ -1585,7 +2134,6 @@ async function saveOnce(
       chain.run()
       restoreMarksAfterDocRewrite(editor, caretMarks)
     }
-    ctx.setDocCss(docStyleCss(reparsed))
     ctx.setDoc((prev) =>
       prev
         ? {
@@ -1602,11 +2150,14 @@ async function saveOnce(
           }
         : prev,
     )
+    reload = null
+    ctx.setDocCss(docStyleCss(reparsed))
     ctx.setSection(readSectionSettings(reparsed))
     ctx.setSections(readSections(reparsed))
     ctx.setSectionDirty(false)
     ctx.setPageColor(readPageColor(reparsed))
     ctx.setPageColorDirty(false)
+    ctx.setPropertyChanges(null)
     ctx.setHeader(
       reparsed.headerText || reparsed.headerHasPageNumber || reparsed.headerParas?.length
         ? {
@@ -1628,7 +2179,8 @@ async function saveOnce(
     )
     ctx.setFooterDirty(false)
     ctx.setHfVariants(hfVariantsFromParsed(reparsed))
-    resetCrossDocEditState(ctx)
+    // an equal doc kept its undo history: undoing a comment delete still needs the parked card
+    resetCrossDocEditState(ctx, unchanged)
     ctx.setHfVariantsDirty([])
     ctx.setTitlePg(reparsed.titlePg ?? false)
     ctx.setTitlePgDirty(false)
@@ -1636,6 +2188,24 @@ async function saveOnce(
     ctx.setEvenOddHfDirty(false)
     ctx.setMirrorMargins(reparsed.mirrorMargins ?? false)
     ctx.setMirrorMarginsDirty(false)
+<<<<<<< ours
+=======
+    ctx.setAutoHyphenation(reparsed.autoHyphenation ?? false)
+    ctx.setAutoHyphenationDirty(false)
+    ctx.setHyphenationEdit(null)
+    ctx.endManualHyphenation()
+    ctx.setDefaultTabStopEdit(null)
+    ctx.setMathPrEdit(null)
+    ctx.setNotePropsEdit(null)
+    ctx.setGutterAtTopEdit(null)
+    // a rewritten editor has no history left to undo a conversion from
+    ctx.setFontConversions(
+      unchanged && fresh?.fontsWritten.length ? { pending: {}, written: fresh.fontsWritten } : null,
+    )
+    ctx.setCompressPunctEdit(null)
+    ctx.setTrackMovesEdit(null)
+    ctx.setStrictKinsokuEdit(null)
+>>>>>>> theirs
     ctx.setTrackRevisionsDirty(false)
     ctx.setComments(reparsed.comments)
     ctx.setCommentsDirty(false)
@@ -1649,6 +2219,7 @@ async function saveOnce(
     ctx.setEndnotes(reparsed.endnotes)
     ctx.setNotesDirty(false)
     ctx.setSources(reparsed.sources)
+    ctx.setCitationStyle(reparsed.citationStyle ?? null)
     ctx.setSourcesDirty(false)
     ctx.setZoteroDocumentData(reparsed.zoteroDocumentData)
     ctx.setZoteroDocumentDataDirty(false)
@@ -1670,8 +2241,18 @@ async function saveOnce(
     if (!auto) showToast(t('appSaved'))
     return true
   } catch (err) {
-    ctx.setStatus(t('appSaveFailed', { error: String(err) }))
-    if (!auto) showToast(t('appSaveFailed', { error: String(err) }), 'error')
+    if (reload) {
+      // The reload failed part-way. The context has to hold the document the
+      // editor is on again, or every later save would wait for one that never
+      // comes: the old one if the editor was not rewritten, else the new one.
+      const { from, to } = reload
+      if (editor.state.doc === reload.editorDoc) supersededParsed.delete(from)
+      else ctx.setDoc((prev) => (prev ? { ...prev, parsed: to } : prev))
+    }
+    console.error('[docs] save failed', err)
+    const detail = shortFileError(err)
+    ctx.setStatus(t('appSaveFailed', { error: detail }))
+    if (!auto) showToast(t('appSaveFailed', { error: detail }), 'error')
     return false
   } finally {
     ctx.saveInFlightRef.current = false
@@ -1811,7 +2392,11 @@ export async function exportPdf(ctx: FileActionContext, outPath?: string): Promi
   if (!doc) return false
   await waitForFullContent()
   if (printJobActive || ctx.pendingMixedExportRef.current) {
+<<<<<<< ours
     ctx.setStatus({ key: 'appExportingPdf' })
+=======
+    ctx.setStatus(t('appExportingPdf'))
+>>>>>>> theirs
     return false
   }
   printJobActive = true
@@ -1886,7 +2471,11 @@ export async function exportPdf(ctx: FileActionContext, outPath?: string): Promi
           : []
       ).map((st) => `${st.pageWidth}x${st.pageHeight}`),
     )
+<<<<<<< ours
     if (sizes.size > 1) ctx.setStatus({ key: 'appMixedExportOpening' })
+=======
+    if (sizes.size > 1) ctx.setStatus(t('appMixedExportOpening'))
+>>>>>>> theirs
     return deferExportToPreview(ctx, outPath)
   } finally {
     clearPrintZoom()

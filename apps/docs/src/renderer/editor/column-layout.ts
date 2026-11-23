@@ -1,3 +1,4 @@
+import { charCellSpacingCss } from '../char-grid'
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
@@ -70,9 +71,16 @@ export interface ColumnBlockSpec {
    *  sections disagree on docGrid charSpace (doc-charspace-block) */
   charSpacePt?: number
   charSpaceSbPt?: number
+<<<<<<< ours
+=======
+  /** owning section's snapToChars cell pitch (pt) in docs whose sections disagree on it */
+  charCellPt?: number
+>>>>>>> theirs
   /** translate; dy < 0 pulls content up over vacated column space */
   dx: number
   dy: number
+  /** the w:mirrorIndents share of dx (--mirror-ind-dx, read by the export sheets) */
+  mirrorDx?: number
   /** left edge of the block's page on the shared paper (--page-cx); not undone by page-relative anchors */
   pageDx?: number
   /** vertical-text section block (doc-vert-block): writing-mode box, see verticalTextSpecs */
@@ -107,6 +115,10 @@ const PATCH_PROPS = [
   '--doc-grid-pitch',
   '--doc-char-space',
   '--doc-char-space-sb',
+<<<<<<< ours
+=======
+  '--doc-char-snap',
+>>>>>>> theirs
   '--vert-mb',
 ]
 
@@ -133,6 +145,10 @@ function specClass(spec: ColumnBlockSpec, leading = true): string {
   const varsOnly =
     (spec.gridPitchPt !== undefined ||
       spec.charSpacePt !== undefined ||
+<<<<<<< ours
+=======
+      spec.charCellPt !== undefined ||
+>>>>>>> theirs
       spec.marginTopPx !== undefined ||
       spec.sectionPageStart) &&
     spec.widthPx === undefined &&
@@ -185,7 +201,14 @@ export function setColumnLayout(
       (spec.charSpaceSbPt !== undefined
         ? `--doc-char-space-sb:${round4(spec.charSpaceSbPt)}pt;`
         : '') +
+<<<<<<< ours
+=======
+      (spec.charCellPt !== undefined
+        ? `--doc-char-snap:${charCellSpacingCss(spec.charCellPt)};`
+        : '') +
+>>>>>>> theirs
       (spec.pageDx ? `--page-cx:${round2(spec.pageDx)}px;` : '') +
+      (spec.mirrorDx ? `--mirror-ind-dx:${round2(spec.mirrorDx)}px;` : '') +
       (spec.vertical ? `--vert-mb:${round2(spec.vertical.marginBottomPx)}px;` : '') +
       `--col-dx:${round2(spec.dx)}px;--col-dy:${round2(spec.dy)}px`
     const cls = specClass(spec)

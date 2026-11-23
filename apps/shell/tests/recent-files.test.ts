@@ -16,8 +16,13 @@ describe('matchesExtFamily', () => {
   it('maps sidebar filter keys onto their extension families', () => {
     expect(matchesExtFamily('doc', 'docx')).toBe(true)
     expect(matchesExtFamily('docx', 'docx')).toBe(true)
+<<<<<<< ours
     expect(matchesExtFamily('odt', 'docx')).toBe(true)
     expect(matchesExtFamily('ott', 'docx')).toBe(true)
+=======
+    // legacy Word templates belong to the same family as .doc/.docx
+    expect(matchesExtFamily('dot', 'docx')).toBe(true)
+>>>>>>> theirs
     expect(matchesExtFamily('ppt', 'pptx')).toBe(true)
     expect(matchesExtFamily('pptx', 'pptx')).toBe(true)
     expect(matchesExtFamily('odp', 'pptx')).toBe(true)

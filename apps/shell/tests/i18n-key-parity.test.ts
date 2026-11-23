@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { strings } from '../src/renderer/src/strings'
+<<<<<<< ours
 import { uniworkHomeStrings } from '../src/renderer/src/i18n/strings-uniwork-home'
+=======
+>>>>>>> theirs
 
 /**
  * zh defines the key set, every sibling locale must cover it. The LangDicts
@@ -40,6 +43,7 @@ describe('shell strings — key parity', () => {
       }
     }
   })
+<<<<<<< ours
 
   it('names the product "Google Drive" in every locale, never a localized name', () => {
     // the brand stays untranslated (UNI-2197): no "Google ドライブ", "Dysk Google", "Google Диск", ...
@@ -55,4 +59,6 @@ describe('shell strings — key parity', () => {
       }
     }
   })
+=======
+>>>>>>> theirs
 })

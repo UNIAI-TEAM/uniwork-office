@@ -56,6 +56,7 @@ import {
 import { ChartBody } from './ChartBody'
 import { needsTextFrameHitArea } from './text-hit-area'
 import { warpGlyphs, measureGlyph } from './text-warp'
+import { CANVAS_COLORS } from './canvas-colors'
 
 export interface NodeBodyProps {
   node: RenderNode
@@ -1165,7 +1166,11 @@ function RedactFrame({ label, w, h }: { label: string; w: number; h: number }) {
         y={-pad}
         width={w + pad * 2}
         height={h + pad * 2}
+<<<<<<< ours
         stroke="rgba(0,0,0,0.55)"
+=======
+        stroke={CANVAS_COLORS.redactFrame.stroke}
+>>>>>>> theirs
         strokeWidth={1.5}
         dash={[6, 4]}
         cornerRadius={3}
@@ -1176,7 +1181,11 @@ function RedactFrame({ label, w, h }: { label: string; w: number; h: number }) {
         y={0}
         width={Math.min(w, fontSize * 0.62 * text.length + 8)}
         height={chipH}
+<<<<<<< ours
         fill="rgba(0,0,0,0.55)"
+=======
+        fill={CANVAS_COLORS.redactFrame.chip}
+>>>>>>> theirs
         cornerRadius={3}
         listening={false}
       />
@@ -1188,7 +1197,11 @@ function RedactFrame({ label, w, h }: { label: string; w: number; h: number }) {
         height={fontSize}
         align="left"
         fontSize={fontSize}
+<<<<<<< ours
         fill="#ffffff"
+=======
+        fill={CANVAS_COLORS.redactFrame.label}
+>>>>>>> theirs
         ellipsis
         listening={false}
       />

@@ -1,7 +1,10 @@
 /** Insert tab of the slides ribbon. Extracted from Ribbon.tsx. */
 import type { InsertKind } from '../../shared/ipc'
 import { platformShortcuts } from '@genoffice/i18n'
+<<<<<<< ours
 import { slidesAriaProp, slidesTipKbd } from '../shortcuts'
+=======
+>>>>>>> theirs
 import { WORDART_PRESETS, wordArtStrokePx } from '@genoffice/ui'
 import {
   CHART_GALLERY,
@@ -46,6 +49,9 @@ import {
   closeSiblingPanels,
   type RibbonTabCtx,
 } from './ribbon-shared'
+
+/** The New Slide screentip shows the platform's real chord: ⇧⌘N on mac, Ctrl+M elsewhere. */
+const IS_MAC = navigator.platform.toLowerCase().includes('mac')
 
 const ZOOM_LABEL = {
   summary: 'ribbonZoomSummary',
@@ -105,8 +111,12 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
             disabled={!hasDoc}
             onClick={onAddSlide}
             data-tip={platformShortcuts(t('ribbonNewSlideTip'))}
+<<<<<<< ours
             data-tip-kbd={slidesTipKbd('slides-14')}
             aria-keyshortcuts={slidesAriaProp('slides-14')}
+=======
+            data-tip-kbd={IS_MAC ? '⇧⌘N' : 'Ctrl+M'}
+>>>>>>> theirs
           >
             <span className="rb-big-icon">
               <span className="rb-split-main">

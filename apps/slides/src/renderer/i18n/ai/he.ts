@@ -22,7 +22,13 @@ export const he = {
   aiQcPageSkipped: 'עמוד {n}: בדיקת הפריסה האוטומטית דולגה',
   aiQcStopped: 'בדיקת הפריסה הופסקה',
   aiQcCapped: 'עוד {count} עמודים לא נבדקו (מגבלה לכל הרצה)',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: 'התחבר ל-Genspark',
+  aiGskLoginOk: 'מחובר ל-Genspark',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: 'פתיחת עוזר ה-AI',
   aiFactCheckBtn: 'בדיקת עובדות AI',
   aiFactCheckPrompt:
@@ -111,6 +117,7 @@ export const he = {
   aiErrEmptyOutput: 'פלט ריק',
   aiErrUnknown: 'שגיאה לא ידועה',
   aiErrStreamTimeout: 'תם הזמן לבקשת ה-AI: אין תגובה מהרשת וההרצה הופסקה. בדוק את החיבור ונסה שוב',
+  aiErrRegion: 'ספק המודל הזה אינו פועל באזור הנוכחי שלך — בחרו מודל אחר או החליפו רשת',
   aiErrOverloaded: 'שירות ה-AI עמוס כרגע — נסו שוב בעוד רגע',
   aiErrNetwork: 'בעיית רשת: לא ניתן להתחבר לשירות ה-AI. בדוק את החיבור ונסה שוב',
   aiErrRequestFailed: 'שליחת הבקשה נכשלה: {msg}',
@@ -221,6 +228,9 @@ export const he = {
   aiSumSaveTemplate: 'תבנית הסגנון "{name}" נשמרה',
   aiSumTemplatesEmpty: 'תבניות סגנון (ריק)',
   aiSumListTemplates: 'הוצגו {count} תבניות סגנון',
+<<<<<<< ours
   aiPageCloudToLocal: 'הענן לא זמין — נוצר מקומית',
   aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

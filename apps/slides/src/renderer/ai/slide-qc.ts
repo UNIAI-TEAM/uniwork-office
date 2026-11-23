@@ -4,12 +4,44 @@
  * these turns). Runs in its own AgentLoop per page (fresh context, so the QC cost doesn't ride on
  * the main conversation), orchestrated by AiPanel.
  */
+<<<<<<< ours
 import { AgentLoop, type AgentSkill, type AgentTransport } from '@genoffice/agent-core'
+=======
+import {
+  AgentLoop,
+  type AgentImage,
+  type AgentSkill,
+  type AgentTransport,
+} from '@genoffice/agent-core'
+import { endpointSupportsVision, type AiSettings } from '@genoffice/ai-provider/browser'
+>>>>>>> theirs
 import { auditSlideLayout } from '@genoffice/pipelines/slides/layout-audit'
 import { createSlidesSkill, formatSlideDump, type DeckAccess } from './slides-skill'
 import qcGeometryPrompt from './prompts/qc-geometry.md?raw'
+import { redactionCount } from './redact-view'
 
 /** Kill switch: localStorage 'ai-slides-qc' = '0' disables the automatic pass */
+/**
+ * Whether a rendered picture of this slide may go to the model.
+ *
+ * A screenshot is the one outbound path no text projection can reach: the
+ * renderer tints a withheld run rather than replacing it, so the words are in
+ * the bitmap. There is no mask for that — a picture has no spans to cover — so
+ * a slide that withholds anything gets no picture at all.
+ */
+export function screenshotAllowed(slide: { nodes: unknown[] }): boolean {
+  return redactionCount(slide as Parameters<typeof redactionCount>[0]) === 0
+}
+
+/**
+ * What to say instead of attaching a picture.
+ *
+ * Said rather than omitted: a model told nothing assumes it is looking at the
+ * rendering, and reasons about text it cannot see.
+ */
+export const NO_SCREENSHOT_NOTE =
+  'No image of this slide: it contains text withheld from you, and a picture is not something the withholding can cover. Work from the element inventory.'
+
 export function isQcEnabled(): boolean {
   return localStorage.getItem('ai-slides-qc') !== '0'
 }
@@ -17,6 +49,30 @@ export function isQcEnabled(): boolean {
 /** Cost ceiling per generation run — beyond this the tail pages are skipped (reported to the user) */
 export const QC_MAX_PAGES = 20
 
+<<<<<<< ours
+=======
+/**
+ * Whether a rendered picture of this slide may go to the model.
+ *
+ * A custom endpoint answers from its own declaration (compat.vision, or a
+ * per-model override); everything else keeps the provider capability plus the
+ * shipped text-only model list. Unknown providers are treated as text-only:
+ * omitting an image is safer than a user-visible 400.
+ */
+export function settingsSupportVision(
+  settings: Pick<AiSettings, 'provider' | 'providers'>,
+): boolean {
+  return endpointSupportsVision(settings)
+}
+
+/** Custom/OpenAI-compatible endpoints can still reject images despite optimistic metadata. */
+export function isUnsupportedImageInputError(error: string): boolean {
+  return /(?:does not support|doesn't support|unsupported).{0,40}(?:image|vision)|(?:image|vision).{0,40}(?:not supported|unsupported)/i.test(
+    error,
+  )
+}
+
+>>>>>>> theirs
 /**
  * Pages produced by a landGeneratedPages/regenerateSlide call, as 0-based indexes.
  * replace lands a whole new deck; append starts at appendedFrom; insert_at/replace_at touch one page.

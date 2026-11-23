@@ -22,7 +22,13 @@ export const ar = {
   aiQcPageSkipped: 'الصفحة {n}: تم تخطي فحص التخطيط التلقائي',
   aiQcStopped: 'تم إيقاف فحص التخطيط',
   aiQcCapped: '{count} صفحة أخرى لم تُفحص (حد لكل تشغيل)',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: 'تسجيل الدخول إلى Genspark',
+  aiGskLoginOk: 'تم تسجيل الدخول إلى Genspark',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: 'فتح مساعد الذكاء الاصطناعي',
   aiFactCheckBtn: 'تدقيق حقائق AI',
   aiFactCheckPrompt:
@@ -112,6 +118,8 @@ export const ar = {
   aiErrUnknown: 'خطأ غير معروف',
   aiErrStreamTimeout:
     'انتهت مهلة طلب الذكاء الاصطناعي: لا توجد استجابة من الشبكة وتم الإيقاف. تحقق من الاتصال وحاول مجددًا',
+  aiErrRegion:
+    'مزوّد هذا النموذج لا يقدم الخدمة في منطقتك الحالية — اختر نموذجًا آخر أو غيّر الشبكة',
   aiErrOverloaded: 'خدمة الذكاء الاصطناعي مشغولة حاليًا — يرجى المحاولة مرة أخرى بعد قليل',
   aiErrNetwork:
     'مشكلة في الشبكة: تعذّر الوصول إلى خدمة الذكاء الاصطناعي. تحقق من الاتصال وحاول مجددًا',
@@ -223,7 +231,10 @@ export const ar = {
   aiSumSaveTemplate: 'حفظ قالب النمط "{name}"',
   aiSumTemplatesEmpty: 'قوالب الأنماط (فارغ)',
   aiSumListTemplates: 'سرد {count} من قوالب الأنماط',
+<<<<<<< ours
   aiPageCloudToLocal: 'السحابة غير متاحة — تم التوليد محليًا',
   aiViewOnlyNotice:
     'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

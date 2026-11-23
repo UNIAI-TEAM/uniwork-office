@@ -1,4 +1,8 @@
+<<<<<<< ours
 import { useEffect, useMemo, useRef, useState } from 'react'
+=======
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+>>>>>>> theirs
 import type {
   CommentInfo,
   HeaderFooter,
@@ -49,6 +53,7 @@ import { pageMargins } from '../page-margins'
 import { noteSeparatorPx, noteSeparatorRulePx } from '../line-metrics'
 import { cssFontFamily } from '../text-layout/font-rules'
 import { syncPreviewLineNumbers } from '../editor/line-numbers'
+import { syncPreviewColumnRules } from '../editor/column-rules'
 import type { EditorView } from '@tiptap/pm/view'
 import { revWhen, type AnchorBlock } from '../editor/margin-annotations'
 import { pageBorderArtStripStyle, pageBorderStyleOf } from '../editor/pagination-gaps'
@@ -66,6 +71,73 @@ import {
   wordArtSvgMarkup,
 } from '../editor/hf-dom'
 import { HeaderFooterArea } from './HeaderFooterArea'
+import { HyphenatedText } from './HyphenatedText'
+import { docHyphenationSig, onDocHyphenationChange } from '../editor/hyphenation'
+import {
+  STATIC_HYPH_CLASS,
+  enforceStaticLineRules,
+  hyphenPieces,
+} from '../editor/hyphenation-static'
+import { commentInitials } from '../editor/balloon-markers'
+
+/** Word's margin label, e.g. "Commented [A1]: ". A producer that omits the
+ *  comment's own initials still gets them from the author's name — the same
+ *  rule the inline `[initials N]` tags use. */
+export function commentBalloonLabel(
+  comment: Pick<CommentInfo, 'author' | 'initials'> | undefined,
+  no: number,
+  prefix: string,
+): string {
+  return `${prefix} [${comment ? commentInitials(comment) : ''}${no}]: `
+}
+
+/** a note run's text, cut where the document hyphenates */
+function noteRunContent(para: ReadonlyArray<{ text: string }>, index: number): React.ReactNode {
+  const pieces = hyphenPieces(para.map((run) => run.text))
+  return pieces && pieces[index].length > 1 ? (
+    <HyphenatedText pieces={pieces[index]} />
+  ) : (
+    para[index].text
+  )
+}
+
+import {
+  anchoredBoxesOf,
+  canvasChildWidths,
+  canvasContentLeft,
+  canvasEditorEl,
+  canvasFlowOrigin,
+  cloneChildrenOf,
+  hoistMarkedEls,
+  isLaidOutAbsoluteBox,
+  previewScrollEl,
+  publishPreviewProbes,
+  shapeBoxExtent,
+  bodyWindowHeight,
+  canvasWrapWidth,
+  cloneBlockHtml,
+  cloneChildGeom,
+  collectCellPageBoxes,
+  hoistPaperClamp,
+  hoistPlan,
+  hoistSlotOf,
+  hoistWindowCss,
+  leadLeakCss,
+  measureCommentSpots,
+  measureRevisionSpots,
+  pageRelXPictureHtml,
+  pinnedCloneCss,
+  prunedCloneHtml,
+  shouldPruneClones,
+  verticalPageCss,
+  type CellPageBox,
+  type CloneChild,
+  type CommentSpot,
+  type PageRelXPicture,
+  type RevSpot,
+} from '../preview-canvas-snapshot'
+
+export * from '../preview-canvas-snapshot'
 
 import {
   anchoredBoxesOf,
@@ -901,11 +973,20 @@ export function PaginationPreview({
     return () => window.removeEventListener('keydown', onKey, true)
   }, [onClose, suppressEscape])
 
+  const hyphenation = useSyncExternalStore(onDocHyphenationChange, docHyphenationSig)
+  const hyphClass = hyphenation ? [STATIC_HYPH_CLASS] : []
+  // the consecutive limit and the zone in the strips and notes, once the sheets are laid out
+  useEffect(() => {
+    const root = previewScrollEl()
+    if (hyphenation && root) enforceStaticLineRules(root)
+  }, [hyphenation, slices, pageNotes, commentSpots, revSpots])
+
   // line numbers (w:lnNumType) ride the cloned pages: measured after the sheets mount;
   // markup spots rescale the sheets, so they re-measure too
   useEffect(() => {
     const root = previewScrollEl()
     if (root) syncPreviewLineNumbers(root, secs, blockMetaOf)
+    if (root) syncPreviewColumnRules(root, secs)
   }, [secs, blockMetaOf, slices, commentSpots, revSpots])
 
   // probe: where the clone's table lands inside each repeated-header window
@@ -1294,6 +1375,7 @@ export function PaginationPreview({
                       <div
                         key={ri}
                         className="pv-region"
+                        data-pv-region-section={Math.min(region.section, secs.length - 1)}
                         style={{
                           ...(extent !== undefined ? { height: extent } : {}),
                           // RTL section (w:bidi): columns fill right-to-left
@@ -1455,10 +1537,16 @@ export function PaginationPreview({
                       // instead of overprinting the next entry
                       <div
                         key={n.id}
+<<<<<<< ours
                         className={['pv-footnote', ...noteRowBox(n).classes].join(' ')}
+=======
+                        className={['pv-footnote', ...noteRowBox(n).classes, ...hyphClass].join(
+                          ' ',
+                        )}
+>>>>>>> theirs
                         style={{ minHeight: n.height, ...noteRowBox(n).style }}
                       >
-                        {!n.noRefMark && <sup>{noteMarkText('footnote', n.no)}</sup>}
+                        {!n.noRefMark && <sup>{noteMarkText('footnote', n.no, n.fmt)}</sup>}
                         {n.richParas
                           ? n.richParas.map((para, pi) => (
                               <span key={pi}>
@@ -1489,12 +1577,12 @@ export function PaginationPreview({
                                         run.caps === 'small' ? 'small-caps' : undefined,
                                     }}
                                   >
-                                    {run.text}
+                                    {noteRunContent(para, ri)}
                                   </span>
                                 ))}
                               </span>
                             ))
-                          : n.text}
+                          : noteRunContent([n], 0)}
                       </div>
                     ))}
                   </div>
@@ -1522,7 +1610,13 @@ export function PaginationPreview({
                       {rows.map(({ item: n, height, withSeparator }) => (
                         <div
                           key={n.id}
+<<<<<<< ours
                           className={['pv-footnote', ...noteRowBox(n).classes].join(' ')}
+=======
+                          className={['pv-footnote', ...noteRowBox(n).classes, ...hyphClass].join(
+                            ' ',
+                          )}
+>>>>>>> theirs
                           style={{ minHeight: height, ...noteRowBox(n).style }}
                         >
                           {withSeparator && (
@@ -1531,7 +1625,11 @@ export function PaginationPreview({
                               style={separatorVars('endnote')}
                             />
                           )}
+<<<<<<< ours
                           {!n.noRefMark && <sup>{noteMarkText('endnote', n.no)}</sup>}
+=======
+                          {!n.noRefMark && <sup>{noteMarkText('endnote', n.no, n.fmt)}</sup>}
+>>>>>>> theirs
                           {n.richParas
                             ? n.richParas.map((para, pi) => (
                                 <span key={pi}>
@@ -1565,12 +1663,12 @@ export function PaginationPreview({
                                           run.caps === 'small' ? 'small-caps' : undefined,
                                       }}
                                     >
-                                      {run.text}
+                                      {noteRunContent(para, ri)}
                                     </span>
                                   ))}
                                 </span>
                               ))
-                            : n.text}
+                            : noteRunContent([n], 0)}
                         </div>
                       ))}
                     </div>
@@ -1662,7 +1760,7 @@ export function PaginationPreview({
                       .filter(Boolean)
                       .join('\n')
                     // Word labels by initials + running number: "Commented [KICC1]"
-                    const label = `${t('appPvCommented')} [${root?.initials ?? ''}${sp.no}]: `
+                    const label = commentBalloonLabel(root, sp.no, t('appPvCommented'))
                     orderFloor = Math.max(orderFloor, anchorTop)
                     items.push({
                       key: `c${sp.id}`,

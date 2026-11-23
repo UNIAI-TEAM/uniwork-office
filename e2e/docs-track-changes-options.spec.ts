@@ -81,7 +81,11 @@ test.describe('docs Track Changes Options', () => {
       expect(baseline).toContain('<w:delText>removed words</w:delText>')
 
       await page.locator('.ribbon-tab', { hasText: /^Review$/ }).click()
+<<<<<<< ours
       await page.getByRole('button', { name: 'Markup', exact: true }).click()
+=======
+      await page.getByRole('button', { name: 'Markup Options', exact: true }).click()
+>>>>>>> theirs
       await page.getByTestId('tc-options').click()
       const dialog = page.locator('.modal.tco-dialog')
       await expect(dialog).toBeVisible()
@@ -113,7 +117,11 @@ test.describe('docs Track Changes Options', () => {
       expect(await documentXml(docPath)).toBe(baseline)
 
       // Reset to defaults puts the author ink back
+<<<<<<< ours
       await page.getByRole('button', { name: 'Markup', exact: true }).click()
+=======
+      await page.getByRole('button', { name: 'Markup Options', exact: true }).click()
+>>>>>>> theirs
       await page.getByTestId('tc-options').click()
       await expect(dialog).toBeVisible()
       await dialog.getByRole('button', { name: 'Reset to defaults' }).click()

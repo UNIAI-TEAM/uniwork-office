@@ -172,6 +172,13 @@ describe('MultiSelect', () => {
     link.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, ...init }))
     link.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, ...init }))
     expect(multiSelectRanges(editor.view)).toEqual([])
+<<<<<<< ours
+=======
+    // nor does the paragraph become a node selection the next key would replace
+    const sel = editor.state.selection
+    expect(sel instanceof TextSelection).toBe(true)
+    expect([sel.from, sel.to]).toEqual([1, 6])
+>>>>>>> theirs
   })
 
   it('a plain click clears every added range', () => {

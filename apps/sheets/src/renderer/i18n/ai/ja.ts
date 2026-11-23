@@ -4,6 +4,11 @@ export const ja = {
   aiComposerPlaceholderBuild: '作りたい表・データ・グラフを入力…',
   aiEmptyBuildTitle: 'AI にシート作りを任せる',
   aiEmptyBuildBody: '欲しい表・データ・グラフを伝えると、AI がその場で作成します。',
+<<<<<<< ours
+=======
+  aiGskLoginBtn: 'Genspark にサインイン',
+  aiGskLoginOk: 'Genspark にサインインしました',
+>>>>>>> theirs
   aiUndelivered: '送信できませんでした',
   aiRetry: '再試行',
   aiOpenAssistant: 'AI アシスタントを開く',
@@ -57,6 +62,8 @@ export const ja = {
   aiUnknownError: '不明なエラー',
   aiTimeoutError:
     'AIリクエストがタイムアウトしました：ネットワークからの応答がないため中断しました。接続を確認して再試行してください',
+  aiRegionError:
+    'このモデルの提供元は現在の地域ではサービスを提供していません。別のモデルを選ぶか、ネットワークを切り替えてください',
   aiOverloadedError: 'AI サービスが混み合っています。しばらくしてからもう一度お試しください',
   aiNetworkError:
     'ネットワークに問題があり、AI サービスに接続できません。接続を確認して再試行してください',

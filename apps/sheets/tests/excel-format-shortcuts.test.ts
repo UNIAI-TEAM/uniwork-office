@@ -15,6 +15,7 @@ import { numfmtOptionsOf, numfmtPreview } from '../src/renderer/numfmt-dialog'
 // locks which table row applies which format.
 describe('number format shortcuts by table row', () => {
   it.each([
+<<<<<<< ours
     ['sheets-68', 'General'],
     ['sheets-69', '#,##0.00'],
     ['sheets-70', 'h:mm AM/PM'],
@@ -24,6 +25,34 @@ describe('number format shortcuts by table row', () => {
     ['sheets-74', '0.00E+00'],
   ])('%s applies %s', (id, pattern) => {
     expect(NUMBER_FORMAT_SHORTCUTS[id]).toBe(pattern)
+=======
+    ['Backquote', 'format:General'],
+    ['Digit1', 'format:#,##0.00'],
+    ['Digit2', 'format:h:mm AM/PM'],
+    ['Digit3', 'format:d-mmm-yy'],
+    ['Digit4', 'format:$#,##0.00_);($#,##0.00)'],
+    ['Digit5', 'format:0%'],
+    ['Digit6', 'format:0.00E+00'],
+    ['Digit7', 'border:outer'],
+    ['Minus', 'border:none'],
+  ])('Ctrl+Shift+%s and Cmd+Shift+%s map to %s', (code, command) => {
+    expect(formatShortcutCommand(ctrlShift(code))).toBe(command)
+    expect(formatShortcutCommand(cmdShift(code))).toBe(command)
+  })
+
+  it('accepts the Excel for Mac border variants Cmd+Opt+0 and Cmd+Opt+-', () => {
+    expect(formatShortcutCommand(key('Digit0', { metaKey: true, altKey: true }), true)).toBe(
+      'border:outer',
+    )
+    expect(formatShortcutCommand(key('Minus', { metaKey: true, altKey: true }), true)).toBe(
+      'border:none',
+    )
+  })
+
+  it('ignores the mac-only border variants on Windows and Linux', () => {
+    expect(formatShortcutCommand(key('Digit0', { metaKey: true, altKey: true }))).toBeNull()
+    expect(formatShortcutCommand(key('Minus', { metaKey: true, altKey: true }))).toBeNull()
+>>>>>>> theirs
   })
 
   it('names rows of the sheets table only', () => {

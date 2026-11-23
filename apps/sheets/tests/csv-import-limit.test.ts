@@ -1,14 +1,21 @@
+<<<<<<< ours
 import { describe, expect, it, vi } from 'vitest'
+=======
+import { describe, expect, it } from 'vitest'
+>>>>>>> theirs
 
 import { CSV_IMPORT_DEFAULT_LIMIT_MB } from '@genoffice/xlsx-gateway/gateway/csv-limits'
 
 import { delimitedImportLimit, setDelimitedImportLimit } from '../src/main/csv-import-limit'
+<<<<<<< ours
 import {
   handleImportCsv,
   resolveCsvImportLimitMb,
   type DataToolsContext,
 } from '../src/renderer/data-tools-actions'
 import { t } from '../src/renderer/i18n/locale'
+=======
+>>>>>>> theirs
 
 /**
  * The ceiling a delimited import may reach (a .csv/.tsv opened as a
@@ -36,6 +43,7 @@ describe('the delimited import ceiling', () => {
     expect(delimitedImportLimit()).toBe(before)
   })
 })
+<<<<<<< ours
 
 describe('resolveCsvImportLimitMb (handleImportCsv ceiling)', () => {
   it('clamps undefined, 0, non-finite, and rejected IPC results to CSV_IMPORT_DEFAULT_LIMIT_MB', async () => {
@@ -175,3 +183,5 @@ describe('resolveCsvImportLimitMb (handleImportCsv ceiling)', () => {
     }
   })
 })
+=======
+>>>>>>> theirs

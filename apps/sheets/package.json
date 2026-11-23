@@ -10,10 +10,15 @@
     "dev": "electron-vite dev",
     "dev:renderer": "vite --config vite.renderer.config.ts",
     "build": "npm run native:build && electron-vite build",
-    "native:build": "cargo build --release --manifest-path native/xlsx-engine/Cargo.toml --config native/xlsx-engine/.cargo/config.toml",
+    "native:build": "cargo build --release --manifest-path native/xlsx-engine/Cargo.toml --config native/xlsx-engine/.cargo/config.toml && cargo build --release --manifest-path native/win-clipboard-helper/Cargo.toml --config native/win-clipboard-helper/.cargo/config.toml",
     "native:build:universal": "node scripts/build-sidecar-universal.mjs",
+<<<<<<< ours
     "native:test": "cargo test --manifest-path native/xlsx-engine/Cargo.toml --config native/xlsx-engine/.cargo/config.toml",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.collab-shim.json",
+=======
+    "native:test": "cargo test --manifest-path native/xlsx-engine/Cargo.toml --config native/xlsx-engine/.cargo/config.toml && cargo test --manifest-path native/win-clipboard-helper/Cargo.toml --config native/win-clipboard-helper/.cargo/config.toml",
+    "typecheck": "tsc --noEmit",
+>>>>>>> theirs
     "test": "npm run native:test && npm run native:build && vitest run",
     "test:watch": "vitest",
     "fixtures": "tsx scripts/generate-fixtures.ts",
@@ -23,6 +28,7 @@
     "gate": "npm run typecheck && npm run fixtures && npm test && npm run compat"
   },
   "dependencies": {
+    "@eslint-community/regexpp": "^4.12.2",
     "@fluentui/react-icons": "^2.0.333",
     "@genoffice/agent-core": "*",
     "@genoffice/ai-provider": "*",
@@ -64,12 +70,21 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.4",
+<<<<<<< ours
     "electron": "43.8.3",
     "electron-vite": "^5.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "7.3.7",
     "vitest": "4.1.12"
+=======
+    "electron": "^43.8.8",
+    "electron-vite": "^5.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.7",
+    "vitest": "^4.1.12"
+>>>>>>> theirs
   },
   "author": {
     "name": "UniWork",

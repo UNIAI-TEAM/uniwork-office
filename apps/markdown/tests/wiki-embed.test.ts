@@ -207,7 +207,10 @@ describe('resolution', () => {
 
   it('a picture embed with a width hint sizes the image', async () => {
     const { editor } = open('![[pic.png|120]]', {
+<<<<<<< ours
       // the resolver is asked for the bare file name: the width hint is not part of it
+=======
+>>>>>>> theirs
       answers: { 'pic.png': { path: '/notes/pic.png', fragment: '', found: true } },
     })
     await settled()

@@ -26,6 +26,7 @@ export class OdfConvertError extends Error {
  */
 export const MAX_ODF_PART_BYTES = 64 * 1024 * 1024
 
+<<<<<<< ours
 /**
  * Total uncompressed bytes a single ODF conversion may inflate across
  * `content.xml`, `styles.xml`, and every referenced media read combined.
@@ -105,6 +106,17 @@ function declaredSize(entry: JSZipObject): number {
 function exceedsCap(entry: JSZipObject, budget: InflationBudget): boolean {
   const size = declaredSize(entry)
   return size > MAX_ODF_PART_BYTES || budget.inflatedBytes + size > MAX_ODF_TOTAL_BYTES
+=======
+/** JSZip keeps the central-directory size on the entry's lazy compressed data */
+function declaredSize(entry: JSZipObject): number {
+  return (
+    (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0
+  )
+}
+
+function exceedsCap(entry: JSZipObject): boolean {
+  return declaredSize(entry) > MAX_ODF_PART_BYTES
+>>>>>>> theirs
 }
 
 /**
@@ -120,17 +132,30 @@ interface ChunkStream {
   resume(): ChunkStream
 }
 
+<<<<<<< ours
 function inflateCapped(entry: JSZipObject, budget: InflationBudget): Promise<Uint8Array> {
+=======
+function inflateCapped(entry: JSZipObject): Promise<Uint8Array> {
+>>>>>>> theirs
   return new Promise((resolve, reject) => {
     const chunks: Uint8Array[] = []
     let total = 0
     // JSZip's typings stop at async(); internalStream is the public chunked API
+<<<<<<< ours
     const internal: JSZipEntryInternal = entry as JSZipEntryInternal
     const stream = internal.internalStream('uint8array')
     stream.on('data', (chunk) => {
       total += chunk.length
       budget.inflatedBytes += chunk.length
       if (total > MAX_ODF_PART_BYTES || budget.inflatedBytes > MAX_ODF_TOTAL_BYTES) {
+=======
+    const stream = (
+      entry as unknown as { internalStream(type: 'uint8array'): ChunkStream }
+    ).internalStream('uint8array')
+    stream.on('data', (chunk) => {
+      total += chunk.length
+      if (total > MAX_ODF_PART_BYTES) {
+>>>>>>> theirs
         stream.pause()
         reject(new OdfConvertError('unreadable'))
         return
@@ -151,10 +176,17 @@ function inflateCapped(entry: JSZipObject, budget: InflationBudget): Promise<Uin
   })
 }
 
+<<<<<<< ours
 async function inflateText(entry: JSZipObject, budget: InflationBudget): Promise<string | null> {
   if (exceedsCap(entry, budget)) return null
   try {
     return new TextDecoder().decode(await inflateCapped(entry, budget))
+=======
+async function inflateText(entry: JSZipObject): Promise<string | null> {
+  if (exceedsCap(entry)) return null
+  try {
+    return new TextDecoder().decode(await inflateCapped(entry))
+>>>>>>> theirs
   } catch {
     return null
   }
@@ -168,25 +200,38 @@ export interface OdfPackage {
 }
 
 export async function loadOdfPackage(bytes: Uint8Array): Promise<OdfPackage | null> {
+<<<<<<< ours
   if (!hasValidEntryCount(bytes)) return null
+=======
+>>>>>>> theirs
   let zip: JSZip
   try {
     zip = await JSZip.loadAsync(bytes)
   } catch {
     return null
   }
+<<<<<<< ours
   if (Object.keys(zip.files).length > MAX_ODF_ENTRIES) return null
   const budget: InflationBudget = { inflatedBytes: 0 }
   const contentEntry = zip.file('content.xml')
   if (!contentEntry) return null
   const content = await inflateText(contentEntry, budget)
+=======
+  const contentEntry = zip.file('content.xml')
+  if (!contentEntry) return null
+  const content = await inflateText(contentEntry)
+>>>>>>> theirs
   if (!content) return null
   const contentRoots = parseOdfXml(content)
   if (!contentRoots) return null
   const stylesEntry = zip.file('styles.xml')
   let stylesXml: string | null = null
   if (stylesEntry) {
+<<<<<<< ours
     stylesXml = await inflateText(stylesEntry, budget)
+=======
+    stylesXml = await inflateText(stylesEntry)
+>>>>>>> theirs
     if (stylesXml === null) return null
   }
   const stylesRoots = stylesXml ? parseOdfXml(stylesXml) : null
@@ -197,14 +242,22 @@ export async function loadOdfPackage(bytes: Uint8Array): Promise<OdfPackage | nu
       const clean = path.replace(/^\.\//, '')
       const entry = zip.file(clean) ?? zip.file(decodeURIComponent(clean))
       if (!entry) return null
+<<<<<<< ours
       if (exceedsCap(entry, budget)) {
+=======
+      if (exceedsCap(entry)) {
+>>>>>>> theirs
         // Unlike a missing entry, which only costs the caller this one image, a
         // part this large is a file the app cannot convert: say so instead of
         // inflating it or silently handing back a document with holes in it.
         throw new OdfConvertError('unreadable')
       }
       try {
+<<<<<<< ours
         return await inflateCapped(entry, budget)
+=======
+        return await inflateCapped(entry)
+>>>>>>> theirs
       } catch (err) {
         if (err instanceof OdfConvertError) throw err
         return null

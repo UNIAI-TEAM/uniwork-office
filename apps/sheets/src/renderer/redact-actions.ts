@@ -26,7 +26,11 @@ export interface RedactDialogState {
   readonly endColumn: number
   /** A1 notation of the selection, so the dialog can name what it covers */
   readonly rangeLabel: string
+<<<<<<< ours
   /** Starting label for the dialog (always empty so hidden cell values are never pre-filled) */
+=======
+  /** The cell's own text, offered as a starting label; empty for a range */
+>>>>>>> theirs
   readonly seed: string
 }
 

@@ -167,7 +167,7 @@ export async function parseFileToText(
         }
       case 'xlsx':
       case 'xlsm':
-        return { ok: true, kind: 'text', text: await xlsxToText(bytes) }
+        return { ok: true, kind: 'text', text: await xlsxToText(bytes, opts) }
       case 'pdf':
         return { ok: true, kind: 'text', text: await pdfToText(bytes) }
     }

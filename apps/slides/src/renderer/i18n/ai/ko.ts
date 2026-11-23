@@ -22,7 +22,13 @@ export const ko = {
   aiQcPageSkipped: '{n}페이지: 자동 레이아웃 검사 건너뜀',
   aiQcStopped: '레이아웃 검사를 중지했습니다',
   aiQcCapped: '나머지 {count}페이지는 검사하지 않음(회당 상한)',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: 'Genspark 로그인',
+  aiGskLoginOk: 'Genspark에 로그인했습니다',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: 'AI 도우미 열기',
   aiFactCheckBtn: 'AI 팩트체크',
   aiFactCheckPrompt:
@@ -114,6 +120,8 @@ export const ko = {
   aiErrUnknown: '알 수 없는 오류',
   aiErrStreamTimeout:
     'AI 요청 시간 초과: 네트워크 응답이 없어 중단되었습니다. 연결을 확인한 후 다시 시도해 주세요',
+  aiErrRegion:
+    '이 모델의 제공업체는 현재 지역에서 서비스를 제공하지 않습니다. 다른 모델을 선택하거나 네트워크를 변경하세요',
   aiErrOverloaded: 'AI 서비스가 혼잡합니다. 잠시 후 다시 시도해 주세요',
   aiErrNetwork:
     '네트워크에 문제가 있어 AI 서비스에 연결할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요',
@@ -225,6 +233,9 @@ export const ko = {
   aiSumSaveTemplate: '스타일 템플릿 "{name}" 저장',
   aiSumTemplatesEmpty: '스타일 템플릿 목록(비어 있음)',
   aiSumListTemplates: '스타일 템플릿 {count}개 나열',
+<<<<<<< ours
   aiPageCloudToLocal: '클라우드 생성 불가 — 로컬로 생성',
   aiViewOnlyNotice: '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

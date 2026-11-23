@@ -60,7 +60,11 @@ test.describe('formatting marks show breaks', () => {
       await page.locator('.doc-page p', { hasText: 'Page break:' }).first().waitFor()
       await expect(page.locator('.doc-fmt-mark')).toHaveCount(0)
 
+<<<<<<< ours
       await page.getByRole('button', { name: 'Show/hide formatting marks' }).click()
+=======
+      await page.getByRole('button', { name: 'Show formatting marks' }).click()
+>>>>>>> theirs
       await expect(page.locator('.doc-fmt-pagebr')).toHaveText('Page Break')
       await expect(page.locator('.doc-fmt-wrapbr')).toHaveCount(1)
       const sectChips = page.locator('.doc-fmt-sectbr')
@@ -75,7 +79,11 @@ test.describe('formatting marks show breaks', () => {
         .evaluate((el) => getComputedStyle(el, '::after').content)
       expect(pilcrow).toBe('none')
 
+<<<<<<< ours
       await page.getByRole('button', { name: 'Show/hide formatting marks' }).click()
+=======
+      await page.getByRole('button', { name: 'Show formatting marks' }).click()
+>>>>>>> theirs
       await expect(page.locator('.doc-fmt-mark')).toHaveCount(0)
     } finally {
       await closeAndSaveVideo(app, 'docs-formatting-marks-breaks')

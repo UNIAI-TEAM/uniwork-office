@@ -4,7 +4,11 @@
  * the matching Univer language packs — every preset ships all 19 — and
  * switches LocaleService, which re-renders the whole Univer React tree
  * (rule-management panels, dialogs, menus). Languages Univer has no pack for
+<<<<<<< ours
  * (cs/he/hi/ms/nl/th/zh-TW, plus en, which boots directly) stay English.
+=======
+ * (cs/he/hi/ms/nl/th/tr/zh-TW, plus en, which boots directly) stay English.
+>>>>>>> theirs
  */
 import { LocaleService, LocaleType, mergeLocales, type ILocales } from '@univerjs/core'
 import type { Lang } from '@genoffice/i18n'
@@ -276,11 +280,19 @@ export function insertRowsBelowLocale(pack: LocalePack): LocalePack {
  * It is a Univer menu item, so its label is a Univer locale key resolved at
  * render — the app's own `t()` cannot be used for a menu `title`. The pack,
  * however, is built here, so the wording is read straight out of the app's
+<<<<<<< ours
  * `redactMenuLabel`: one definition, all 21 languages, and the same gesture
  * reads identically in markdown, slides, docs and html. A second hand-written
  * table could only ever drift from it.
  *
  * Languages Univer has no pack for (th/nl/ms/he/hi/cs/zh-TW) keep the English
+=======
+ * `redactMenuLabel`: one definition, all 22 languages, and the same gesture
+ * reads identically in markdown, slides, docs and html. A second hand-written
+ * table could only ever drift from it.
+ *
+ * Languages Univer has no pack for (th/nl/ms/he/hi/cs/tr/zh-TW) keep the English
+>>>>>>> theirs
  * pack the runtime booted with, where every other right-click item is English;
  * the redaction item follows that rather than being the one entry in the menu
  * with a language of its own. `applyUniverLocale` returns before reaching here
@@ -299,6 +311,7 @@ export function hideFromAiLocale(pack: LocalePack, lang: Lang): LocalePack {
   }
 }
 
+<<<<<<< ours
 /**
  * Univer's own vi / ko / ja / fr / es / ru table packs ship the three header
  * column actions of the table-filter popup in English (the upstream pack was
@@ -351,6 +364,8 @@ export function tableColumnMenuLocale(pack: LocalePack, lang: string): LocalePac
   return { 'sheets-table-ui': { ...tableUi, columnMenu: { ...menu, ...translated } } }
 }
 
+=======
+>>>>>>> theirs
 export function univerLocaleFor(lang: string): LocaleType | null {
   return UNIVER_LOCALES[lang]?.type ?? null
 }
@@ -363,7 +378,10 @@ export async function applyUniverLocale(runtime: UniverRuntime, lang: Lang): Pro
   Object.assign(merged, numberAsTextAlertLocale(merged))
   Object.assign(merged, insertRowsBelowLocale(merged))
   Object.assign(merged, hideFromAiLocale(merged, lang))
+<<<<<<< ours
   Object.assign(merged, tableColumnMenuLocale(merged, lang))
+=======
+>>>>>>> theirs
   const localeService = runtime.univer.__getInjector().get(LocaleService)
   localeService.load({ [entry.type]: merged } as unknown as ILocales)
   localeService.setLocale(entry.type)

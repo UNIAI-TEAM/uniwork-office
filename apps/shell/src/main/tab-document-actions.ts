@@ -28,11 +28,18 @@ export function runTabDocumentAction(
 ): void {
   const tab = deps.tabs.list().find((item) => item.id === id)
   const contents = deps.tabs.webContentsForTab(id)
+<<<<<<< ours
   const kind: string | undefined = tab?.kind
   if (
     !tab ||
     kind === 'home' ||
     kind === 'help' ||
+=======
+  if (
+    !tab ||
+    tab.kind === 'home' ||
+    tab.kind === 'help' ||
+>>>>>>> theirs
     !deps.tabs.canDetachTab(id) ||
     !contents ||
     contents.isDestroyed()

@@ -9,7 +9,13 @@ export const it = {
   aiStarterPolishAll: "Rifinisci l'intero documento con un tono più professionale",
   aiStarterContinue: 'Continua a scrivere da dove il documento si interrompe',
   aiStarterFillTemplate: 'Trova e compila i segnaposto nel documento',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: 'Accedi a Genspark',
+  aiGskLoginOk: 'Accesso a Genspark effettuato',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: "Apri l'assistente IA",
   aiSummarizeBtn: 'Riassunto IA',
   aiSummarizePrompt: 'Riassumi il contenuto principale e i punti chiave di questo documento',
@@ -117,6 +123,11 @@ export const it = {
     "Revisioni attivate: le modifiche ai contenuti dell'IA sono contrassegnate come revisioni (inserimenti sottolineati, eliminazioni barrate); accettale o rifiutale in Revisione",
   aiTrackOffTitle:
     "Revisioni disattivate: le modifiche dell'IA vengono applicate subito (puoi comunque ripristinare tramite gli snapshot delle versioni)",
+  aiRevisionBarTitle: 'Revisioni',
+  aiRevisionCount: '{count} modifiche in sospeso',
+  aiRevisionRejectAll: 'Rifiuta tutto',
+  aiRevisionAcceptAll: 'Accetta tutto',
+  aiRevisionPara: 'Paragrafo {n}',
   aiTurnLimit:
     '(Raggiunto il limite di chiamate agli strumenti per questa richiesta; la risposta sopra riflette i passaggi completati finora e potrebbe essere incompleta.)',
   aiStopped: '(Interrotto)',
@@ -130,6 +141,8 @@ export const it = {
   aiUnknownError: 'Errore sconosciuto',
   aiTimeoutError:
     'Richiesta IA scaduta: nessuna risposta dalla rete, esecuzione interrotta. Controlla la connessione e riprova',
+  aiRegionError:
+    'Il fornitore di questo modello non serve la tua regione attuale — scegli un altro modello o cambia rete',
   aiOverloadedError: 'Il servizio IA è momentaneamente sovraccarico — riprova tra poco',
   aiNetworkError:
     'Problema di rete: impossibile raggiungere il servizio IA. Controlla la connessione e riprova',
@@ -137,6 +150,9 @@ export const it = {
   aiSumImageAttachment: 'Immagine allegata {name}',
   aiSumRead: 'Lettura di {name}',
   aiSumReadAttachmentName: 'Lettura allegato {name}',
+  aiSumSkillsList: 'Skill installate elencate',
+  aiSumSkillRead: 'Skill {name} letta',
+  aiSumRunCli: 'Ha eseguito {args}',
   aiSumWebSearch: 'Ricerca web',
   aiSumWebSearchDone: 'Ricerca di "{query}" ({count} risultati)',
   aiSumImageSearch: 'Ricerca immagini',
@@ -200,6 +216,7 @@ export const it = {
   aiCmdImages: '{count} immagine/i aggiornata/e',
   aiCmdToc: 'Sommario inserito ({count} voci)',
   aiCmdSkipped: ' ({count} blocco/i protetto/i ignorato/i)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
   aiClarifyTitle: 'Qualche domanda prima di continuare',
@@ -214,6 +231,8 @@ export const it = {
   aiClarifySubmit: 'Continua',
   aiSumClarify: 'Chiarimenti forniti',
   aiSumClarifySkipped: 'Chiarimenti saltati',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Genera una mappa mentale di questo documento',
   aiMindMapBtn: 'Mappa mentale IA',
   aiMindMapPrompt:
@@ -224,9 +243,20 @@ export const it = {
   aiMindMapAskPrompt: 'Parlami di "{label}" in questo documento',
   aiMindMapJump: 'Vai al passaggio citato',
   aiMindMapExport: 'Esporta PNG',
+<<<<<<< ours
   aiMindMapReset: 'Reimposta vista',
   aiMindMapExpand: 'Espandi ramo',
   aiMindMapCollapse: 'Comprimi ramo',
   aiMindMapExportSvg: 'Esporta SVG',
   aiMindMapInsert: 'Inserisci nel documento',
+=======
+  aiMindMapExportSvg: 'Esporta SVG',
+  aiMindMapInsert: 'Inserisci nel documento',
+  aiMindMapReset: 'Reimposta vista',
+  aiMindMapExpand: 'Espandi ramo',
+  aiMindMapCollapse: 'Comprimi ramo',
+  aiMindMapToggleLayout: 'Cambia layout',
+  aiMindMapLayoutTopDown: 'Passa al layout dall’alto verso il basso',
+  aiMindMapLayoutLeftRight: 'Passa al layout da sinistra a destra',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

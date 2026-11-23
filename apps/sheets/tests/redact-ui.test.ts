@@ -6,7 +6,10 @@ import { ICommandService } from '@univerjs/core'
 
 import { RedactDialog } from '../src/renderer/components/RedactDialog'
 import { HIDE_SELECTION_COMMAND_ID, installRedactMenu } from '../src/renderer/redact-menu'
+<<<<<<< ours
 import { resetForTest } from '../src/renderer/capabilities'
+=======
+>>>>>>> theirs
 import { strings } from '../src/renderer/i18n/strings'
 import { hideFromAiLocale } from '../src/renderer/univer-locales'
 
@@ -74,6 +77,7 @@ function click(element: Element) {
 }
 
 describe('the redaction dialog', () => {
+<<<<<<< ours
   it('starts with an empty label by default so the hidden cell value is never pre-filled', () => {
     const container = mount(dialog())
     const input = container.querySelector('input')!
@@ -84,6 +88,14 @@ describe('the redaction dialog', () => {
   it('selects any explicit seed so typing replaces it', () => {
     const input = mount(dialog({ seed: '13800138000' })).querySelector('input')!
     expect(input.value).toBe('13800138000')
+=======
+  it('offers the cell text as a starting label, selected so typing replaces it', () => {
+    const input = mount(dialog({ seed: '13800138000' })).querySelector('input')!
+    expect(input.value).toBe('13800138000')
+    // Pre-selected: the reader types over the phone number rather than
+    // appending to it. A seed that is not selected is a very easy mistake to
+    // make here, and the label is the only thing the model will ever see.
+>>>>>>> theirs
     expect(input.selectionStart).toBe(0)
     expect(input.selectionEnd).toBe('13800138000'.length)
   })
@@ -154,6 +166,7 @@ describe('the redaction dialog', () => {
     })
     expect(onCancel).toHaveBeenCalledTimes(2)
   })
+<<<<<<< ours
 
   it('cancels on Escape from a dialog button, restores focus on unmount, and uses phrasing markup inside label', () => {
     const opener = document.createElement('button')
@@ -174,6 +187,8 @@ describe('the redaction dialog', () => {
     expect(document.activeElement).toBe(opener)
     opener.remove()
   })
+=======
+>>>>>>> theirs
 })
 
 describe('the grid menu item', () => {
@@ -252,6 +267,7 @@ describe('the grid menu item', () => {
     // Keyed by the command it runs, which is what Univer invokes on press.
     expect(JSON.stringify(h.merged)).toContain(HIDE_SELECTION_COMMAND_ID)
   })
+<<<<<<< ours
 
   it('is not installed when the ai capability is off', () => {
     Reflect.set(window, 'desktopApi', { capabilities: { ai: false } })
@@ -268,6 +284,8 @@ describe('the grid menu item', () => {
       resetForTest()
     }
   })
+=======
+>>>>>>> theirs
 })
 
 describe('the menu label reaches Univer as a locale key', () => {

@@ -4,8 +4,13 @@ import { join } from 'node:path'
 import { closeAndSaveVideo, launchShell } from './helpers'
 
 /**
+<<<<<<< ours
  * The shell window remembers its position and size across sessions: a moved
  * and resized window comes back at the same
+=======
+ * The shell window remembers its position and size across sessions
+ * (genoffice#2049): a moved and resized window comes back at the same
+>>>>>>> theirs
  * geometry after a restart, and a saved position no display can show — an
  * unplugged monitor — is discarded instead of opening off-screen.
  *
@@ -35,7 +40,11 @@ test.describe('shell: window bounds across sessions', () => {
     // how far the platform moves a newly created window sideways off the
     // requested x. macOS' window server does this even when the constructor
     // asks for an exact position — reproduced with a hand-made Electron app,
+<<<<<<< ours
     // so it is a platform quirk, not app code; on Linux CI the exact
+=======
+    // so it is a platform quirk, not GenOffice code; on Linux CI the exact
+>>>>>>> theirs
     // rectangle comes back (dx 0). The same nudge applies to the restored
     // window, so measure it here on a throwaway window at the same rectangle
     // and require the restored window to repeat it.

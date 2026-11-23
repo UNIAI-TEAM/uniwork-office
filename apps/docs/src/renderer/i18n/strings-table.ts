@@ -26,6 +26,7 @@ const en = {
   ribbonCellMargins: 'Default cell margins',
 }
 
+<<<<<<< ours
 /** Vietnamese is reviewed for the UniWork web (the Table Design tab was English in vi). */
 const vi: Record<keyof typeof en, string> = {
   ribbonTableStyleOptions: 'Tùy chọn kiểu bảng',
@@ -53,6 +54,8 @@ const vi: Record<keyof typeof en, string> = {
   ribbonCellMargins: 'Lề ô mặc định',
 }
 
+=======
+>>>>>>> theirs
 const ru: Record<keyof typeof en, string> = {
   ribbonTableStyleOptions: 'Параметры стилей таблиц',
   ribbonTableFirstRow: 'Строка заголовка',
@@ -79,6 +82,35 @@ const ru: Record<keyof typeof en, string> = {
   ribbonCellMargins: 'Поля ячеек по умолчанию',
 }
 
+<<<<<<< ours
+=======
+const hu: Record<keyof typeof en, string> = {
+  ribbonTableStyleOptions: 'Táblázatstílus-beállítások',
+  ribbonTableFirstRow: 'Fejlécsor',
+  ribbonTableLastRow: 'Összegsor',
+  ribbonTableBandedRows: 'Sávos sorok',
+  ribbonTableFirstColumn: 'Első oszlop',
+  ribbonTableLastColumn: 'Utolsó oszlop',
+  ribbonTableBandedColumns: 'Sávos oszlopok',
+  ribbonTablePresetGrid: 'Egyszerű rács',
+  ribbonTablePresetBlueHeader: 'Kék fejléc',
+  ribbonTablePresetBlueBanded: 'Kék sávos',
+  ribbonTablePresetGrayBanded: 'Szürke sávos',
+  ribbonTablePresetGreenHeader: 'Zöld fejléc',
+  ribbonAutoFit: 'Automatikus illesztés',
+  ribbonAutoFitContents: 'Tartalomhoz igazítás',
+  ribbonAutoFitWindow: 'Ablakhoz igazítás',
+  ribbonFixedColumnWidth: 'Rögzített oszlopszélesség',
+  ribbonRepeatHeaderRows: 'Fejlécsorok ismétlése',
+  ribbonTableProperties: 'Táblázat tulajdonságai',
+  ribbonTableData: 'Táblázat',
+  ribbonHorizontalPosition: 'Vízszintes pozíció',
+  ribbonVerticalPosition: 'Függőleges pozíció',
+  ribbonDistanceFromText: 'Távolság a szövegtől',
+  ribbonCellMargins: 'Alapértelmezett cellamargók',
+}
+
+>>>>>>> theirs
 /**
  * New table controls deliberately fall back to English until each locale has
  * reviewed terminology (vi is reviewed). Keeping one complete key set prevents
@@ -105,5 +137,11 @@ export const tableStrings = defineStrings({
   he: en,
   hi: en,
   'zh-TW': en,
+<<<<<<< ours
   vi,
+=======
+  vi: en,
+  tr: en,
+  hu,
+>>>>>>> theirs
 })

@@ -1,4 +1,5 @@
 import { authorName } from '../author-name'
+<<<<<<< ours
 import { t } from '../i18n/locale'
 
 /** default author on AI-generated tracked revisions when Settings has no user name */
@@ -8,4 +9,10 @@ export const AI_REVISION_AUTHOR = 'AI Assistant'
 export function aiRevisionAuthor(): string {
   const name = authorName()
   return name && name !== t('editorDefaultAuthor') ? name : AI_REVISION_AUTHOR
+=======
+
+/** AI edits are attributed to the Settings user name, as Word does for add-in edits */
+export function aiRevisionAuthor(): string {
+  return authorName()
+>>>>>>> theirs
 }

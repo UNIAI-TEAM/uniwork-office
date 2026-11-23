@@ -44,6 +44,22 @@ const tUpd = createI18n({
     updInstall: 'Khởi động lại & Cài đặt',
     updLater: 'Nhắc tôi sau',
   },
+  tr: {
+    updTitle: 'Yazılım Güncellemesi',
+    updHeadline: 'Yeni bir sürüm var',
+    updDesc:
+      'Bu güncelleme performans iyileştirmeleri ve hata düzeltmeleri içerir. Şimdi güncellemenizi öneririz.',
+    updInstall: 'Yeniden Başlat ve Yükle',
+    updLater: 'Daha sonra hatırlat',
+  },
+  hu: {
+    updTitle: 'Szoftverfrissítés',
+    updHeadline: 'Új verzió érhető el',
+    updDesc:
+      'Ez a frissítés teljesítményjavításokat és hibajavításokat tartalmaz. Javasoljuk, hogy most frissíts.',
+    updInstall: 'Újraindítás és telepítés',
+    updLater: 'Emlékeztess később',
+  },
   ja: {
     updTitle: 'ソフトウェアアップデート',
     updHeadline: '新しいバージョンがあります',

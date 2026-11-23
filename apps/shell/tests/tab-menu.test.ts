@@ -253,6 +253,10 @@ describe('the tab context menu', () => {
       'zh',
       'en',
       'vi',
+<<<<<<< ours
+=======
+      'tr',
+>>>>>>> theirs
       'ja',
       'ko',
       'fr',
@@ -271,6 +275,10 @@ describe('the tab context menu', () => {
       'he',
       'hi',
       'zh-TW',
+<<<<<<< ours
+=======
+      'hu',
+>>>>>>> theirs
     ] as const
     expect(Object.keys(mainMenuStrings).sort()).toEqual([...locales].sort())
     for (const locale of locales) {
@@ -295,6 +303,7 @@ describe('the tab context menu', () => {
     expect(translateMainMenu('th', 'menuTabSave')).toBe('บันทึก')
     expect(translateMainMenu('id', 'menuTabSave')).toBe('Simpan')
   })
+<<<<<<< ours
   it('hides Rename, Duplicate, Reveal, Open with default app, and Copy path on a UniWork-bound tab while keeping Copy file name', () => {
     const bound = tab('bound', { filePath: '/uniwork-store/doc-1/Report.docx' })
     const { items, actions: given } = menu(bound, [home, bound, b], { uniworkBound: true })
@@ -329,6 +338,8 @@ describe('the tab context menu', () => {
     expect(moveLeftIndex).toBeGreaterThan(pinIndex)
     expect(raw[pinIndex + 1]).toMatchObject({ type: 'separator' })
   })
+=======
+>>>>>>> theirs
 })
 
 describe('where the file is, shown in the tab menu', () => {

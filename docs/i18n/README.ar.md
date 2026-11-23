@@ -19,16 +19,19 @@
   <a href="https://github.com/genspark-ai/genoffice/releases/latest"><img src="https://img.shields.io/github/v/release/genspark-ai/genoffice" alt="أحدث إصدار"></a>
   <a href="https://github.com/genspark-ai/genoffice/releases"><img src="https://img.shields.io/github/downloads/genspark-ai/genoffice/total" alt="عدد التنزيلات"></a>
   <a href="https://github.com/genspark-ai/genoffice/stargazers"><img src="https://img.shields.io/github/stars/genspark-ai/genoffice?style=flat" alt="نجوم GitHub"></a>
+  <a href="https://x.com/merrickbuilds"><img src="https://img.shields.io/badge/follow-%40merrickbuilds-000000?logo=x&logoColor=white" alt="تابع @merrickbuilds على X"></a>
 </p>
 
-<p align="center"><a href="../../README.md">English</a> · <a href="README.es.md">Español</a> · <a href="README.pt-BR.md">Português (Brasil)</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ko.md">한국어</a> · <a href="README.ja.md">日本語</a> · <b>العربية</b> · <a href="README.ru.md">Русский</a> · <a href="README.it.md">Italiano</a> · <a href="README.nl.md">Nederlands</a> · <a href="README.pl.md">Polski</a> · <a href="README.cs.md">Čeština</a> · <a href="README.id.md">Bahasa Indonesia</a> · <a href="README.ms.md">Bahasa Melayu</a> · <a href="README.th.md">ไทย</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.he.md">עברית</a></p>
+<p align="center"><a href="../../README.md">English</a> · <a href="README.es.md">Español</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ko.md">한국어</a> · <a href="README.ja.md">日本語</a> · <b>العربية</b> · <a href="README.ru.md">Русский</a> · <a href="README.it.md">Italiano</a> · <a href="README.nl.md">Nederlands</a> · <a href="README.pl.md">Polski</a> · <a href="README.cs.md">Čeština</a> · <a href="README.id.md">Bahasa Indonesia</a> · <a href="README.ms.md">Bahasa Melayu</a> · <a href="README.th.md">ไทย</a> · <a href="README.hi.md">हिन्दी</a> · <a href="README.he.md">עברית</a> · <a href="README.vi.md">Tiếng Việt</a> · <a href="README.tr.md">Türkçe</a> · <a href="README.hu.md">Magyar</a></p>
 
 <p align="center" dir="rtl">
   <a href="#download"><b>التنزيل</b></a> ·
+  <a href="#skills"><b>المهارات</b></a> ·
   <a href="#command-line-and-agent-skill"><b>CLI</b></a> ·
   <a href="#mcp-server"><b>MCP</b></a> ·
   <a href="https://genoffice.ai/"><b>الموقع الإلكتروني</b></a> ·
   <a href="https://genoffice.ai/join"><b>المجتمع</b></a> ·
+  <a href="https://x.com/merrickbuilds"><b>X</b></a> ·
   <a href="../../PRIVACY.md"><b>الخصوصية</b></a>
 </p>
 
@@ -36,7 +39,11 @@ GenOffice بديل مجاني ومفتوح المصدر لـ Microsoft Office ع
 و Linux. يفتح البرنامج ويحفظ مباشرة ملفات `.docx` و `.xlsx` و `.pptx` الأصلية،
 ويحرّر ملفات PDF و Markdown و HTML، ويضع وكيل ذكاء اصطناعي إلى جانب كل مستند —
 لا كمربع محادثة مُلحق بشكل عرضي، بل كمحرّر يقرأ الملف، وينفّذ التغيير، ويوضّح
-لك تحديدًا ما لمسه.
+لك تحديدًا ما لمسه. وتُفتح ملفات ODF (`.odt` و `.ods` و `.odp` وقوالب
+`.ott`/`.ots`/`.otp`) كنسخ OOXML قابلة للتحرير، وكذلك ملفات Word القديمة
+`.doc`/`.dot` وملفات Excel 97 بصيغة `.xls` وملفات PowerPoint 97–2003 بصيغة
+`.ppt` ومستندات Hancom (`.hwp` و `.hwpx`)؛ والاستيراد في اتجاه واحد فقط
+(open-only) — يكتب الحفظ بصيغة OOXML ولا يكتب صيغة المصدر أبدًا.
 
 - **صِيَغ أصلية، حفظ يحافظ على البايتات.** يُعاد كتابة الجزء الذي تحرّره فقط،
   وتبقى بقية الملف كما هي حرفيًا بايتًا ببايت، فتستمر المستندات في العمل
@@ -44,11 +51,32 @@ GenOffice بديل مجاني ومفتوح المصدر لـ Microsoft Office ع
 - **ذكاء اصطناعي يمكنك مراجعته.** تصل التعديلات على شكل تتبّع للتغييرات
   وفروقات (diffs) قابلة للتراجع بضغطة واحدة. تحصل جداول البيانات على صِيَغ
   حيّة، لا أرقام ملصقة؛ وتُولَّد الشرائح والصفحات مباشرة على لوحة الرسم وتبقى
-  قابلة للتحرير بالكامل.
+  قابلة للتحرير بالكامل. أخفِ تحديدًا في Docs أو نطاق خلايا في Sheets عن النموذج
+  فيرى الذكاء الاصطناعي عنصرًا نائبًا مسمّى (placeholder) فقط؛ وتبقى الكلمات
+  الأصلية في الملف وتعود كما كانت. ويشمل الإخفاء ذكاء التطبيق نفسه — فسطر
+  الأوامر وأدوات MCP والتصدير بلا واجهة يقرؤون الملف مباشرة ويظلون يرون هذه
+  الكلمات.
 - **محلي بالتصميم.** تُفتح الملفات وتُحرَّر وتُحفَظ وتُحوَّل على جهازك مباشرة.
   جميع عمليات التحويل — PDF إلى Word / Excel / PowerPoint، وMarkdown إلى Word،
   وHTML إلى Word — تعمل على الجهاز نفسه. لا يغادر جهازك شيء سوى طلبات الذكاء
+<<<<<<< ours
   الاصطناعي، وتُرسَل إلى UniWork AI.
+=======
+  الاصطناعي، وتُرسَل فقط إلى مزوّد الخدمة الذي تختاره.
+- **اعثر على الملفات بمضمونها.** تبحث الشاشة الرئيسية في أسماء ملفات `.docx`
+  و `.xlsx` و `.pptx` و PDF و Markdown و HTML الخاصة بك ومجلداتها ونصوصها
+  الكاملة عبر فهرس SQLite محلي، بما يشمل نصوص CJK. واختياريًا، يعيد
+  **[TypeSafe Jev](https://typesafe.ai/)**، نموذج التقييم System One، ترتيب
+  أفضل النتائج ليأتي الملف الذي يجيب عن سؤالك في المقدمة.
+- **اسأل ملفاتك، مع ذكر المصادر.** ميّز مجموعة من المستندات بنجمة، فتجيب ميزة
+  **Ask AI** في الشاشة الرئيسية عن الأسئلة عبرها جميعًا، مع الاستشهاد بالملف
+  الذي يستند إليه كل ادّعاء لتتمكّن من فتحه والتحقّق.
+- **مفاتيحك أو بلا مفاتيح.** سجّل الدخول بواسطة Genspark لتجنّب إدارة المفاتيح،
+  أو استخدم مفتاحك الخاص مع Claude أو OpenAI أو Gemini أو DeepSeek أو Kimi أو
+  GLM أو Qwen أو Doubao أو MiniMax أو Grok أو Mistral أو OpenRouter أو Requesty أو Opper أو
+  Cheaper Inference أو Atlas Cloud، أو أي
+  نقطة نهاية متوافقة مع OpenAI، بما في ذلك الخوادم المحلية.
+>>>>>>> theirs
 - **قابل للبرمجة وجاهز للوكلاء.** يأتي التطبيق مع سطر أوامر `genoffice` ومهارة
   لكل من Claude Code وCodex وCursor وGemini CLI وGitHub Copilot وOpenCode
   وWindsurf، ليتمكّن وكيل البرمجة من إنشاء ملفات Office حقيقية وتحويلها
@@ -59,9 +87,11 @@ GenOffice بديل مجاني ومفتوح المصدر لـ Microsoft Office ع
 [Linux](https://github.com/genspark-ai/genoffice/releases/latest) (deb، rpm، AppImage) —
 التفاصيل والمتطلبات في [التنزيل](#download).
 
-## العرض التوضيحي
+## <a id="demo"></a>العرض التوضيحي
 
-ست تطبيقات، ولوحة ذكاء اصطناعي واحدة، وسطر أوامر لوكيل البرمجة الخاص بك. كل
+ست تطبيقات، ولوحة ذكاء اصطناعي واحدة، وبحث في الملفات يعيد TypeSafe Jev ترتيب
+نتائجه، وميزة Ask AI تجيب من ملفاتك المميَّزة بنجمة مع ذكر المصادر، وسطر أوامر
+لوكيل البرمجة الخاص بك. كل
 لقطة شاشة هي من التطبيق الفعلي على macOS، والذكاء الاصطناعي فيها ناتج عن
 التوجيه (prompt) الذي يمكنك قراءته في اللوحة.
 
@@ -73,8 +103,8 @@ GenOffice بديل مجاني ومفتوح المصدر لـ Microsoft Office ع
 <td width="50%"><img src="../assets/readme/docs-ai.webp" alt="GenOffice Docs: نظرة عامة عن الشركة مع صورة بانر؛ أعاد الذكاء الاصطناعي صياغة قسم النظرة العامة بإحكام وأضاف قسمًا جديدًا بنقاط، وتوفّر اللوحة تراجعًا بضغطة واحدة"></td>
 </tr>
 <tr>
-<td dir="rtl"><b>يفتح الملف كما يعرضه Word تمامًا</b> — أقسام بعمودين، صور بعرض الصفحة كاملة، جداول مظلّلة، ترويسات وتذييلات، وتقسيم إلى صفحات بحسب مقاييس أسطر Word. الأنماط والتعليقات وتتبّع التغييرات والمعادلات والكتابة بالحبر تبقى سليمة دون تغيير عند الحفظ.</td>
-<td dir="rtl"><b>اطلب التعديل</b> — يقرأ الذكاء الاصطناعي الكتل النصية التي يحتاجها، ويعيد كتابة قسم النظرة العامة ويضيف قسمًا جديدًا بنقاط. كل خطوة ذكاء اصطناعي هي لقطة يمكنك التراجع عنها؛ ومع تفعيل <b>تتبّع التغييرات</b>، تصل التعديلات كمراجعات على طراز Word.</td>
+<td dir="rtl"><b>يفتح الملف كما يعرضه Word تمامًا</b> — أقسام بعمودين، صور بعرض الصفحة كاملة، جداول مظلّلة، ترويسات وتذييلات، وتقسيم إلى صفحات بحسب مقاييس أسطر Word. الأنماط والتعليقات وتتبّع التغييرات والمعادلات والكتابة بالحبر وعناصر تحكم المحتوى (content controls) تبقى سليمة دون تغيير عند الحفظ. ويحوّل تبويب <b>Mailings</b> المستند إلى قالب دمج: اختر قائمة مستلمين بصيغة <code>.xlsx</code> أو <code>.csv</code>، وأدرج حقول <code>MERGEFIELD</code> حقيقية، وعاين سجلًا بسجل، ثم ادمج في مستند واحد أو في ملف <code>.docx</code> لكل سجل.</td>
+<td dir="rtl"><b>اطلب التعديل</b> — يقرأ الذكاء الاصطناعي الكتل النصية التي يحتاجها، ويعيد كتابة قسم النظرة العامة ويضيف قسمًا جديدًا بنقاط. كل خطوة ذكاء اصطناعي هي لقطة يمكنك التراجع عنها؛ ومع تفعيل <b>تتبّع التغييرات</b>، تصل التعديلات كمراجعات على طراز Word. اطلب بدلًا من ذلك خريطة ذهنية (mind map) فيكون الجواب مخططًا تفاعليًا للمستند بأكمله: فروع قابلة للطي، وتكبير وتحريك، والنقر على عقدة يطرح سؤالًا متابِعًا، والاستشهادات تقفز إلى الكتلة التي جاءت منها.</td>
 </tr>
 </table>
 
@@ -87,7 +117,7 @@ GenOffice بديل مجاني ومفتوح المصدر لـ Microsoft Office ع
 </tr>
 <tr>
 <td dir="rtl"><b>ابنِه</b> — من جملة واحدة، يضيف الوكيل ورقة ملخّص بصِيَغ <code>SUMIF</code> فعلية حسب المنطقة والفئة، ويُدرج رسمًا بيانيًا بالأعمدة، ويطبّق الـ43 تغييرًا كدفعة واحدة قابلة للتراجع.</td>
-<td dir="rtl"><b>اسأله</b> — تُجاب الأسئلة عن المصنّف مع شرح المنطق والخلايا الدقيقة المستخدمة كاستشهادات قابلة للنقر. ويعمل خلف الكواليس: محرّك <code>.xlsx</code> داخلي مطوَّر بلغة Rust، وجداول محورية، ومرشِّحات تقطيع (slicers)، وتنسيق شرطي، وتتبّع للصِّيَغ.</td>
+<td dir="rtl"><b>اسأله</b> — تُجاب الأسئلة عن المصنّف مع شرح المنطق والخلايا الدقيقة المستخدمة كاستشهادات قابلة للنقر. ويعمل خلف الكواليس: محرّك <code>.xlsx</code> داخلي مطوَّر بلغة Rust، وجداول محورية، ومرشِّحات تقطيع (slicers)، وتنسيق شرطي، وتتبّع للصِّيَغ، وصور مُضمَّنة في الخلايا كقيم غنية (rich values) أصلية في Excel — يعيد Excel فتحها فتبقى في الخلية. يمكن أن تحمل ملاحظة الخلية صورة، تُعرض أسفل نافذة الملاحظة المنبثقة.</td>
 </tr>
 </table>
 
@@ -102,9 +132,13 @@ GenOffice بديل مجاني ومفتوح المصدر لـ Microsoft Office ع
 </tr>
 <tr>
 <td dir="rtl"><b>سطر واحد كمُدخل</b> — "أنشئ عرضًا تقديميًا من 10 شرائح لعرضه على المستثمرين لصالح Aurora Home…". يخطّط GenOffice للسرد القصصي، ويبحث عن الأرقام، ويُعِدّ مسودة كل شريحة على لوحة الرسم كملف <code>.pptx</code> فعلي.</td>
-<td dir="rtl"><b>عرض تقديمي جاهز كمُخرَج</b> — إحدى عشرة شريحة مصمَّمة بخطوط وصور متّسقة ودعوة ختامية لاتخاذ إجراء؛ استمر في التحرير عبر الشرائح الرئيسية والتخطيطات والأدلة الذكية والقصّ غير المدمِّر، أو اطلب من اللوحة إعادة التصميم أو الصياغة أو إعادة الترتيب.</td>
+<td dir="rtl"><b>عرض تقديمي جاهز كمُخرَج</b> — إحدى عشرة شريحة مصمَّمة بخطوط وصور متّسقة ودعوة ختامية لاتخاذ إجراء؛ استمر في التحرير عبر الشرائح الرئيسية والتخطيطات والأدلة الذكية والقصّ غير المدمِّر، أو اطلب من اللوحة إعادة التصميم أو الصياغة أو إعادة الترتيب. وأدرج ملف <code>.glb</code> فيصير نموذجًا ثلاثي الأبعاد حقيقيًا: أدره بالسحب داخل المحرِّر، ويُخزَّن بالطريقة نفسها التي يخزّن بها PowerPoint النماذج ثلاثية الأبعاد، ويبقى ثلاثي الأبعاد في PowerPoint.</td>
 </tr>
 </table>
+
+**Slide Show → Record** يسجّل سردًا صوتيًا للعرض شريحةً شريحة، مع إيقاف مؤقت
+واستئناف. يُحفظ السرد الصوتي وأزمنة الانتقال التلقائي التي يقيسها في ملف
+`.pptx`، ويعيد PowerPoint تشغيلها بالطريقة نفسها.
 
 ### 4 · PDF — حرّر نص PDF في مكانه، وحوّل PDF إلى Word على الجهاز مباشرة
 
@@ -162,7 +196,55 @@ GenOffice بديل مجاني ومفتوح المصدر لـ Microsoft Office ع
 </tr>
 </table>
 
-### 7 · CLI — وكيل البرمجة الخاص بك يقود GenOffice، على جهازك
+**ملاحظات مترابطة على طريقة Obsidian.** روابط `[[wiki links]]` تنقلك إلى
+الملاحظة التي تسمّيها، وكتابة `[[` تُظهر إكمالًا لأسماء الملاحظات، و`![[…]]`
+تُضمِّن ملاحظة أو صورة داخل النص. تعرض لوحة **Backlinks** كل ملاحظة تشير إلى
+الملاحظة المفتوحة، وترسم واجهة **Graph** خريطة لروابط الـ vault بأكملها.
+
+### <a id="7--search--find-the-file-that-answers-the-question-with-typesafe-jev"></a>7 · البحث — اعثر على الملف الذي يجيب عن السؤال، مع TypeSafe Jev
+
+يُفهرَس كل ملف في مجلد عملك على الجهاز نفسه: الأسماء والمجلدات والنص
+المستخرَج من ملفات Word و Excel و PowerPoint و PDF و Markdown و HTML، في فهرس
+نص كامل من SQLite مع تقطيع (tokenizing) يراعي لغات CJK. فعِّل **Jev search
+reranking** فيُقيِّم
+[TypeSafe Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev)
+أفضل 20 نتيجة محلية، وهو نموذج System One الذي يعيد درجة صلة معايَرة واحدة لكل
+مستند في استدعاء واحد بدلًا من توليد نص. يُعاد ترتيب القائمة وفق تلك الدرجة؛
+وإذا فشل الاستدعاء أو انتهت مهلته، يبقى الترتيب المحلي كما هو.
+
+<img src="../assets/readme/search-jev-motion.webp" alt="تسجيل شاشة للشاشة الرئيسية في GenOffice: كتابة laptop refresh policy تعرض أولًا سياسة لذاكرة المتصفح المؤقتة وخطة لتجديد العلامة التجارية وجدولًا لتحديث لوحة المعلومات، بينما يأتي مستند معايير المعدّات في الأخير؛ ثم تعرض صفحة الإعدادات خيار Jev search reranking مفعَّلًا تحت AI Media & Search مع نقطة نهاية TypeSafe؛ ثم يُظهر البحث نفسه مستند معايير المعدّات في المقدمة مع شارة Jev بجوار عدد النتائج" width="100%">
+
+<table>
+<tr>
+<td width="50%"><img src="../assets/readme/search-jev-before-after.webp" alt="قائمتا نتائج للاستعلام laptop refresh policy جنبًا إلى جنب: بدون Jev يتصدّر جدول تحديث لوحة المعلومات وخطة تجديد العلامة التجارية وسياسة تحديث ذاكرة المتصفح المؤقتة، ويأتي مستند معايير معدّات الشركة خامسًا؛ ومع Jev يأتي أولًا مستند معايير المعدّات الذي ينصّ على دورة استبدال الحواسيب المحمولة كل ثلاث سنوات"></td>
+<td width="50%"><img src="../assets/readme/search-jev-settings.webp" alt="إعدادات GenOffice، صفحة AI Media & Search: قسم Local file search مع مفتاح تفعيل Jev search reranking، واختيار نقطة النهاية بين OpenRouter وTypeSafe، وحقل مفتاح API"></td>
+</tr>
+<tr>
+<td dir="rtl"><b>الكلمات نفسها، وإجابات مختلفة</b> — عبارة "laptop refresh policy" تطابق حرفيًا سياسة تحديث ذاكرة المتصفح المؤقتة وخطة تجديد العلامة التجارية وجدول تحديث لوحة المعلومات، فيضعها ترتيب النص الكامل في المقدمة. يقرأ Jev المقتطفات وينقل مستند معايير المعدّات، وهو الذي ينصّ على دورة الاستبدال كل ثلاث سنوات، إلى الأعلى. وتُظهر شارة <b>Jev</b> بجوار عدد النتائج متى كان الترتيب صادرًا عن النموذج.</td>
+<td dir="rtl"><b>مُعطَّل افتراضيًا، ومفتاح تفعيل واحد لتشغيله</b> — Settings → AI Media & Search → Local file search. اختر OpenRouter أو TypeSafe مباشرة، والصق مفتاح API، واضغط Test connection. لا تغادر مقتطفات أفضل النتائج الجهاز إلا عندما يكون مفتاح التفعيل مشغَّلًا؛ أما الفهرس نفسه فلا يغادره أبدًا.</td>
+</tr>
+</table>
+
+### 8 · Ask AI — ملفاتك المميَّزة بنجمة، بإجابات موثَّقة بالمصادر
+
+ميّز الملفات التي تعمل عليها بنجمة، فتتعامل ميزة **Ask AI** في الشاشة الرئيسية
+معها كقاعدة معرفة. اطرح سؤالًا بلغة عادية؛ فيبحث الوكيل في الملفات المميَّزة
+بنجمة، ويقرأ ما يحتاجه منها، ويجيب مع استشهاد بعد كل ادّعاء. انقر على استشهاد
+فيُفتح الملف في التطبيق المناسب. أرفق ملفات بالسؤال بالسحب أو اللصق أو من قائمة
+**+** — وتُرسَل الصور إلى النموذج كمُدخل بصري — ويُحفَظ كل سؤال كمحادثة
+مستقلة: تنقّل بينها، أو ابدأ محادثة جديدة، أو احذف واحدة، وتبقى القائمة بعد
+إعادة التشغيل.
+
+<img src="../assets/readme/home-ask-ai-motion.webp" alt="تسجيل شاشة لميزة Ask AI في GenOffice: يُكتب السؤال quick summary, what drove our Q3 growth and how did Asia-Pacific perform في الشاشة الرئيسية؛ يقرأ الوكيل ملفين مميَّزين بنجمة ويجيب بإطلاق Aurora X1 والتوسّع في آسيا والمحيط الهادئ، ويتبع كل ادّعاء شريحة استشهاد تسمّي التقرير الفصلي أو مصنّف المبيعات الإقليمية؛ والنقر على شريحة المصنّف يفتحه في Sheets مع تمييز صف Asia-Pacific" width="100%">
+
+تبحث Ask AI في فهرس النص الكامل نفسه الموجود على الجهاز الذي يستخدمه
+[البحث](#7--search--find-the-file-that-answers-the-question-with-typesafe-jev)
+وتقرأ الملفات صفحةً صفحة، فلا يرى النموذج سوى النتائج والمقاطع التي طلبها، عبر
+المزوّد الذي اخترته. ويمكنها أيضًا استدعاء سطر أوامر `genoffice` المدمج لبناء
+ملفات كاملة؛ فيظهر كل ملف كبطاقة ناتج (artifact) أسفل الإجابة، وتفتحه نقرة
+واحدة.
+
+### 9 · CLI — وكيل البرمجة الخاص بك يقود GenOffice، على جهازك
 
 يأتي GenOffice مع سطر أوامر `genoffice` ومهارة وكيل. ثبّت المهارة، وسيتمكّن
 Claude Code أو Codex أو Cursor أو Gemini CLI أو GitHub Copilot أو OpenCode أو
@@ -182,7 +264,7 @@ Windsurf من إنشاء ملفات Office حقيقية وتحويلها وقر�
 </tr>
 </table>
 
-### 8 · MCP — نفس الأدوات عبر Model Context Protocol
+### 10 · MCP — نفس الأدوات عبر Model Context Protocol
 
 كل أمر من أوامر `genoffice` هو أيضًا أداة MCP. يمكن لـ Claude Code وClaude
 Desktop وCursor وأي عميل MCP آخر تشغيل `genoffice mcp` بأنفسهم، دون الحاجة
@@ -199,6 +281,12 @@ Desktop وCursor وأي عميل MCP آخر تشغيل `genoffice mcp` بأنف�
 </tr>
 </table>
 
+### 11 · الملفات القديمة — ملفات `.doc` و`.xls` و`.ppt` من العقد الأول من الألفية تُفتح أيضاً
+
+يُفتح ملف Word 97–2003 بصيغة `.doc` أو ملف Excel بصيغة `.xls` أو ملف PowerPoint بصيغة `.ppt` كنسخة محوَّلة بصيغة `.docx` أو `.xlsx` أو `.pptx` تُنشأ على جهازك؛ والملف الأصلي لا يتغير أبداً. تنتقل الصور والجداول والصيغ وتنسيقات الأرقام والتعبئات والتخطيط. وما يحتفظ به كل تنسيق وما يُسقطه موضَّح في [الملفات القديمة وملفات ODF تُفتح كنسخ محوَّلة](#legacy-and-odf-files-open-as-converted-copies).
+
+<img src="../assets/readme/legacy-formats-motion.webp" alt="عرض سريع لـ GenOffice وهو يفتح ملفات .ppt و.doc و.xls لتقرير سنوي خيالي لعام 2004، ثم شريحة واحدة معروضة في PowerPoint بجانب العرض المحوَّل في GenOffice" width="100%">
+
 ## لماذا GenOffice
 
 - **مفتوح المصدر**، برخصة Apache-2.0، ويُطوَّر علنًا على GitHub.
@@ -212,18 +300,71 @@ Desktop وCursor وأي عميل MCP آخر تشغيل `genoffice mcp` بأنف�
 - **PDF يُعالَج كما ينبغي.** حرِّر النص داخل الصفحة مباشرة، وحوِّل PDF إلى Word
   أو Excel أو PowerPoint على جهازك، مع OCR للنظام لملفات المسح الممسوحة.
 - **Markdown و HTML أيضًا**، بنفس لوحة الذكاء الاصطناعي وتصدير محلي إلى Word.
+- **بحث يجد الإجابة، لا الكلمة المفتاحية.** بحث في النص الكامل لكل مستند في
+  مجلداتك، مفهرَس على الجهاز، مع إعادة ترتيب اختيارية عبر TypeSafe Jev، نموذج
+  التقييم System One.
+- **Ask AI عبر ملفاتك.** ميّز الملفات المهمة بنجمة واطرح أسئلتك بلغة عادية؛ وكل
+  إجابة تستشهد بالملف الذي جاءت منه، على بُعد نقرة واحدة.
+- **المهارات.** مهارات جاهزة أو ملف `SKILL.md` خاص بك، تُرفق من قائمة **+** في أي لوحة ذكاء اصطناعي.
 - **قابل للبرمجة.** سطر أوامر `genoffice`، ومهارة وكيل، وخادم MCP يضعون كل
   محرّك في خدمة Claude Code وClaude Desktop وCodex وCursor وغيرها من الوكلاء،
   مع بقاء كل شيء على الجهاز.
 - **مجاني**، للأفراد والفرق على حد سواء.
 
+<<<<<<< ours
+=======
+## خلفيات الذكاء الاصطناعي
+
+**سجّل الدخول بواسطة Genspark** فلا تحتاج إلى أي إعداد: تُوجَّه طلبات النماذج
+عبر بروكسي Genspark (عائلات Claude و GPT و Gemini)، ويحصل الوكلاء على البحث
+عبر الويب والصور، وتوليد الصور، وتحليل الصور والصوت والفيديو.
+
+**أو استخدم مفتاحك الخاص.** تسرد صفحة Settings → AI مزوِّدين مثل Claude
+وOpenAI وGemini وDeepSeek وKimi وGLM وQwen وDoubao وMiniMax وGrok وMistral
+وOpenRouter وRequesty
+وOpper
+وCheaper Inference
+وAtlas Cloud
+وSiliconFlow
+وPPIO
+وCommand Code وOpenCode Zen/Go، إضافة إلى خانة مخصَّصة لأي نقطة نهاية متوافقة مع
+OpenAI (عنوان أساسي + مفتاح)، بما في ذلك خوادم النماذج المحلية. ولكل من
+البحث والوسائط مزوِّدوه الخاصون بحسب القدرة تحت **AI Media & Search**: Serper
+أو Serply أو SearchApi أو Tavily أو Parallel أو Keenable أو Exa أو Firecrawl للبحث عبر
+الويب، وOpenAI أو Gemini أو Doubao/Seedream أو GLM أو Grok أو Qwen أو MiniMax أو Stability أو FLUX أو أي
+نقطة نهاية للصور متوافقة مع OpenAI لتوليد الصور وتحليل الصور والفيديو، إضافة
+إلى DeepSeek V4.1 Flash لتحليل الصور.
+
+يعيد **TypeSafe Jev** ترتيب نتائج البحث في الملفات على الشاشة الرئيسية. تحت
+**AI Media & Search → Local file search**، فعِّل Jev search reranking واختر
+نقطة نهاية: [OpenRouter](https://openrouter.ai/typesafe) (النموذج
+`typesafe/jev-1.13`) أو واجهة API الخاصة بـ TypeSafe. يُخزَّن المفتاح على هذا
+الجهاز فقط. الميزة مُعطَّلة افتراضيًا؛ وعند تفعيلها تُرسَل مقتطفات أفضل 20
+نتيجة محلية للتقييم ولا يغادر الجهاز أي شيء آخر.
+
+يعمل **Parallel** دون حساب: خدمة Search MCP المجانية التابعة له (محدودة
+المعدّل) هي البحث الافتراضي عبر الويب متى لم يكن هناك تسجيل دخول إلى Genspark
+أو مفتاح بحث مُعدّ، وتعمل قبل اللجوء إلى استخلاص نتائج DuckDuckGo. اختر
+Parallel تحت Web search وأدخل مفتاح [Parallel](https://platform.parallel.ai/)
+لاستخدام Search API بدلًا من ذلك. وKeenable كذلك لا يحتاج إلى مفتاح؛ فالمفتاح
+يرفع حدود الاستخدام فقط.
+
+>>>>>>> theirs
 تأتي الحزمة كاملةً بثلاثة مظاهر: فاتح وداكن ومظهر النظام. تغيّر المظاهر فقط ما
 يظهر على الشاشة: تحتفظ ملفات التصدير والطباعة والحفظ دائمًا بألوان المستند
 نفسه.
 
-<a id="command-line-and-agent-skill"></a>
+## <a id="skills"></a>المهارات
 
-## سطر الأوامر ومهارة الوكيل
+المهارة ملف `SKILL.md` يخبر الذكاء الاصطناعي كيف يُنجز مهمة واحدة بإتقان: تقرير أسبوعي، اتفاقية عدم إفصاح، خطة درس.
+يأتي GenOffice بمجموعة منها ويقبل مهاراتك الخاصة بالتنسيق نفسه الذي تستخدمه وكلاء البرمجة.
+
+- **الإعدادات ← المهارات.** **ثبّت** مهارة موصى بها، أو **استورد** مجلدًا أو ملف zip أو ملف `SKILL.md` واحدًا. لا يُشغَّل شيء عند الاستيراد. ويوضح تبويب **الكل** الدليل الموصى به كاملاً في مكان واحد، مع أوصاف تتبع لغة التطبيق.
+- **في المحادثة.** افتح قائمة **+** بجوار مربع الكتابة في أي لوحة ذكاء اصطناعي، اختر **المهارات**، حدد واحدة وأرسل. تُرفق المهارة بتلك الرسالة فقط.
+
+---
+
+## <a id="command-line-and-agent-skill"></a>سطر الأوامر ومهارة الوكيل
 
 كل ما تستطيع التطبيقات فعله بملف، يستطيع سطر أوامر `genoffice` فعله من
 الطرفية: فحص ملفات Word وExcel وPowerPoint وPDF وMarkdown وHTML وتحويلها
@@ -252,10 +393,11 @@ GenOffice، ولا يحتاج إلى بيئة تشغيل خاصة به، ولا 
 ```bash
 genoffice --version
 genoffice info report.docx --json                  # headings and blocks; or sheets, slides, pages
-genoffice convert report.md --to pdf               # md/html/docx/xlsx/pptx → pdf, pdf → docx/xlsx/pptx, …
+genoffice convert report.md --to pdf               # md/html/docx/xlsx/pptx → pdf, pdf → docx/xlsx/pptx/md/html, odt/ods/odp → docx/xlsx/pptx, doc/dot → docx, ppt → pptx, …
 genoffice create --type docx --from notes.md --out notes.docx
 genoffice create --type xlsx --from table.json --out sales.xlsx   # "=SUM(B2:B9)" cells stay live formulas
 genoffice docs read report.docx --range 0-9 --json # then `docs apply --ops edits.json` edits in place
+genoffice docs compare original.docx revised.docx --out redline.docx   # the differences as tracked Word revisions
 genoffice render report.docx --out shots/          # one PNG per page, to look at what you made
 genoffice open sales.xlsx                          # hand the result to the editor
 ```
@@ -267,7 +409,7 @@ genoffice open sales.xlsx                          # hand the result to the edit
 
 ### ما الذي يشغّله الوكيل فعليًا
 
-عرض المجموعة الشمسية في العرض التوضيحي أعلاه استغرق توجيهًا واحدًا في Claude Code.
+عرض المجموعة الشمسية في [العرض التوضيحي](#demo) استغرق توجيهًا واحدًا في Claude Code.
 وخلف الكواليس، اتّبع الوكيل سير العمل المرحلي للمهارة، وتحقّق سطر الأوامر من
 كل مرحلة قبل أن تبدأ التالية:
 
@@ -287,19 +429,25 @@ genoffice open deck/solar-system.pptx
 لا يحدث أي استدعاء لنموذج داخل `genoffice`: الوكيل هو من يفكّر، وسطر الأوامر
 هو من يبني ويتحقّق، وتُفتح النتيجة في GenOffice أو PowerPoint كملف `.pptx` عادي.
 
-<a id="mcp-server"></a>
-
-### خادم MCP
+### <a id="mcp-server"></a>خادم MCP
 
 الأوامر نفسها متاحة كأدوات [Model Context Protocol](https://modelcontextprotocol.io)
 للمساعدين الذين لا يمكنهم تشغيل طرفية، أو الذين تفضّل ألا تمنحهم واحدة. هناك
 طريقتان للدخول، وكلتاهما موضَّحتان بمقتطفات جاهزة للنسخ في **الإعدادات →
 التكاملات → MCP**:
 
+<<<<<<< ours
 | الطريقة                            | ما هي                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **A · `genoffice mcp`** (موصى بها) | خادم stdio يشغّله المساعد بنفسه؛ لا حاجة لفتح GenOffice. أداة واحدة لكل أمر (`info`، `convert`، `create_docx`، `create_xlsx`، `create_pptx`، `create_pdf`، `docs_read` / `docs_apply` / `docs_check`، `sheet_*`، `slides_*`، `render`، `guide`، `open`) بالإضافة إلى تدفّق العرض المرحلي `deck_start` → `deck_page` → `deck_build` → `deck_replace`. تُمرَّر العمليات والمواصفات وMarkdown مباشرة ضمن الطلب، لذا يعمل حتى العميل بلا نظام ملفات. |
 | **B · خادم HTTP محلي**             | يعمل داخل تطبيق GenOffice على `http://127.0.0.1:3093/mcp` (Streamable HTTP، مع دعم SSE القديم). تُشغِّل أدواته تبويب محرِّر Word المرئي: `create_session`، `insert_content`، `replace_blocks`، `apply_ops`، `read_document`، `save_session`، وتشاهد المستند وهو يتشكّل. مُعطَّل افتراضيًا؛ فعِّله من لوحة الإعدادات نفسها.                                                                                                                       |
+=======
+| الطريقة                            | ما هي                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A · `genoffice mcp`** (موصى بها) | خادم stdio يشغّله المساعد بنفسه؛ لا حاجة لفتح GenOffice. أداة واحدة لكل أمر (`info`، `convert`، `create_docx`، `create_xlsx`، `create_pptx`، `create_pdf`، `docs_read` / `docs_apply` / `docs_check`، `sheet_*`، `slides_*`، `render`، `guide`، `search`، `image`، `media`، `open`) بالإضافة إلى تدفّق العرض المرحلي `deck_start` → `deck_page` → `deck_build` → `deck_replace`. تُمرَّر العمليات والمواصفات وMarkdown مباشرة ضمن الطلب، لذا يعمل حتى العميل بلا نظام ملفات. |
+| **B · خادم HTTP محلي**             | يعمل داخل تطبيق GenOffice على `http://127.0.0.1:3093/mcp` (Streamable HTTP، مع دعم SSE القديم). تُشغِّل أدواته تبويب محرِّر Word المرئي: `create_session`، `insert_content`، `replace_blocks`، `apply_ops`، `read_document`، `save_session`، وتشاهد المستند وهو يتشكّل. مُعطَّل افتراضيًا؛ فعِّله من لوحة الإعدادات نفسها.                                                                                                                                                   |
+| **C · `genoffice mcp --http`**     | مجموعة أدوات stdio نفسها كخادم Streamable HTTP للعملاء على أجهزة أخرى: حاوية، أو بيئة معزولة (sandbox)، أو جهاز مشترك على شبكتك. تنتقل الملفات مع الاستدعاءات: `PUT /files/<name>` يرفع ملفًا ويعيد عنوان URL، وكل معامل `file` يقبل عنوان URL من نوع http(s)، والأداة التي تكتب ملفًا تعيده كعنوان URL للتنزيل، ومعه، إن كان صغيرًا، البايتات كمورد MCP. يفتحه `--host 0.0.0.0` على الشبكة، ويحميه `--token`.                                                               |
+>>>>>>> theirs
 
 ```bash
 # Claude Code
@@ -307,9 +455,27 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 ```
 
 ```jsonc
-// Cursor أو Claude Desktop أو أي عميل MCP آخر
+// Cursor, Claude Desktop or any other MCP client
 { "mcpServers": { "genoffice": { "command": "genoffice", "args": ["mcp"] } } }
 ```
+
+```bash
+# On the machine that has GenOffice (private network; add --token for a shared box)
+genoffice mcp --http 3093 --host 0.0.0.0 --token "$GENOFFICE_MCP_TOKEN"
+
+# From the client: upload, then use the URL wherever a tool takes a file
+curl -T report.docx -H "Authorization: Bearer $GENOFFICE_MCP_TOKEN" http://server:3093/files/
+#   → { "url": "http://server:3093/files/<id>/report.docx", ... }
+#   docs_read({ "file": "http://server:3093/files/<id>/report.docx" })
+#   docs_apply(...) → output_url, downloadable with curl -o
+```
+
+عبر HTTP تحصل كل جلسة على مجلد عمل مؤقت خاص بها، وتُحَلّ المسارات النسبية
+ومجلدات العروض داخله، ولا تُتاح أداة `open`، وما لم يُضبط
+`GENOFFICE_ALLOWED_ROOTS` لا تستطيع الأدوات الخروج من مخزن الملفات الخاص
+بالخادم. أما `render` و`convert` إلى PDF و`create_pdf` فما زالت تشغّل عملية
+GenOffice مخفية، لذا يحتاج المضيف الذي يعمل بلا واجهة إلى تثبيت التطبيق وإلى
+شاشة افتراضية (`xvfb-run`).
 
 `genoffice` هنا هو سطر الأوامر المرفق داخل التطبيق (على macOS في
 `/Applications/GenOffice.app/Contents/Resources/cli/genoffice`؛ تعرض لوحة
@@ -318,9 +484,36 @@ claude mcp add --transport stdio genoffice -- genoffice mcp
 يمكن للمهارة وخادم MCP التعايش معًا، ويختار المساعد أحدهما. يحصر `GENOFFICE_ALLOWED_ROOTS` كل
 أداة ضمن المجلدات التي تحدّدها.
 
+<<<<<<< ours
 <a id="download"></a>
 
 ## التنزيل
+=======
+عرض الطاقة المتجدّدة في [العرض التوضيحي](#demo) هو ما يبدو عليه توجيه واحد في
+Claude Code، مع تفعيل خادم MCP الخاص بـ `genoffice` فقط، من جهة البروتوكول:
+
+```text
+capabilities · guide(slides, spec) · guide(slides, design)
+search(query) ×4                         → IEA, BNEF and IRENA figures for the slides
+search(query, images) ×7 · media(url, ask) ×7
+                                         → candidate photos, each one checked to be a real photograph
+deck_start(dir, style, outline)          → outline checked: 8 pages to write
+deck_page(dir, 0, page) … deck_page(dir, 7, page)
+                                         → each page checked against the outline and the palette; one page sent again
+deck_build(dir, out)                     → renewables-2026.pptx, no image failures
+slides_audit(file) · slides_render(file, out)
+                                         → no layout findings; 8 PNGs come back as image content
+deck_replace(dir, n, page) ×3 · slides_render(file, out)
+                                         → three pages fixed after looking at the renders
+```
+
+ثمانية وثلاثون استدعاءً، في نحو ثلاث عشرة دقيقة، دون أن يلمس المساعد أي طرفية:
+الرسوم البيانية والصور وكل الأدلة والفحوصات والعروض المصيَّرة انتقلت كنتائج
+لاستدعاءات أدوات MCP. غادر الجهاز فقط `search` و`media`، إلى المزوّد المهيَّأ
+في GenOffice.
+
+## <a id="download"></a>التنزيل
+>>>>>>> theirs
 
 | المنصة                               | المتطلبات                                             | التنزيل                                                                              |
 | ------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -352,6 +545,11 @@ sudo dnf install ./genoffice-<version>.x86_64.rpm     # Fedora / RHEL family
 sudo zypper install ./genoffice-<version>.x86_64.rpm  # openSUSE
 ```
 
+تضيف حزمتا deb و rpm أيضًا قوالب فارغة لمدير الملفات Dolphin في KDE Plasma:
+انقر بزر الفأرة الأيمن داخل مجلد → **Create New** فتظهر _GenOffice Document_
+و _GenOffice Spreadsheet_ و _GenOffice Presentation_. توجد هذه القوالب في
+`/usr/share/templates` وتُزال مع الحزمة.
+
 يعمل ملف AppImage مباشرة من مكانه: ثبِّت بيئة تشغيل FUSE 2
 (`sudo apt install libfuse2`؛ وعلى Ubuntu 24.04 اسم الحزمة هو `libfuse2t64`)،
 ثم اجعل الملف قابلاً للتنفيذ، وشغِّله:
@@ -360,6 +558,8 @@ sudo zypper install ./genoffice-<version>.x86_64.rpm  # openSUSE
 chmod +x GenOffice-<version>.AppImage
 ./GenOffice-<version>.AppImage
 ```
+
+على جهاز Chromebook، تعمل الحزم نفسها داخل بيئة لينكس (Crostini) — التفاصيل في [docs/platforms/chromeos.md](../platforms/chromeos.md).
 
 </details>
 
@@ -382,6 +582,29 @@ save      ─► dirty blocks → OOXML fragments (referencing existing styles o
 
 الجولة التفصيلية حزمة بحزمة (محرِّكات docx/pptx، و`pdf2docx`، و`html2docx`،
 ونواة الوكيل ومزوِّدوه) موجودة في [CONTRIBUTING.md](../../CONTRIBUTING.md#engine-packages).
+
+### <a id="legacy-and-odf-files-open-as-converted-copies"></a>الملفات القديمة وملفات ODF تُفتح كنسخ محوَّلة
+
+الصيغ التي لا يستطيع GenOffice الكتابة إليها — ملفات Word القديمة
+`.doc`/`.dot`، وملفات Hancom بصيغتي `.hwp`/`.hwpx`، وملفات Excel 97 بصيغة
+`.xls`، وملفات `.tsv`، وملفات PowerPoint القديمة `.ppt`، وعائلة OpenDocument
+(`.odt` و `.ott` و `.ods` و `.ots` و `.odp` و `.otp`) — هي ملفات مستورَدة لا
+ملفات أصلية.
+عند فتح أحدها يُحوَّل على جهازك إلى نسخة `.docx` أو `.xlsx` أو `.pptx` وتُفتح
+تلك النسخة؛ أما الملف الأصلي فلا يُقرأ مرة أخرى ولا يُكتب إليه أبدًا.
+
+- يسأل Docs و Slides أولًا عن مكان حفظ النسخة (افتراضيًا ملف `.docx`/`.pptx`
+  مجاور للملف الأصلي)، فتذهب كل عملية حفظ لاحقة إلى هناك. يُحوَّل ملف `.ppt`
+  مع شرائحه الرئيسية وهندسة أشكاله وتعبئاته وصوره وتنسيق نصوصه، فيبدو العرض
+  التقديمي كما كان يعرضه PowerPoint؛ أما الملاحظات والحركات والانتقالات
+  والارتباطات التشعبية فلا تُنقل بعد.
+- يفتح Sheets المصنّف المحوَّل مباشرة ويوجّه أول عملية حفظ عبر Save As إلى ملف
+  `.xlsx` جديد. ويُستثنى من ذلك `.csv`: يحتفظ بهويته ويكتب الحفظ القيم إلى ملف
+  `.csv` نفسه، كما يفعل Excel.
+- التحويل في اتجاه واحد وقد يُسقط ميزات تحملها صيغة المصدر ولا تحملها OOXML.
+  تعرض صيغ `.doc` و `.ppt` و `.hwp` وصيغ ODF مربع تأكيد يوضّح ذلك؛ حدِّد خيار
+  "Convert without asking next time" لتخطّيه، ويعيد خيار "Ask before converting
+  legacy files" في Settings → General تفعيله.
 
 ## التطوير
 
@@ -411,6 +634,8 @@ GenOffice قيد تطوير نشط، وملاحظاتك هي ما يشكِّل �
   [GitHub Issues](https://github.com/genspark-ai/genoffice/issues).
 - **انضم إلى محادثة مجموعة GenOffice** على
   [GenTeam](https://genoffice.ai/join) للتواصل مع الفريق والمستخدمين الآخرين.
+- **تابع [@merrickbuilds](https://x.com/merrickbuilds) على X** للاطلاع على
+  ملاحظات الإصدارات والعروض التوضيحية وما يُبنى تاليًا.
 - **أضِف نجمة (Star) للمستودع** إذا كان GenOffice مفيدًا لك — فهذه أفضل طريقة
   لدعم المشروع.
 
@@ -430,6 +655,9 @@ GenOffice قيد تطوير نشط، وملاحظاتك هي ما يشكِّل �
 نعم. يفتح GenOffice ملفات `.docx` و `.xlsx` و `.pptx` الأصلية ويحفظها.
 والحفظ يحافظ على البايتات: تُكتب الأجزاء التي لم تلمسها من الملف كما هي
 حرفيًا بايتًا ببايت، فتستمر المستندات في العمل في Microsoft Office.
+وتُفتح كذلك ملفات `.doc`/`.dot` و `.xls` و `.ppt` القديمة كنسخ محوَّلة بصيغ
+`.docx`/`.xlsx`/`.pptx` — راجع [الملفات القديمة وملفات ODF تُفتح كنسخ
+محوَّلة](#legacy-and-odf-files-open-as-converted-copies).
 
 </details>
 
@@ -461,6 +689,31 @@ macOS و Windows، فتُحوَّل إلى نص قابل للتحرير بدلً
 </details>
 
 <details>
+<<<<<<< ours
+=======
+<summary><b>هل يمكنني استخدام نموذج ذكاء اصطناعي أو مفتاح API خاص بي؟</b></summary>
+
+نعم. إلى جانب تسجيل الدخول بواسطة Genspark الذي لا يتطلب أي مفتاح، يدعم
+GenOffice استخدام مفتاحك الخاص مع Claude وOpenAI وGemini وDeepSeek وKimi
+وGLM وQwen وDoubao وMiniMax وGrok وMistral وOpenRouter وRequesty وOpper وCheaper Inference وAtlas Cloud وOpenCode Zen/Go،
+إضافة إلى أي نقطة نهاية متوافقة مع OpenAI — بما في ذلك خوادم النماذج المحلية.
+ولكل من البحث وتوليد الصور وتحليل الصور والفيديو مفاتيحه الخاصة تحت
+Settings → AI Media & Search.
+
+</details>
+
+<details>
+<summary><b>هل يمكنني إيقاف لوحة الذكاء الاصطناعي؟</b></summary>
+
+نعم. يحمل Settings → AI مفتاح تفعيل باسم **Show the AI sidebar**. أوقفه فتُخفي
+كل المحرِّرات الشريط الجانبي، وتتوقف المستندات الجديدة عن فتحه من تلقاء نفسها.
+ويظل أي إجراء ذكاء اصطناعي صريح — زر في الشريط (ribbon) أو بند في القائمة —
+يفتح اللوحة لذلك المستند، وبإغلاقها تعود إلى الوضع المخفي.
+
+</details>
+
+<details>
+>>>>>>> theirs
 <summary><b>هل يمكن لـ GenOffice تحويل HTML إلى Word؟</b></summary>
 
 نعم — يُنتج خيار Export as Word في تطبيق HTML ملف `.docx` أصليًا قابلًا
@@ -525,6 +778,11 @@ macOS و Windows، فتُحوَّل إلى نص قابل للتحرير بدلً
   عملية Rust المساعدة الخاصة بـ xlsx.
 - [libeot](https://github.com/umanwizard/libeot) (MPL-2.0) — أداة فكّ تشفير
   MicroType Express لخطوط PowerPoint المُضمَّنة، تم نقلها إلى TypeScript.
+- [rhwp](https://github.com/edwardkim/rhwp) (MIT) — يقرأ مستندات `.hwp`
+  الثنائية ويحوّلها إلى HWPX لاستيراد ملفات Hancom؛ وتحمل نسخته المبنية بـ
+  WebAssembly حزم Rust (crates) ومنفذ hwp-extract من Volexity المذكورَين في
+  إشعارات الجهات الخارجية. "한글" و"한컴" و"HWP" و"HWPX" علامات تجارية مسجَّلة
+  لشركة Hancom Inc.؛ ولا تربط GenOffice أي علاقة بشركة Hancom.
 - [React](https://react.dev/) (MIT) — طبقة واجهة المستخدم لكل التطبيقات.
 - [Mermaid](https://mermaid.js.org/) (MIT) و [KaTeX](https://katex.org/)
   (MIT) — الرسوم البيانية والمعادلات الرياضية في Markdown و Docs.

@@ -135,6 +135,7 @@ describe('PDF image export paths', () => {
     expect(state.showItemInFolder).toHaveBeenCalledWith(join(resolve(dir), 'page-p3.jpg'))
   })
 
+<<<<<<< ours
   it('encodes JPG export bytes as a valid JPEG (SOI FFD8 / EOI FFD9) at the chosen quality', async () => {
     const canvas = createCanvas(16, 16)
     const ctx = canvas.getContext('2d')
@@ -173,6 +174,8 @@ describe('PDF image export paths', () => {
     expect(written.equals(encoded50)).toBe(false)
   })
 
+=======
+>>>>>>> theirs
   it('builds jpg paths in the path builder', () => {
     expect(buildExportImagePaths(resolve(dir), 'page', [3], 'jpg')).toEqual([
       join(resolve(dir), 'page-p3.jpg'),

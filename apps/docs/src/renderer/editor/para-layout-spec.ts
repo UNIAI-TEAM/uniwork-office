@@ -62,6 +62,7 @@ import {
   PARA_BORDER_SHADOW,
   paraBorderCss,
   paraBorderLinesWithPad,
+<<<<<<< ours
   paraBorderPadding,
   paraBorderPaddingDecls,
   paraBorderShadowDecls,
@@ -69,6 +70,19 @@ import {
 import { paraFrameCss } from './para-frame'
 import { DK_SIDE, dkBackground, dkBorder } from './dark-page'
 import { fillInk } from './shading-ink'
+=======
+  paraBorderOutset,
+  paraBorderOutsetDecls,
+  paraBorderPadding,
+  paraBorderPaddingDecls,
+  paraBorderShadowDecls,
+  type ParaBorderSideLines,
+} from './para-border-css'
+import { paraFrameCss } from './para-frame'
+import { DK_SIDE, dkBackground, dkBackgroundImage, dkBorder } from './dark-page'
+import { fillInk } from './shading-ink'
+import { shadingHatchCss } from './shading-hatch'
+>>>>>>> theirs
 import { quarterTurnInsetPx } from './image-rotation'
 
 export type LayoutRunAttrs = {
@@ -586,6 +600,11 @@ const CLIPBOARD_PARA_ATTR_TYPES: Record<string, 'string' | 'number' | 'boolean'>
   styleSpaceBeforeAuto: 'boolean',
   styleSpaceAfterAuto: 'boolean',
   contextualSpacing: 'boolean',
+<<<<<<< ours
+=======
+  suppressAutoHyphens: 'boolean',
+  mirrorIndents: 'boolean',
+>>>>>>> theirs
   keepNext: 'boolean',
   keepLines: 'boolean',
   widowControl: 'boolean',
@@ -601,6 +620,10 @@ const CLIPBOARD_PARA_ATTR_TYPES: Record<string, 'string' | 'number' | 'boolean'>
   shadingFill: 'string',
   shadingDisplay: 'string',
   shadingClear: 'boolean',
+<<<<<<< ours
+=======
+  shadingPattern: 'string',
+>>>>>>> theirs
   borderReset: 'string',
   frameBox: 'string',
   emptyRunSize: 'number',
@@ -811,6 +834,11 @@ export interface LayoutParaFormat {
   spaceBeforeAuto?: boolean | null
   spaceAfterAuto?: boolean | null
   contextualSpacing?: boolean | null
+<<<<<<< ours
+=======
+  suppressAutoHyphens?: boolean | null
+  mirrorIndents?: boolean | null
+>>>>>>> theirs
   emptyRunSize?: number | null
   emptyRunFont?: string | null
   /** in-flow pictures and nothing else */
@@ -1024,7 +1052,16 @@ export function lineBoxSpec(
   if (kind === 'body') {
     if (fmt.contextualSpacing === true) classes.push('ctx-sp')
     else if (fmt.contextualSpacing === false) classes.push('ctx-sp-off')
+<<<<<<< ours
   }
+=======
+    if (fmt.mirrorIndents === true) classes.push('doc-mirror-ind')
+  }
+  if (fmt.suppressAutoHyphens === true)
+    styles.push('hyphens:manual', '-webkit-hyphens:manual', '--doc-shy:none')
+  // the rule exists only in a document that hyphenates (doc-style-css)
+  else if (fmt.suppressAutoHyphens === false) classes.push('doc-hyphens-on')
+>>>>>>> theirs
   return { classes, styles }
 }
 
@@ -1142,6 +1179,11 @@ export function fromRuns(
       spaceAfterAuto:
         fmt?.spaceAfterAuto ?? (fmt?.spaceAfter != null && !!fmt?.effective?.spacing.afterAuto),
       contextualSpacing: fmt?.contextualSpacing ?? null,
+<<<<<<< ours
+=======
+      suppressAutoHyphens: fmt?.suppressAutoHyphens ?? null,
+      mirrorIndents: fmt?.mirrorIndents ?? null,
+>>>>>>> theirs
       emptyRunSize: fmt?.emptyRunSizeHalfPoints ?? null,
       emptyRunFont: fmt?.emptyRunFontFamily ?? null,
       picOnly,
@@ -1360,6 +1402,11 @@ export function fromPmNode(
       spaceBeforeAuto: !!(node.attrs.spaceBeforeAuto ?? node.attrs.styleSpaceBeforeAuto),
       spaceAfterAuto: !!(node.attrs.spaceAfterAuto ?? node.attrs.styleSpaceAfterAuto),
       contextualSpacing: node.attrs.contextualSpacing as boolean | null,
+<<<<<<< ours
+=======
+      suppressAutoHyphens: node.attrs.suppressAutoHyphens as boolean | null,
+      mirrorIndents: node.attrs.mirrorIndents as boolean | null,
+>>>>>>> theirs
       emptyRunSize: numOrNull(node.attrs.emptyRunSize),
       emptyRunFont: node.attrs.emptyRunFont ? String(node.attrs.emptyRunFont) : null,
       picOnly,
@@ -1369,7 +1416,15 @@ export function fromPmNode(
   classes.push(...box.classes)
   const styles = box.styles
   if (classes.length > 0) attrs['class'] = classes.join(' ')
+<<<<<<< ours
   const shdBg = node.attrs.shadingDisplay ?? node.attrs.shadingFill
+=======
+  const hatch = paraHatchCss(node.attrs.shadingPattern)
+  const shdBg = hatch
+    ? node.attrs.shadingFill
+    : (node.attrs.shadingDisplay ?? node.attrs.shadingFill)
+  if (hatch) styles.push(`background-image:${hatch}`, dkBackgroundImage(hatch))
+>>>>>>> theirs
   // authored colors stay the declaration; the --dk-* twins feed the dark page (dark-page.ts)
   if (shdBg)
     styles.push(
@@ -1380,7 +1435,12 @@ export function fromPmNode(
     )
   else if (node.attrs.shadingClear)
     styles.push('background-color:transparent', '--pbdr-fill:transparent')
+<<<<<<< ours
   const ink = fillInk(shdBg ? String(shdBg) : null)
+=======
+  const inkFill = node.attrs.shadingDisplay ?? shdBg
+  const ink = fillInk(inkFill ? String(inkFill) : null)
+>>>>>>> theirs
   if (ink) attrs['data-ink'] = ink
   const borderPad = parseJsonAttr<Partial<Record<'t' | 'b' | 'l' | 'r', number>>>(
     node.attrs.borderPad,
@@ -1398,9 +1458,13 @@ export function fromPmNode(
   if (node.attrs.borders || borderPad) {
     const borders = String(node.attrs.borders ?? '')
     const borderLines = paraBorderLinesWithPad(
+<<<<<<< ours
       parseJsonAttr<Partial<Record<'t' | 'b' | 'l' | 'r', { color?: string; szPt?: number }>>>(
         node.attrs.borderLines,
       ),
+=======
+      parseJsonAttr<ParaBorderSideLines>(node.attrs.borderLines),
+>>>>>>> theirs
       borderPad,
     )
     for (const side of ['top', 'bottom', 'left', 'right'] as const) {
@@ -1416,6 +1480,18 @@ export function fromPmNode(
       delete padding.paddingRight
     }
     styles.push(...paraBorderPaddingDecls(padding), ...paraBorderShadowDecls(borderLines))
+<<<<<<< ours
+=======
+    const outset = paraBorderOutset(borders, borderLines)
+    if (outset)
+      styles.push(
+        ...paraBorderOutsetDecls(styles, outset, {
+          rtl: styles.includes('direction:rtl'),
+          list: listGeometry,
+          anchorHost,
+        }),
+      )
+>>>>>>> theirs
   }
   // a positioned frame (below) models the same w:framePr; frameBox only covers frames without a width
   if (node.attrs.frameBox && !node.attrs.frame)
@@ -1452,6 +1528,14 @@ export function fromPmNode(
   return { classes, styles, attrs }
 }
 
+<<<<<<< ours
+=======
+function paraHatchCss(raw: unknown): string | null {
+  const pattern = parseJsonAttr<{ val?: string; color?: string }>(raw)
+  return typeof pattern?.val === 'string' ? shadingHatchCss(pattern.val, pattern.color) : null
+}
+
+>>>>>>> theirs
 function parseJsonAttr<T>(raw: unknown): T | undefined {
   if (!raw) return undefined
   try {

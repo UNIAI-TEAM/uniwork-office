@@ -35,6 +35,7 @@ export function printScaleOption(scale: unknown): { scale: number } | Record<str
     : {}
 }
 
+<<<<<<< ours
 /**
  * True when the machine reports no printers at all (a fresh Linux VM without
  * CUPS, macOS "No printers available"). Chromium's print() then neither shows
@@ -87,6 +88,8 @@ export function markdownExportPath(picked: string): string {
   return `${picked}.md`
 }
 
+=======
+>>>>>>> theirs
 /** the document's own paper size for the CUPS print route: the renderer reads
  * it off the pagination preview's first sheet (twips), and printToPDF bakes
  * the pages at that size instead of Chromium's Letter default. Absent or

@@ -23,7 +23,13 @@ export const cs = {
   aiQcPageSkipped: 'Stránka {n}: automatická kontrola rozložení přeskočena',
   aiQcStopped: 'Kontrola rozložení zastavena',
   aiQcCapped: 'Dalších {count} stránek nebylo zkontrolováno (limit na jedno spuštění)',
+<<<<<<< ours
   aiPanelTitle: 'UniAI',
+=======
+  aiGskLoginBtn: 'Přihlásit se ke Genspark',
+  aiGskLoginOk: 'Přihlášeno ke Genspark',
+  aiPanelTitle: 'Genspark',
+>>>>>>> theirs
   aiOpenAssistant: 'Otevřít asistenta AI',
   aiFactCheckBtn: 'Ověření faktů AI',
   aiFactCheckPrompt:
@@ -115,6 +121,8 @@ export const cs = {
   aiErrUnknown: 'Neznámá chyba',
   aiErrStreamTimeout:
     'Požadavek na AI vypršel: ze sítě nepřišla žádná odpověď, běh byl zastaven. Zkontrolujte připojení a zkuste to znovu',
+  aiErrRegion:
+    'Poskytovatel tohoto modelu neposkytuje služby ve vaší aktuální oblasti — vyberte jiný model nebo změňte síť',
   aiErrOverloaded: 'Služba AI je momentálně zaneprázdněná — zkuste to prosím za chvíli znovu',
   aiErrNetwork:
     'Problém se sítí: službu AI se nepodařilo kontaktovat. Zkontrolujte připojení a zkuste to znovu',
@@ -226,7 +234,10 @@ export const cs = {
   aiSumSaveTemplate: 'Uložena šablona stylu „{name}“',
   aiSumTemplatesEmpty: 'Šablony stylu (prázdné)',
   aiSumListTemplates: 'Vypsáno šablon stylu: {count}',
+<<<<<<< ours
   aiPageCloudToLocal: 'Cloud není dostupný — vygenerováno lokálně',
   aiViewOnlyNotice:
     'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

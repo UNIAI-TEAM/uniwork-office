@@ -30,6 +30,17 @@ export const id = {
   appExportPdfProgress: 'Mengekspor PDF…',
   appExportPdfDone: 'PDF diekspor: {path}',
   appExportPdfFailed: 'Gagal mengekspor PDF: {error}',
+  appExportVideoTitle: 'Ekspor sebagai video',
+  appExportVideoResolution: 'Resolusi',
+  appExportVideoSeconds: 'Detik yang dihabiskan di setiap slide',
+  appExportVideoUseTimings: 'Gunakan pengaturan waktu dan narasi yang direkam bila ada',
+  appExportVideoCreate: 'Buat Video',
+  appExportVideoCancel: 'Batal',
+  appExportVideoProgress: 'Mengenkode video… {percent}%',
+  appExportVideoDone: 'Video diekspor: {path}',
+  appExportVideoFailed: 'Ekspor video gagal: {error}',
+  appExportVideoUnsupported:
+    'Tidak ada encoder video H.264 di sistem ini, ekspor MP4 tidak dapat dilakukan',
   appStatusBgAppliedAll: 'Warna latar belakang diterapkan ke semua slide',
   appStatusThemeApplied: 'Tema "{name}" diterapkan',
   appStatusThemeApplyFailed: 'Gagal menerapkan tema: {error}',
@@ -65,6 +76,10 @@ export const id = {
   appStatusAudioInserted: 'Audio disisipkan (disematkan dalam .pptx)',
   appStatusModel3dInserted:
     'Model 3D disisipkan: pilih untuk memutarnya (PowerPoint juga menampilkannya dalam 3D)',
+<<<<<<< ours
+=======
+  appStatusModel3dNoPreview: 'Model 3D tidak dapat digambar di sini; gambarnya tidak berubah',
+>>>>>>> theirs
   appStatusRecordingEmpty: 'Rekaman kosong; tidak ada yang disisipkan',
   appStatusRecordingInserted: 'Rekaman layar disisipkan pada slide saat ini (webm disematkan)',
   appStatusRecording: 'Merekam… klik "Rekaman Layar" lagi untuk berhenti dan menyisipkan',
@@ -199,6 +214,7 @@ export const id = {
   appCtxSendToBack: 'Kirim ke Belakang',
   appCtxBringForward: 'Bawa Maju',
   appCtxSendBackward: 'Kirim Mundur',
+  appCtxRotate: 'Putar',
   appCtxRotateLeft90: 'Putar Kiri 90°',
   appCtxRotateRight90: 'Putar Kanan 90°',
   appCtxFlipH: 'Balik Horizontal',
@@ -267,6 +283,25 @@ export const id = {
     'Total waktu peragaan slide adalah {duration}. Simpan waktu setiap slide untuk perpindahan slide otomatis?',
   appRehearseDiscard: 'Jangan Simpan',
   appRehearseSave: 'Simpan',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Rekam Narasi',
+  appRecordSummary: 'Durasi rekaman {duration}. Simpan narasi dan waktu setiap slide?',
+  appRecordDiscard: 'Jangan Simpan',
+  appRecordSave: 'Simpan',
+  appStatusRecordSaved: 'Narasi disimpan di {count} slide (PowerPoint juga memutarnya)',
+  appStatusRecordFailed: 'Rekaman tidak dapat disimpan',
+  appStatusNarrationCleared: 'Narasi dihapus',
+  appSettingsTitle: 'Pengaturan AI',
+  appSettingsAccount: 'Akun Genspark',
+  appSettingsChecking: 'Memeriksa…',
+  appSettingsLoggedIn: 'Sudah masuk',
+  appSettingsLoggedInEmail: 'Sudah masuk: {email}',
+  appSettingsLoggedOut: 'Belum masuk (fitur AI memerlukan akun Genspark)',
+  appSettingsLoginPending: 'Menunggu proses masuk di browser…',
+  appSettingsLogin: 'Masuk ke Genspark',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Batal',
   appCropHint:
     'Enter untuk mengonfirmasi · Esc untuk membatalkan · Klik di luar untuk mengonfirmasi',

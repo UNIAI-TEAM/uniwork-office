@@ -40,8 +40,11 @@ export default defineConfig({
           '@genoffice/docx-engine',
           '@genoffice/electron-utils',
           '@genoffice/font-metrics',
+<<<<<<< ours
           '@genoffice/shortcuts',
           '@genoffice/pptx-render',
+=======
+>>>>>>> theirs
           '@genoffice/xlsx-gateway',
         ],
       }),

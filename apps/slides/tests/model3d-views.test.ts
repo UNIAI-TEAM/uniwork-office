@@ -1,10 +1,17 @@
 /** PowerPoint's 3D Model Views: each turns the named side of the model towards the camera. */
+<<<<<<< ours
 import { describe, expect, it, vi } from 'vitest'
 import { Euler, Vector3 } from 'three'
 import { MODEL3D_VIEWS } from '../src/renderer/model3d/views'
 import { renderingSize, MAX_RENDERING_PX } from '../src/renderer/model3d/scene'
 import { insertModel3dFile } from '../src/renderer/model3d/actions'
 import type { ActionCtx } from '../src/renderer/action-context'
+=======
+import { describe, expect, it } from 'vitest'
+import { Euler, Vector3 } from 'three'
+import { MODEL3D_VIEWS } from '../src/renderer/model3d/views'
+import { renderingSize, MAX_RENDERING_PX } from '../src/renderer/model3d/scene'
+>>>>>>> theirs
 
 const toward = (label: string) => {
   const { rot } = MODEL3D_VIEWS.find((v) => v.label === label)!
@@ -37,6 +44,7 @@ describe('3D Model Views', () => {
       height: MAX_RENDERING_PX / 2,
     })
   })
+<<<<<<< ours
 
   it('insertModel3dFile shows no-preview status and does not insert when picked bytes are not a valid GLB container', async () => {
     const addModel3d = vi.fn(() => Promise.resolve(null))
@@ -64,4 +72,6 @@ describe('3D Model Views', () => {
     expect(setStatus).toHaveBeenCalledOnce()
     expect(addModel3d).not.toHaveBeenCalled()
   })
+=======
+>>>>>>> theirs
 })

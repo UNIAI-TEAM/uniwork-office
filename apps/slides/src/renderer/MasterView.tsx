@@ -347,6 +347,8 @@ export function MasterView({ initialItems, onClose }: Props) {
               }
               onEditText={(sourceId, caret) => setEditing({ sourceId, caret })}
               onTransform={onTransform}
+              // Master edits have no snapshot undo to pop: settle the gesture on its start box
+              onTransformCancel={(id, startBox) => void onTransform(id, startBox)}
               onEditTableCell={() => {}}
               onTableColResize={() => {}}
               onContextMenu={(sourceId, x, y) => {

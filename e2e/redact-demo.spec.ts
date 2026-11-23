@@ -106,7 +106,11 @@ test.describe('withholding a span from the model', () => {
       const dialog = page.locator('.modal', { hasText: 'Hide the selection from AI' })
       await expect(dialog).toBeVisible()
       const input = dialog.locator('input').first()
+<<<<<<< ours
       await expect(input).toHaveValue('')
+=======
+      await expect(input).toHaveValue(SECRET.slice(0, 24))
+>>>>>>> theirs
       await page.screenshot({ path: screenshotPath('docs-3-dialog') })
 
       await input.fill(LABEL)
@@ -120,7 +124,11 @@ test.describe('withholding a span from the model', () => {
       await expect(editor).toContainText(SECRET)
       await page.screenshot({ path: screenshotPath('docs-5-marked') })
 
+<<<<<<< ours
       await page.keyboard.press('ControlOrMeta+s')
+=======
+      await page.keyboard.press('Meta+s')
+>>>>>>> theirs
       // a .docx is a zip: document.xml is deflated, so the run properties can
       // only be read after inflating the part, not by scanning the raw bytes
       const readDocumentXml = async (): Promise<string> => {

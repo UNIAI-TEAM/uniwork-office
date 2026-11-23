@@ -453,6 +453,7 @@ describe('maySpoolOriginal', () => {
     expect(maySpoolOriginal('secret')).toBe(false)
   })
 })
+<<<<<<< ours
 
 describe('macOS lp printFile route with granted path', () => {
   let grantDir = ''
@@ -637,3 +638,5 @@ describe('macOS lp printFile route with granted path', () => {
     ])
   })
 })
+=======
+>>>>>>> theirs

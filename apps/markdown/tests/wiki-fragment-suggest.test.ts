@@ -205,6 +205,43 @@ describe('the suggester in fragment mode', () => {
     expect(asked).toHaveLength(1)
   })
 
+<<<<<<< ours
+=======
+  it('an empty fragment list lets Enter and the arrows reach the document', async () => {
+    const keys: string[] = []
+    const editor = new Editor({
+      extensions: buildExtensions({
+        slashController: { onOpen() {}, onUpdate() {}, onKeyDown: () => false, onClose() {} },
+        slashItems: () => [],
+        wikiSuggestController: {
+          onOpen() {},
+          onUpdate() {},
+          onKeyDown: (event) => {
+            keys.push(event.key)
+            return true
+          },
+          onClose() {},
+        },
+        wikiLink: { getDocumentPath: () => '/vault/Note.md' },
+      }),
+      content: '',
+    })
+    editors.push(editor)
+    ;(window as unknown as { markdownApi: Record<string, unknown> }).markdownApi.wikiHeads =
+      async () => []
+    editor.commands.setContent('Body.', { contentType: 'markdown' })
+    editor.commands.focus('end')
+    editor.commands.insertContent(' [[Nope')
+    await tick()
+    editor.commands.insertContent('#zz')
+    await tick()
+    await tick()
+    const enter = new KeyboardEvent('keydown', { key: 'Enter' })
+    editor.view.someProp('handleKeyDown', (f) => f(editor.view, enter))
+    expect(keys).toEqual([])
+  })
+
+>>>>>>> theirs
   it('a typed alias narrows the fragment on the head and rides along on completion', async () => {
     ;(window as unknown as { markdownApi: Record<string, unknown> }).markdownApi.wikiHeads =
       async () => [

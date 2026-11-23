@@ -2,12 +2,17 @@ import JSZip from 'jszip'
 import { isEastAsianLangTag } from './char-class'
 import type { JSZipObject } from 'jszip'
 import { LAZY_MEDIA_PLACEHOLDER_BYTES, lazyMediaHashOf, lazyMediaUrl } from './lazy-media'
+import { hasPermRanges, permRangeMap } from './perm-ranges'
 import { parseCustGeom } from '@genoffice/pptx-engine/custgeom'
 import { parseChartPartXml } from './chart'
 import { findInkRuns, stripInkRuns } from './ink'
 import { isMetafileMime, metafileToDataUrl } from './metafile'
 import { isTiffMime, tiffToDataUrlAsync } from './tiff'
 import { ommlEndsWithBreak, ommlFragmentsOf, ommlToLatex, ommlToMathML } from './math'
+<<<<<<< ours
+=======
+import { readMathPr, type MathLimits, type MathPr } from './math-pr'
+>>>>>>> theirs
 import { splitXmlChildren } from './generate'
 import { readPropChangeXml } from './revision-xml'
 import {
@@ -25,14 +30,23 @@ import {
   sectionSettingsFromXml,
   xmlFlagOn,
 } from './section'
-import { findSourcesPart, parseSourcesXml } from './sources'
+import {
+  citationStyleOfXml,
+  findSourcesPart,
+  parseSourcesXml,
+  type CitationStyleId,
+} from './sources'
 import { decodeSymbolText, symbolGlyph } from './symbol-fonts'
 import { readZoteroDocumentData } from './zotero-doc-props'
 import { emptyDocumentProperties, readDocumentProperties } from './doc-properties'
 import { computeListMarkerInfos, type ListItemRef } from './list-markers'
 import { FONT_TABLE_PART_PATH, parseFontTable, readEmbeddedFonts } from './font-table'
 import { DEFAULT_THEME_COLORS, THEME_PART_PATH, readThemeColors, readThemeFonts } from './theme'
+<<<<<<< ours
 import { PAGE_MARK, SECTION_PAGES_MARK, TOTAL_PAGES_MARK } from './types'
+=======
+import { PAGE_MARK, SECTION_PAGES_MARK, TEXTBOX_VERTS, TOTAL_PAGES_MARK } from './types'
+>>>>>>> theirs
 import { assertZipWithinLimits, loadDocxZip } from './zip-load'
 import { altChunkToDocx, hasAltChunkHtmlConverter } from './alt-chunk'
 import type {
@@ -43,6 +57,7 @@ import type {
   DiagramShape,
   DocDefaults,
   FieldRun,
+  FieldTextRun,
   InkInfo,
   InlineContentControl,
   NoteInfo,
@@ -57,6 +72,7 @@ import type {
   HfTableFloat,
   HfTableRow,
   HfPartInfo,
+  ListStyleInfo,
   NumberingDef,
   ParaAlign,
   ParaFormat,
@@ -70,6 +86,7 @@ import type {
   RevisionInfo,
   RuleOverlay,
   Run,
+  RunOpenType,
   SectionSettings,
   SourceInfo,
   StrayIndent,
@@ -81,6 +98,7 @@ import type {
   TextboxDisplay,
   TextboxParaDisplay,
   ThemeColors,
+  EqLayout,
   ThemeFonts,
 } from './types'
 import {
@@ -112,16 +130,19 @@ import {
   floatTableColumnSpan,
   normalizeImageZOrders,
 } from './parse-block-passes'
-import { eqFieldToOmml } from './eq-field'
+import { encloseStyleOf, eqFieldToOmml, eqLayoutOf } from './eq-field'
 import {
   additiveSpacingOf,
   directLineOf,
   directParaGeometry,
+  applyTableLinkFlags,
   applyTocEntryNumbers,
   fieldDisplayOf,
   fieldLabel,
   rPrNodeOf,
   fieldStackAfter,
+  indexFieldTracker,
+  isIndexTabEntry,
   markInsideFieldCode,
   tagAttr,
   tocLevelOf,
@@ -150,6 +171,8 @@ import {
   colorNodeHex,
   solidFillAlpha,
   composeGroupCtm,
+  placedInGroups,
+  placeGroupedBox,
   drawingAnchorMeta,
   gradFillApproxHex,
   lineBoxOf,
@@ -157,6 +180,8 @@ import {
   resolveAnchorPageYEmu,
   topLevelDrawings,
   w14GlowOf,
+  w14ReflectionOf,
+  w14ShadowOf,
   w14TextFillHex,
   w14TextOutlineOf,
   type DrawingAnchorMeta,
@@ -168,12 +193,22 @@ import {
   IMAGE_RUN_CHILDREN,
   JC_ALIGN,
   MERGEFIELD_INSTR_RE,
+<<<<<<< ours
+=======
+  MERGE_RULE_INSTR_RE,
+  MERGE_CONTROL_FIELD_RE,
+  NO_FIELD_RESULT,
+  CITATION_FIELD_RE,
+>>>>>>> theirs
   SIMPLE_INLINE_FIELD_RE,
+  FORMULA_FIELD_RE,
+  bareMergeFieldName,
   ZOTERO_INLINE_FIELD_RE,
   activeCharIndents,
   autoSpaceFlagsOf,
   autoSpaceMode,
   bookmarkNamesOf,
+  noteMarkBookmarks,
   cellMarginsOf,
   charIndentsOf,
   checkboxStateOf,
@@ -210,6 +245,7 @@ import {
   rowBandSizeOf,
   ruleDisplayOf,
   shdDisplayFill,
+  shdPatternOf,
   splitImageRun,
   splitSymRun,
   staysVanished,
@@ -259,7 +295,11 @@ import {
   rowGridEdges,
   tableWidthFields,
 } from './table-widths'
+<<<<<<< ours
 import { paraCsFormat, parseStyles } from './parse-styles'
+=======
+import { paraCsFormat, parseStyles, runBorderOf } from './parse-styles'
+>>>>>>> theirs
 import {
   VML_PICT_RID_RE,
   VML_WORDART_RE,
@@ -400,7 +440,11 @@ export async function parseDocx(
   const documentXml = await zip.file(docPath)!.async('string')
 
   const theme = await parseTheme(zip)
-  const { styles, docDefaults } = await parseStyles(zip, theme.colors, theme.fonts)
+  const {
+    styles,
+    docDefaults,
+    listStyles: listStyleHeads,
+  } = await parseStyles(zip, theme.colors, theme.fonts)
   const headingStyleIds = new Map<number, string>()
   let listParagraphStyleId: string | undefined
   for (const info of styles.values()) {
@@ -415,11 +459,19 @@ export async function parseDocx(
   const rels = await parseRels(zip, docPath.replace(/([^/]+)$/, '_rels/$1.rels'))
   const { formats: numFormats, defs: numbering, picBullets } = await parseNumbering(zip)
   await resolvePicBullets(zip, numbering, picBullets)
+  const listStyles: ListStyleInfo[] = listStyleHeads.map((head) => ({
+    ...head,
+    levels: (head.numId !== undefined && numbering.get(head.numId)?.levels) || {},
+  }))
   const comments = await parseComments(zip)
   const protection = await parseProtection(zip)
   const writeProtection = await parseWriteProtection(zip)
   const removePersonalInfo = await parseRemovePersonalInfo(zip)
+<<<<<<< ours
   const sources = await parseSources(zip)
+=======
+  const { sources, style: citationStyle } = await parseSources(zip)
+>>>>>>> theirs
   // a damaged docProps/custom.xml must not keep the document from opening
   const zoteroDocumentData = await readZoteroDocumentData(zip).catch(() => '')
   // the same goes for the other docProps parts: a broken one is simply empty
@@ -497,11 +549,30 @@ export async function parseDocx(
     'endnote',
     noteCtx,
   )
+<<<<<<< ours
   const { footnoteProps, endnoteProps } = await parseNoteProps(zip, documentXml)
   const noteNumbers = noteNumbersOf(documentXml, footnotes, endnotes, footnoteProps, endnoteProps)
+=======
+  const { footnoteProps, endnoteProps, settingsNoteProps } = await parseNoteProps(zip, documentXml)
+  const { numbers: noteNumbers, formats: noteNumFmts } = noteNumbersOf(
+    documentXml,
+    footnotes,
+    endnotes,
+    settingsNoteProps,
+  )
+  // editing permission ranges, resolved once in document order (they cross blocks)
+  const permRanges = hasPermRanges(documentXml)
+    ? permRangeMap(documentXml, scan.elements)
+    : undefined
+>>>>>>> theirs
   const buildCtx: BuildContext = {
+    ...(permRanges ? { permTables: permRanges.tables } : {}),
     zip,
     compat,
+<<<<<<< ours
+=======
+    ...(layoutSettings.mathPr ? { mathLimits: layoutSettings.mathPr } : {}),
+>>>>>>> theirs
     resolver,
     ...(resolveDiff ? { resolveDiff } : {}),
     sourcePath: docPath,
@@ -511,6 +582,7 @@ export async function parseDocx(
     numbering,
     chartParts,
     noteNumbers,
+    noteNumFmts,
     compatibilityMode,
     themeColors: theme.colors,
     themeFonts: theme.fonts,
@@ -539,6 +611,10 @@ export async function parseDocx(
       return cands.length > 0 ? Math.min(...cands) : undefined
     })(),
   }
+<<<<<<< ours
+=======
+  const inIndexField = indexFieldTracker()
+>>>>>>> theirs
   for (const el of scan.elements) {
     const xml = documentXml.slice(el.start, el.end)
     const sdtParts = el.name === 'w:sdt' ? splitSdtParts(xml) : null
@@ -550,6 +626,7 @@ export async function parseDocx(
         const i = elements.length
         elements.push({ name: part.name, start: el.start + part.start, end: el.start + part.end })
         const childXml = xml.slice(part.childStart, part.childEnd)
+        buildCtx.inIndexField = inIndexField(childXml)
         // real document offsets (not 0): sectionAt resolves page geometry by them
         const block = await buildBlock(
           { name: part.name, start: el.start + part.childStart, end: el.start + part.childEnd },
@@ -557,6 +634,7 @@ export async function parseDocx(
           childXml,
           buildCtx,
         )
+        await attachImageVector(block, childXml, buildCtx)
         block.originalXml = xml.slice(part.start, part.end)
         // The control chain may be nested (an inner control around this child)
         // and a split control's bytes live on several parts: record the owning
@@ -615,13 +693,21 @@ export async function parseDocx(
     }
     const i = elements.length
     elements.push(el)
+    buildCtx.inIndexField = inIndexField(xml)
     const block = await buildBlock(el, i, xml, buildCtx, zoteroFieldParagraphs.get(el.start))
+<<<<<<< ours
     if (el.name === 'w:p') attachInlineContentControls(block, xml)
+=======
+    await attachImageVector(block, xml, buildCtx)
+    if (el.name === 'w:p') attachInlineContentControls(block, xml)
+    if (permRanges?.paragraphs.has(el.start)) block.permEditable = true
+>>>>>>> theirs
     blocks.push(block)
     buildCtx.floatTableAhead = floatTableColumnSpan(block, sectionAt(el.start))
   }
   foldFieldCodeParagraphs(blocks, buildCtx)
   applyTocEntryNumbers(blocks, numbering)
+  applyTableLinkFlags(blocks)
   bandWrappedBoxesBeforeTables(blocks)
   normalizeImageZOrders(blocks)
   applyProtectedLeadingBreaks(blocks)
@@ -650,6 +736,10 @@ export async function parseDocx(
   const evenAndOddHeaders = await parseSettingsFlag(zip, 'w:evenAndOddHeaders')
   const mirrorMargins = await parseSettingsFlag(zip, 'w:mirrorMargins')
   const trackRevisions = await parseSettingsFlag(zip, 'w:trackRevisions')
+<<<<<<< ours
+=======
+  const doNotTrackMoves = await parseSettingsFlag(zip, 'w:doNotTrackMoves')
+>>>>>>> theirs
   const hfParts = await parseAllHfParts(
     zip,
     rels,
@@ -710,7 +800,10 @@ export async function parseDocx(
     ...(footnoteProps ? { footnoteProps } : {}),
     ...(endnoteProps ? { endnoteProps } : {}),
     noteNumbers: Object.fromEntries(noteNumbers),
+    ...(noteNumFmts.size > 0 ? { noteNumFmts: Object.fromEntries(noteNumFmts) } : {}),
+    ...(settingsNoteProps.footnote || settingsNoteProps.endnote ? { settingsNoteProps } : {}),
     sources,
+    ...(citationStyle ? { citationStyle } : {}),
     inks,
     themeFonts: theme.fonts,
     themeColors: theme.colors,
@@ -730,6 +823,10 @@ export async function parseDocx(
     evenAndOddHeaders,
     ...(mirrorMargins ? { mirrorMargins } : {}),
     ...(trackRevisions ? { trackRevisions } : {}),
+<<<<<<< ours
+=======
+    ...(doNotTrackMoves ? { doNotTrackMoves } : {}),
+>>>>>>> theirs
     ...(gutterAtTop ? { gutterAtTop } : {}),
     compatibilityMode,
     ...layoutSettings,
@@ -743,6 +840,7 @@ export async function parseDocx(
     headingStyleIds,
     listParagraphStyleId,
     numbering,
+    ...(listStyles.length > 0 ? { listStyles } : {}),
     internal: {
       originalBytes: bytes,
       documentXml,
@@ -766,6 +864,8 @@ export async function parseDocx(
 
 interface BuildContext {
   zip: JSZip
+  /** editing permission ranges: per top-level table start offset, one editable flag per w:tc */
+  permTables?: ReadonlyMap<number, readonly boolean[]>
   sourcePath?: string
   styles: Map<string, StyleInfo>
   rels: Map<string, RelInfo>
@@ -778,6 +878,8 @@ interface BuildContext {
   chartParts: Record<string, string>
   /** "footnote:<id>" / "endnote:<id>" -> display number */
   noteNumbers: Map<string, number>
+  /** "footnote:<id>" / "endnote:<id>" -> the number format its section states */
+  noteNumFmts?: Map<string, string>
   /** live palette for w:themeColor resolution (built-in Office palette when the doc has no theme part) */
   themeColors?: ThemeColors | null
   /** theme font scheme for w:asciiTheme/... resolution */
@@ -800,6 +902,11 @@ interface BuildContext {
   /** column span (twips) of a w:tblpPr table built just before the current block:
    *  it anchors to that block and shares its horizontal space */
   floatTableAhead?: { leftTwips: number; rightTwips: number }
+<<<<<<< ours
+=======
+  /** the element being built lies in the result of an INDEX field */
+  inIndexField?: boolean
+>>>>>>> theirs
   /** next block-level control chain id: one id per w:sdt instance, shared by
    *  every level and every block of a split control */
   sdtGroupSeq: number
@@ -807,6 +914,11 @@ interface BuildContext {
   compatibilityMode?: number
   /** settings.xml compat flags the property resolver applies */
   compat?: ResolveCompat
+<<<<<<< ours
+=======
+  /** settings.xml m:intLim / m:naryLim, for n-ary operators without their own m:limLoc */
+  mathLimits?: MathLimits
+>>>>>>> theirs
   /** effective-property resolver context (shared caches live on it) */
   resolver?: ResolveCtx
   /** shadow mode collector: resolver vs legacy format disagreements */
@@ -1198,7 +1310,11 @@ async function buildBlock(
   }
   const fieldPassthrough = (): Block => {
     const pStyle = tagAttr(xml, 'w:pStyle', 'w:val')
+<<<<<<< ours
     const fieldDisplay = fieldDisplayOf(xml, ctx.styles, ctx.resolver)
+=======
+    const fieldDisplay = fieldDisplayOf(xml, ctx.styles, ctx.resolver, ctx.inIndexField)
+>>>>>>> theirs
     if (fieldDisplay?.kind === 'text') {
       const runs = fieldResultRuns(xml, ctx, fieldDisplay.left ?? '')
       if (runs) fieldDisplay.runs = runs
@@ -1245,6 +1361,21 @@ async function buildBlock(
       label: 'TOC entry',
       previewText: plainText(xml),
       fieldDisplay: fieldDisplayOf(xml, ctx.styles, ctx.resolver),
+<<<<<<< ours
+=======
+      styleId: tocStyleId,
+    }
+  }
+  // the same for the entries of an index whose pages sit behind a tab: only its
+  // first and last paragraphs carry the field chars
+  if (tocStyleId && ctx.inIndexField && el.name === 'w:p' && isIndexTabEntry(xml, ctx.styles)) {
+    return {
+      ...base,
+      type: 'passthrough',
+      label: 'Index entry',
+      previewText: plainText(xml),
+      fieldDisplay: fieldDisplayOf(xml, ctx.styles, ctx.resolver, true),
+>>>>>>> theirs
       styleId: tocStyleId,
     }
   }
@@ -1275,12 +1406,18 @@ async function buildBlock(
     const omml = ommlFragmentsOf(detect).join('')
     // 2D MathML only for pure equations; an oMathPara paragraph that also has
     // plain runs keeps the flat token strip so the surrounding text stays visible
-    const mathml = plainText(detect).trim() === '' ? ommlToMathML(omml) : ''
+    const mathml = plainText(detect).trim() === '' ? ommlToMathML(omml, ctx.mathLimits) : ''
     const latex = omml ? ommlToLatex(omml) : null
     const pPr = /<w:pPr>[\s\S]*?<\/w:pPr>/.exec(xml)?.[0] ?? ''
     const styleId = tagAttr(pPr, 'w:pStyle', 'w:val')
     const align = mathParaAlign(detect, pPr)
     const eff = resolveParagraphPropsXml(xml, resolverOf(ctx))
+<<<<<<< ours
+=======
+    const mathPara = detect.includes('<m:oMathPara')
+    const jcDefault = mathPara && tagAttr(detect, 'm:jc', 'm:val') === undefined
+    const paraAlign = eff.align === 'center' || eff.align === 'right' ? eff.align : 'left'
+>>>>>>> theirs
     return {
       ...base,
       type: 'passthrough',
@@ -1294,6 +1431,11 @@ async function buildBlock(
         ...(latex ? { latex } : {}),
         sizeHalfPoints: mathSizeHalfPoints(omml, eff),
         ...(align ? { align } : {}),
+<<<<<<< ours
+=======
+        ...(mathPara ? { mathPara } : {}),
+        ...(jcDefault ? { jcDefault, paraAlign } : {}),
+>>>>>>> theirs
         ...directParaGeometry(eff),
         ...additiveSpacingOf(resolverOf(ctx)),
       },
@@ -2521,7 +2663,10 @@ function buildTextParagraph(
     }
   }
   const { bookmarks, hiddenBookmarks } = bookmarkNamesOf(stripTextboxes(xml))
-  const { commentStarts, commentEnds } = crossParaCommentMarkers(stripTextboxes(xml))
+  const { commentStarts, commentEnds } = crossParaCommentMarkers(
+    stripTextboxes(xml),
+    new Set(runs.flatMap((run) => run.commentIds ?? [])),
+  )
 
   // --- move revision detection ---
   // A paragraph with moveFrom/moveTo at run level gets a block-level marker
@@ -3011,8 +3156,13 @@ function extractTextboxes(
     shape: XNode,
     groupFill?: string,
     nested?: boolean,
-    grouped?: boolean,
+    ctm?: GroupCtm | null,
   ): TextboxDisplay | null => {
+    // a grouped shape's xfrm lives in the group's child space (chOff/chExt):
+    // sizes are measured in drawing EMU, before any rounding to px
+    const grouped = !!ctm
+    const scaleX = ctm?.sx ?? 1
+    const scaleY = ctm?.sy ?? 1
     const contents: XNode[] = []
     collectNodes(childrenOf(shape), 'w:txbxContent', contents)
     // only top-level contents of a top-level shape consume a save-path
@@ -3044,7 +3194,7 @@ function extractTextboxes(
     const custGeomNode = spPr ? findChild(spPr, 'a:custGeom') : undefined
     if (contents.length === 0) {
       if (prstOf && LINE_PRSTS.has(prstOf)) {
-        if (hasLineShapes) return lineBoxOf(shape, ctx.themeColors)
+        if (hasLineShapes) return lineBoxOf(shape, ctx.themeColors, ctm)
         if (!opts?.shapes) return null
         // anchored gallery connector: a real vertical extent, flips, or arrow
         // ends mark a drawn connector; plain near-flat lines stay on the
@@ -3058,8 +3208,8 @@ function extractTextboxes(
           const type = attrsOf(findChild(ln ?? {}, name) ?? {})['type']
           return !!type && type !== 'none'
         })
-        return (Number.isFinite(cy) && cy > 130000) || flipped || arrowed
-          ? lineBoxOf(shape, ctx.themeColors)
+        return (Number.isFinite(cy) && cy * scaleY > 130000) || flipped || arrowed
+          ? lineBoxOf(shape, ctx.themeColors, ctm)
           : null
       }
       if (hasLineShapes && !opts?.shapes) return null
@@ -3075,7 +3225,7 @@ function extractTextboxes(
         // and nothing else would paint it (the decorative-rule path only
         // takes a lone drawing paragraph)
         const filledSibling = (grouped || multiDrawing) && !!findChild(spPr ?? {}, 'a:solidFill')
-        if (!filledSibling && (!Number.isFinite(cy) || cy <= 130000)) return null
+        if (!filledSibling && (!Number.isFinite(cy) || cy * scaleY <= 130000)) return null
       }
     }
     const box: TextboxDisplay = { paras: [] }
@@ -3157,14 +3307,14 @@ function extractTextboxes(
       if (Number.isFinite(rot) && rot !== 0) box.rotDeg = Math.round(rot / 60000)
       const ext = findChild(xfrm ?? {}, 'a:ext')
       const cx = ext ? parseInt(attrsOf(ext)['cx'] ?? '', 10) : NaN
-      if (Number.isFinite(cx) && cx > 0) box.widthPx = Math.round(cx / EMU_PER_PX)
+      if (Number.isFinite(cx) && cx > 0) box.widthPx = Math.round((cx * scaleX) / EMU_PER_PX)
       // Word clips overflowing text unless the shape auto-fits its content;
       // carrying the fixed height keeps tall sparse boxes from exploding layout
       const bodyPrNode = findChild(shape, 'wps:bodyPr')
       const autoFit = bodyPrNode ? !!findChild(bodyPrNode, 'a:spAutoFit') : false
       const cy = ext ? parseInt(attrsOf(ext)['cy'] ?? '', 10) : NaN
       if (!autoFit && Number.isFinite(cy) && cy > 0) {
-        box.heightPx = Math.round(cy / EMU_PER_PX)
+        box.heightPx = Math.round((cy * scaleY) / EMU_PER_PX)
         box.minHeightPx = box.heightPx
       }
     }
@@ -3183,6 +3333,8 @@ function extractTextboxes(
       box.insetBottomPx = inset('bIns')
       if (attrs['anchor'] === 'b') box.vAlign = 'bottom'
       else if (attrs['anchor'] === 'ctr') box.vAlign = 'center'
+      const vert = TEXTBOX_VERTS.find((v) => v === attrs['vert'])
+      if (vert) box.vert = vert
     }
     for (const content of contents)
       box.paras.push(...txbxContentParas(content, ctx, opts?.docOffset))
@@ -3518,6 +3670,7 @@ function extractTextboxes(
     let wspCount = 0
     const extentCy = parseInt(/<wp:extent[^>]*cy="(\d+)"/.exec(frag)?.[1] ?? '', 10)
     const inlineExtentPx = !meta.anchored && extentCy > 0 ? emuToPx(extentCy) : 0
+    const groupPath: number[] = []
     const pushShape = (
       shape: XNode,
       ctm: GroupCtm | null,
@@ -3525,7 +3678,7 @@ function extractTextboxes(
       nested?: boolean,
     ): void => {
       wspCount++
-      const box = buildWpsBox(shape, groupFill, nested, ctm !== null)
+      const box = buildWpsBox(shape, groupFill, nested, ctm)
       if (!box) return
       if (ctm) {
         const xfrm = findChild(findChild(shape, 'wps:spPr') ?? {}, 'a:xfrm')
@@ -3534,13 +3687,12 @@ function extractTextboxes(
         const y = parseInt(off['y'] ?? '', 10)
         if (Number.isFinite(x)) box.offsetXEmu = Math.round(ctm.tx + x * ctm.sx)
         if (Number.isFinite(y)) box.offsetYEmu = Math.round(ctm.ty + y * ctm.sy)
-        if (ctm.sx !== 1 && box.widthPx) box.widthPx = Math.round(box.widthPx * ctm.sx)
-        if (ctm.sy !== 1) {
-          if (box.heightPx) box.heightPx = Math.round(box.heightPx * ctm.sy)
-          if (box.minHeightPx) box.minHeightPx = Math.round(box.minHeightPx * ctm.sy)
-        }
+        const placed = placedInGroups(xfrm, ctm)
+        if (placed) placeGroupedBox(box, placed)
         // grouped shapes place absolutely at their mapped offset like Word
         box.floating = true
+        box.grouped = true
+        if (groupPath.length > 0) box.groupPath = [...groupPath]
         if (inlineExtentPx > 0) box.inlineExtentPx = inlineExtentPx
       }
       applyAnchor(box, meta, pagePos, ctm !== null)
@@ -3567,6 +3719,10 @@ function extractTextboxes(
         paras: [],
         readOnly: true,
         picture: true,
+<<<<<<< ours
+=======
+        ...(ctm ? { grouped: true } : {}),
+>>>>>>> theirs
         ...(picId ? { shapeId: picId } : {}),
         fillImageDataUrl: dataUrl,
         widthPx: emuToPx(cx * (ctm?.sx ?? 1)),
@@ -3583,7 +3739,10 @@ function extractTextboxes(
         const y = parseInt(off['y'] ?? '', 10)
         if (Number.isFinite(x)) box.offsetXEmu = Math.round(ctm.tx + x * ctm.sx)
         if (Number.isFinite(y)) box.offsetYEmu = Math.round(ctm.ty + y * ctm.sy)
+        const placed = placedInGroups(xfrm, ctm)
+        if (placed) placeGroupedBox(box, placed)
         box.floating = true
+        if (groupPath.length > 0) box.groupPath = [...groupPath]
         if (inlineExtentPx > 0) box.inlineExtentPx = inlineExtentPx
       }
       applyAnchor(box, meta, pagePos, ctm !== null)
@@ -3608,12 +3767,19 @@ function extractTextboxes(
               findChild(findChild(node, 'wpg:grpSpPr') ?? {}, 'a:solidFill'),
               ctx.themeColors,
             ) ?? groupFill
-          walkShapes(
-            childrenOf(node),
-            composeGroupCtm(node, ctm ?? IDENTITY_CTM) ?? ctm,
-            fill,
-            nested,
-          )
+          const inner = composeGroupCtm(node, ctm ?? IDENTITY_CTM) ?? ctm
+          if (inner && !nested) {
+            // each box remembers the way down to it: the child it descends from, group by group
+            let index = 0
+            for (const child of childrenOf(node)) {
+              const member = ['wps:wsp', 'pic:pic', 'wpg:grpSp'].includes(nameOf(child) ?? '')
+              if (member) groupPath.push(index++)
+              walkShapes([child], inner, fill, nested)
+              if (member) groupPath.pop()
+            }
+          } else {
+            walkShapes(childrenOf(node), inner, fill, nested)
+          }
         } else {
           walkShapes(childrenOf(node), ctm, groupFill, nested || name === 'wps:wsp')
         }
@@ -4253,6 +4419,7 @@ function extractParaFormat(
     const sln = onOffOf(pPr, 'w:suppressLineNumbers')
     if (sln !== undefined) format.suppressLineNumbers = sln
   }
+  unresolvedFlags(pPr, format)
   // snapToGrid: default ON; only store when explicitly set to OFF
   if (onOffOf(pPr, 'w:snapToGrid') === false) format.snapToGrid = false
   // widowControl: Word default is ON; tri-state so an explicit on overrides a
@@ -4271,16 +4438,48 @@ function extractParaFormat(
   const autoSpaceAll = autoSpaceMode(autoSpace.de, autoSpace.dn)
   if (autoSpaceAll !== undefined) format.autoSpace = autoSpaceAll
   const wordWrap = onOffOf(pPr, 'w:wordWrap')
-  if (wordWrap !== undefined) format.wordWrap = wordWrap
+  if (wordWrap !== undefined) {
+    format.wordWrap = wordWrap
+    format.wordWrapDirect = wordWrap
+  }
   const overflowPunct = onOffOf(pPr, 'w:overflowPunct')
+<<<<<<< ours
   if (overflowPunct !== undefined) format.overflowPunct = overflowPunct
+=======
+  if (overflowPunct !== undefined) {
+    format.overflowPunct = overflowPunct
+    format.overflowPunctDirect = overflowPunct
+  }
+>>>>>>> theirs
   Object.assign(format, pPrOnlyFormat(pPr, theme))
   return Object.keys(format).length > 0 ? format : undefined
+}
+
+<<<<<<< ours
+/** the w:pPr keys the resolver does not model (shading, borders, tab stops, frames, flow) */
+function pPrOnlyFormat(pPr: XNode, theme?: ThemeColors | null): ParaFormat {
+  const format: ParaFormat = {}
+=======
+/** direct pPr flags read off the paragraph alone (the resolver does not carry them) */
+function unresolvedFlags(pPr: XNode, format: ParaFormat): void {
+  const sah = onOffOf(pPr, 'w:suppressAutoHyphens')
+  if (sah !== undefined) format.suppressAutoHyphens = sah
+  const mi = onOffOf(pPr, 'w:mirrorIndents')
+  if (mi !== undefined) format.mirrorIndents = mi
+  if (onOffOf(pPr, 'w:adjustRightInd') === false) format.adjustRightInd = false
 }
 
 /** the w:pPr keys the resolver does not model (shading, borders, tab stops, frames, flow) */
 function pPrOnlyFormat(pPr: XNode, theme?: ThemeColors | null): ParaFormat {
   const format: ParaFormat = {}
+  const kinsoku = onOffOf(pPr, 'w:kinsoku')
+  if (kinsoku !== undefined) format.kinsoku = kinsoku
+  const topLinePunct = onOffOf(pPr, 'w:topLinePunct')
+  if (topLinePunct !== undefined) format.topLinePunct = topLinePunct
+  const textAlignment = attrsOf(findChild(pPr, 'w:textAlignment') ?? {})['w:val']
+  if (textAlignment) format.textAlignment = textAlignment
+  unresolvedFlags(pPr, format)
+>>>>>>> theirs
   const shd = findChild(pPr, 'w:shd')
   if (shd) {
     const fill = attrsOf(shd)['w:fill']
@@ -4290,6 +4489,8 @@ function pPrOnlyFormat(pPr: XNode, theme?: ThemeColors | null): ParaFormat {
     const display = shdDisplayFill(shd, theme)
     if (display && display !== format.shadingFill) format.shadingDisplay = display
     if (!display) format.shadingClear = true
+    const pattern = shdPatternOf(shd)
+    if (pattern) format.shadingPattern = pattern
   }
   const sides = paraBorderSidesOf(pPr)
   if (sides) Object.assign(format, paraBordersOf(sides))
@@ -4303,7 +4504,12 @@ function pPrOnlyFormat(pPr: XNode, theme?: ThemeColors | null): ParaFormat {
     const dropCapVal = attrsOf(framePr)['w:dropCap']
     if (dropCapVal === 'drop' || dropCapVal === 'margin') {
       const lines = parseInt(attrsOf(framePr)['w:lines'] ?? '3', 10) || 3
-      format.dropCap = { type: dropCapVal as 'drop' | 'margin', lines }
+      const hSpace = parseInt(attrsOf(framePr)['w:hSpace'] ?? '', 10)
+      format.dropCap = {
+        type: dropCapVal as 'drop' | 'margin',
+        lines,
+        ...(hSpace > 0 ? { hSpace } : {}),
+      }
     } else {
       const frame = paraFrameOf(attrsOf(framePr))
       if (frame) format.frame = frame
@@ -4425,7 +4631,67 @@ function foldFieldCodeParagraphs(blocks: Block[], ctx: BuildContext): void {
 }
 
 /** Run keys that are content or field machinery, not formatting a field result inherits */
-const XE_INSTR_RE = /^\s*XE\s+(?:"([^"]*)"|(\S+))/
+const XE_INSTR_RE = /^\s*XE\s+(?:"([^"]*)"|(\S+))([\s\S]*)$/
+/** an index entry run: its text, and the switches that follow it when it has any */
+const xeRun = (xe: RegExpExecArray): Run => {
+  const switches = (xe[3] ?? '').trim()
+  return { text: '', xeTerm: xe[1] ?? xe[2], ...(switches ? { xeSwitches: switches } : {}) }
+}
+/** a table of authorities citation: everything after TA is kept as written */
+/** the layout with the field it was read from, and the fit that field's sizes show */
+function eqLayoutWithXml(
+  layout: NonNullable<ReturnType<typeof eqLayoutOf>>,
+  xml: string,
+): EqLayout {
+  const style = layout.kind === 'enclose' ? encloseStyleOf(xml, layout.a, layout.b) : undefined
+  return { ...layout, ...(style ? { style } : {}), xml }
+}
+
+const TA_INSTR_RE = /^\s*TA\s+(\S[\s\S]*?)\s*$/
+/** the direct bold / italic / underline of a field code run */
+function instrRunFormat(node: XNode): Omit<FieldTextRun, 'text'> {
+  const rPr = findChild(node, 'w:rPr')
+  const on = (tag: string, bare: boolean): boolean => {
+    const el = rPr && findChild(rPr, tag)
+    if (!el) return false
+    const val = attrsOf(el)['w:val']
+    return val === undefined ? bare : !/^(?:0|false|none)$/.test(String(val))
+  }
+  return {
+    ...(on('w:b', true) ? { bold: true } : {}),
+    ...(on('w:i', true) ? { italic: true } : {}),
+    ...(on('w:u', false) ? { underline: true } : {}),
+  }
+}
+
+/** the long citation (\l "...") of a TA field in its formatted pieces; undefined when it is plain */
+function taLongRuns(parts: FieldTextRun[]): FieldTextRun[] | undefined {
+  const joined = parts.map((p) => p.text).join('')
+  const open = /\\l\s+"/.exec(joined)
+  if (!open) return undefined
+  const from = open.index + open[0].length
+  const to = joined.indexOf('"', from)
+  if (to <= from) return undefined
+  const out: FieldTextRun[] = []
+  let at = 0
+  for (const part of parts) {
+    const text = part.text.slice(Math.max(0, from - at), Math.max(0, to - at))
+    at += part.text.length
+    if (!text) continue
+    const last = out[out.length - 1]
+    if (
+      last &&
+      !!last.bold === !!part.bold &&
+      !!last.italic === !!part.italic &&
+      !!last.underline === !!part.underline
+    )
+      last.text += text
+    else out.push({ ...part, text })
+  }
+  return out.some((r) => r.bold || r.italic || r.underline) ? out : undefined
+}
+
+const TC_INSTR_RE = /^\s*TC\s+(\S[\s\S]*?)\s*$/
 const REF_INSTR_RE = /^\s*REF\s+(?:"([^"]+)"|([^\s\\]+))/
 
 const RESULT_FORMAT_SKIP = new Set([
@@ -4434,8 +4700,12 @@ const RESULT_FORMAT_SKIP = new Set([
   'math',
   'sym',
   'ruby',
+  'eqLayout',
   'noteRef',
   'xeTerm',
+  'taInstr',
+  'taRuns',
+  'tcInstr',
   'refField',
   'refInstr',
   'instrField',
@@ -4523,15 +4793,30 @@ function extractRuns(
   }
   collectRangeIds(childrenOf(pNode))
   const complete = new Set([...starts].filter((id) => ends.has(id)))
+  let onMarks: Map<string, string[]> | undefined
+  const markBookmarks = () =>
+    (onMarks ??= hasDeepChild(pNode, new Set(['w:bookmarkStart']))
+      ? noteMarkBookmarks(serializeXNode(pNode))
+      : new Map())
   const activeComments = new Set<string>()
   type RevCtx = { ins?: RevisionInfo; del?: RevisionInfo }
   // inline field state: XE folds into Run.xeTerm, REF (cross-reference) into Run.refField
   let fieldDepth = zoteroField && zoteroField.part !== 'begin' ? 1 : 0
   let fieldInstr = zoteroField?.instruction ?? ''
+  /** the outer field's code run by run, with each run's direct formatting */
+  let fieldInstrRuns: FieldTextRun[] = []
   let fieldSeparated = zoteroField !== undefined && zoteroField.part !== 'begin'
   let fieldCached = ''
+  // a mail-merge IF: the instruction with each nested MERGEFIELD operand as
+  // «Name», or null once the field turns out not to be one
+  let mergeIf: string | null = null
+  let nestedInstr = ''
+  let nestedSeparated = false
+  let fieldNested = false
   let fieldCachedRuns: Run[] = []
   let fieldBeginRun: XNode | null = null
+  /** the runs of the field being read, begin to end */
+  let fieldRunNodes: XNode[] = []
   let fieldDirty = false
   const eqField = (instr: string) => (/^\s*EQ\b/i.test(instr) ? eqFieldToOmml(instr) : null)
   // formatting of the field result: the first cached run, else the field code's rPr
@@ -4591,12 +4876,23 @@ function extractRuns(
   }
   const handleRun = (node: XNode, link: Run['link'] | undefined, rev?: RevCtx) => {
     const fldChar = findChild(node, 'w:fldChar')
+    if (fieldDepth === 0) fieldRunNodes = []
+    if (fldChar || fieldDepth > 0) fieldRunNodes.push(node)
     if (fldChar) {
       const type = attrsOf(fldChar)['w:fldCharType']
       if (type === 'begin') {
         fieldDepth++
+        if (fieldDepth === 2) {
+          fieldNested = true
+          nestedInstr = ''
+          nestedSeparated = false
+          if (fieldSeparated) mergeIf = null
+        } else if (fieldDepth > 2) mergeIf = null
         if (fieldDepth === 1) {
+          fieldNested = false
           fieldInstr = ''
+          fieldInstrRuns = []
+          mergeIf = ''
           fieldSeparated = false
           fieldCached = ''
           fieldCachedRuns = []
@@ -4605,14 +4901,25 @@ function extractRuns(
         }
       } else if (type === 'separate') {
         if (fieldDepth === 1) fieldSeparated = true
+        else if (fieldDepth === 2) nestedSeparated = true
       } else if (type === 'end') {
         fieldDepth = Math.max(0, fieldDepth - 1)
+        if (fieldDepth === 1 && mergeIf !== null) {
+          const name = bareMergeFieldName(nestedInstr)
+          mergeIf = name === null ? null : `${mergeIf}«${name}»`
+        }
         if (fieldDepth === 0) {
           let merge: RegExpExecArray | null
           const xe = XE_INSTR_RE.exec(fieldInstr)
+          const ta = TA_INSTR_RE.exec(fieldInstr)
+          const tc = TC_INSTR_RE.exec(fieldInstr)
           const ref = REF_INSTR_RE.exec(fieldInstr)
           const hyper = convertibleHyperlink(fieldInstr)
-          if (xe) pushRun({ text: '', xeTerm: xe[1] ?? xe[2] }, rev)
+          if (xe) pushRun(xeRun(xe), rev)
+          else if (ta) {
+            const taRuns = taLongRuns(fieldInstrRuns)
+            pushRun({ text: '', xeTerm: '', taInstr: ta[1], ...(taRuns ? { taRuns } : {}) }, rev)
+          } else if (tc) pushRun({ text: '', xeTerm: '', tcInstr: tc[1] }, rev)
           else if (ref) {
             const name = ref[1] ?? ref[2]
             pushRun(
@@ -4664,11 +4971,18 @@ function extractRuns(
           } else if (ZOTERO_INLINE_FIELD_RE.test(fieldInstr)) {
             if (zoteroField) pushZoteroCachedRuns(zoteroField.part, rev)
             else pushZoteroCachedRuns('single', rev)
+<<<<<<< ours
+=======
+          } else if (!fieldNested && CITATION_FIELD_RE.test(fieldInstr)) {
+            // the cached result keeps its runs (an italic title), as a Zotero citation's does
+            pushZoteroCachedRuns('single', rev)
+>>>>>>> theirs
           } else if ((merge = MERGEFIELD_INSTR_RE.exec(fieldInstr))) {
             // Mail merge: Word fills the result in from a data source, so an
             // unmerged main document caches nothing. Show the guillemet
             // placeholder Word uses instead of an empty run; the value is not
             // dirtied because only the merge itself can supply it.
+<<<<<<< ours
             pushRun(
               {
                 ...resultFormat(),
@@ -4681,6 +4995,47 @@ function extractRuns(
             )
           } else if (SIMPLE_INLINE_FIELD_RE.test(fieldInstr)) {
             // an unformatted result run would drop to the paragraph default size
+=======
+>>>>>>> theirs
+            pushRun(
+              {
+                ...resultFormat(),
+                text: fieldCached || `«${merge[1] ?? merge[2]}»`,
+                instrField: fieldInstr.trim(),
+                ...(fieldDirty ? { fldDirty: true } : {}),
+                ...(link ? { link } : {}),
+              },
+              rev,
+            )
+<<<<<<< ours
+=======
+          } else if (mergeIf !== null && MERGE_RULE_INSTR_RE.test(mergeIf)) {
+            pushRun(
+              {
+                ...resultFormat(),
+                text: fieldCached || (/^\s*IF\b/.test(mergeIf) ? ' ' : NO_FIELD_RESULT),
+                instrField: mergeIf.trim(),
+                ...(fieldDirty ? { fldDirty: true } : {}),
+                ...(link ? { link } : {}),
+              },
+              rev,
+            )
+          } else if (!fieldNested && MERGE_CONTROL_FIELD_RE.test(fieldInstr)) {
+            pushRun(
+              {
+                ...resultFormat(),
+                text: fieldCached || NO_FIELD_RESULT,
+                instrField: fieldInstr.trim(),
+                ...(link ? { link } : {}),
+              },
+              rev,
+            )
+          } else if (
+            SIMPLE_INLINE_FIELD_RE.test(fieldInstr) ||
+            // a table formula; one built from other fields keeps its runs as they are
+            (!fieldNested && FORMULA_FIELD_RE.test(fieldInstr))
+          ) {
+            // an unformatted result run would drop to the paragraph default size
             pushRun(
               {
                 ...resultFormat(),
@@ -4691,6 +5046,18 @@ function extractRuns(
               },
               rev,
             )
+          } else if (eqLayoutOf(fieldInstr)) {
+            // enclosed or combined characters: the field's own runs save as they are
+            const layout = eqLayoutOf(fieldInstr)!
+            pushRun(
+              {
+                ...resultFormat(),
+                text: layout.kind === 'enclose' ? layout.b : layout.a + layout.b,
+                eqLayout: eqLayoutWithXml(layout, fieldRunNodes.map(serializeXNode).join('')),
+              },
+              rev,
+            )
+>>>>>>> theirs
           } else if (eqField(fieldInstr)) {
             const eq = eqField(fieldInstr)!
             pushRun({ ...resultFormat(), text: eq.text, math: { omml: eq.omml } }, rev)
@@ -4728,8 +5095,19 @@ function extractRuns(
       // keep the fragment index aligned even for ruby inside a field cache
       if (findChild(node, 'w:ruby')) rubyIndex++
       const instr = findChild(node, 'w:instrText')
+<<<<<<< ours
       if (instr) fieldInstr += textOf(instr)
       else if (fieldSeparated && fieldDepth === 1) {
+=======
+      if (instr) {
+        const text = textOf(instr)
+        fieldInstr += text
+        if (fieldDepth === 1) {
+          fieldInstrRuns.push({ text, ...instrRunFormat(node) })
+          if (mergeIf !== null) mergeIf = /[«»]/.test(text) ? null : mergeIf + text
+        } else if (fieldDepth === 2 && !nestedSeparated) nestedInstr += text
+      } else if (fieldSeparated && fieldDepth === 1) {
+>>>>>>> theirs
         // REF/HYPERLINK cached result is the display text; other fields' caches are dropped
         const cached = buildRun(
           node,
@@ -4763,15 +5141,40 @@ function extractRuns(
       const id = attrsOf(noteRefNode)['w:id']
       if (id) {
         const num = ctx.noteNumbers.get(`${kind}:${id}`)
+<<<<<<< ours
+=======
+        const numFmt = ctx.noteNumFmts?.get(`${kind}:${id}`)
+        const bookmarks = markBookmarks().get(`${kind}:${id}`)
+>>>>>>> theirs
         // the marker's rPr rides along verbatim (rStyle FootnoteReference, the
         // fonts, the size): the run skips buildRun, so without this the
         // properties exist nowhere and any edit to the paragraph restyles the
         // marker to a bare superscript
         const markerRPr = findChild(node, 'w:rPr')
+<<<<<<< ours
         pushRun(
           {
             text: String(num ?? '*'),
             noteRef: { kind, id },
+=======
+        const custom = /^(?:1|true|on)$/.test(attrsOf(noteRefNode)['w:customMarkFollows'] ?? '')
+        const customMark = custom
+          ? childrenOf(node)
+              .filter((c) => nameOf(c) === 'w:t')
+              .map((c) => decodeNumericCharRefs(textOf(c)))
+              .join('')
+          : undefined
+        pushRun(
+          {
+            text: customMark ?? String(num ?? '*'),
+            noteRef: {
+              kind,
+              id,
+              ...(customMark !== undefined ? { customMark } : {}),
+              ...(numFmt && customMark === undefined ? { numFmt } : {}),
+              ...(bookmarks ? { bookmarks } : {}),
+            },
+>>>>>>> theirs
             ...(markerRPr ? { rawRPr: serializeXNode(markerRPr) } : {}),
           },
           rev,
@@ -4829,9 +5232,15 @@ function extractRuns(
   const foldSimpleField = (node: XNode, link: Run['link'] | undefined, rev?: RevCtx) => {
     const instr = decodeNumericCharRefs(String(attrsOf(node)['w:instr'] ?? ''))
     const xe = XE_INSTR_RE.exec(instr)
+    const ta = TA_INSTR_RE.exec(instr)
+    const tc = TC_INSTR_RE.exec(instr)
     const ref = REF_INSTR_RE.exec(instr)
     const merge = MERGEFIELD_INSTR_RE.exec(instr)
+<<<<<<< ours
     if (!xe && !ref && !merge && !SIMPLE_INLINE_FIELD_RE.test(instr)) {
+=======
+    if (!xe && !ta && !tc && !ref && !merge && !SIMPLE_INLINE_FIELD_RE.test(instr)) {
+>>>>>>> theirs
       walk(childrenOf(node), link, rev)
       return
     }
@@ -4843,7 +5252,9 @@ function extractRuns(
       ? Object.fromEntries(Object.entries(cached[0]).filter(([k]) => !RESULT_FORMAT_SKIP.has(k)))
       : {}
     const dirty = /^(?:true|1)$/.test(String(attrsOf(node)['w:dirty'] ?? ''))
-    if (xe) pushRun({ text: '', xeTerm: xe[1] ?? xe[2] }, rev)
+    if (xe) pushRun(xeRun(xe), rev)
+    else if (ta) pushRun({ text: '', xeTerm: '', taInstr: ta[1] }, rev)
+    else if (tc) pushRun({ text: '', xeTerm: '', tcInstr: tc[1] }, rev)
     else if (ref) {
       const name = ref[1] ?? ref[2]
       pushRun(
@@ -4858,6 +5269,20 @@ function extractRuns(
         rev,
       )
     } else if (merge) {
+<<<<<<< ours
+=======
+      pushRun(
+        {
+          ...format,
+          text: text || `«${merge[1] ?? merge[2]}»`,
+          instrField: instr.trim(),
+          ...(dirty ? { fldDirty: true } : {}),
+          ...(link ? { link } : {}),
+        },
+        rev,
+      )
+    } else {
+>>>>>>> theirs
       pushRun(
         {
           ...format,
@@ -5068,6 +5493,12 @@ function buildRun(
       const dataUrl = rId ? mediaByRid.get(rId) : undefined
       if (dataUrl) {
         image = { dataUrl, xml: drawingXml }
+<<<<<<< ours
+=======
+        const svgRId = svgBlipRIdOf(drawingXml)
+        const vectorUrl = svgRId ? mediaByRid.get(svgRId) : undefined
+        if (vectorUrl) image.vectorUrl = vectorUrl
+>>>>>>> theirs
         const layers = groupPictureLayers(drawing, mediaByRid)
         if (layers) image.layers = layers
         const extentTag = /<wp:extent[^>]*\/?>/.exec(drawingXml)?.[0] ?? ''
@@ -5163,6 +5594,32 @@ function buildRun(
     // w:specVanish (style separator) keeps the run visible
     const vanishOwn = onOffOf(rPr, 'w:specVanish') === true ? undefined : onOffOf(rPr, 'w:vanish')
     if (vanishOwn !== undefined) run.vanishOwn = vanishOwn
+    const ownBdr = findChild(rPr, 'w:bdr')
+    if (ownBdr) run.bdrOwn = runBorderOf(ownBdr) ?? null
+    const fitText = findChild(rPr, 'w:fitText')
+    if (fitText) run.fitTextTwips = Math.max(0, parseInt(attrsOf(fitText)['w:val'] ?? '', 10) || 0)
+    const eaLayout = findChild(rPr, 'w:eastAsianLayout')
+    if (eaLayout) {
+      const ea = attrsOf(eaLayout)
+      const on = (v: string | undefined) => v === '1' || v === 'true' || v === 'on'
+      const id = parseInt(ea['w:id'] ?? '', 10)
+      run.eaLayout = {
+        ...(on(ea['w:combine']) ? { combine: true as const } : {}),
+        ...(on(ea['w:vert']) ? { vert: true as const } : {}),
+        ...(Number.isFinite(id) ? { id } : {}),
+      }
+    }
+    const ownLang = findChild(rPr, 'w:lang')
+    if (ownLang) {
+      const la = attrsOf(ownLang)
+      run.lang = {
+        ...(la['w:val'] ? { val: la['w:val'] } : {}),
+        ...(la['w:eastAsia'] ? { eastAsia: la['w:eastAsia'] } : {}),
+        ...(la['w:bidi'] ? { bidi: la['w:bidi'] } : {}),
+      }
+    }
+    const ownNoProof = findChild(rPr, 'w:noProof')
+    if (ownNoProof) run.noProof = !/^(0|false|off)$/.test(attrsOf(ownNoProof)['w:val'] ?? '')
     const eaLang =
       attrsOf(findChild(rPr, 'w:lang') ?? {})['w:eastAsia'] ??
       (rStyle ? styles.get(rStyle)?.display?.eastAsiaLang : undefined)
@@ -5219,10 +5676,21 @@ function buildRun(
     if (dstrike !== undefined) run.dstrike = dstrike
     const glow = w14GlowOf(rPr, theme)
     if (glow) run.glow = glow
+    const shadow = w14ShadowOf(rPr, theme)
+    if (shadow) run.textShadow = shadow
+    const reflection = w14ReflectionOf(rPr)
+    if (reflection) run.textReflection = reflection
     const position = parseInt(attrsOf(findChild(rPr, 'w:position') ?? {})['w:val'] ?? '', 10)
     if (position) run.positionHalfPoints = position
     const em = attrsOf(findChild(rPr, 'w:em') ?? {})['w:val']
     if (em && em !== 'none') run.em = em as NonNullable<Run['em']>
+    const u = attrsOf(findChild(rPr, 'w:u') ?? {})
+    if (u['w:val'] && u['w:val'] !== 'none') {
+      if (u['w:val'] !== 'single') run.underlineStyle = u['w:val']
+      if (u['w:color'] && u['w:color'] !== 'auto') run.underlineColor = stripHash(u['w:color'])
+    }
+    const otf = w14OpenTypeOf(rPr)
+    if (otf) run.otf = otf
     const rPrChange = findChild(rPr, 'w:rPrChange')
     if (rPrChange) {
       const a = attrsOf(rPrChange)
@@ -5306,6 +5774,36 @@ function buildRun(
   return run
 }
 
+<<<<<<< ours
+=======
+/** the run's own w14 OpenType elements; a key is present only when its element is */
+function w14OpenTypeOf(rPr: XNode): RunOpenType | undefined {
+  const val = (tag: string) => {
+    const node = findChild(rPr, tag)
+    return node ? (attrsOf(node)['w14:val'] ?? '') : undefined
+  }
+  const off = (v: string) => v === '0' || v === 'false' || v === 'off'
+  const out: RunOpenType = {}
+  const ligatures = val('w14:ligatures')
+  if (ligatures) out.ligatures = ligatures
+  const numForm = val('w14:numForm')
+  if (numForm === 'default' || numForm === 'lining' || numForm === 'oldStyle') out.numForm = numForm
+  const numSpacing = val('w14:numSpacing')
+  if (numSpacing === 'default' || numSpacing === 'proportional' || numSpacing === 'tabular')
+    out.numSpacing = numSpacing
+  const sets = findChild(rPr, 'w14:stylisticSets')
+  if (sets) {
+    out.stylisticSets = childrenOf(sets)
+      .filter((n) => nameOf(n) === 'w14:styleSet' && !off(attrsOf(n)['w14:val'] ?? ''))
+      .map((n) => parseInt(attrsOf(n)['w14:id'] ?? '', 10))
+      .filter((id) => id >= 1 && id <= 20)
+  }
+  const alts = val('w14:cntxtAlts')
+  if (alts !== undefined) out.cntxtAlts = !off(alts)
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
+>>>>>>> theirs
 /** shadow mode: extractRun's former direct rPr reader for the keys the resolver now owns */
 function legacyDirectRunFormat(
   rPr: XNode,
@@ -5539,12 +6037,23 @@ function extractTableModel(
     const h = findChild(findChild(tc, 'w:tcPr') ?? {}, 'w:hMerge')
     return !!h && attrsOf(h)['w:val'] !== 'restart'
   }
+<<<<<<< ours
+=======
+  // permission-range flags are resolved per w:tc in this same order (perm-ranges.ts)
+  const permFlags =
+    depth === 1 && docOffset !== undefined ? ctx.permTables?.get(docOffset) : undefined
+  let tcOrdinal = 0
+>>>>>>> theirs
   for (const [i, tr] of trs.entries()) {
     const cells: TableCell[] = []
     const tcws: Array<number | undefined> = []
     const tcs = trCells[i]
     let col = 0
     for (const [j, tc] of tcs.entries()) {
+<<<<<<< ours
+=======
+      const permEditable = permFlags?.[tcOrdinal++] === true
+>>>>>>> theirs
       const span = spanOf(tc)
       // the conditions see the visual span: legacy w:hMerge continue cells fold into
       // this one below, so a restart reaching the last column still gets lastCol
@@ -5558,11 +6067,13 @@ function extractTableModel(
       // Legacy horizontal merge: continue cells fold into the cell to their left (same effect
       // as gridSpan)
       if (cell.hMerge === 'continue' && prev) {
+        if (permEditable) prev.permEditable = true
         prev.colSpan = (prev.colSpan ?? 1) + (cell.colSpan ?? 1)
         const prevW = tcws[tcws.length - 1]
         tcws[tcws.length - 1] = prevW !== undefined && tcw !== undefined ? prevW + tcw : undefined
         continue
       }
+      if (permEditable) cell.permEditable = true
       cells.push(cell)
       tcws.push(tcw)
     }
@@ -5984,9 +6495,17 @@ function extractCell(
     const dir = attrsOf(findChild(tcPr, 'w:textDirection') ?? {})['w:val']
     if (dir === 'tbRl' || dir === 'tbRlV') cell.textDirection = 'tbRl'
     else if (dir === 'btLr' || dir === 'btLrV') cell.textDirection = 'btLr'
+<<<<<<< ours
     // table-layout: allow — a cell property carried to the model as declared
     if (boolProp(tcPr, 'w:noWrap')) cell.noWrap = true
     if (boolProp(tcPr, 'w:hideMark')) cell.hideMark = true
+=======
+    if (boolProp(tcPr, 'w:hideMark')) cell.hideMark = true
+    if (boolProp(tcPr, 'w:tcFitText')) cell.fitText = true
+    if (boolProp(tcPr, 'w:noWrap')) cell.noWrap = true
+    // table-layout: allow — cell properties carried to the model as declared
+    if (attrsOf(findChildren(tcPr, 'w:tcW').at(-1) ?? {})['w:type'] === 'pct') cell.widthPct = true
+>>>>>>> theirs
     const hMerge = findChild(tcPr, 'w:hMerge')
     if (hMerge) cell.hMerge = attrsOf(hMerge)['w:val'] === 'restart' ? 'restart' : 'continue'
     const borders = mergedBorderLinesOf(tcPr, 'w:tcBorders', false)
@@ -6114,9 +6633,22 @@ function extractCell(
       : undefined
     const emptyFont = markSized ? emptyParaMarkFont(p, pPr, ctx.themeFonts, spaceOnly) : undefined
     const markSz = cellRef ? markSizeOf(eff, pPr) : undefined
+<<<<<<< ours
+=======
+    // bookmark anchors opening in the cell paragraph (REF/TOC targets): carried
+    // on the model like the body paragraphs' names so a cell rebuild re-emits
+    // them instead of silently dropping the anchor its REF fields point at
+    const cellBookmarkNames = hasDeepChild(p, new Set(['w:bookmarkStart']))
+      ? bookmarkNamesOf(stripTextboxes(serializeXNode(p)))
+      : { bookmarks: undefined, hiddenBookmarks: undefined }
+>>>>>>> theirs
     richParas.push({
       ...format,
       ...(cellStyleId ? { styleId: cellStyleId } : {}),
+      ...(cellBookmarkNames.bookmarks ? { bookmarks: cellBookmarkNames.bookmarks } : {}),
+      ...(cellBookmarkNames.hiddenBookmarks
+        ? { hiddenBookmarks: cellBookmarkNames.hiddenBookmarks }
+        : {}),
       ...(emptySz ? { emptyRunSizeHalfPoints: emptySz } : {}),
       ...(emptyFont ? { emptyRunFontFamily: emptyFont } : {}),
       ...(markSz ? { markSizeHalfPoints: markSz } : {}),
@@ -6731,15 +7263,23 @@ async function parseCompatibilityMode(zip: JSZip): Promise<number> {
 /** settings.xml w:autoHyphenation + w:defaultTabStop (absent = Word's 720 twips) */
 async function parseLayoutSettings(zip: JSZip): Promise<{
   autoHyphenation?: boolean
+  hyphenationZoneTwips?: number
+  doNotHyphenateCaps?: boolean
+  consecutiveHyphenLimit?: number
   defaultTabStopTwips?: number
   balanceDbcsSpacing?: boolean
   useFELayout?: boolean
   compressPunctuation?: boolean
+  strictFirstAndLastChars?: boolean
   adjustLineHeightInTable?: boolean
   indentNotNumberingTabStop?: boolean
   doNotExpandShiftReturn?: boolean
   doNotUseHTMLParagraphAutoSpacing?: boolean
   overrideTableStyleFontSizeAndJustification?: boolean
+<<<<<<< ours
+=======
+  mathPr?: MathPr
+>>>>>>> theirs
 }> {
   const file = zip.file('word/settings.xml')
   if (!file) return {}
@@ -6750,13 +7290,21 @@ async function parseLayoutSettings(zip: JSZip): Promise<{
       /\sw:val="(?:1|true|on)"/.test(tag),
   )
   const tab = /<w:defaultTabStop[^>]*w:val="(-?\d+)"/.exec(xml)
+  const zone = /<w:hyphenationZone[^>]*w:val="(\d+)"/.exec(xml)
+  const hyphenLimit = /<w:consecutiveHyphenLimit[^>]*w:val="(\d+)"/.exec(xml)
   const csc = /<w:characterSpacingControl[^>]*w:val="(\w+)"/.exec(xml)
+  const mathPr = readMathPr(xml)
   return {
+    ...(mathPr ? { mathPr } : {}),
     ...(xmlFlagOn(xml, 'w:autoHyphenation') ? { autoHyphenation: true } : {}),
+    ...(zone ? { hyphenationZoneTwips: parseInt(zone[1], 10) } : {}),
+    ...(xmlFlagOn(xml, 'w:doNotHyphenateCaps') ? { doNotHyphenateCaps: true } : {}),
+    ...(hyphenLimit ? { consecutiveHyphenLimit: parseInt(hyphenLimit[1], 10) } : {}),
     ...(tab ? { defaultTabStopTwips: parseInt(tab[1], 10) } : {}),
     ...(xmlFlagOn(xml, 'w:balanceSingleByteDoubleByteWidth') ? { balanceDbcsSpacing: true } : {}),
     ...(xmlFlagOn(xml, 'w:useFELayout') ? { useFELayout: true } : {}),
     ...(csc && csc[1].startsWith('compressPunctuation') ? { compressPunctuation: true } : {}),
+    ...(xmlFlagOn(xml, 'w:strictFirstAndLastChars') ? { strictFirstAndLastChars: true } : {}),
     ...(xmlFlagOn(xml, 'w:adjustLineHeightInTable') ? { adjustLineHeightInTable: true } : {}),
     ...(xmlFlagOn(xml, 'w:doNotUseIndentAsNumberingTabStop')
       ? { indentNotNumberingTabStop: true }
@@ -6773,7 +7321,11 @@ async function parseLayoutSettings(zip: JSZip): Promise<{
 async function parseNoteProps(
   zip: JSZip,
   documentXml: string,
-): Promise<{ footnoteProps?: NoteProps; endnoteProps?: NoteProps }> {
+): Promise<{
+  footnoteProps?: NoteProps
+  endnoteProps?: NoteProps
+  settingsNoteProps: { footnote?: NoteProps; endnote?: NoteProps }
+}> {
   const settingsXml = (await zip.file('word/settings.xml')?.async('string')) ?? ''
   // a tracked w:sectPrChange embeds the previous sectPr after the live one
   const bodyXml = documentXml.replace(/<w:sectPrChange\b[\s\S]*?<\/w:sectPrChange>/g, '')
@@ -6786,42 +7338,67 @@ async function parseNoteProps(
   }
   const footnoteProps = merged('w:footnotePr')
   const endnoteProps = merged('w:endnotePr')
+  const footnote = notePropsFromXml(settingsXml, 'w:footnotePr')
+  const endnote = notePropsFromXml(settingsXml, 'w:endnotePr')
+  const settingsNoteProps = { ...(footnote ? { footnote } : {}), ...(endnote ? { endnote } : {}) }
   return {
     ...(footnoteProps ? { footnoteProps } : {}),
     ...(endnoteProps ? { endnoteProps } : {}),
+    settingsNoteProps,
   }
 }
 
 /**
- * Display numbers for note reference markers: Word counts references in body
- * order from numStart, restarting per section when numRestart=eachSect (a
- * section-break paragraph's own references still belong to the section it
- * closes; nested paragraphs in textboxes do not end it). A note is numbered
- * at its first reference; later references reuse it. Notes never referenced
- * in the body keep their part-order number; references to a missing note are
- * not counted. eachPage cannot be resolved before pagination and counts as
- * continuous.
+ * Display numbers and number formats for note reference markers. Word counts
+ * references in body order; each section numbers its own by the settings.xml
+ * properties overlaid by its sectPr's: the number is its numStart plus the
+ * running count, and the count starts over where a section says
+ * numRestart=eachSect (a section-break paragraph's own references still belong
+ * to the section it closes; nested paragraphs in textboxes do not end it). A
+ * note is numbered at its first reference; later references reuse it. Notes
+ * never referenced in the body keep their part-order number; references to a
+ * missing note are not counted. eachPage cannot be resolved before pagination
+ * and counts as continuous.
  */
 function noteNumbersOf(
   documentXml: string,
   footnotes: NoteInfo[],
   endnotes: NoteInfo[],
-  footnoteProps?: NoteProps,
-  endnoteProps?: NoteProps,
-): Map<string, number> {
-  const out = new Map<string, number>()
-  footnotes.forEach((n, i) => out.set(`footnote:${n.id}`, i + 1))
-  endnotes.forEach((n, i) => out.set(`endnote:${n.id}`, i + 1))
-  const props = { footnote: footnoteProps, endnote: endnoteProps }
+  base: { footnote?: NoteProps; endnote?: NoteProps },
+): { numbers: Map<string, number>; formats: Map<string, string> } {
+  const numbers = new Map<string, number>()
+  const formats = new Map<string, string>()
+  footnotes.forEach((n, i) => numbers.set(`footnote:${n.id}`, i + 1))
+  endnotes.forEach((n, i) => numbers.set(`endnote:${n.id}`, i + 1))
   const count = { footnote: 0, endnote: 0 }
   const numbered = new Set<string>()
+  // a section's properties sit in the sectPr that closes it, after its references
+  let pending: Array<{ kind: 'footnote' | 'endnote'; key: string }> = []
+  const closeSection = (sectPr: string) => {
+    for (const kind of ['footnote', 'endnote'] as const) {
+      const props = { ...base[kind], ...notePropsFromXml(sectPr, `w:${kind}Pr`) }
+      if (props.numRestart === 'eachSect') count[kind] = 0
+      for (const ref of pending) {
+        if (ref.kind !== kind) continue
+        numbers.set(ref.key, (props.numStart ?? 1) + count[kind]++)
+        if (props.numFmt) formats.set(ref.key, props.numFmt)
+      }
+    }
+    pending = []
+  }
   let depth = 0
   let sectDepth = -1
+  let sectPr = ''
+  let sectPrEnd = 0
   const re =
-    /<w:(footnote|endnote)Reference\b([^>]*?)\/?>|<w:sectPr[\s>]|<w:p(?:\s[^>]*)?\/?>|<\/w:p>/g
+    /<w:(footnote|endnote)Reference\b([^>]*?)\/?>|<w:sectPr[\s/>]|<w:p(?:\s[^>]*)?\/?>|<\/w:p>/g
   for (const m of documentXml.matchAll(re)) {
     if (m[0].startsWith('<w:sectPr')) {
-      sectDepth = depth
+      // the previous sectPr inside a tracked w:sectPrChange is not a section of its own
+      if (m.index < sectPrEnd) continue
+      ;[sectPr, sectPrEnd] = liveSectPrAt(documentXml, m.index)
+      if (depth === 0) closeSection(sectPr)
+      else sectDepth = depth
       continue
     }
     if (m[0].startsWith('<w:p')) {
@@ -6832,9 +7409,7 @@ function noteNumbersOf(
       depth--
       if (sectDepth > depth) {
         sectDepth = -1
-        for (const kind of ['footnote', 'endnote'] as const) {
-          if (props[kind]?.numRestart === 'eachSect') count[kind] = 0
-        }
+        closeSection(sectPr)
       }
       continue
     }
@@ -6842,11 +7417,26 @@ function noteNumbersOf(
     if (/w:customMarkFollows="(?:1|true)"/.test(m[2])) continue
     const id = /w:id="([^"]+)"/.exec(m[2])?.[1]
     const key = `${kind}:${id}`
-    if (!id || !out.has(key) || numbered.has(key)) continue
+    if (!id || !numbers.has(key) || numbered.has(key)) continue
     numbered.add(key)
-    out.set(key, (props[kind]?.numStart ?? 1) + count[kind]++)
+    pending.push({ kind, key })
   }
-  return out
+  closeSection('')
+  return { numbers, formats }
+}
+
+/**
+ * The sectPr that opens at `at` without the tracked previous one it may carry,
+ * and where the scan is past it.
+ */
+function liveSectPrAt(xml: string, at: number): [string, number] {
+  const openEnd = xml.indexOf('>', at)
+  const close = xml.indexOf('</w:sectPr>', at)
+  if (openEnd < 0 || close < 0 || xml[openEnd - 1] === '/') return ['', at]
+  const change = xml.indexOf('<w:sectPrChange', at)
+  if (change < 0 || change > close) return [xml.slice(at, close), close]
+  const changeEnd = xml.indexOf('</w:sectPrChange>', change)
+  return [xml.slice(at, change), changeEnd < 0 ? close : changeEnd]
 }
 
 /** settings.xml on/off flag such as <w:evenAndOddHeaders/> (w:val="0|false" counts as off) */
@@ -8016,10 +8606,13 @@ function noteRunOf(run: Run, base: EffectiveRPr): NoteRun {
   return out
 }
 
-async function parseSources(zip: JSZip): Promise<SourceInfo[]> {
+async function parseSources(
+  zip: JSZip,
+): Promise<{ sources: SourceInfo[]; style: CitationStyleId | null }> {
   const path = await findSourcesPart(zip)
-  if (!path) return []
-  return parseSourcesXml(await zip.file(path)!.async('string'))
+  if (!path) return { sources: [], style: null }
+  const xml = await zip.file(path)!.async('string')
+  return { sources: parseSourcesXml(xml), style: citationStyleOfXml(xml) }
 }
 
 async function parseTheme(
@@ -8095,6 +8688,7 @@ type ImageMeta = Pick<
   | 'imageRotDeg'
   | 'imageFlipH'
   | 'imageFlipV'
+  | 'imageAlt'
   | 'imageCrop'
   | 'imageEffects'
   | 'imageFillRect'
@@ -8387,6 +8981,8 @@ function imageMeta(xml: string, ctx?: BuildContext): ImageMeta {
   if (xf.rotDeg !== undefined) meta.imageRotDeg = xf.rotDeg
   if (xf.flipH) meta.imageFlipH = true
   if (xf.flipV) meta.imageFlipV = true
+  const descr = /<wp:docPr\b[^>]*?\bdescr="([^"]*)"/.exec(xml)?.[1]
+  if (descr) meta.imageAlt = decodeEntities(descr)
   const border = picBorderOf(xml)
   if (border) meta.imageBorder = border
   // source crop (a:srcRect) and fill placement (a:stretch/a:fillRect): applied
@@ -8687,6 +9283,7 @@ async function tableBlipMedia(
     }
     for (const m of slice.matchAll(/<a:blip[^>]*r:(?:embed|link)\s*=\s*["']([^"']+)["']/g))
       rIds.add(m[1])
+    for (const m of slice.matchAll(SVG_BLIP_RE)) rIds.add(m[1])
     // legacy VML pictures and OLE previews inside cells (w:pict / w:object)
     for (const m of slice.matchAll(/<v:imagedata[^>]*r:id\s*=\s*["']([^"']+)["']/g)) rIds.add(m[1])
   }
@@ -8701,6 +9298,26 @@ async function tableBlipMedia(
     if (dataUrl) out.set(rId, dataUrl)
   }
   return out
+}
+
+/** the SVG a blip names beside its bitmap (Office 2016 svgBlip extension) */
+const SVG_BLIP_RE = /<\w+:svgBlip\b[^>]*r:embed\s*=\s*["']([^"']+)["']/g
+
+/** rId of the SVG part of the first picture of a drawing, when its blip names one */
+function svgBlipRIdOf(xml: string): string | undefined {
+  const blip = /<a:blip\b[^>]*?(\/?)>/.exec(xml)
+  if (!blip || blip[1]) return undefined
+  const end = xml.indexOf('</a:blip>', blip.index)
+  if (end === -1) return undefined
+  return new RegExp(SVG_BLIP_RE.source).exec(xml.slice(blip.index, end))?.[1]
+}
+
+/** the picture of an image block as its SVG, when the file carries one */
+async function attachImageVector(block: Block, xml: string, ctx: BuildContext): Promise<void> {
+  if (block.type !== 'image' || !block.imageDataUrl) return
+  const path = relPartPath(ctx, svgBlipRIdOf(xml))
+  const url = path ? await mediaPartDataUrl(ctx.zip, path) : null
+  if (url) block.imageVectorUrl = url
 }
 
 /** drawing kinds that need a display path of their own rather than a run image */
@@ -8732,6 +9349,7 @@ async function resolveBlipMedia(xml: string, ctx: BuildContext): Promise<void> {
     ...xml.matchAll(/<a:blip[^>]*r:embed\s*=\s*["']([^"']+)["']/g),
     ...xml.matchAll(/<a:blip[^>]*r:link\s*=\s*["']([^"']+)["']/g),
     ...xml.matchAll(/<v:imagedata[^>]*r:id\s*=\s*["']([^"']+)["']/g),
+    ...xml.matchAll(SVG_BLIP_RE),
   ]
   for (const m of refs) {
     const rId = m[1]
